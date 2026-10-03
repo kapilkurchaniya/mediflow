@@ -1,28 +1,31 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Inter, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+const inter = Inter({
+  variable: "--font-inter",
   subsets: ["latin"],
+  display: "swap",
 });
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
+const mono = JetBrains_Mono({
+  variable: "--font-mono-face",
   subsets: ["latin"],
+  display: "swap",
 });
 
 export const metadata: Metadata = {
-  title: "MediFlow — Pharmacy OS",
-  description: "Production-Grade AI Pharmacy Operating System",
+  title: {
+    default: "MediFlow — Pharmacy Operating System",
+    template: "%s · MediFlow",
+  },
+  description:
+    "Billing, batch-level inventory, GST purchases and double-entry accounting for modern Indian pharmacies.",
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html
-      lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
-    >
+    <html lang="en" className={`${inter.variable} ${mono.variable} h-full`}>
       <body className="min-h-full flex flex-col">{children}</body>
     </html>
   );
