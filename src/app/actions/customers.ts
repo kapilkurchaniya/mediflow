@@ -1,0 +1,107 @@
+"use server";
+
+import { db, schema } from "@/server/db";
+import { eq, ilike, and, desc } from "drizzle-orm";
+import { getCurrentSession } from "@/server/auth";
+import { revalidatePath } from "next/cache";
+
+export async function getCustomers(searchQuery?: string) {
+  const { session } = await getCurrentSession();
+  if (!session?.tenantId) throw new Error("Unauthorized");
+
+  let query = db
+    .select()
+    .from(schema.customers)
+    .where(eq(schema.customers.tenantId, session.tenantId))
+    .orderBy(desc(schema.customers.createdAt));
+
+  const results = await query;
+
+  if (searchQuery) {
+    const lowerQuery = searchQuery.toLowerCase();
+    return results.filter(
+      (c) =>
+        c.name.toLowerCase().includes(lowerQuery) ||
+        (c.phone && c.phone.includes(lowerQuery)) ||
+        (c.email && c.email.toLowerCase().includes(lowerQuery))
+    );
+  }
+
+  return results;
+}
+
+export async function createCustomer(formData: FormData) {
+  const { session } = await getCurrentSession();
+  if (!session?.tenantId) throw new Error("Unauthorized");
+
+  const name = formData.get("name") as string;
+  const phone = formData.get("phone") as string;
+  const email = formData.get("email") as string;
+  const address = formData.get("address") as string;
+  const gstin = formData.get("gstin") as string;
+  const creditLimitStr = formData.get("creditLimit") as string;
+  const notes = formData.get("notes") as string;
+
+  if (!name) return { error: "Name is required" };
+
+  // Parse credit limit to integer paise (multiply by 100)
+  const creditLimit = creditLimitStr ? Math.round(parseFloat(creditLimitStr) * 100) : 0;
+
+  try {
+    await db.insert(schema.customers).values({
+      tenantId: session.tenantId,
+      name,
+      phone: phone || null,
+      email: email || null,
+      address: address || null,
+      gstin: gstin || null,
+      creditLimit,
+      notes: notes || null,
+      isActive: true,
+    });
+
+    revalidatePath("/dashboard/customers");
+    return { success: true };
+  } catch (err: any) {
+    return { error: err.message || "Failed to create customer" };
+  }
+}
+
+export async function updateCustomer(id: string, formData: FormData) {
+  const { session } = await getCurrentSession();
+  if (!session?.tenantId) throw new Error("Unauthorized");
+
+  const name = formData.get("name") as string;
+  const phone = formData.get("phone") as string;
+  const email = formData.get("email") as string;
+  const address = formData.get("address") as string;
+  const gstin = formData.get("gstin") as string;
+  const creditLimitStr = formData.get("creditLimit") as string;
+  const notes = formData.get("notes") as string;
+  const isActive = formData.get("isActive") === "on";
+
+  if (!name) return { error: "Name is required" };
+
+  const creditLimit = creditLimitStr ? Math.round(parseFloat(creditLimitStr) * 100) : 0;
+
+  try {
+    await db
+      .update(schema.customers)
+      .set({
+        name,
+        phone: phone || null,
+        email: email || null,
+        address: address || null,
+        gstin: gstin || null,
+        creditLimit,
+        notes: notes || null,
+        isActive,
+      })
+      .where(and(eq(schema.customers.id, id), eq(schema.customers.tenantId, session.tenantId)));
+
+    revalidatePath("/dashboard/customers");
+    return { success: true };
+  } catch (err: any) {
+    return { error: err.message || "Failed to update customer" };
+  }
+}
