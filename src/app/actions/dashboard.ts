@@ -2,11 +2,10 @@
 
 import { db, schema } from "@/server/db";
 import { eq, and, desc, sql, gte, lt } from "drizzle-orm";
-import { getCurrentSession } from "@/server/auth";
+import { getCurrentSession, requireAuth } from "@/server/auth";
 
 export async function getDashboardStats() {
-  const { session } = await getCurrentSession();
-  if (!session?.tenantId || !session?.storeId) throw new Error("Unauthorized");
+  const { session } = await requireAuth();
 
   const todayStr = new Date().toISOString().split("T")[0];
   const ninetyDaysFromNow = new Date();

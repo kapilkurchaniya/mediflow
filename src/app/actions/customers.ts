@@ -2,12 +2,11 @@
 
 import { db, schema } from "@/server/db";
 import { eq, ilike, and, desc } from "drizzle-orm";
-import { getCurrentSession } from "@/server/auth";
+import { getCurrentSession, requireAuth } from "@/server/auth";
 import { revalidatePath } from "next/cache";
 
 export async function getCustomers(searchQuery?: string) {
-  const { session } = await getCurrentSession();
-  if (!session?.tenantId) throw new Error("Unauthorized");
+  const { session } = await requireAuth();
 
   let query = db
     .select()
@@ -31,8 +30,7 @@ export async function getCustomers(searchQuery?: string) {
 }
 
 export async function createCustomer(formData: FormData) {
-  const { session } = await getCurrentSession();
-  if (!session?.tenantId) throw new Error("Unauthorized");
+  const { session } = await requireAuth();
 
   const name = formData.get("name") as string;
   const phone = formData.get("phone") as string;
@@ -68,8 +66,7 @@ export async function createCustomer(formData: FormData) {
 }
 
 export async function updateCustomer(id: string, formData: FormData) {
-  const { session } = await getCurrentSession();
-  if (!session?.tenantId) throw new Error("Unauthorized");
+  const { session } = await requireAuth();
 
   const name = formData.get("name") as string;
   const phone = formData.get("phone") as string;

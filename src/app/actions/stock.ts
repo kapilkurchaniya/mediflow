@@ -2,16 +2,17 @@
 
 import { db, schema } from "@/server/db";
 import { eq, and, desc, sql, lte } from "drizzle-orm";
-import { getCurrentSession } from "@/server/auth";
+import { getCurrentSession, requireAuth } from "@/server/auth";
 import { recordStockMovement } from "@/server/domain/stock";
 import { revalidatePath } from "next/cache";
 import { addDays, format } from "date-fns";
 
 export async function getBatches(nearExpiryOnly = false) {
-  const { session } = await getCurrentSession();
-  if (!session?.tenantId || !session?.storeId) throw new Error("Unauthorized or Store not selected");
+  const { session, user } = await requireAuth();
 
-  let query = db
+  const ninetyDaysFromNow = nearExpiryOnly ? format(addDays(new Date(), 90), "yyyy-MM-dd") : undefined;
+
+  const query = db
     .select({
       batch: schema.batches,
       medicine: schema.medicines,
@@ -21,31 +22,17 @@ export async function getBatches(nearExpiryOnly = false) {
     .where(
       and(
         eq(schema.batches.tenantId, session.tenantId),
-        eq(schema.batches.storeId, session.storeId)
+        eq(schema.batches.storeId, session.storeId),
+        nearExpiryOnly ? lte(schema.batches.expiryDate, ninetyDaysFromNow!) : undefined
       )
     );
-
-  if (nearExpiryOnly) {
-    // 90 days from now
-    const ninetyDaysFromNow = format(addDays(new Date(), 90), "yyyy-MM-dd");
-    query = query.where(
-      and(
-        eq(schema.batches.tenantId, session.tenantId),
-        eq(schema.batches.storeId, session.storeId),
-        lte(schema.batches.expiryDate, ninetyDaysFromNow)
-      )
-    ) as any;
-  }
 
   const results = await query.orderBy(schema.batches.expiryDate);
   return results;
 }
 
 export async function addOpeningStock(formData: FormData) {
-  const { session, user } = await getCurrentSession();
-  if (!session?.tenantId || !session?.storeId || !user) {
-    throw new Error("Unauthorized or Store not selected");
-  }
+  const { session, user } = await requireAuth();
 
   const medicineId = formData.get("medicineId") as string;
   const batchNo = formData.get("batchNo") as string;
@@ -75,7 +62,7 @@ export async function addOpeningStock(formData: FormData) {
         .from(schema.batches)
         .where(
           and(
-            eq(schema.batches.storeId, session.storeId!),
+            eq(schema.batches.storeId, session.storeId),
             eq(schema.batches.medicineId, medicineId),
             eq(schema.batches.batchNo, batchNo)
           )
@@ -131,10 +118,7 @@ export async function addOpeningStock(formData: FormData) {
 }
 
 export async function adjustBatchStock(formData: FormData) {
-  const { session, user } = await getCurrentSession();
-  if (!session?.tenantId || !session?.storeId || !user) {
-    throw new Error("Unauthorized");
-  }
+  const { session, user } = await requireAuth();
 
   const batchId = formData.get("batchId") as string;
   const qtyChangeStr = formData.get("qtyChange") as string;

@@ -2,7 +2,7 @@
 
 import { db, schema } from "@/server/db";
 import { eq, and, sql } from "drizzle-orm";
-import { getCurrentSession } from "@/server/auth";
+import { getCurrentSession, requireAuth } from "@/server/auth";
 import { recordStockMovement } from "@/server/domain/stock";
 import { revalidatePath } from "next/cache";
 
@@ -20,8 +20,7 @@ export type ImportRow = {
 };
 
 export async function processInventoryImport(rows: ImportRow[]) {
-  const { session, user } = await getCurrentSession();
-  if (!session?.tenantId || !session?.storeId) throw new Error("Unauthorized");
+  const { session, user } = await requireAuth();
 
   if (!rows || rows.length === 0) return { error: "No data to import" };
 
@@ -48,11 +47,40 @@ export async function processInventoryImport(rows: ImportRow[]) {
           medicineId = existingMed.id;
         } else {
           // Create new medicine
+          // 1.5 Resolve Manufacturer and Category
+          let manufacturerId: string | null = null;
+          if (row.manufacturer && row.manufacturer !== "Unknown") {
+            const [m] = await tx.select().from(schema.manufacturers)
+              .where(and(eq(schema.manufacturers.tenantId, session.tenantId), sql`lower(${schema.manufacturers.name}) = lower(${row.manufacturer})`));
+            if (m) {
+              manufacturerId = m.id;
+            } else {
+              const [newM] = await tx.insert(schema.manufacturers)
+                .values({ tenantId: session.tenantId, name: row.manufacturer })
+                .returning({ id: schema.manufacturers.id });
+              manufacturerId = newM.id;
+            }
+          }
+
+          let categoryId: string | null = null;
+          if (row.category && row.category !== "General") {
+            const [c] = await tx.select().from(schema.categories)
+              .where(and(eq(schema.categories.tenantId, session.tenantId), sql`lower(${schema.categories.name}) = lower(${row.category})`));
+            if (c) {
+              categoryId = c.id;
+            } else {
+              const [newC] = await tx.insert(schema.categories)
+                .values({ tenantId: session.tenantId, name: row.category })
+                .returning({ id: schema.categories.id });
+              categoryId = newC.id;
+            }
+          }
+
           const [newMed] = await tx.insert(schema.medicines).values({
             tenantId: session.tenantId,
             name: row.medicineName,
-            manufacturer: row.manufacturer || "Unknown",
-            category: row.category || "General",
+            manufacturerId,
+            categoryId,
             mrp: row.mrp,
             purchasePrice: row.purchaseRate,
             salePrice: row.saleRate,
