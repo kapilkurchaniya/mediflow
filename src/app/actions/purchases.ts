@@ -2,13 +2,12 @@
 
 import { db, schema } from "@/server/db";
 import { eq, and, desc } from "drizzle-orm";
-import { getCurrentSession } from "@/server/auth";
+import { getCurrentSession, requireAuth } from "@/server/auth";
 import { recordStockMovement } from "@/server/domain/stock";
 import { revalidatePath } from "next/cache";
 
 export async function getPurchases() {
-  const { session } = await getCurrentSession();
-  if (!session?.tenantId || !session?.storeId) throw new Error("Unauthorized");
+  const { session, user } = await requireAuth();
 
   return db
     .select({
@@ -45,10 +44,7 @@ export async function createPurchaseInvoice(
   invoiceDate: string,
   items: PurchaseItemInput[]
 ) {
-  const { session, user } = await getCurrentSession();
-  if (!session?.tenantId || !session?.storeId || !user) {
-    throw new Error("Unauthorized");
-  }
+  const { session, user } = await requireAuth();
 
   if (items.length === 0) return { error: "No items added" };
 

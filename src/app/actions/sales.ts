@@ -1,15 +1,14 @@
 "use server";
 
 import { db, schema } from "@/server/db";
-import { eq, and, desc, gt, ilike, or } from "drizzle-orm";
-import { getCurrentSession } from "@/server/auth";
+import { eq, and, desc, gt, ilike, or, sql, inArray } from "drizzle-orm";
+import { getCurrentSession, requireAuth } from "@/server/auth";
 import { recordStockMovement } from "@/server/domain/stock";
 import { revalidatePath } from "next/cache";
 import { sendWhatsAppReceipt } from "@/server/whatsapp";
 
 export async function getSales() {
-  const { session } = await getCurrentSession();
-  if (!session?.tenantId || !session?.storeId) throw new Error("Unauthorized");
+  const { session, user } = await requireAuth();
 
   return db
     .select({
@@ -29,8 +28,7 @@ export async function getSales() {
 
 // POS Search: Returns medicines with their nearest expiry batches that have stock
 export async function searchPosItems(query: string) {
-  const { session } = await getCurrentSession();
-  if (!session?.tenantId || !session?.storeId) throw new Error("Unauthorized");
+  const { session, user } = await requireAuth();
   
   if (!query || query.length < 2) return [];
 
@@ -63,7 +61,8 @@ export async function searchPosItems(query: string) {
     .where(
       and(
         eq(schema.batches.storeId, session.storeId),
-        gt(schema.batches.qtyOnHand, 0)
+        gt(schema.batches.qtyOnHand, 0),
+        inArray(schema.batches.medicineId, medicineIds)
       )
     )
     .orderBy(schema.batches.expiryDate);
@@ -95,20 +94,17 @@ export async function createSaleInvoice(
   paymentMethod: string,
   amountPaid: number // paise
 ) {
-  const { session, user } = await getCurrentSession();
-  if (!session?.tenantId || !session?.storeId || !user) {
-    throw new Error("Unauthorized");
-  }
+  const { session, user } = await requireAuth();
 
   if (items.length === 0) return { error: "No items to bill" };
 
   try {
     let customerPhone = "";
-    if (customerId) {
+    if (customerId?.trim()) {
       const [customer] = await db
         .select({ phone: schema.customers.phone })
         .from(schema.customers)
-        .where(eq(schema.customers.id, customerId));
+        .where(eq(schema.customers.id, customerId.trim()));
       if (customer?.phone) customerPhone = customer.phone;
     }
 
@@ -127,7 +123,7 @@ export async function createSaleInvoice(
         .innerJoin(schema.medicines, eq(schema.batches.medicineId, schema.medicines.id))
         .where(
           and(
-            eq(schema.batches.storeId, session.storeId!),
+            eq(schema.batches.storeId, session.storeId),
             // Workaround for whereIn
             sql`${schema.batches.id} = ANY(ARRAY[${sql.join(batchIds, sql`, `)}]::uuid[])`
           )
@@ -151,12 +147,9 @@ export async function createSaleInvoice(
         const discountAmount = Math.round((itemGross * item.discountBp) / 10000);
         const taxableAmount = itemGross - discountAmount;
         
-        // Reverse calculate tax based on inclusive MRP/Sale Rate (common in retail)
-        // If the rate is 100 and GST is 12%, taxable is 100 / 1.12
-        // Assuming the passed rate is INCUSIVE of tax for retail POS:
-        const gstRateMultiplier = 1 + (medicine.gstRateBp / 10000);
-        const actualTaxable = Math.round(taxableAmount / gstRateMultiplier);
-        const taxAmount = taxableAmount - actualTaxable;
+        // Calculate 5% exclusive GST as requested
+        const actualTaxable = taxableAmount;
+        const taxAmount = Math.round(actualTaxable * 0.05);
 
         grossAmount += itemGross;
         totalDiscountAmount += discountAmount;
@@ -169,11 +162,11 @@ export async function createSaleInvoice(
           discountAmount,
           taxableAmount: actualTaxable,
           taxAmount,
-          totalAmount: taxableAmount,
+          totalAmount: actualTaxable + taxAmount,
         };
       });
 
-      const totalInvoiceAmount = grossAmount - totalDiscountAmount; // Since rate is inclusive
+      const totalInvoiceAmount = grossAmount - totalDiscountAmount + totalTaxAmount; // Adding 5% exclusive tax
       const amountDue = totalInvoiceAmount - amountPaid;
 
       // 2. Generate Invoice Number
@@ -186,13 +179,13 @@ export async function createSaleInvoice(
         tenantId: session.tenantId,
         storeId: session.storeId,
         invoiceNo,
-        customerId: customerId || null,
-        doctorName: doctorName || null,
+        customerId: customerId?.trim() ? customerId.trim() : null,
+        doctorName: doctorName?.trim() ? doctorName.trim() : null,
         grossAmount,
         discountAmount: totalDiscountAmount,
-        taxableAmount: grossAmount - totalDiscountAmount - totalTaxAmount,
-        cgst: totalTaxAmount / 2,
-        sgst: totalTaxAmount / 2,
+        taxableAmount: grossAmount - totalDiscountAmount,
+        cgst: Math.floor(totalTaxAmount / 2),
+        sgst: Math.ceil(totalTaxAmount / 2),
         igst: 0,
         totalAmount: totalInvoiceAmount,
         paidAmount: amountPaid,
@@ -235,8 +228,8 @@ export async function createSaleInvoice(
           discountAmount: item.discountAmount,
           taxableAmount: item.taxableAmount,
           gstRateBp: item.medicine.gstRateBp,
-          cgst: item.taxAmount / 2,
-          sgst: item.taxAmount / 2,
+          cgst: Math.floor(item.taxAmount / 2),
+          sgst: Math.ceil(item.taxAmount / 2),
           igst: 0,
           totalAmount: item.totalAmount,
           unitCost: item.batch.purchaseRate,
@@ -267,4 +260,16 @@ export async function createSaleInvoice(
   } catch (err: any) {
     return { error: err.message || "Failed to create sale invoice" };
   }
+}
+
+
+export async function getSaleById(id: string) {
+  const { session } = await requireAuth();
+  const [sale] = await db.select().from(schema.sales).where(and(eq(schema.sales.id, id), eq(schema.sales.tenantId, session.tenantId)));
+  if (!sale) return null;
+  const items = await db.select().from(schema.saleItems).where(eq(schema.saleItems.saleId, id));
+  const [customer] = sale.customerId ? await db.select().from(schema.customers).where(eq(schema.customers.id, sale.customerId)) : [null];
+  const [store] = await db.select().from(schema.stores).where(eq(schema.stores.id, sale.storeId));
+  const [tenant] = await db.select().from(schema.tenants).where(eq(schema.tenants.id, sale.tenantId));
+  return { sale, items, customer, store, tenant };
 }

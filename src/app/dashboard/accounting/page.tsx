@@ -1,11 +1,10 @@
 import { getTrialBalance, getJournalLines } from "@/app/actions/accounting";
-import { BookOpen, IndianRupee, FileText } from "lucide-react";
+import { BookOpenText, Scale, ArrowDownLeft, ArrowUpRight, CheckCircle2, AlertTriangle } from "lucide-react";
 import { format } from "date-fns";
-import Link from "next/link";
+import { PageHeader, StatCard, EmptyState } from "@/app/components/ui";
+import { formatINR } from "@/lib/format";
 
-export const metadata = {
-  title: "Accounting - MediFlow",
-};
+export const metadata = { title: "Accounting" };
 
 export default async function AccountingPage() {
   const trialBalance = await getTrialBalance();
@@ -13,104 +12,129 @@ export default async function AccountingPage() {
 
   const totalDebit = trialBalance.reduce((sum, row) => sum + row.totalDebit, 0);
   const totalCredit = trialBalance.reduce((sum, row) => sum + row.totalCredit, 0);
+  const balanced = totalDebit === totalCredit;
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900">Accounting Ledger</h1>
-          <p className="text-slate-500 mt-1">Double-entry Trial Balance and recent journal entries.</p>
-        </div>
-      </div>
+    <div className="page space-y-6">
+      <PageHeader
+        title="Accounting"
+        description="Double-entry trial balance and day book, posted automatically from sales and purchases."
+      />
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Trial Balance */}
-        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden flex flex-col h-[600px]">
-          <div className="p-4 border-b border-slate-100 bg-slate-50 flex items-center justify-between">
-            <h3 className="font-semibold text-slate-800 flex items-center">
-              <BookOpen className="h-5 w-5 mr-2 text-brand-600" />
-              Trial Balance
-            </h3>
+      <section className="grid grid-cols-1 gap-4 md:grid-cols-3">
+        <StatCard label="Total debits" value={formatINR(totalDebit)} icon={ArrowDownLeft} tone="info" />
+        <StatCard label="Total credits" value={formatINR(totalCredit)} icon={ArrowUpRight} tone="neutral" />
+        <StatCard
+          label="Ledger status"
+          value={balanced ? "Balanced" : "Out of balance"}
+          icon={balanced ? CheckCircle2 : AlertTriangle}
+          tone={balanced ? "brand" : "danger"}
+          footnote={balanced ? "Debits equal credits" : `Difference ${formatINR(Math.abs(totalDebit - totalCredit))}`}
+        />
+      </section>
+
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-5">
+        {/* Trial balance */}
+        <div className="card overflow-hidden xl:col-span-3 flex flex-col max-h-[640px]">
+          <div className="card-header">
+            <div className="flex items-center gap-2">
+              <Scale className="h-4 w-4 text-ink-400" />
+              <h2 className="card-title">Trial balance</h2>
+            </div>
+            <span className="text-[12.5px] text-ink-500">As of {format(new Date(), "d MMM yyyy")}</span>
           </div>
-          
-          <div className="flex-1 overflow-y-auto p-4">
-            {trialBalance.length === 0 ? (
-              <div className="h-full flex flex-col items-center justify-center text-slate-400">
-                <FileText className="h-10 w-10 mb-4 opacity-20" />
-                <p>No account balances found.</p>
-              </div>
-            ) : (
-              <table className="w-full text-left text-sm">
-                <thead className="text-slate-500 border-b border-slate-100">
+
+          {trialBalance.length === 0 ? (
+            <EmptyState icon={Scale} title="No balances yet" description="Balances appear once the first sale or purchase is posted." compact />
+          ) : (
+            <div className="flex-1 overflow-y-auto">
+              <table className="data-table">
+                <thead>
                   <tr>
-                    <th className="py-3 font-medium">Account</th>
-                    <th className="py-3 font-medium text-right text-green-600">Debit (Dr)</th>
-                    <th className="py-3 font-medium text-right text-red-600">Credit (Cr)</th>
+                    <th>Code</th>
+                    <th>Account</th>
+                    <th>Type</th>
+                    <th className="text-right">Debit</th>
+                    <th className="text-right">Credit</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-50">
+                <tbody>
                   {trialBalance.map((row) => (
-                    <tr key={row.id} className="hover:bg-slate-50">
-                      <td className="py-3">
-                        <div className="font-medium text-slate-900">{row.name}</div>
-                        <div className="text-xs text-slate-400 capitalize">{row.type} • {row.code}</div>
+                    <tr key={row.id}>
+                      <td className="font-mono text-[12px] text-ink-500">{row.code}</td>
+                      <td className="cell-primary">{row.name}</td>
+                      <td>
+                        <span className="badge badge-neutral capitalize">{row.type}</span>
                       </td>
-                      <td className="py-3 text-right font-medium text-slate-700">
-                        {row.balance > 0 ? `₹${(Math.abs(row.balance) / 100).toFixed(2)}` : "-"}
+                      <td className="text-right num text-ink-900">
+                        {row.balance > 0 ? formatINR(Math.abs(row.balance)) : <span className="text-ink-300">—</span>}
                       </td>
-                      <td className="py-3 text-right font-medium text-slate-700">
-                        {row.balance < 0 ? `₹${(Math.abs(row.balance) / 100).toFixed(2)}` : "-"}
+                      <td className="text-right num text-ink-900">
+                        {row.balance < 0 ? formatINR(Math.abs(row.balance)) : <span className="text-ink-300">—</span>}
                       </td>
                     </tr>
                   ))}
                 </tbody>
-                <tfoot className="border-t-2 border-slate-200 font-bold text-slate-900">
-                  <tr>
-                    <td className="py-4">Total</td>
-                    <td className="py-4 text-right">₹{(totalDebit / 100).toFixed(2)}</td>
-                    <td className="py-4 text-right">₹{(totalCredit / 100).toFixed(2)}</td>
+                <tfoot className="sticky bottom-0 bg-ink-50">
+                  <tr className="border-t-2 border-ink-200">
+                    <td colSpan={3} className="px-4 py-3 text-[12px] font-semibold uppercase tracking-wide text-ink-600">
+                      Total
+                    </td>
+                    <td className="px-4 py-3 text-right font-semibold text-ink-900 num">{formatINR(totalDebit)}</td>
+                    <td className="px-4 py-3 text-right font-semibold text-ink-900 num">{formatINR(totalCredit)}</td>
                   </tr>
                 </tfoot>
               </table>
-            )}
-          </div>
+            </div>
+          )}
         </div>
 
-        {/* Daybook / Recent Journals */}
-        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden flex flex-col h-[600px]">
-          <div className="p-4 border-b border-slate-100 bg-slate-50 flex items-center justify-between">
-            <h3 className="font-semibold text-slate-800 flex items-center">
-              <FileText className="h-5 w-5 mr-2 text-indigo-600" />
-              Recent Journal Lines (Daybook)
-            </h3>
+        {/* Day book */}
+        <div className="card overflow-hidden xl:col-span-2 flex flex-col max-h-[640px]">
+          <div className="card-header">
+            <div className="flex items-center gap-2">
+              <BookOpenText className="h-4 w-4 text-ink-400" />
+              <h2 className="card-title">Day book</h2>
+            </div>
+            <span className="text-[12.5px] text-ink-500">Recent postings</span>
           </div>
-          
-          <div className="flex-1 overflow-y-auto p-4">
-            {journalLines.length === 0 ? (
-              <div className="h-full flex flex-col items-center justify-center text-slate-400">
-                <p>No journal entries posted yet.</p>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {journalLines.map(({ line, entry, account }) => (
-                  <div key={line.id} className="p-3 border border-slate-100 rounded-xl hover:border-slate-200 transition-colors">
-                    <div className="flex justify-between items-start mb-2">
-                      <div className="text-sm font-semibold text-slate-900">{account.name}</div>
-                      <div className="text-xs text-slate-500">{format(new Date(entry.entryDate), "dd MMM")}</div>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <div className="text-xs text-slate-500 truncate max-w-[200px]" title={entry.narration}>
-                        {entry.narration} ({entry.entryNo})
+
+          {journalLines.length === 0 ? (
+            <EmptyState icon={BookOpenText} title="No journal entries" description="Entries post automatically when you bill or receive stock." compact />
+          ) : (
+            <ul className="flex-1 overflow-y-auto divide-y divide-ink-100">
+              {journalLines.map(({ line, entry, account }) => {
+                const isDebit = (line.debit ?? 0) > 0;
+                return (
+                  <li key={line.id} className="flex items-start gap-3 px-5 py-3 transition-colors hover:bg-ink-50/70">
+                    <span
+                      className={`mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded text-[10px] font-bold ${
+                        isDebit ? "bg-sky-50 text-sky-700" : "bg-ink-100 text-ink-600"
+                      }`}
+                    >
+                      {isDebit ? "Dr" : "Cr"}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-baseline justify-between gap-3">
+                        <p className="truncate text-[13px] font-medium text-ink-900">{account.name}</p>
+                        <p className="shrink-0 text-[13px] font-medium text-ink-900 num">
+                          {formatINR(isDebit ? line.debit : line.credit)}
+                        </p>
                       </div>
-                      <div className={`text-sm font-bold ${line.debit! > 0 ? "text-green-600" : "text-red-600"}`}>
-                        {line.debit! > 0 ? `+ ₹${(line.debit! / 100).toFixed(2)}` : `- ₹${(line.credit! / 100).toFixed(2)}`}
+                      <div className="mt-0.5 flex items-center justify-between gap-3 text-[12px] text-ink-500">
+                        <p className="truncate" title={entry.narration}>
+                          {entry.narration}
+                        </p>
+                        <p className="shrink-0 num">
+                          <span className="font-mono">{entry.entryNo}</span> · {format(new Date(entry.entryDate), "d MMM")}
+                        </p>
                       </div>
                     </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
         </div>
       </div>
     </div>
