@@ -2,14 +2,13 @@
 
 import { db, schema } from "@/server/db";
 import { eq, desc, ilike, or } from "drizzle-orm";
-import { getCurrentSession } from "@/server/auth";
+import { getCurrentSession, requireAuth } from "@/server/auth";
 import { revalidatePath } from "next/cache";
 
 // --- Categories ---
 
 export async function getCategories() {
-  const { session } = await getCurrentSession();
-  if (!session?.tenantId) throw new Error("Unauthorized");
+  const { session } = await requireAuth();
 
   return db
     .select()
@@ -19,8 +18,7 @@ export async function getCategories() {
 }
 
 export async function createCategory(name: string) {
-  const { session } = await getCurrentSession();
-  if (!session?.tenantId) throw new Error("Unauthorized");
+  const { session } = await requireAuth();
 
   try {
     const [category] = await db
@@ -39,8 +37,7 @@ export async function createCategory(name: string) {
 // --- Manufacturers ---
 
 export async function getManufacturers() {
-  const { session } = await getCurrentSession();
-  if (!session?.tenantId) throw new Error("Unauthorized");
+  const { session } = await requireAuth();
 
   return db
     .select()
@@ -50,8 +47,7 @@ export async function getManufacturers() {
 }
 
 export async function createManufacturer(name: string) {
-  const { session } = await getCurrentSession();
-  if (!session?.tenantId) throw new Error("Unauthorized");
+  const { session } = await requireAuth();
 
   try {
     const [manufacturer] = await db
@@ -70,8 +66,7 @@ export async function createManufacturer(name: string) {
 // --- Medicines ---
 
 export async function getMedicines(searchQuery?: string) {
-  const { session } = await getCurrentSession();
-  if (!session?.tenantId) throw new Error("Unauthorized");
+  const { session } = await requireAuth();
 
   let query = db
     .select({
@@ -102,8 +97,7 @@ export async function getMedicines(searchQuery?: string) {
 }
 
 export async function createMedicine(formData: FormData) {
-  const { session } = await getCurrentSession();
-  if (!session?.tenantId) throw new Error("Unauthorized");
+  const { session } = await requireAuth();
 
   const name = formData.get("name") as string;
   const genericName = formData.get("genericName") as string;
