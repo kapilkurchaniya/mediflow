@@ -10,6 +10,7 @@ export function AIAssistant() {
   const [isOpen, setIsOpen] = useState(false);
   const [isListening, setIsListening] = useState(false);
   const [transcript, setTranscript] = useState<string | null>(null);
+  const [recognition, setRecognition] = useState<any>(null);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -21,21 +22,54 @@ export function AIAssistant() {
       }
     };
     window.addEventListener("keydown", onKey);
+
+    // Initialize speech recognition
+    const SpeechRecognition = window.SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (SpeechRecognition) {
+      const rec = new SpeechRecognition();
+      rec.continuous = false;
+      rec.interimResults = false;
+      rec.lang = "en-US";
+      
+      rec.onresult = (event: any) => {
+        const text = event.results[0][0].transcript;
+        setTranscript(text);
+        setIsListening(false);
+        // Here we could trigger a server action with the transcript
+      };
+      
+      rec.onerror = (event: any) => {
+        setTranscript("Error: " + event.error);
+        setIsListening(false);
+      };
+      
+      rec.onend = () => {
+        setIsListening(false);
+      };
+      
+      setRecognition(rec);
+    }
+
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
   const toggleListen = () => {
     if (!isListening) {
-      setIsListening(true);
-      setTranscript("Listening…");
-      // Mock processing delay
-      setTimeout(() => {
-        setTranscript("Added Paracetamol 500mg to the current bill.");
-        setIsListening(false);
-      }, 3000);
+      if (recognition) {
+        try {
+          recognition.start();
+          setIsListening(true);
+          setTranscript("Listening…");
+        } catch (e) {
+          console.error(e);
+          setTranscript("Failed to start mic");
+        }
+      } else {
+        setTranscript("Voice not supported in this browser.");
+      }
     } else {
+      if (recognition) recognition.stop();
       setIsListening(false);
-      setTranscript(null);
     }
   };
 

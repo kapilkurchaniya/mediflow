@@ -2,12 +2,11 @@
 
 import { db, schema } from "@/server/db";
 import { eq, and, desc } from "drizzle-orm";
-import { getCurrentSession } from "@/server/auth";
+import { getCurrentSession, requireAuth } from "@/server/auth";
 import { revalidatePath } from "next/cache";
 
 export async function getSuppliers(searchQuery?: string) {
-  const { session } = await getCurrentSession();
-  if (!session?.tenantId) throw new Error("Unauthorized");
+  const { session } = await requireAuth();
 
   const query = db
     .select()
@@ -32,8 +31,7 @@ export async function getSuppliers(searchQuery?: string) {
 }
 
 export async function createSupplier(formData: FormData) {
-  const { session } = await getCurrentSession();
-  if (!session?.tenantId) throw new Error("Unauthorized");
+  const { session } = await requireAuth();
 
   const name = formData.get("name") as string;
   const contactPerson = formData.get("contactPerson") as string;
