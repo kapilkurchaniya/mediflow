@@ -24,8 +24,32 @@ export async function loginAction(prevState: any, formData: FormData) {
     return { error: "Invalid email or password" };
   }
 
+  // Fetch user's membership to get tenantId and storeId
+  const memberships = await db
+    .select()
+    .from(schema.memberships)
+    .where(eq(schema.memberships.userId, user.id))
+    .limit(1);
+
+  let tenantId = null;
+  let storeId = null;
+
+  if (memberships.length > 0) {
+    tenantId = memberships[0].tenantId;
+    // Get first store of this tenant
+    const stores = await db
+      .select()
+      .from(schema.stores)
+      .where(eq(schema.stores.tenantId, tenantId))
+      .limit(1);
+    
+    if (stores.length > 0) {
+      storeId = stores[0].id;
+    }
+  }
+
   const token = (await import("@/server/auth")).generateSessionToken();
-  await createSession(token, user.id);
+  await createSession(token, user.id, tenantId, storeId);
   await setSessionCookie(token);
 
   // Redirect to dashboard
