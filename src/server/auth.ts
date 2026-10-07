@@ -1,6 +1,6 @@
 import { cookies } from "next/headers";
 import { db, schema } from "./db";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
 
@@ -44,20 +44,23 @@ export async function createSession(
   return sessionId;
 }
 
+const validateSessionQuery = db
+  .select({
+    session: schema.sessions,
+    user: schema.users,
+  })
+  .from(schema.sessions)
+  .innerJoin(schema.users, eq(schema.sessions.userId, schema.users.id))
+  .where(eq(schema.sessions.id, sql.placeholder("sessionId")))
+  .prepare("validateSessionQuery");
+
 /**
  * Validates the session token. Extends expiration if needed.
  */
 export async function validateSessionToken(token: string) {
   const sessionId = hashSessionToken(token);
 
-  const result = await db
-    .select({
-      session: schema.sessions,
-      user: schema.users,
-    })
-    .from(schema.sessions)
-    .innerJoin(schema.users, eq(schema.sessions.userId, schema.users.id))
-    .where(eq(schema.sessions.id, sessionId));
+  const result = await validateSessionQuery.execute({ sessionId });
 
   if (result.length === 0) {
     return { session: null, user: null };
@@ -107,9 +110,10 @@ export async function getCurrentSession() {
  */
 export async function requireAuth() {
   const { session, user } = await getCurrentSession();
-  if (!session?.tenantId || !session?.storeId || !user) {
+  if (!session || !session.tenantId || !session.storeId || !user) {
     const { redirect } = await import("next/navigation");
     redirect("/login");
+    throw new Error("Unauthorized");
   }
   return {
     session: {

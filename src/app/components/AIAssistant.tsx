@@ -24,7 +24,7 @@ export function AIAssistant() {
     window.addEventListener("keydown", onKey);
 
     // Initialize speech recognition
-    const SpeechRecognition = window.SpeechRecognition || (window as any).webkitSpeechRecognition;
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (SpeechRecognition) {
       const rec = new SpeechRecognition();
       rec.continuous = false;

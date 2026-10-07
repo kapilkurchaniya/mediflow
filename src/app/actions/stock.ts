@@ -31,28 +31,31 @@ export async function getBatches(nearExpiryOnly = false) {
   return results;
 }
 
+import { z } from "zod";
+
+const openingStockSchema = z.object({
+  medicineId: z.string().min(1, "Medicine is required"),
+  batchNo: z.string().min(1, "Batch number is required"),
+  expiryDate: z.string().min(1, "Expiry date is required"),
+  qty: z.coerce.number().int().min(1, "Quantity must be greater than 0"),
+  purchaseRate: z.coerce.number().optional().default(0),
+  mrp: z.coerce.number().optional().default(0),
+  saleRate: z.coerce.number().optional().default(0),
+});
+
 export async function addOpeningStock(formData: FormData) {
   const { session, user } = await requireAuth();
 
-  const medicineId = formData.get("medicineId") as string;
-  const batchNo = formData.get("batchNo") as string;
-  const expiryDate = formData.get("expiryDate") as string; // YYYY-MM-DD
+  const parsed = openingStockSchema.safeParse(Object.fromEntries(formData.entries()));
   
-  const qtyStr = formData.get("qty") as string;
-  const purchaseRateStr = formData.get("purchaseRate") as string;
-  const mrpStr = formData.get("mrp") as string;
-  const saleRateStr = formData.get("saleRate") as string;
-
-  if (!medicineId || !batchNo || !expiryDate || !qtyStr) {
-    return { error: "Missing required fields" };
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0].message };
   }
 
-  const qty = parseInt(qtyStr, 10);
-  if (qty <= 0) return { error: "Quantity must be greater than 0" };
-
-  const purchaseRate = purchaseRateStr ? Math.round(parseFloat(purchaseRateStr) * 100) : 0;
-  const mrp = mrpStr ? Math.round(parseFloat(mrpStr) * 100) : 0;
-  const saleRate = saleRateStr ? Math.round(parseFloat(saleRateStr) * 100) : mrp;
+  const { medicineId, batchNo, expiryDate, qty } = parsed.data;
+  const purchaseRate = Math.round(parsed.data.purchaseRate * 100);
+  const mrp = Math.round(parsed.data.mrp * 100);
+  const saleRate = parsed.data.saleRate ? Math.round(parsed.data.saleRate * 100) : mrp;
 
   try {
     await db.transaction(async (tx) => {
@@ -117,22 +120,22 @@ export async function addOpeningStock(formData: FormData) {
   }
 }
 
+const adjustBatchStockSchema = z.object({
+  batchId: z.string().min(1, "Batch is required"),
+  qtyChange: z.coerce.number().refine(val => val !== 0, "Quantity change cannot be 0"),
+  reason: z.enum(["damage", "expired", "adjustment"]),
+  note: z.string().optional(),
+});
+
 export async function adjustBatchStock(formData: FormData) {
   const { session, user } = await requireAuth();
 
-  const batchId = formData.get("batchId") as string;
-  const qtyChangeStr = formData.get("qtyChange") as string;
-  const reason = formData.get("reason") as "damage" | "expired" | "adjustment";
-  const note = formData.get("note") as string;
-
-  if (!batchId || !qtyChangeStr || !reason) {
-    return { error: "Missing required fields" };
+  const parsed = adjustBatchStockSchema.safeParse(Object.fromEntries(formData.entries()));
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0].message };
   }
 
-  const qtyChange = parseInt(qtyChangeStr, 10);
-  if (qtyChange === 0) {
-    return { error: "Quantity change cannot be 0" };
-  }
+  const { batchId, qtyChange, reason, note } = parsed.data;
 
   try {
     await db.transaction(async (tx) => {
