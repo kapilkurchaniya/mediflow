@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect, useActionState } from "react";
 import { searchPosItems, createSaleInvoice, PosItemInput } from "@/app/actions/sales";
 import { getCustomers } from "@/app/actions/customers";
+import { computeSaleTotals } from "@/lib/money";
 import { Search, ShoppingCart, User, Stethoscope, ArrowLeft, Trash2, Printer, Plus } from "lucide-react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
@@ -17,7 +18,7 @@ export default function POSPage() {
   const [doctorName, setDoctorName] = useState("");
   const [paymentMethod, setPaymentMethod] = useState("cash");
   
-  const [cart, setCart] = useState<(PosItemInput & { medicineName: string; batchNo: string; mrp: number; qtyOnHand: number })[]>([]);
+  const [cart, setCart] = useState<(PosItemInput & { medicineName: string; batchNo: string; mrp: number; qtyOnHand: number; gstRateBp: number })[]>([]);
   
   const searchInputRef = useRef<HTMLInputElement>(null);
 
@@ -72,6 +73,7 @@ export default function POSPage() {
         mrp: batch.mrp,
         rate: batch.saleRate || batch.mrp, // inclusive rate
         discountBp: 0,
+        gstRateBp: medicine.gstRateBp,
       }]);
     }
     setSearchQuery("");
@@ -97,18 +99,14 @@ export default function POSPage() {
     setCart(cart.filter((_, i) => i !== index));
   };
 
-  const totals = cart.reduce((acc, item) => {
-    const gross = item.qty * item.rate;
-    const disc = (gross * item.discountBp) / 10000;
-    return {
-      gross: acc.gross + gross,
-      disc: acc.disc + disc,
-    };
-  }, { gross: 0, disc: 0 });
+  const totals = computeSaleTotals(cart.map(c => ({
+    qty: c.qty,
+    rate: c.rate,
+    discountBp: c.discountBp,
+    gstRateBp: c.gstRateBp,
+  })));
 
-  const netBeforeTax = totals.gross - totals.disc;
-  const gst = Math.round(netBeforeTax * 0.05); // 5% GST
-  const netPayable = netBeforeTax + gst;
+  const netPayable = totals.total;
 
   const [state, formAction, isPending] = useActionState(async (prevState: any, formData: FormData) => {
     if (cart.length === 0) return { error: "Cart is empty" };
@@ -229,9 +227,6 @@ export default function POSPage() {
                 </thead>
                 <tbody className="divide-y divide-slate-50">
                   {cart.map((item, index) => {
-                    const gross = item.qty * item.rate;
-                    const disc = (gross * item.discountBp) / 10000;
-                    const net = gross - disc;
                     return (
                       <tr key={index} className="hover:bg-slate-50">
                         <td className="px-4 py-3">
@@ -262,7 +257,7 @@ export default function POSPage() {
                           />
                         </td>
                         <td className="px-4 py-3 text-right font-semibold text-slate-900">
-                          ₹{(net / 100).toFixed(2)}
+                          ₹{(totals.lines[index].total / 100).toFixed(2)}
                         </td>
                         <td className="px-4 py-3 text-right">
                           <button onClick={() => removeCartItem(index)} className="text-red-400 hover:text-red-600 p-1">
@@ -323,12 +318,22 @@ export default function POSPage() {
               </div>
               <div className="flex justify-between text-brand-600">
                 <span>Discount</span>
-                <span>- ₹{(totals.disc / 100).toFixed(2)}</span>
+                <span>- ₹{(totals.discount / 100).toFixed(2)}</span>
               </div>
               <div className="flex justify-between text-slate-600">
-                <span>Tax (5% GST)</span>
-                <span>+ ₹{(gst / 100).toFixed(2)}</span>
+                <span>Taxable Amount</span>
+                <span>₹{(totals.taxable / 100).toFixed(2)}</span>
               </div>
+              <div className="flex justify-between text-slate-600">
+                <span>GST (Incl.)</span>
+                <span>₹{((totals.cgst + totals.sgst + totals.igst) / 100).toFixed(2)}</span>
+              </div>
+              {totals.roundOff !== 0 && (
+                <div className="flex justify-between text-slate-600">
+                  <span>Round Off</span>
+                  <span>{totals.roundOff > 0 ? '+' : '-'} ₹{(Math.abs(totals.roundOff) / 100).toFixed(2)}</span>
+                </div>
+              )}
               
               <div className="pt-4 mt-4 border-t border-slate-100">
                 <div className="flex justify-between items-end">

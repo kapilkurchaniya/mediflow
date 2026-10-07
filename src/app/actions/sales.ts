@@ -4,8 +4,11 @@ import { db, schema } from "@/server/db";
 import { eq, and, desc, gt, ilike, or, sql, inArray } from "drizzle-orm";
 import { getCurrentSession, requireAuth } from "@/server/auth";
 import { recordStockMovement } from "@/server/domain/stock";
+import { nextDocNumber } from "@/server/domain/sequence";
 import { revalidatePath } from "next/cache";
 import { sendWhatsAppReceipt } from "@/server/whatsapp";
+import { computeSaleTotals, type SaleLineInput } from "@/lib/money";
+import { format } from "date-fns";
 
 export async function getSales() {
   const { session, user } = await requireAuth();
@@ -33,6 +36,7 @@ export async function searchPosItems(query: string) {
   if (!query || query.length < 2) return [];
 
   const lowerQuery = query.toLowerCase();
+  const todayStr = format(new Date(), 'yyyy-MM-dd');
 
   // Find medicines matching query
   const medicines = await db
@@ -55,6 +59,7 @@ export async function searchPosItems(query: string) {
   const medicineIds = medicines.map((m) => m.id);
 
   // Get active batches for these medicines, ordered by expiry (nearest first)
+  // Ensure we don't sell expired stock
   const batches = await db
     .select()
     .from(schema.batches)
@@ -62,6 +67,7 @@ export async function searchPosItems(query: string) {
       and(
         eq(schema.batches.storeId, session.storeId),
         gt(schema.batches.qtyOnHand, 0),
+        gt(schema.batches.expiryDate, todayStr),
         inArray(schema.batches.medicineId, medicineIds)
       )
     )
@@ -83,7 +89,7 @@ export type PosItemInput = {
   medicineId: string;
   batchId: string;
   qty: number;
-  rate: number; // paise
+  rate: number; // paise - ignored by server, but we keep the type signature for now
   discountBp: number; // basis points
 };
 
@@ -104,9 +110,26 @@ export async function createSaleInvoice(
       const [customer] = await db
         .select({ phone: schema.customers.phone })
         .from(schema.customers)
-        .where(eq(schema.customers.id, customerId.trim()));
+        .where(
+          and(
+            eq(schema.customers.id, customerId.trim()),
+            eq(schema.customers.tenantId, session.tenantId) // Tenant isolation fix
+          )
+        );
       if (customer?.phone) customerPhone = customer.phone;
     }
+
+    const [store] = await db
+      .select({ invoicePrefix: schema.stores.invoicePrefix })
+      .from(schema.stores)
+      .where(
+        and(
+          eq(schema.stores.id, session.storeId),
+          eq(schema.stores.tenantId, session.tenantId)
+        )
+      );
+      
+    if (!store) throw new Error("Store not found");
 
     let generatedInvoiceNo = "";
     let finalTotalAmount = 0;
@@ -114,6 +137,8 @@ export async function createSaleInvoice(
     const saleId = await db.transaction(async (tx) => {
       // 1. Fetch full details of batches and medicines to prevent client tampering
       const batchIds = items.map((i) => i.batchId);
+      
+      // We lock batches for update via recordStockMovement, but here we just need to read them to compute totals first
       const dbBatches = await tx
         .select({
           batch: schema.batches,
@@ -124,15 +149,13 @@ export async function createSaleInvoice(
         .where(
           and(
             eq(schema.batches.storeId, session.storeId),
-            // Workaround for whereIn
             sql`${schema.batches.id} = ANY(ARRAY[${sql.join(batchIds, sql`, `)}]::uuid[])`
           )
         );
 
-      let grossAmount = 0;
-      let totalTaxAmount = 0;
-      let totalDiscountAmount = 0;
-
+      const todayStr = format(new Date(), 'yyyy-MM-dd');
+      
+      const lineInputs: SaleLineInput[] = [];
       const processedItems = items.map((item) => {
         const dbRecord = dbBatches.find((b) => b.batch.id === item.batchId);
         if (!dbRecord) throw new Error(`Batch ${item.batchId} not found`);
@@ -142,37 +165,40 @@ export async function createSaleInvoice(
         if (batch.qtyOnHand < item.qty) {
           throw new Error(`Insufficient stock for ${medicine.name}. Available: ${batch.qtyOnHand}`);
         }
-
-        const itemGross = item.qty * item.rate;
-        const discountAmount = Math.round((itemGross * item.discountBp) / 10000);
-        const taxableAmount = itemGross - discountAmount;
         
-        // Calculate 5% exclusive GST as requested
-        const actualTaxable = taxableAmount;
-        const taxAmount = Math.round(actualTaxable * 0.05);
+        if (batch.expiryDate <= todayStr) {
+          throw new Error(`Batch for ${medicine.name} has expired on ${batch.expiryDate}`);
+        }
+        
+        // Use server-side rate, falling back to MRP
+        const saleRate = batch.saleRate ?? batch.mrp ?? 0;
 
-        grossAmount += itemGross;
-        totalDiscountAmount += discountAmount;
-        totalTaxAmount += taxAmount;
+        lineInputs.push({
+          qty: item.qty,
+          rate: saleRate,
+          discountBp: item.discountBp,
+          gstRateBp: medicine.gstRateBp
+        });
 
         return {
           ...item,
           medicine,
           batch,
-          discountAmount,
-          taxableAmount: actualTaxable,
-          taxAmount,
-          totalAmount: actualTaxable + taxAmount,
+          saleRate
         };
       });
 
-      const totalInvoiceAmount = grossAmount - totalDiscountAmount + totalTaxAmount; // Adding 5% exclusive tax
-      const amountDue = totalInvoiceAmount - amountPaid;
+      // Compute GST-inclusive totals (replaces manual 5% math)
+      const isInterState = false; // Could determine this based on customer vs store state code
+      const totals = computeSaleTotals(lineInputs, isInterState);
+      
+      // Calculate amount due based on server-computed total
+      const amountDue = totals.total - amountPaid;
 
-      // 2. Generate Invoice Number
-      const invoiceNo = `INV-${Date.now().toString().slice(-6)}`;
+      // 2. Generate Invoice Number (gap-free, row-locked)
+      const invoiceNo = await nextDocNumber(tx, session.tenantId, session.storeId, "sale", store.invoicePrefix);
       generatedInvoiceNo = invoiceNo;
-      finalTotalAmount = totalInvoiceAmount;
+      finalTotalAmount = totals.total;
 
       // 3. Create Sale Header
       const [sale] = await tx.insert(schema.sales).values({
@@ -181,23 +207,27 @@ export async function createSaleInvoice(
         invoiceNo,
         customerId: customerId?.trim() ? customerId.trim() : null,
         doctorName: doctorName?.trim() ? doctorName.trim() : null,
-        grossAmount,
-        discountAmount: totalDiscountAmount,
-        taxableAmount: grossAmount - totalDiscountAmount,
-        cgst: Math.floor(totalTaxAmount / 2),
-        sgst: Math.ceil(totalTaxAmount / 2),
-        igst: 0,
-        totalAmount: totalInvoiceAmount,
+        grossAmount: totals.gross,
+        discountAmount: totals.discount,
+        taxableAmount: totals.taxable,
+        cgst: totals.cgst,
+        sgst: totals.sgst,
+        igst: totals.igst,
+        roundOff: totals.roundOff,
+        totalAmount: totals.total,
         paidAmount: amountPaid,
-        creditAmount: amountDue,
+        creditAmount: amountDue > 0 ? amountDue : 0,
         status: "completed",
         completedAt: new Date(),
         createdBy: user.id,
       }).returning({ id: schema.sales.id });
 
       // 4. Process Items & Update Stock
-      for (const item of processedItems) {
-        // Decrement physical stock
+      for (let i = 0; i < processedItems.length; i++) {
+        const item = processedItems[i];
+        const lineRes = totals.lines[i];
+        
+        // Decrement physical stock (this locks the batch row)
         await recordStockMovement({
           tx,
           tenantId: session.tenantId,
@@ -223,15 +253,15 @@ export async function createSaleInvoice(
           expiryDate: item.batch.expiryDate,
           qty: item.qty,
           mrp: item.batch.mrp,
-          rate: item.rate, // inclusive rate
+          rate: item.saleRate, // server-side rate
           discountBp: item.discountBp,
-          discountAmount: item.discountAmount,
-          taxableAmount: item.taxableAmount,
+          discountAmount: lineRes.discount,
+          taxableAmount: lineRes.taxable,
           gstRateBp: item.medicine.gstRateBp,
-          cgst: Math.floor(item.taxAmount / 2),
-          sgst: Math.ceil(item.taxAmount / 2),
-          igst: 0,
-          totalAmount: item.totalAmount,
+          cgst: lineRes.cgst,
+          sgst: lineRes.sgst,
+          igst: lineRes.igst,
+          totalAmount: lineRes.total,
           unitCost: item.batch.purchaseRate,
         });
       }
@@ -253,6 +283,7 @@ export async function createSaleInvoice(
     revalidatePath("/dashboard/sales");
 
     if (customerPhone) {
+      // In a real app we'd queue this out of band, but keeping it simple
       await sendWhatsAppReceipt(customerPhone, generatedInvoiceNo, finalTotalAmount, "https://mediflow.demo/receipts/" + saleId);
     }
 
@@ -261,7 +292,6 @@ export async function createSaleInvoice(
     return { error: err.message || "Failed to create sale invoice" };
   }
 }
-
 
 export async function getSaleById(id: string) {
   const { session } = await requireAuth();
