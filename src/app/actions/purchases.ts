@@ -4,6 +4,7 @@ import { db, schema } from "@/server/db";
 import { eq, and, desc } from "drizzle-orm";
 import { getCurrentSession, requireAuth } from "@/server/auth";
 import { recordStockMovement } from "@/server/domain/stock";
+import { nextDocNumber } from "@/server/domain/sequence";
 import { revalidatePath } from "next/cache";
 
 export async function getPurchases() {
@@ -71,8 +72,8 @@ export async function createPurchaseInvoice(
 
       const totalInvoiceAmount = grossAmount - totalDiscountAmount + totalTaxAmount;
 
-      // 2. Generate Internal Purchase Number
-      const purchaseNo = `PI-${Date.now().toString().slice(-6)}`;
+      // 2. Generate Internal Purchase Number (gap-free, row-locked)
+      const purchaseNo = await nextDocNumber(tx, session.tenantId, session.storeId, "purchase", "PUR");
 
       // 3. Create Purchase Header
       const [purchase] = await tx.insert(schema.purchases).values({
