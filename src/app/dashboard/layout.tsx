@@ -31,7 +31,13 @@ export default async function DashboardLayout({ children }: { children: React.Re
   const ctx = await getShellContext();
 
   return (
-    <div className="flex h-screen overflow-hidden bg-background">
+    <div className="relative isolate flex h-screen overflow-hidden bg-background">
+      {/* Ambient background for the translucent shell (Topbar/Sidebar) */}
+      <div
+        className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(ellipse_80%_50%_at_50%_-10%,var(--color-brand-100),transparent)]"
+        aria-hidden="true"
+      />
+
       <Sidebar {...ctx} />
       <div className="flex min-w-0 flex-1 flex-col">
         <Topbar />

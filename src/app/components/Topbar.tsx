@@ -52,7 +52,7 @@ export function Topbar() {
   }));
 
   return (
-    <header className="sticky top-0 z-20 flex h-14 shrink-0 items-center gap-4 border-b border-ink-150 bg-white/85 px-4 backdrop-blur-md sm:px-6">
+    <header className="sticky top-0 z-20 flex h-14 shrink-0 items-center gap-4 border-b border-ink-200/50 bg-white/40 px-4 backdrop-blur-2xl sm:px-6">
       <Link href="/dashboard" className="lg:hidden" aria-label="Home">
         <LogoMark />
       </Link>

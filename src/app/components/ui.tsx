@@ -130,7 +130,7 @@ export function StatCard({
     return (
       <Link
         href={href}
-        className="card group block p-5 transition-[border-color,box-shadow] duration-150 hover:border-ink-300 hover:shadow-[var(--shadow-pop)]"
+        className="card card-interactive group block p-5"
       >
         {body}
       </Link>
