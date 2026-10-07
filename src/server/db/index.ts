@@ -18,11 +18,13 @@ declare global {
   var __mediflowPool: pg.Pool | undefined;
 }
 
+import { env } from "../../env";
+
 // Reuse the pool across hot reloads in development.
 const pool =
   globalThis.__mediflowPool ??
-  new pg.Pool({ connectionString: process.env.DATABASE_URL, max: 10, idleTimeoutMillis: 30_000 });
-if (process.env.NODE_ENV !== "production") globalThis.__mediflowPool = pool;
+  new pg.Pool({ connectionString: env.DATABASE_URL, max: 10, idleTimeoutMillis: 30_000 });
+if (env.NODE_ENV !== "production") globalThis.__mediflowPool = pool;
 
 export const db: DB = drizzle(pool, { schema });
 export { schema, pool };
