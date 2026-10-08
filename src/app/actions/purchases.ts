@@ -175,10 +175,10 @@ export async function createPurchaseInvoice(
 
     revalidatePath("/dashboard/purchases");
     return { success: true };
-  } catch (err: any) {
-    if (err.message?.includes("purchases_supplier_invoice_uq")) {
+  } catch (err: unknown) {
+    if ((err instanceof Error ? err.message : String(err))?.includes("purchases_supplier_invoice_uq")) {
       return { error: "This invoice number has already been entered for this supplier." };
     }
-    return { error: err.message || "Failed to create purchase invoice" };
+    return { error: (err instanceof Error ? err.message : String(err)) || "Failed to create purchase invoice" };
   }
 }

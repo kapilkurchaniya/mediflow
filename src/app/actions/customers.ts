@@ -8,7 +8,7 @@ import { revalidatePath } from "next/cache";
 export async function getCustomers(searchQuery?: string) {
   const { session } = await requireAuth();
 
-  let query = db
+  const query = db
     .select()
     .from(schema.customers)
     .where(eq(schema.customers.tenantId, session.tenantId))
@@ -60,8 +60,8 @@ export async function createCustomer(formData: FormData) {
 
     revalidatePath("/dashboard/customers");
     return { success: true };
-  } catch (err: any) {
-    return { error: err.message || "Failed to create customer" };
+  } catch (err: unknown) {
+    return { error: (err instanceof Error ? err.message : String(err)) || "Failed to create customer" };
   }
 }
 
@@ -98,7 +98,7 @@ export async function updateCustomer(id: string, formData: FormData) {
 
     revalidatePath("/dashboard/customers");
     return { success: true };
-  } catch (err: any) {
-    return { error: err.message || "Failed to update customer" };
+  } catch (err: unknown) {
+    return { error: (err instanceof Error ? err.message : String(err)) || "Failed to update customer" };
   }
 }

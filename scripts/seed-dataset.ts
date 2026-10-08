@@ -11,7 +11,7 @@ const MAX_ROWS = 20000;
 
 async function seedDataset() {
   console.log("Fetching first tenant...");
-  let tenants = await db.select().from(schema.tenants).limit(1);
+  const tenants = await db.select().from(schema.tenants).limit(1);
   if (tenants.length === 0) {
     console.error("No tenants found! Run setup-db.ts first.");
     process.exit(1);
@@ -26,7 +26,7 @@ async function seedDataset() {
     process.exit(1);
   }
 
-  let manufacturersCache = new Map<string, string>(); // lowercase name -> id
+  const manufacturersCache = new Map<string, string>(); // lowercase name -> id
   // Pre-load existing manufacturers
   const existingMfrs = await db.select({ id: schema.manufacturers.id, name: schema.manufacturers.name })
     .from(schema.manufacturers)
@@ -36,13 +36,12 @@ async function seedDataset() {
     manufacturersCache.set(m.name.toLowerCase().trim(), m.id);
   }
 
-  const results: any[] = [];
   let rowCount = 0;
   let insertedCount = 0;
 
   console.log("Reading CSV...");
   
-  const processBatch = async (batch: any[]) => {
+  const processBatch = async (batch: Record<string, string>[]) => {
     // 1. Resolve Manufacturers
     const newMfrs = new Set<string>();
     for (const row of batch) {
@@ -120,7 +119,7 @@ async function seedDataset() {
   };
 
   return new Promise((resolve, reject) => {
-    let currentBatch: any[] = [];
+    let currentBatch: Record<string, string>[] = [];
     
     const stream = fs.createReadStream(filePath)
       .pipe(csv())
