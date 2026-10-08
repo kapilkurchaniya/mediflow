@@ -163,8 +163,8 @@ export async function processInventoryImport(rows: ImportRow[]) {
 
     revalidatePath("/dashboard/inventory");
     return { success: true, count: importCount };
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Import error:", error);
-    return { error: error.message || "Failed to process import" };
+    return { error: (error instanceof Error ? error.message : String(error)) || "Failed to process import" };
   }
 }

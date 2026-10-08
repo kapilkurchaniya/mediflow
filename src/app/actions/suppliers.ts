@@ -70,7 +70,7 @@ export async function createSupplier(formData: FormData) {
 
     revalidatePath("/dashboard/suppliers");
     return { success: true };
-  } catch (err: any) {
-    return { error: err.message || "Failed to create supplier" };
+  } catch (err: unknown) {
+    return { error: (err instanceof Error ? err.message : String(err)) || "Failed to create supplier" };
   }
 }

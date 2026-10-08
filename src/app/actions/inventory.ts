@@ -29,8 +29,8 @@ export async function createCategory(name: string) {
       })
       .returning();
     return { success: true, category };
-  } catch (err: any) {
-    return { error: err.message || "Failed to create category" };
+  } catch (err: unknown) {
+    return { error: (err instanceof Error ? err.message : String(err)) || "Failed to create category" };
   }
 }
 
@@ -58,8 +58,8 @@ export async function createManufacturer(name: string) {
       })
       .returning();
     return { success: true, manufacturer };
-  } catch (err: any) {
-    return { error: err.message || "Failed to create manufacturer" };
+  } catch (err: unknown) {
+    return { error: (err instanceof Error ? err.message : String(err)) || "Failed to create manufacturer" };
   }
 }
 
@@ -68,7 +68,7 @@ export async function createManufacturer(name: string) {
 export async function getMedicines(searchQuery?: string) {
   const { session } = await requireAuth();
 
-  let query = db
+  const query = db
     .select({
       medicine: schema.medicines,
       manufacturer: schema.manufacturers,
@@ -143,10 +143,10 @@ export async function createMedicine(formData: FormData) {
 
     revalidatePath("/dashboard/inventory");
     return { success: true };
-  } catch (err: any) {
-    if (err.message?.includes("medicines_tenant_barcode_uq")) {
+  } catch (err: unknown) {
+    if ((err instanceof Error ? err.message : String(err))?.includes("medicines_tenant_barcode_uq")) {
       return { error: "A medicine with this barcode already exists." };
     }
-    return { error: err.message || "Failed to create medicine" };
+    return { error: (err instanceof Error ? err.message : String(err)) || "Failed to create medicine" };
   }
 }
