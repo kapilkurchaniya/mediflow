@@ -25,7 +25,7 @@ export async function searchTavily(query: string): Promise<string> {
     }
     
     const data = await res.json();
-    return data.answer || data.results?.map((r: any) => r.content).join("\n") || "";
+    return data.answer || data.results?.map((r: { content: string }) => r.content).join("\n") || "";
   } catch (e) {
     console.error("Tavily search failed", e);
     return "";
@@ -96,13 +96,13 @@ export async function generateAICompletion(prompt: string): Promise<AIResponse> 
   try {
     const content = await callGemini(prompt);
     return { content, model: "gemini" };
-  } catch (e: any) {
-    console.warn(e.message);
+  } catch (e: unknown) {
+    console.warn((e instanceof Error ? e.message : String(e)));
     try {
       const content = await callGroq(prompt);
       return { content, model: "groq" };
-    } catch (e2: any) {
-      console.warn(e2.message);
+    } catch (e2: unknown) {
+      console.warn(e2 instanceof Error ? e2.message : String(e2));
       const content = await callCohere(prompt);
       return { content, model: "cohere" };
     }

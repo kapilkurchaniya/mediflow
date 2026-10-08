@@ -51,7 +51,7 @@ export default function NewMedicinePage() {
     getManufacturers().then(setManufacturers);
   }, []);
 
-  const [state, formAction, isPending] = useActionState(async (prevState: any, formData: FormData) => {
+  const [state, formAction, isPending] = useActionState(async (prevState: { error?: string; success?: boolean } | null, formData: FormData) => {
     const res = await createMedicine(formData);
     if (res.success) {
       redirect("/dashboard/inventory");

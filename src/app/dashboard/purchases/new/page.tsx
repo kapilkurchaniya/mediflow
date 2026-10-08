@@ -30,7 +30,7 @@ export default function NewPurchasePage() {
     });
   }, []);
 
-  const [state, formAction, isPending] = useActionState(async (prevState: any, formData: FormData) => {
+  const [state, formAction, isPending] = useActionState(async (prevState: { error?: string; success?: boolean } | null, formData: FormData) => {
     const res = await createPurchaseInvoice(supplierId, supplierInvoiceNo, invoiceDate, items);
     if (res.success) redirect("/dashboard/purchases");
     return res;
@@ -54,9 +54,9 @@ export default function NewPurchasePage() {
     ]);
   };
 
-  const updateItem = (index: number, field: keyof PurchaseItemInput, value: any) => {
+  const updateItem = <K extends keyof PurchaseItemInput>(index: number, field: K, value: PurchaseItemInput[K]) => {
     const newItems = [...items];
-    (newItems[index] as any)[field] = value;
+    newItems[index][field] = value;
 
     if (field === "medicineId") {
       const med = medicines.find(m => m.id === value);
