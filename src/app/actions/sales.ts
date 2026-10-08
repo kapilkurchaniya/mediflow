@@ -288,8 +288,8 @@ export async function createSaleInvoice(
     }
 
     return { success: true, saleId };
-  } catch (err: any) {
-    return { error: err.message || "Failed to create sale invoice" };
+  } catch (err: unknown) {
+    return { error: (err instanceof Error ? err.message : String(err)) || "Failed to create sale invoice" };
   }
 }
 

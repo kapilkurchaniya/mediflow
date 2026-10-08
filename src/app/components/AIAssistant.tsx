@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { Mic, Square, X, CornerDownLeft } from "lucide-react";
 import clsx from "clsx";
 
@@ -10,7 +10,7 @@ export function AIAssistant() {
   const [isOpen, setIsOpen] = useState(false);
   const [isListening, setIsListening] = useState(false);
   const [transcript, setTranscript] = useState<string | null>(null);
-  const [recognition, setRecognition] = useState<any>(null);
+  const recognitionRef = useRef<ISpeechRecognition | null>(null);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -31,14 +31,14 @@ export function AIAssistant() {
       rec.interimResults = false;
       rec.lang = "en-US";
       
-      rec.onresult = (event: any) => {
+      rec.onresult = (event: SpeechRecognitionEvent) => {
         const text = event.results[0][0].transcript;
         setTranscript(text);
         setIsListening(false);
         // Here we could trigger a server action with the transcript
       };
       
-      rec.onerror = (event: any) => {
+      rec.onerror = (event: SpeechRecognitionErrorEvent) => {
         setTranscript("Error: " + event.error);
         setIsListening(false);
       };
@@ -47,7 +47,7 @@ export function AIAssistant() {
         setIsListening(false);
       };
       
-      setRecognition(rec);
+      recognitionRef.current = rec;
     }
 
     return () => window.removeEventListener("keydown", onKey);
@@ -55,9 +55,9 @@ export function AIAssistant() {
 
   const toggleListen = () => {
     if (!isListening) {
-      if (recognition) {
+      if (recognitionRef.current) {
         try {
-          recognition.start();
+          recognitionRef.current.start();
           setIsListening(true);
           setTranscript("Listening…");
         } catch (e) {
@@ -68,7 +68,7 @@ export function AIAssistant() {
         setTranscript("Voice not supported in this browser.");
       }
     } else {
-      if (recognition) recognition.stop();
+      if (recognitionRef.current) recognitionRef.current.stop();
       setIsListening(false);
     }
   };

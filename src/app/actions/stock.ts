@@ -115,8 +115,8 @@ export async function addOpeningStock(formData: FormData) {
 
     revalidatePath("/dashboard/inventory/batches");
     return { success: true };
-  } catch (err: any) {
-    return { error: err.message || "Failed to add opening stock" };
+  } catch (err: unknown) {
+    return { error: (err instanceof Error ? err.message : String(err)) || "Failed to add opening stock" };
   }
 }
 
@@ -169,7 +169,7 @@ export async function adjustBatchStock(formData: FormData) {
 
     revalidatePath("/dashboard/inventory/batches");
     return { success: true };
-  } catch (err: any) {
-    return { error: err.message || "Failed to adjust stock" };
+  } catch (err: unknown) {
+    return { error: (err instanceof Error ? err.message : String(err)) || "Failed to adjust stock" };
   }
 }
