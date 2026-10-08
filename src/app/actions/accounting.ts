@@ -60,7 +60,7 @@ export async function getTrialBalance() {
     ORDER BY a.type, a.code
   `);
 
-  return results.rows.map((r: any) => ({
+  return results.rows.map((r: Record<string, unknown>) => ({
     id: r.id,
     code: r.code,
     name: r.name,

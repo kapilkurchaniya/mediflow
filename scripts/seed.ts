@@ -25,7 +25,7 @@ async function seed() {
   console.log("Fetching first tenant, store, and user...");
   
   // 1. Tenant
-  let tenants = await db.select().from(schema.tenants).limit(1);
+  const tenants = await db.select().from(schema.tenants).limit(1);
   let tenantId;
   if (tenants.length === 0) {
     const [newT] = await db.insert(schema.tenants).values({ name: "Default Pharmacy", legalName: "Default" }).returning();
@@ -35,7 +35,7 @@ async function seed() {
   }
 
   // 2. Store
-  let stores = await db.select().from(schema.stores).where(eq(schema.stores.tenantId, tenantId)).limit(1);
+  const stores = await db.select().from(schema.stores).where(eq(schema.stores.tenantId, tenantId)).limit(1);
   let storeId;
   if (stores.length === 0) {
     const [newS] = await db.insert(schema.stores).values({ tenantId, name: "Main Store", code: "S001", stateCode: "MH" }).returning();
@@ -45,7 +45,7 @@ async function seed() {
   }
 
   // 3. User
-  let users = await db.select().from(schema.users).limit(1);
+  const users = await db.select().from(schema.users).limit(1);
   let userId;
   if (users.length === 0) {
     const [newU] = await db.insert(schema.users).values({ name: "Admin", email: "admin@mediflow.com", passwordHash: "..." }).returning();
