@@ -8,7 +8,7 @@ import { enrichMedicineDetails } from "@/app/actions/ai-enrichment";
 import { useRouter } from "next/navigation";
 
 type ParsedRow = {
-  raw: any;
+  raw: Record<string, string>;
   mapped: Partial<ImportRow>;
   errors: string[];
   warnings: string[];
@@ -36,20 +36,20 @@ export default function SmartImportPage() {
       header: true,
       skipEmptyLines: true,
       complete: (results) => {
-        const rows: ParsedRow[] = results.data.map((row: any) => {
+        const rows: ParsedRow[] = results.data.map((row: Record<string, string>) => {
           return mapAndValidateRow(row);
         });
         setParsedData(rows);
         setIsParsing(false);
       },
       error: (error) => {
-        setGlobalError(error.message);
+        setGlobalError((error instanceof Error ? error.message : String(error)));
         setIsParsing(false);
       }
     });
   };
 
-  const mapAndValidateRow = (row: any): ParsedRow => {
+  const mapAndValidateRow = (row: Record<string, string>): ParsedRow => {
     const errors: string[] = [];
     const warnings: string[] = [];
     
@@ -217,7 +217,7 @@ export default function SmartImportPage() {
           </div>
           <h3 className="text-xl font-bold text-slate-800 mb-2">Drop your CSV file here</h3>
           <p className="text-slate-500 max-w-sm mx-auto">
-            Don't worry about templates. Our AI-driven parser will auto-detect your columns.
+            Don&apos;t worry about templates. Our AI-driven parser will auto-detect your columns.
           </p>
         </div>
       ) : (

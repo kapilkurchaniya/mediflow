@@ -8,9 +8,18 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { PageHeader, FormSection, Field } from "@/app/components/ui";
 
+interface RawMedicine {
+  id?: string;
+  genericName?: string | null;
+  unit?: string | null;
+  packSize?: string | null;
+  mrp?: number;
+  salePrice?: number | null;
+}
+
 export default function NewBatchPage() {
-  const [medicines, setMedicines] = useState<{ id: string; name: string; raw: any }[]>([]);
-  const [selectedMedicine, setSelectedMedicine] = useState<any>(null);
+  const [medicines, setMedicines] = useState<{ id: string; name: string; raw: RawMedicine }[]>([]);
+  const [selectedMedicine, setSelectedMedicine] = useState<RawMedicine | null>(null);
 
   useEffect(() => {
     getMedicines().then((data) => {
@@ -18,7 +27,7 @@ export default function NewBatchPage() {
     });
   }, []);
 
-  const [state, formAction, isPending] = useActionState(async (prevState: any, formData: FormData) => {
+  const [state, formAction, isPending] = useActionState(async (prevState: { error?: string; success?: boolean } | null, formData: FormData) => {
     const res = await addOpeningStock(formData);
     if (res.success) {
       redirect("/dashboard/inventory/batches");

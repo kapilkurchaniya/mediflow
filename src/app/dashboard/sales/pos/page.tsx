@@ -8,10 +8,15 @@ import { Search, ShoppingCart, User, Stethoscope, ArrowLeft, Trash2, Printer, Pl
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
+interface SearchResult {
+  medicine: { id: string; name: string; gstRateBp: number };
+  batches: { id: string; batchNo: string; expiryDate: string; qtyOnHand: number; mrp: number; saleRate?: number }[];
+}
+
 export default function POSPage() {
   const [customers, setCustomers] = useState<{ id: string; name: string }[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
-  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   
   const [customerId, setCustomerId] = useState("");
@@ -47,13 +52,13 @@ export default function POSPage() {
     setIsSearching(true);
     try {
       const results = await searchPosItems(searchQuery);
-      setSearchResults(results);
+      setSearchResults(results as SearchResult[]);
     } finally {
       setIsSearching(false);
     }
   };
 
-  const addToCart = (medicine: any, batch: any) => {
+  const addToCart = (medicine: SearchResult["medicine"], batch: SearchResult["batches"][0]) => {
     // Check if already in cart
     const existingIndex = cart.findIndex(c => c.batchId === batch.id);
     if (existingIndex >= 0) {
@@ -108,7 +113,7 @@ export default function POSPage() {
 
   const netPayable = totals.total;
 
-  const [state, formAction, isPending] = useActionState(async (prevState: any, formData: FormData) => {
+  const [state, formAction, isPending] = useActionState(async (prevState: { error?: string; success?: boolean } | null, formData: FormData) => {
     if (cart.length === 0) return { error: "Cart is empty" };
     // Assuming full payment for retail POS
     const res = await createSaleInvoice(customerId, doctorName, cart, paymentMethod, netPayable);
@@ -166,7 +171,7 @@ export default function POSPage() {
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {searchResults.map((res) => 
-                    res.batches.map((batch: any, i: number) => (
+                    res.batches.map((batch: SearchResult["batches"][0]) => (
                       <tr 
                         key={`${res.medicine.id}-${batch.id}`} 
                         className="hover:bg-slate-50 cursor-pointer transition-colors"
