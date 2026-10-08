@@ -8,7 +8,7 @@ import { redirect } from "next/navigation";
 import { PageHeader, FormSection, Field } from "@/app/components/ui";
 
 export default function NewSupplierPage() {
-  const [state, formAction, isPending] = useActionState(async (prevState: any, formData: FormData) => {
+  const [state, formAction, isPending] = useActionState(async (prevState: { error?: string; success?: boolean } | null, formData: FormData) => {
     const res = await createSupplier(formData);
     if (res.success) {
       redirect("/dashboard/suppliers");
