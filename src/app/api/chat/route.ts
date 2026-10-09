@@ -166,5 +166,5 @@ When answering, be concise, professional, and helpful. Format your responses usi
     }
   });
 
-  return result.toDataStreamResponse();
+  return result.toUIMessageStreamResponse();
 }
