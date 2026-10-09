@@ -15,7 +15,7 @@ export function AIAssistant() {
   const [input, setInput] = useState("");
   const recognitionRef = useRef<ISpeechRecognition | null>(null);
   
-  const { messages, append, status } = useChat({
+  const { messages, sendMessage, status } = useChat({
     // Vercel AI SDK v4+ API options
   });
 
@@ -63,8 +63,7 @@ export function AIAssistant() {
       rec.onresult = (event: SpeechRecognitionEvent) => {
         const text = event.results[0][0].transcript;
         setIsListening(false);
-        // Automatically submit after voice recognition
-        append({ role: 'user', content: text });
+        sendMessage({ role: 'user', parts: [{ type: 'text', text }] });
       };
       
       rec.onerror = () => {
@@ -79,7 +78,7 @@ export function AIAssistant() {
     }
 
     return () => window.removeEventListener("keydown", onKey);
-  }, [append]);
+  }, [sendMessage]);
 
   const toggleListen = () => {
     if (!isListening) {
@@ -101,7 +100,7 @@ export function AIAssistant() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!input.trim()) return;
-    append({ role: 'user', content: input });
+    sendMessage({ role: 'user', parts: [{ type: 'text', text: input }] });
     setInput("");
   };
 
@@ -173,7 +172,7 @@ export function AIAssistant() {
                 {SUGGESTIONS.map((s) => (
                   <button
                     key={s}
-                    onClick={() => append({ role: 'user', content: s })}
+                    onClick={() => sendMessage({ role: 'user', parts: [{ type: 'text', text: s }] })}
                     className="rounded-md border border-ink-150 bg-ink-50/60 px-3 py-1.5 text-[12px] text-ink-600 transition-colors hover:border-ink-300 hover:bg-white hover:text-ink-900"
                   >
                     {s}

@@ -1,6 +1,6 @@
 // @ts-nocheck
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
-import { streamText, tool } from "ai";
+import { streamText, tool, convertToModelMessages } from "ai";
 import { db, schema } from "@/server/db";
 import { sql } from "drizzle-orm";
 import { z } from "zod";
@@ -17,11 +17,25 @@ export async function POST(req: Request) {
   if (!session) {
     return new Response("Unauthorized", { status: 401 });
   }
-  const { messages } = await req.json();
+  const body = await req.json();
+  let messages = body.messages;
+
+  // Fallback for Vercel AI SDK 7 payload formats
+  if (!messages) {
+    if (body.role && (body.parts || body.content)) {
+      messages = [body];
+    } else if (Array.isArray(body)) {
+      messages = body;
+    } else {
+      messages = [];
+    }
+  } else if (!Array.isArray(messages)) {
+    messages = [messages];
+  }
 
   const result = streamText({
     model: google("gemini-1.5-pro-latest"),
-    messages,
+    messages: convertToModelMessages(messages),
     maxSteps: 5,
     system: `You are MediFlow, an intelligent AI assistant for a pharmacy and clinic management system. 
 You can help the user check inventory, add new medicines, check drug interactions, generate reports, and draft purchase orders.
