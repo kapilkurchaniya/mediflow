@@ -4,7 +4,7 @@ import { streamText, tool } from "ai";
 import { db, schema } from "@/server/db";
 import { sql } from "drizzle-orm";
 import { z } from "zod";
-import { requireAuth } from "@/server/auth";
+import { getCurrentSession } from "@/server/auth";
 
 export const maxDuration = 30;
 
@@ -13,7 +13,10 @@ const google = createGoogleGenerativeAI({
 });
 
 export async function POST(req: Request) {
-  const { session } = await requireAuth();
+  const { session } = await getCurrentSession();
+  if (!session) {
+    return new Response("Unauthorized", { status: 401 });
+  }
   const { messages } = await req.json();
 
   const result = streamText({
@@ -89,6 +92,43 @@ When answering, be concise, professional, and helpful. Format your responses usi
             message: `Please evaluate the interactions between ${medications.join(' and ')} based on your medical knowledge.`,
             note: "Disclaimer: This is an AI assessment, not medical advice."
           };
+        }
+      }),
+      // @ts-ignore
+      add_to_bill: tool({
+        description: "Add a medicine to the current bill/cart in the Point of Sale interface. The user might say 'add dolo in the bill'.",
+        parameters: z.object({
+          medicineName: z.string().describe("The name of the medicine to add")
+        }),
+        execute: async ({ medicineName }: any) => {
+          try {
+            const query = sql`SELECT id, name, mrp FROM medicines WHERE name ILIKE ${'%' + medicineName + '%'} AND tenant_id = ${session.tenantId} AND is_active = true LIMIT 1`;
+            const res = await db.execute(query);
+            if (res.rows.length === 0) return { error: "Medicine not found in inventory." };
+            
+            const med = res.rows[0];
+            const batchQuery = sql`SELECT id as batch_id, batch_no, mrp, qty_on_hand, gst_rate_bp FROM batches WHERE medicine_id = ${med.id} AND qty_on_hand > 0 LIMIT 1`;
+            const batchRes = await db.execute(batchQuery);
+            if (batchRes.rows.length === 0) return { error: "No available batches with stock for this medicine." };
+            
+            const batch = batchRes.rows[0];
+            return {
+              action: "DISPATCH_ADD_TO_BILL",
+              payload: {
+                medicineId: med.id,
+                medicineName: med.name,
+                batchId: batch.batch_id,
+                batchNo: batch.batch_no,
+                qty: 1,
+                mrp: batch.mrp,
+                qtyOnHand: batch.qty_on_hand,
+                gstRateBp: batch.gst_rate_bp
+              },
+              message: `I've triggered the action to add 1 unit of ${med.name} to the bill.`
+            };
+          } catch (e: unknown) {
+             return { error: e instanceof Error ? e.message : "Unknown error" };
+          }
         }
       }),
       // @ts-ignore

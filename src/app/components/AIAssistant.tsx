@@ -22,10 +22,22 @@ export function AIAssistant() {
   const isLoading = status === 'submitted' || status === 'streaming';
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  // Auto-scroll to bottom of messages
+  // Auto-scroll and event dispatch
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    }
+    
+    // Check for tool results
+    const lastMessage = messages[messages.length - 1];
+    if (lastMessage?.role === 'assistant' && lastMessage.parts) {
+      const toolResult = lastMessage.parts.find(p => p.type === 'tool-invocation' && (p as any).toolInvocation?.state === 'result');
+      if (toolResult) {
+         const result = (toolResult as any).toolInvocation.result;
+         if (result?.action === 'DISPATCH_ADD_TO_BILL') {
+             window.dispatchEvent(new CustomEvent('ai-add-to-bill', { detail: result.payload }));
+         }
+      }
     }
   }, [messages]);
 
