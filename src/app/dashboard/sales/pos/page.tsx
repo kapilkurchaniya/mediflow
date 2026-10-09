@@ -41,8 +41,30 @@ export default function POSPage() {
         searchInputRef.current?.focus();
       }
     };
+    
+    const handleAiAdd = (e: Event) => {
+       const detail = (e as CustomEvent).detail;
+       if (detail) {
+         setCart(c => {
+           const existing = c.find((i) => i.medicineId === detail.medicineId && i.batchId === detail.batchId);
+           if (existing) {
+             return c.map((i) =>
+               i.medicineId === detail.medicineId && i.batchId === detail.batchId
+                 ? { ...i, qty: i.qty + 1 }
+                 : i
+             );
+           }
+           return [...c, detail];
+         });
+       }
+    };
+
     window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
+    window.addEventListener("ai-add-to-bill", handleAiAdd);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("ai-add-to-bill", handleAiAdd);
+    };
   }, []);
 
   const handleSearch = async (e: React.FormEvent) => {
