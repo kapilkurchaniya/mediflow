@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
-const publicRoutes = ["/login", "/register", "/api/webhook"]; // Routes that do not require authentication
+const publicRoutes = ["/login", "/register", "/api/webhook", "/api/chat"]; // Routes that do not require authentication
 const authRoutes = ["/login", "/register"]; // Routes for unauthenticated users only (redirect to dashboard if logged in)
 
 export async function proxy(request: NextRequest) {

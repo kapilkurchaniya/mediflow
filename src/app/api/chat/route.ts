@@ -22,6 +22,7 @@ export async function POST(req: Request) {
   const result = streamText({
     model: google("gemini-1.5-pro-latest"),
     messages,
+    maxSteps: 5,
     system: `You are MediFlow, an intelligent AI assistant for a pharmacy and clinic management system. 
 You can help the user check inventory, add new medicines, check drug interactions, generate reports, and draft purchase orders.
 When answering, be concise, professional, and helpful. Format your responses using markdown where appropriate (like tables or bold text).`,
@@ -36,15 +37,31 @@ When answering, be concise, professional, and helpful. Format your responses usi
           try {
             let query;
             if (productName) {
-              query = sql`SELECT name, generic_name, mrp, sale_price FROM medicines WHERE name ILIKE ${'%' + productName + '%'} AND tenant_id = ${session.tenantId} LIMIT 10`;
+              query = sql`
+                SELECT m.name, m.generic_name, m.mrp, SUM(b.qty_on_hand) as total_stock, m.reorder_level
+                FROM medicines m
+                LEFT JOIN batches b ON m.id = b.medicine_id
+                WHERE m.name ILIKE ${'%' + productName + '%'} AND m.tenant_id = ${session.tenantId}
+                GROUP BY m.id
+                LIMIT 10
+              `;
             } else {
-              query = sql`SELECT name, generic_name, mrp, sale_price FROM medicines WHERE tenant_id = ${session.tenantId} LIMIT 10`;
+              // Return low stock items
+              query = sql`
+                SELECT m.name, m.generic_name, m.mrp, COALESCE(SUM(b.qty_on_hand), 0) as total_stock, m.reorder_level
+                FROM medicines m
+                LEFT JOIN batches b ON m.id = b.medicine_id
+                WHERE m.tenant_id = ${session.tenantId}
+                GROUP BY m.id
+                HAVING COALESCE(SUM(b.qty_on_hand), 0) <= m.reorder_level
+                LIMIT 10
+              `;
             }
             
             const res = await db.execute(query);
             return {
               results: res.rows,
-              message: res.rows.length ? "Found these items in inventory." : "No matching items found.",
+              message: res.rows.length ? "Found these items." : "No low stock items found.",
             };
           } catch (e: unknown) {
             return { error: e instanceof Error ? e.message : "Unknown error" };
@@ -149,5 +166,5 @@ When answering, be concise, professional, and helpful. Format your responses usi
     }
   });
 
-  return result.toTextStreamResponse();
+  return result.toDataStreamResponse();
 }
