@@ -108,7 +108,7 @@ export default function NewBatchPage() {
                   name="mrp"
                   step="0.01"
                   min="0"
-                  defaultValue={selectedMedicine ? selectedMedicine.mrp / 100 : ""}
+                  defaultValue={selectedMedicine ? (selectedMedicine.mrp || 0) / 100 : ""}
                   className="input pl-7 num"
                   placeholder="0.00"
                 />
