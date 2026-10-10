@@ -19,9 +19,9 @@ const groq = createGroq({
 
 // Model fallback chain: each entry is tried up to MAX_RETRIES times
 const MODEL_CHAIN = [
-  { provider: "google" as const, id: "gemini-2.0-flash", label: "Gemini 2.0 Flash" },
-  { provider: "google" as const, id: "gemini-2.0-flash-lite", label: "Gemini 2.0 Flash Lite" },
-  { provider: "groq" as const, id: "llama-3.1-8b-instant", label: "Groq Llama 3.1 8B" },
+  { provider: "google" as const, id: "gemini-3.8-flash", label: "Gemini 3.8 Flash" },
+  { provider: "google" as const, id: "gemini-2.5-flash", label: "Gemini 2.5 Flash" },
+  { provider: "groq" as const, id: "openai/gpt-oss-20b", label: "Groq GPT-OSS 20B" },
 ];
 const MAX_RETRIES = 3;
 
