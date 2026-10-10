@@ -8,7 +8,7 @@ const inter = Inter({
   display: "swap",
 });
 
-const mono = JetBrains_Mono({
+  const mono = JetBrains_Mono({
   variable: "--font-mono-face",
   subsets: ["latin"],
   display: "swap",

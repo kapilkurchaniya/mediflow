@@ -33,9 +33,11 @@ export async function POST(req: Request) {
     messages = [messages];
   }
 
+  const modelMessages = await convertToModelMessages(messages);
+
   const result = streamText({
     model: google("gemini-1.5-pro-latest"),
-    messages: convertToModelMessages(messages),
+    messages: modelMessages,
     maxSteps: 5,
     system: `You are MediFlow, an intelligent AI assistant for a pharmacy and clinic management system. 
 You can help the user check inventory, add new medicines, check drug interactions, generate reports, and draft purchase orders.
