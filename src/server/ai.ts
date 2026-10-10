@@ -35,7 +35,7 @@ export async function searchTavily(query: string): Promise<string> {
 async function callGemini(prompt: string): Promise<string> {
   const apiKey = process.env.GEMINI_API_KEY?.trim();
   if (!apiKey) throw new Error("No Gemini key");
-  const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
+  const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -58,7 +58,7 @@ async function callGroq(prompt: string): Promise<string> {
       "Authorization": `Bearer ${apiKey}`
     },
     body: JSON.stringify({
-      model: "llama3-8b-8192",
+      model: "llama-3.1-8b-instant",
       messages: [{ role: "user", content: prompt }],
       temperature: 0.2
     })
@@ -71,40 +71,55 @@ async function callGroq(prompt: string): Promise<string> {
 async function callCohere(prompt: string): Promise<string> {
   const apiKey = process.env.COHERE_API_KEY?.trim();
   if (!apiKey) throw new Error("No Cohere key");
-  const res = await fetch("https://api.cohere.com/v1/generate", {
+  const res = await fetch("https://api.cohere.com/v2/chat", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       "Authorization": `Bearer ${apiKey}`
     },
     body: JSON.stringify({
-      model: "command",
-      prompt,
+      model: "command-r",
+      messages: [{ role: "user", content: prompt }],
       max_tokens: 1000,
       temperature: 0.2
     })
   });
   if (!res.ok) throw new Error(`Cohere failed: ${await res.text()}`);
   const data = await res.json();
-  return data.generations[0].text;
+  return data.message?.content?.[0]?.text || data.text || "";
 }
+
+const PROVIDERS: { name: string; fn: (p: string) => Promise<string> }[] = [
+  { name: "gemini", fn: callGemini },
+  { name: "groq", fn: callGroq },
+  { name: "cohere", fn: callCohere },
+];
+
+const MAX_RETRIES = 3;
 
 /**
  * Generates an AI completion using Gemini -> Groq -> Cohere fallback strategy.
+ * Each provider is attempted up to MAX_RETRIES times before falling to the next.
  */
 export async function generateAICompletion(prompt: string): Promise<AIResponse> {
-  try {
-    const content = await callGemini(prompt);
-    return { content, model: "gemini" };
-  } catch (e: unknown) {
-    console.warn((e instanceof Error ? e.message : String(e)));
-    try {
-      const content = await callGroq(prompt);
-      return { content, model: "groq" };
-    } catch (e2: unknown) {
-      console.warn(e2 instanceof Error ? e2.message : String(e2));
-      const content = await callCohere(prompt);
-      return { content, model: "cohere" };
+  let lastError: Error | null = null;
+
+  for (const provider of PROVIDERS) {
+    for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+      try {
+        console.log(`[AI] Trying ${provider.name} (attempt ${attempt}/${MAX_RETRIES})`);
+        const content = await provider.fn(prompt);
+        return { content, model: provider.name };
+      } catch (e: unknown) {
+        lastError = e instanceof Error ? e : new Error(String(e));
+        console.warn(`[AI] ${provider.name} attempt ${attempt} failed: ${lastError.message}`);
+        if (attempt < MAX_RETRIES) {
+          await new Promise((r) => setTimeout(r, 500 * attempt));
+        }
+      }
     }
+    console.warn(`[AI] All ${MAX_RETRIES} attempts exhausted for ${provider.name}`);
   }
+
+  throw lastError || new Error("All AI providers failed");
 }
