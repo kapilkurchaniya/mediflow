@@ -1,16 +1,39 @@
 // @ts-nocheck
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
+import { createGroq } from "@ai-sdk/groq";
 import { streamText, tool, convertToModelMessages } from "ai";
 import { db, schema } from "@/server/db";
 import { sql } from "drizzle-orm";
 import { z } from "zod";
 import { getCurrentSession } from "@/server/auth";
 
-export const maxDuration = 30;
+export const maxDuration = 60;
 
 const google = createGoogleGenerativeAI({
   apiKey: process.env.GEMINI_API_KEY,
 });
+
+const groq = createGroq({
+  apiKey: process.env.GROQ_API_KEY,
+});
+
+// Model fallback chain: each entry is tried up to MAX_RETRIES times
+const MODEL_CHAIN = [
+  { provider: "google" as const, id: "gemini-2.0-flash", label: "Gemini 2.0 Flash" },
+  { provider: "google" as const, id: "gemini-2.0-flash-lite", label: "Gemini 2.0 Flash Lite" },
+  { provider: "groq" as const, id: "llama-3.1-8b-instant", label: "Groq Llama 3.1 8B" },
+];
+const MAX_RETRIES = 3;
+
+function getModel(entry: (typeof MODEL_CHAIN)[number]) {
+  if (entry.provider === "google") return google(entry.id);
+  if (entry.provider === "groq") return groq(entry.id);
+  throw new Error(`Unknown provider: ${entry.provider}`);
+}
+
+const SYSTEM_PROMPT = `You are MediFlow, an intelligent AI assistant for a pharmacy and clinic management system. 
+You can help the user check inventory, add new medicines, check drug interactions, generate reports, and draft purchase orders.
+When answering, be concise, professional, and helpful. Format your responses using markdown where appropriate (like tables or bold text).`;
 
 export async function POST(req: Request) {
   const { session } = await getCurrentSession();
@@ -35,13 +58,11 @@ export async function POST(req: Request) {
 
   const modelMessages = await convertToModelMessages(messages);
 
-  const result = streamText({
-    model: google("gemini-1.5-pro-latest"),
+  // Build shared streamText options (everything except `model`)
+  const streamOptions = {
     messages: modelMessages,
     maxSteps: 5,
-    system: `You are MediFlow, an intelligent AI assistant for a pharmacy and clinic management system. 
-You can help the user check inventory, add new medicines, check drug interactions, generate reports, and draft purchase orders.
-When answering, be concise, professional, and helpful. Format your responses using markdown where appropriate (like tables or bold text).`,
+    system: SYSTEM_PROMPT,
     tools: {
       // @ts-ignore - Ignore zod v4 / ai SDK v7 type incompatibility
       check_inventory: tool({
@@ -180,7 +201,42 @@ When answering, be concise, professional, and helpful. Format your responses usi
         }
       })
     }
-  });
+  } as const;
 
-  return result.toUIMessageStreamResponse();
+  // Try each model in the chain with retries
+  let lastError: Error | null = null;
+
+  for (const modelEntry of MODEL_CHAIN) {
+    for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+      try {
+        console.log(`[MediFlow AI] Trying ${modelEntry.label} (attempt ${attempt}/${MAX_RETRIES})`);
+        const result = streamText({
+          ...streamOptions,
+          model: getModel(modelEntry),
+        });
+        // If streamText didn't throw, return the stream
+        return result.toUIMessageStreamResponse();
+      } catch (err: unknown) {
+        lastError = err instanceof Error ? err : new Error(String(err));
+        console.warn(
+          `[MediFlow AI] ${modelEntry.label} attempt ${attempt} failed: ${lastError.message}`
+        );
+        // Small backoff before retrying the same model
+        if (attempt < MAX_RETRIES) {
+          await new Promise((r) => setTimeout(r, 500 * attempt));
+        }
+      }
+    }
+    console.warn(`[MediFlow AI] All ${MAX_RETRIES} attempts exhausted for ${modelEntry.label}, falling back...`);
+  }
+
+  // All models exhausted
+  console.error("[MediFlow AI] All models failed.", lastError);
+  return new Response(
+    JSON.stringify({
+      error: "All AI models are currently unavailable. Please try again later.",
+      details: lastError?.message,
+    }),
+    { status: 503, headers: { "Content-Type": "application/json" } }
+  );
 }
