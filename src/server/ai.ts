@@ -35,7 +35,7 @@ export async function searchTavily(query: string): Promise<string> {
 async function callGemini(prompt: string): Promise<string> {
   const apiKey = process.env.GEMINI_API_KEY?.trim();
   if (!apiKey) throw new Error("No Gemini key");
-  const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`, {
+  const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=${apiKey}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -58,7 +58,7 @@ async function callGroq(prompt: string): Promise<string> {
       "Authorization": `Bearer ${apiKey}`
     },
     body: JSON.stringify({
-      model: "llama-3.1-8b-instant",
+      model: "openai/gpt-oss-20b",
       messages: [{ role: "user", content: prompt }],
       temperature: 0.2
     })
@@ -78,7 +78,7 @@ async function callCohere(prompt: string): Promise<string> {
       "Authorization": `Bearer ${apiKey}`
     },
     body: JSON.stringify({
-      model: "command-r",
+      model: "command-a-03-2025",
       messages: [{ role: "user", content: prompt }],
       max_tokens: 1000,
       temperature: 0.2
