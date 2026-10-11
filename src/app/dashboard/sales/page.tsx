@@ -4,11 +4,24 @@ import Link from "next/link";
 import { format } from "date-fns";
 import { PageHeader, SearchForm, EmptyState, Avatar } from "@/app/components/ui";
 import { formatINR, formatNumber } from "@/lib/format";
+import { DateRangeFilter } from "@/app/components/DateRangeFilter";
+import { resolveDateRange } from "@/lib/date-range";
 
 export const metadata = { title: "Sales & invoices" };
 
-export default async function SalesPage() {
-  const sales = await getSales();
+export default async function SalesPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ q?: string; range?: string; from?: string; to?: string }>;
+}) {
+  const params = await searchParams;
+  const dateRange = resolveDateRange({
+    range: params.range,
+    from: params.from,
+    to: params.to,
+  });
+
+  const sales = await getSales(dateRange.from, dateRange.to);
   const total = sales.reduce((a, { sale }) => a + (sale.totalAmount ?? 0), 0);
   const outstanding = sales.reduce((a, { sale }) => a + Math.max(sale.creditAmount ?? 0, 0), 0);
 
@@ -29,6 +42,11 @@ export default async function SalesPage() {
         }
       />
 
+      {/* Date Range Filter */}
+      <div className="card px-4 py-3">
+        <DateRangeFilter />
+      </div>
+
       <div className="card overflow-hidden">
         <SearchForm placeholder="Search invoice no. or customer">
           <div className="flex items-center gap-4 text-[12.5px] text-ink-500">
@@ -38,6 +56,10 @@ export default async function SalesPage() {
             <span className="h-3 w-px bg-ink-200" />
             <span>
               Outstanding <span className="font-medium text-amber-700 num">{formatINR(outstanding)}</span>
+            </span>
+            <span className="h-3 w-px bg-ink-200" />
+            <span>
+              <span className="font-medium text-ink-900 num">{formatNumber(sales.length)}</span> invoices
             </span>
           </div>
         </SearchForm>
