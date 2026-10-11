@@ -33,30 +33,31 @@ function getModel(entry: (typeof MODEL_CHAIN)[number]) {
 }
 
 const SYSTEM_PROMPT = `You are MediFlow, an intelligent AI assistant for a pharmacy and clinic management system.
-You have REAL-TIME access to the store's database and can provide accurate, live data — never make up numbers.
+You have REAL-TIME access to the store's database and can provide accurate, live data — never make up numbers or guess values.
 
 Your capabilities:
-- **Sales Data**: Get real sales summaries for any period (today, yesterday, this week, this month, last month, this quarter, this year, or custom date ranges). Always use the get_sales_summary tool.
-- **Purchase Data**: Get real purchase summaries for any period using the get_purchase_summary tool.
-- **Stock & Inventory**: Check inventory levels, search for specific products, get low-stock alerts, near-expiry reports, and stock valuation using check_inventory and get_stock_report tools.
+- **Sales Data**: Get live sales summaries for any period (today, yesterday, this week, this month, last month, this quarter, this year, or custom date ranges) using get_sales_summary. Look up specific invoices or recent transaction logs using get_sales_details.
+- **Stock Details & Inventory**: Check stock details for specific medicines (batches, expiries, quantities on hand, MRP) using get_stock_details or check_inventory. Get inventory valuation, low-stock items, and near-expiry reports using get_stock_report.
+- **Purchase Data**: Get real purchase and supplier expense summaries for any period using get_purchase_summary.
 - **Add Medicines**: Add new medicines to the catalogue using add_medicine.
 - **Drug Interactions**: Check interactions between medications using check_interactions.
-- **POS Integration**: Add medicines to the current bill using add_to_bill.
+- **POS Integration**: Add medicines directly to the current bill/cart using add_to_bill.
 
-Important rules:
-1. Always use tools to fetch data — NEVER return hardcoded or estimated values.
-2. When the user asks about sales, revenue, or billing data, call get_sales_summary with the appropriate period.
-3. When asked about purchases, call get_purchase_summary.
-4. When asked about stock, inventory value, low-stock or expiry, call get_stock_report.
-5. Money values from the database are in PAISE (1/100th of a rupee). Convert to rupees for display using the _display fields.
-6. Format responses using markdown tables where appropriate. Be concise and professional.
-7. All data is automatically scoped to the user's store/tenant for security — never expose data from other tenants.`;
+Data Protection & Security Rules:
+1. Always use tools to fetch live data from the database — NEVER return hardcoded, estimated, or fabricated numbers.
+2. Data Isolation: All queries are strictly scoped to the authenticated user's store and tenant. Never disclose or attempt to access other stores' or tenants' data.
+3. Privacy: Do not expose sensitive internal credentials, tokens, or private patient information.
+4. Currency: Financial values are returned in Indian Rupees (₹). Always display prices and totals formatted with the ₹ symbol.
+5. Format your responses with clean markdown tables and structured bullet points for readability.`;
 
 
 export async function POST(req: Request) {
   const { session } = await getCurrentSession();
-  if (!session) {
-    return new Response("Unauthorized", { status: 401 });
+  if (!session || !session.tenantId || !session.storeId) {
+    return new Response(JSON.stringify({ error: "Unauthorized: Active store session required." }), {
+      status: 401,
+      headers: { "Content-Type": "application/json" },
+    });
   }
   const body = await req.json();
   let messages = body.messages;
@@ -84,8 +85,89 @@ export async function POST(req: Request) {
       system: SYSTEM_PROMPT,
       tools: {
         // @ts-ignore - Ignore zod v4 / ai SDK v7 type incompatibility
+        get_stock_details: tool({
+          description: "Get detailed stock information for specific medicines, generic compositions, or batch numbers. Returns active batches, quantities on hand, expiry dates, and MRP. Fully protected and scoped to this store.",
+          parameters: z.object({
+            searchTerm: z.string().describe("The name of the medicine, generic salt, or batch number to look up stock details for."),
+          }),
+          execute: async ({ searchTerm }: any) => {
+            try {
+              // 1. Fetch matching active medicines for this tenant
+              const medResult = await db.execute(sql`
+                SELECT m.id, m.name, m.generic_name, m.pack_size, m.mrp, m.reorder_level
+                FROM medicines m
+                WHERE (m.name ILIKE ${'%' + searchTerm + '%'} OR m.generic_name ILIKE ${'%' + searchTerm + '%'})
+                  AND m.tenant_id = ${session.tenantId}
+                  AND m.is_active = true
+                ORDER BY m.name ASC
+                LIMIT 5
+              `);
+
+              if (medResult.rows.length === 0) {
+                return {
+                  searchTerm,
+                  found: false,
+                  message: `No medicine matching "${searchTerm}" was found in this store's catalogue.`,
+                };
+              }
+
+              const medicines = [];
+              for (const row of medResult.rows as any[]) {
+                // Fetch active batches for this medicine in this store with tenant isolation
+                const batchResult = await db.execute(sql`
+                  SELECT 
+                    b.id,
+                    b.batch_no,
+                    b.expiry_date,
+                    b.qty_on_hand,
+                    b.mrp,
+                    b.sale_rate
+                  FROM batches b
+                  WHERE b.medicine_id = ${row.id}
+                    AND b.store_id = ${session.storeId}
+                    AND b.tenant_id = ${session.tenantId}
+                    AND b.qty_on_hand > 0
+                  ORDER BY b.expiry_date ASC
+                `);
+
+                const batches = (batchResult.rows as any[]).map((b) => ({
+                  batch_no: b.batch_no,
+                  expiry_date: b.expiry_date,
+                  qty_on_hand: Number(b.qty_on_hand),
+                  mrp_display: `₹${(Number(b.mrp || 0) / 100).toFixed(2)}`,
+                  sale_rate_display: `₹${(Number(b.sale_rate || b.mrp || 0) / 100).toFixed(2)}`,
+                }));
+
+                const totalStock = batches.reduce((sum, b) => sum + b.qty_on_hand, 0);
+                const isLowStock = totalStock <= (Number(row.reorder_level) || 10);
+
+                medicines.push({
+                  id: row.id,
+                  name: row.name,
+                  generic_composition: row.generic_name || "N/A",
+                  pack_size: row.pack_size || "Unit",
+                  mrp_display: `₹${(Number(row.mrp || 0) / 100).toFixed(2)}`,
+                  total_stock_units: totalStock,
+                  stock_status: totalStock === 0 ? "OUT_OF_STOCK" : isLowStock ? "LOW_STOCK" : "IN_STOCK",
+                  active_batches: batches,
+                });
+              }
+
+              return {
+                searchTerm,
+                found: true,
+                count: medicines.length,
+                medicines,
+                protection_notice: "Protected store-scoped live stock data.",
+              };
+            } catch (e: unknown) {
+              return { error: e instanceof Error ? e.message : "Unable to retrieve stock details." };
+            }
+          },
+        }),
+        // @ts-ignore - Ignore zod v4 / ai SDK v7 type incompatibility
         check_inventory: tool({
-          description: "Check the current inventory levels for all products, or a specific product if provided. Identifies low-stock items.",
+          description: "Check inventory levels across the catalogue or list items that are currently low in stock. Fully protected and scoped to this store.",
           parameters: z.object({
             productName: z.string().optional().describe("Optional product name to search for. If omitted, returns low stock items."),
           }),
@@ -94,10 +176,10 @@ export async function POST(req: Request) {
               let query;
               if (productName) {
                 query = sql`
-                  SELECT m.name, m.generic_name, m.mrp, SUM(b.qty_on_hand) as total_stock, m.reorder_level
+                  SELECT m.name, m.generic_name, m.mrp, COALESCE(SUM(b.qty_on_hand), 0) as total_stock, m.reorder_level
                   FROM medicines m
-                  LEFT JOIN batches b ON m.id = b.medicine_id
-                  WHERE m.name ILIKE ${'%' + productName + '%'} AND m.tenant_id = ${session.tenantId}
+                  LEFT JOIN batches b ON m.id = b.medicine_id AND b.store_id = ${session.storeId} AND b.tenant_id = ${session.tenantId}
+                  WHERE m.name ILIKE ${'%' + productName + '%'} AND m.tenant_id = ${session.tenantId} AND m.is_active = true
                   GROUP BY m.id
                   LIMIT 10
                 `;
@@ -106,21 +188,29 @@ export async function POST(req: Request) {
                 query = sql`
                   SELECT m.name, m.generic_name, m.mrp, COALESCE(SUM(b.qty_on_hand), 0) as total_stock, m.reorder_level
                   FROM medicines m
-                  LEFT JOIN batches b ON m.id = b.medicine_id
-                  WHERE m.tenant_id = ${session.tenantId}
+                  LEFT JOIN batches b ON m.id = b.medicine_id AND b.store_id = ${session.storeId} AND b.tenant_id = ${session.tenantId}
+                  WHERE m.tenant_id = ${session.tenantId} AND m.is_active = true
                   GROUP BY m.id
                   HAVING COALESCE(SUM(b.qty_on_hand), 0) <= m.reorder_level
-                  LIMIT 10
+                  LIMIT 15
                 `;
               }
               
               const res = await db.execute(query);
+              const items = (res.rows as any[]).map((r) => ({
+                name: r.name,
+                generic_composition: r.generic_name,
+                total_stock: Number(r.total_stock || 0),
+                reorder_level: Number(r.reorder_level || 10),
+                mrp_display: `₹${(Number(r.mrp || 0) / 100).toFixed(2)}`,
+              }));
               return {
-                results: res.rows,
-                message: res.rows.length ? "Found these items." : "No low stock items found.",
+                results: items,
+                count: items.length,
+                message: items.length ? `Found ${items.length} items.` : "No items found matching the criteria.",
               };
             } catch (e: unknown) {
-              return { error: e instanceof Error ? e.message : "Unknown error" };
+              return { error: e instanceof Error ? e.message : "Unable to query inventory." };
             }
           },
         }),
@@ -180,7 +270,7 @@ export async function POST(req: Request) {
               if (res.rows.length === 0) return { error: "Medicine not found in inventory." };
               
               const med = res.rows[0];
-              const batchQuery = sql`SELECT id as batch_id, batch_no, mrp, qty_on_hand, gst_rate_bp FROM batches WHERE medicine_id = ${med.id} AND qty_on_hand > 0 LIMIT 1`;
+              const batchQuery = sql`SELECT id as batch_id, batch_no, mrp, qty_on_hand, gst_rate_bp FROM batches WHERE medicine_id = ${med.id} AND qty_on_hand > 0 AND store_id = ${session.storeId} AND tenant_id = ${session.tenantId} LIMIT 1`;
               const batchRes = await db.execute(batchQuery);
               if (batchRes.rows.length === 0) return { error: "No available batches with stock for this medicine." };
               
@@ -272,6 +362,78 @@ export async function POST(req: Request) {
           }
         }),
         // @ts-ignore
+        get_sales_details: tool({
+          description: "Get detailed sales transaction list or look up specific invoices. Shows invoice number, customer name, total amount (₹), payment status, and timestamp. Strictly protected and scoped to this store.",
+          parameters: z.object({
+            period: z.string().optional().describe("Time period e.g. 'today', 'yesterday', 'this week', 'this month'"),
+            from: z.string().optional().describe("Custom start date YYYY-MM-DD"),
+            to: z.string().optional().describe("Custom end date YYYY-MM-DD"),
+            invoiceNo: z.string().optional().describe("Optional invoice number to search for"),
+            limit: z.number().optional().describe("Maximum number of records to return (default 10, max 25)"),
+          }),
+          execute: async ({ period, from, to, invoiceNo, limit = 10 }: any) => {
+            try {
+              const dateRange = (from || to)
+                ? { from: from || null, to: to || null }
+                : period
+                  ? resolveAIPeriod(period)
+                  : { from: null, to: null };
+
+              const conditions: any[] = [
+                sql`s.store_id = ${session.storeId}`,
+                sql`s.tenant_id = ${session.tenantId}`,
+              ];
+
+              if (invoiceNo) {
+                conditions.push(sql`s.invoice_no ILIKE ${'%' + invoiceNo + '%'}`);
+              }
+              if (dateRange.from) {
+                conditions.push(sql`s.created_at >= ${dateRange.from}::date`);
+              }
+              if (dateRange.to) {
+                conditions.push(sql`s.created_at < (${dateRange.to}::date + interval '1 day')`);
+              }
+
+              const whereClause = sql.join(conditions, sql` AND `);
+              const maxLimit = Math.min(Math.max(1, limit || 10), 25);
+
+              const result = await db.execute(sql`
+                SELECT 
+                  s.id,
+                  s.invoice_no,
+                  s.total_amount,
+                  s.payment_mode,
+                  s.status,
+                  s.created_at,
+                  c.name as customer_name
+                FROM sales s
+                LEFT JOIN customers c ON s.customer_id = c.id
+                WHERE ${whereClause}
+                ORDER BY s.created_at DESC
+                LIMIT ${maxLimit}
+              `);
+
+              const invoices = (result.rows as any[]).map((r) => ({
+                invoice_no: r.invoice_no,
+                customer_name: r.customer_name || "Walk-in customer",
+                amount_rupees: `₹${(Number(r.total_amount || 0) / 100).toFixed(2)}`,
+                payment_mode: r.payment_mode || "cash",
+                status: r.status,
+                created_at: r.created_at ? new Date(r.created_at).toLocaleString("en-IN") : "N/A",
+              }));
+
+              return {
+                period: period || "custom/recent",
+                count: invoices.length,
+                invoices,
+                protection_notice: "Protected store-scoped live sales records.",
+              };
+            } catch (e: unknown) {
+              return { error: e instanceof Error ? e.message : "Unable to retrieve sales details." };
+            }
+          },
+        }),
+        // @ts-ignore
         get_purchase_summary: tool({
           description: "Get a summary of purchases for a given period. Shows total purchase value, number of invoices, and top suppliers.",
           parameters: z.object({
@@ -344,7 +506,7 @@ export async function POST(req: Request) {
                     COALESCE(SUM(b.qty_on_hand * COALESCE(b.sale_rate, b.mrp)), 0) as stock_sale_value,
                     COUNT(DISTINCT CASE WHEN b.qty_on_hand > 0 THEN m.id END) as items_in_stock
                   FROM medicines m
-                  LEFT JOIN batches b ON m.id = b.medicine_id AND b.store_id = ${session.storeId}
+                  LEFT JOIN batches b ON m.id = b.medicine_id AND b.store_id = ${session.storeId} AND b.tenant_id = ${session.tenantId}
                   WHERE m.tenant_id = ${session.tenantId} AND m.is_active = true
                 `);
                 const row = result.rows[0] as any;
@@ -360,7 +522,7 @@ export async function POST(req: Request) {
                 const result = await db.execute(sql`
                   SELECT m.name, m.generic_name, COALESCE(SUM(b.qty_on_hand), 0) as total_stock, m.reorder_level
                   FROM medicines m
-                  LEFT JOIN batches b ON m.id = b.medicine_id AND b.store_id = ${session.storeId}
+                  LEFT JOIN batches b ON m.id = b.medicine_id AND b.store_id = ${session.storeId} AND b.tenant_id = ${session.tenantId}
                   WHERE m.tenant_id = ${session.tenantId} AND m.is_active = true
                   GROUP BY m.id, m.name, m.generic_name, m.reorder_level
                   HAVING COALESCE(SUM(b.qty_on_hand), 0) <= m.reorder_level

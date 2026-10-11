@@ -7,10 +7,39 @@ import { recordStockMovement } from "@/server/domain/stock";
 import { revalidatePath } from "next/cache";
 import { addDays, format } from "date-fns";
 
-export async function getBatches(nearExpiryOnly = false) {
+export async function getBatches(
+  opts?:
+    | {
+        nearExpiryOnly?: boolean;
+        from?: string | null;
+        to?: string | null;
+      }
+    | boolean
+) {
   const { session, user } = await requireAuth();
 
+  const isBool = typeof opts === "boolean";
+  const nearExpiryOnly = isBool ? opts : Boolean(opts?.nearExpiryOnly);
+  const from = !isBool ? opts?.from : null;
+  const to = !isBool ? opts?.to : null;
+
   const ninetyDaysFromNow = nearExpiryOnly ? format(addDays(new Date(), 90), "yyyy-MM-dd") : undefined;
+
+  const conditions = [
+    eq(schema.batches.tenantId, session.tenantId),
+    eq(schema.batches.storeId, session.storeId),
+  ];
+
+  if (nearExpiryOnly && ninetyDaysFromNow) {
+    conditions.push(lte(schema.batches.expiryDate, ninetyDaysFromNow));
+  } else {
+    if (from) {
+      conditions.push(sql`${schema.batches.expiryDate} >= ${from}`);
+    }
+    if (to) {
+      conditions.push(sql`${schema.batches.expiryDate} <= ${to}`);
+    }
+  }
 
   const query = db
     .select({
@@ -19,13 +48,7 @@ export async function getBatches(nearExpiryOnly = false) {
     })
     .from(schema.batches)
     .innerJoin(schema.medicines, eq(schema.batches.medicineId, schema.medicines.id))
-    .where(
-      and(
-        eq(schema.batches.tenantId, session.tenantId),
-        eq(schema.batches.storeId, session.storeId),
-        nearExpiryOnly ? lte(schema.batches.expiryDate, ninetyDaysFromNow!) : undefined
-      )
-    );
+    .where(and(...conditions));
 
   const results = await query.orderBy(schema.batches.expiryDate);
   return results;
