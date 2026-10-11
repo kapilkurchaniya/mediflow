@@ -4,6 +4,8 @@ import Link from "next/link";
 import clsx from "clsx";
 import { PageHeader, StatCard, EmptyState } from "@/app/components/ui";
 import { formatINR, formatNumber, daysUntil } from "@/lib/format";
+import { DateRangeFilter } from "@/app/components/DateRangeFilter";
+import { resolveDateRange } from "@/lib/date-range";
 
 export const metadata = { title: "Batches & stock" };
 
@@ -19,11 +21,16 @@ function ExpiryBadge({ date }: { date: string }) {
 export default async function BatchesPage({
   searchParams,
 }: {
-  searchParams: Promise<{ nearExpiry?: string }>;
+  searchParams: Promise<{ nearExpiry?: string; range?: string; from?: string; to?: string }>;
 }) {
-  const { nearExpiry } = await searchParams;
+  const { nearExpiry, range, from, to } = await searchParams;
   const isNearExpiry = nearExpiry === "true";
-  const batches = await getBatches(isNearExpiry);
+  const dateRange = resolveDateRange({ range, from, to });
+  const batches = await getBatches({
+    nearExpiryOnly: isNearExpiry,
+    from: dateRange.from,
+    to: dateRange.to,
+  });
 
   const totalValuation = batches.reduce((acc, row) => acc + row.batch.qtyOnHand * row.batch.purchaseRate, 0);
   const totalUnits = batches.reduce((acc, row) => acc + row.batch.qtyOnHand, 0);
@@ -57,6 +64,12 @@ export default async function BatchesPage({
           footnote="Plan returns or discounts early"
         />
       </section>
+
+      {/* Expiry Date Filter Bar */}
+      <div className="card px-4 py-3 bg-white/70 backdrop-blur-xs">
+        <div className="mb-2 text-[12px] font-medium text-ink-500">Filter by expiry date:</div>
+        <DateRangeFilter />
+      </div>
 
       <div className="card overflow-hidden">
         <div className="flex items-center justify-between gap-3 border-b border-ink-150 px-4 py-3">

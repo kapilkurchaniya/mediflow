@@ -4,11 +4,24 @@ import Link from "next/link";
 import { format } from "date-fns";
 import { PageHeader, SearchForm, EmptyState } from "@/app/components/ui";
 import { formatINR, formatNumber } from "@/lib/format";
+import { DateRangeFilter } from "@/app/components/DateRangeFilter";
+import { resolveDateRange } from "@/lib/date-range";
 
 export const metadata = { title: "Purchases" };
 
-export default async function PurchasesPage() {
-  const purchases = await getPurchases();
+export default async function PurchasesPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ q?: string; range?: string; from?: string; to?: string }>;
+}) {
+  const params = await searchParams;
+  const dateRange = resolveDateRange({
+    range: params.range,
+    from: params.from,
+    to: params.to,
+  });
+
+  const purchases = await getPurchases(dateRange.from, dateRange.to);
   const total = purchases.reduce((a, { purchase }) => a + (purchase.totalAmount ?? 0), 0);
 
   return (
@@ -27,6 +40,11 @@ export default async function PurchasesPage() {
           </>
         }
       />
+
+      {/* Date Range Filter */}
+      <div className="card px-4 py-3">
+        <DateRangeFilter />
+      </div>
 
       <div className="card overflow-hidden">
         <SearchForm placeholder="Search invoice no. or supplier">
