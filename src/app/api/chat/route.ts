@@ -48,7 +48,13 @@ Data Protection & Security Rules:
 2. Data Isolation: All queries are strictly scoped to the authenticated user's store and tenant. Never disclose or attempt to access other stores' or tenants' data.
 3. Privacy: Do not expose sensitive internal credentials, tokens, or private patient information.
 4. Currency: Financial values are returned in Indian Rupees (₹). Always display prices and totals formatted with the ₹ symbol.
-5. Format your responses with clean markdown tables and structured bullet points for readability.`;
+5. Table Structure: When generating Markdown tables, ALWAYS put separate newline breaks (\n) between every row, especially after the table header and separator rows. Never concatenate rows on the same line.
+   Example:
+   | Metric | Value |
+   | :--- | :--- |
+   | Total Invoices | 1 |
+   | Total Revenue | ₹153.00 |
+6. Format your responses with structured cards, bold callouts, and clean bullet points for instant readability.`;
 
 
 export async function POST(req: Request) {
