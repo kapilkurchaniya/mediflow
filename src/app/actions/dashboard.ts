@@ -4,7 +4,7 @@ import { db, schema } from "@/server/db";
 import { eq, and, desc, sql, gte, lt } from "drizzle-orm";
 import { getCurrentSession, requireAuth } from "@/server/auth";
 
-export async function getDashboardStats() {
+export async function getDashboardStats(dateRange?: { from?: string | null; to?: string | null }) {
   const { session } = await requireAuth();
 
   const todayStr = new Date().toISOString().split("T")[0];
@@ -12,46 +12,68 @@ export async function getDashboardStats() {
   ninetyDaysFromNow.setDate(ninetyDaysFromNow.getDate() + 90);
   const expiryThresholdStr = ninetyDaysFromNow.toISOString().split("T")[0];
 
-  // 1. Today's Sales
+  // 1. Sales - Filtered by date range if provided, or defaults to today
+  const salesConditions = [
+    eq(schema.sales.tenantId, session.tenantId),
+    eq(schema.sales.storeId, session.storeId),
+    eq(schema.sales.status, "completed"),
+  ];
+
+  if (dateRange?.from) {
+    salesConditions.push(sql`${schema.sales.createdAt} >= ${dateRange.from}::date`);
+  }
+  if (dateRange?.to) {
+    salesConditions.push(sql`${schema.sales.createdAt} < (${dateRange.to}::date + interval '1 day')`);
+  }
+  if (!dateRange?.from && !dateRange?.to) {
+    salesConditions.push(sql`DATE(${schema.sales.createdAt}) = ${todayStr}::date`);
+  }
+
   const [salesResult] = await db
     .select({
       totalSales: sql<number>`sum(${schema.sales.totalAmount})`.mapWith(Number),
       count: sql<number>`count(${schema.sales.id})`.mapWith(Number),
     })
     .from(schema.sales)
-    .where(
-      and(
-        eq(schema.sales.storeId, session.storeId),
-        sql`DATE(${schema.sales.createdAt}) = ${todayStr}::date`
-      )
-    );
+    .where(and(...salesConditions));
 
-  // 2. Expiring Soon (qty > 0 and expiry <= 90 days)
+  // 2. Expiring Soon (qty > 0 and expiry <= 90 days, scoped to tenant & store)
   const [expiringResult] = await db
     .select({ count: sql<number>`count(${schema.batches.id})`.mapWith(Number) })
     .from(schema.batches)
     .where(
       and(
+        eq(schema.batches.tenantId, session.tenantId),
         eq(schema.batches.storeId, session.storeId),
         gte(schema.batches.qtyOnHand, 1),
-        lt(schema.batches.expiryDate, expiryThresholdStr) // PostgreSQL can compare date strings in YYYY-MM-DD
+        lt(schema.batches.expiryDate, expiryThresholdStr)
       )
     );
 
-  // 3. Low Stock Items
-  // Sum of batch qtys per medicine compared to medicine.minStockLevel
+  // 3. Low Stock Items (scoped to tenant & store)
   const lowStockResult = await db.execute(sql`
     SELECT COUNT(*) as count FROM (
       SELECT m.id, m.name, COALESCE(SUM(b.qty_on_hand), 0) as total_qty, m.reorder_level
       FROM ${schema.medicines} m
-      LEFT JOIN ${schema.batches} b ON m.id = b.medicine_id AND b.store_id = ${session.storeId}
+      LEFT JOIN ${schema.batches} b ON m.id = b.medicine_id AND b.store_id = ${session.storeId} AND b.tenant_id = ${session.tenantId}
       WHERE m.tenant_id = ${session.tenantId} AND m.is_active = true
       GROUP BY m.id, m.name, m.reorder_level
       HAVING COALESCE(SUM(b.qty_on_hand), 0) <= COALESCE(m.reorder_level, 10)
     ) as subquery
   `);
 
-  // 4. Recent Sales
+  // 4. Recent Sales (scoped to tenant and store)
+  const recentSalesConditions = [
+    eq(schema.sales.tenantId, session.tenantId),
+    eq(schema.sales.storeId, session.storeId),
+  ];
+  if (dateRange?.from) {
+    recentSalesConditions.push(sql`${schema.sales.createdAt} >= ${dateRange.from}::date`);
+  }
+  if (dateRange?.to) {
+    recentSalesConditions.push(sql`${schema.sales.createdAt} < (${dateRange.to}::date + interval '1 day')`);
+  }
+
   const recentSales = await db
     .select({
       id: schema.sales.id,
@@ -62,12 +84,7 @@ export async function getDashboardStats() {
     })
     .from(schema.sales)
     .leftJoin(schema.customers, eq(schema.sales.customerId, schema.customers.id))
-    .where(
-      and(
-        eq(schema.sales.tenantId, session.tenantId),
-        eq(schema.sales.storeId, session.storeId)
-      )
-    )
+    .where(and(...recentSalesConditions))
     .orderBy(desc(schema.sales.createdAt))
     .limit(5);
 
