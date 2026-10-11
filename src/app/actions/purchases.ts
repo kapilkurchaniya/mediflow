@@ -1,14 +1,26 @@
 "use server";
 
 import { db, schema } from "@/server/db";
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and, desc, gte, lte } from "drizzle-orm";
 import { getCurrentSession, requireAuth } from "@/server/auth";
 import { recordStockMovement } from "@/server/domain/stock";
 import { nextDocNumber } from "@/server/domain/sequence";
 import { revalidatePath } from "next/cache";
 
-export async function getPurchases() {
+export async function getPurchases(dateFrom?: string | null, dateTo?: string | null) {
   const { session, user } = await requireAuth();
+
+  const conditions = [
+    eq(schema.purchases.tenantId, session.tenantId),
+    eq(schema.purchases.storeId, session.storeId),
+  ];
+
+  if (dateFrom) {
+    conditions.push(gte(schema.purchases.invoiceDate, dateFrom));
+  }
+  if (dateTo) {
+    conditions.push(lte(schema.purchases.invoiceDate, dateTo));
+  }
 
   return db
     .select({
@@ -17,12 +29,7 @@ export async function getPurchases() {
     })
     .from(schema.purchases)
     .innerJoin(schema.suppliers, eq(schema.purchases.supplierId, schema.suppliers.id))
-    .where(
-      and(
-        eq(schema.purchases.tenantId, session.tenantId),
-        eq(schema.purchases.storeId, session.storeId)
-      )
-    )
+    .where(and(...conditions))
     .orderBy(desc(schema.purchases.invoiceDate));
 }
 
