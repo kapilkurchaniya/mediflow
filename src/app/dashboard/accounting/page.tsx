@@ -3,16 +3,34 @@ import { BookOpenText, Scale, ArrowDownLeft, ArrowUpRight, CheckCircle2, AlertTr
 import { format } from "date-fns";
 import { PageHeader, StatCard, EmptyState } from "@/app/components/ui";
 import { formatINR } from "@/lib/format";
+import { DateRangeFilter } from "@/app/components/DateRangeFilter";
+import { resolveDateRange } from "@/lib/date-range";
 
 export const metadata = { title: "Accounting" };
 
-export default async function AccountingPage() {
-  const trialBalance = await getTrialBalance();
-  const journalLines = await getJournalLines();
+export default async function AccountingPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ range?: string; from?: string; to?: string }>;
+}) {
+  const params = await searchParams;
+  const dateRange = resolveDateRange({
+    range: params.range,
+    from: params.from,
+    to: params.to,
+  });
+
+  const trialBalance = await getTrialBalance(dateRange.from, dateRange.to);
+  const journalLines = await getJournalLines(dateRange.from, dateRange.to);
 
   const totalDebit = trialBalance.reduce((sum, row) => sum + row.totalDebit, 0);
   const totalCredit = trialBalance.reduce((sum, row) => sum + row.totalCredit, 0);
   const balanced = totalDebit === totalCredit;
+
+  // Build the period label for display
+  const periodLabel = dateRange.from && dateRange.to
+    ? `${format(new Date(dateRange.from), "d MMM yyyy")} – ${format(new Date(dateRange.to), "d MMM yyyy")}`
+    : `As of ${format(new Date(), "d MMM yyyy")}`;
 
   return (
     <div className="page space-y-6">
@@ -20,6 +38,11 @@ export default async function AccountingPage() {
         title="Accounting"
         description="Double-entry trial balance and day book, posted automatically from sales and purchases."
       />
+
+      {/* Date Range Filter */}
+      <div className="card px-4 py-3">
+        <DateRangeFilter />
+      </div>
 
       <section className="grid grid-cols-1 gap-4 md:grid-cols-3">
         <StatCard label="Total debits" value={formatINR(totalDebit)} icon={ArrowDownLeft} tone="info" />
@@ -41,7 +64,7 @@ export default async function AccountingPage() {
               <Scale className="h-4 w-4 text-ink-400" />
               <h2 className="card-title">Trial balance</h2>
             </div>
-            <span className="text-[12.5px] text-ink-500">As of {format(new Date(), "d MMM yyyy")}</span>
+            <span className="text-[12.5px] text-ink-500">{periodLabel}</span>
           </div>
 
           {trialBalance.length === 0 ? (
@@ -96,7 +119,9 @@ export default async function AccountingPage() {
               <BookOpenText className="h-4 w-4 text-ink-400" />
               <h2 className="card-title">Day book</h2>
             </div>
-            <span className="text-[12.5px] text-ink-500">Recent postings</span>
+            <span className="text-[12.5px] text-ink-500">
+              {dateRange.from ? "Filtered postings" : "Recent postings"}
+            </span>
           </div>
 
           {journalLines.length === 0 ? (

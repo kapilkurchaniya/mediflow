@@ -16,6 +16,8 @@ import { getDashboardStats } from "@/app/actions/dashboard";
 import { getCurrentSession } from "@/server/auth";
 import { PageHeader, StatCard, EmptyState, Avatar } from "@/app/components/ui";
 import { formatINR, formatNumber } from "@/lib/format";
+import { DateRangeFilter } from "@/app/components/DateRangeFilter";
+import { resolveDateRange } from "@/lib/date-range";
 
 export const metadata = { title: "Overview" };
 
@@ -33,18 +35,26 @@ const QUICK_ACTIONS = [
   { href: "/dashboard/customers/new", label: "Add customer", desc: "Create a credit account", icon: UserPlus },
 ];
 
-export default async function DashboardPage() {
-  const [stats, { user }] = await Promise.all([getDashboardStats(), getCurrentSession()]);
+export default async function DashboardPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ range?: string; from?: string; to?: string }>;
+}) {
+  const { range, from, to } = await searchParams;
+  const dateRange = resolveDateRange({ range, from, to });
+  const [stats, { user }] = await Promise.all([getDashboardStats(dateRange), getCurrentSession()]);
   const firstName = user?.name?.split(" ")[0] ?? "there";
   const avgBill = stats.todayCount > 0 ? Math.round(stats.todaySales / stats.todayCount) : 0;
   const attention = stats.lowStockCount + stats.expiringSoonCount;
+  const isFiltered = Boolean((range && range !== "today") || from || to);
+  const revenueLabel = range === "today" || !isFiltered ? "Today’s revenue" : "Period revenue";
 
   return (
     <div className="page space-y-6">
       <PageHeader
         eyebrow={format(new Date(), "EEEE, d MMMM yyyy")}
         title={`${greeting()}, ${firstName}`}
-        description="Here’s what’s happening at your store today."
+        description="Here’s what’s happening at your store."
         actions={
           <>
             <Link href="/dashboard/purchases/new" className="btn btn-secondary">
@@ -57,16 +67,21 @@ export default async function DashboardPage() {
         }
       />
 
+      {/* Date Filter Bar */}
+      <div className="card px-4 py-3 bg-white/70 backdrop-blur-xs">
+        <DateRangeFilter />
+      </div>
+
       {/* KPIs */}
       <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4" aria-label="Key metrics">
         <StatCard
-          label="Today’s revenue"
+          label={revenueLabel}
           value={formatINR(stats.todaySales)}
           icon={IndianRupee}
           tone="brand"
           footnote={
             <span className="inline-flex items-center gap-1">
-              <span className="font-medium text-ink-700 num">{formatNumber(stats.todayCount)}</span> invoices raised
+              <span className="font-medium text-ink-700 num">{formatNumber(stats.todayCount)}</span> {isFiltered ? "invoices in period" : "invoices raised"}
             </span>
           }
         />
