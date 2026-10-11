@@ -1,7 +1,7 @@
 "use server";
 
 import { db, schema } from "@/server/db";
-import { eq, and, desc, gt, ilike, or, sql, inArray } from "drizzle-orm";
+import { eq, and, desc, gt, gte, lte, ilike, or, sql, inArray } from "drizzle-orm";
 import { getCurrentSession, requireAuth } from "@/server/auth";
 import { recordStockMovement } from "@/server/domain/stock";
 import { nextDocNumber } from "@/server/domain/sequence";
@@ -10,8 +10,21 @@ import { sendWhatsAppReceipt } from "@/server/whatsapp";
 import { computeSaleTotals, type SaleLineInput } from "@/lib/money";
 import { format } from "date-fns";
 
-export async function getSales() {
+export async function getSales(dateFrom?: string | null, dateTo?: string | null) {
   const { session, user } = await requireAuth();
+
+  const conditions = [
+    eq(schema.sales.tenantId, session.tenantId),
+    eq(schema.sales.storeId, session.storeId),
+  ];
+
+  // Apply date filters if provided
+  if (dateFrom) {
+    conditions.push(gte(schema.sales.createdAt, new Date(dateFrom + "T00:00:00")));
+  }
+  if (dateTo) {
+    conditions.push(lte(schema.sales.createdAt, new Date(dateTo + "T23:59:59.999")));
+  }
 
   return db
     .select({
@@ -20,12 +33,7 @@ export async function getSales() {
     })
     .from(schema.sales)
     .leftJoin(schema.customers, eq(schema.sales.customerId, schema.customers.id))
-    .where(
-      and(
-        eq(schema.sales.tenantId, session.tenantId),
-        eq(schema.sales.storeId, session.storeId)
-      )
-    )
+    .where(and(...conditions))
     .orderBy(desc(schema.sales.createdAt));
 }
 
