@@ -190,8 +190,12 @@ export function AIAssistant() {
                   {m.role === 'user' ? (
                     m.parts.filter(p => p.type === 'text').map(p => p.type === 'text' ? p.text : '').join('')
                   ) : (
-                    m.parts.some(p => p.type === 'text') ? (
-                      <ReactMarkdown>{m.parts.filter(p => p.type === 'text').map(p => p.type === 'text' ? p.text : '').join('')}</ReactMarkdown>
+                    m.parts.some(p => p.type === 'text' && p.text.trim().length > 0) ? (
+                      <ReactMarkdown>{m.parts.filter(p => p.type === 'text').map(p => (p as any).text).join('')}</ReactMarkdown>
+                    ) : m.parts.some(p => p.type === 'tool-invocation' && (p as any).toolInvocation?.state === 'result') ? (
+                      <span className="text-brand-600 font-medium">
+                        {(m.parts.find(p => p.type === 'tool-invocation' && (p as any).toolInvocation?.state === 'result') as any).toolInvocation.result?.message || "Action completed."}
+                      </span>
                     ) : <span className="text-ink-500 italic">Executing tools...</span>
                   )}
                 </div>
