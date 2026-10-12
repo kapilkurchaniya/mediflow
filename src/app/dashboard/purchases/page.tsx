@@ -1,10 +1,11 @@
 import { getPurchases } from "@/app/actions/purchases";
-import { Plus, FileInput, Download } from "lucide-react";
+import { Plus, FileInput } from "lucide-react";
 import Link from "next/link";
 import { format } from "date-fns";
 import { PageHeader, SearchForm, EmptyState } from "@/app/components/ui";
 import { formatINR, formatNumber } from "@/lib/format";
 import { DateRangeFilter } from "@/app/components/DateRangeFilter";
+import { ExportButton } from "@/app/components/ExportButton";
 import { resolveDateRange } from "@/lib/date-range";
 
 export const metadata = { title: "Purchases" };
@@ -31,9 +32,11 @@ export default async function PurchasesPage({
         description="Supplier invoices and goods receipt notes (GRN) posted to stock and payables."
         actions={
           <>
-            <button type="button" className="btn btn-secondary">
-              <Download /> Export
-            </button>
+            <ExportButton
+              endpoint="/api/export/purchases"
+              from={dateRange.from}
+              to={dateRange.to}
+            />
             <Link href="/dashboard/purchases/new" className="btn btn-primary">
               <Plus /> New purchase
             </Link>
