@@ -1,10 +1,11 @@
 import { getSales } from "@/app/actions/sales";
-import { Plus, Receipt, Download } from "lucide-react";
+import { Plus, Receipt, Printer, Eye } from "lucide-react";
 import Link from "next/link";
 import { format } from "date-fns";
 import { PageHeader, SearchForm, EmptyState, Avatar } from "@/app/components/ui";
 import { formatINR, formatNumber } from "@/lib/format";
 import { DateRangeFilter } from "@/app/components/DateRangeFilter";
+import { ExportButton } from "@/app/components/ExportButton";
 import { resolveDateRange } from "@/lib/date-range";
 
 export const metadata = { title: "Sales & invoices" };
@@ -32,9 +33,11 @@ export default async function SalesPage({
         description="Every bill raised from this store, with payment status."
         actions={
           <>
-            <button type="button" className="btn btn-secondary">
-              <Download /> Export
-            </button>
+            <ExportButton
+              endpoint="/api/export/sales"
+              from={dateRange.from}
+              to={dateRange.to}
+            />
             <Link href="/dashboard/sales/pos" className="btn btn-primary">
               <Plus /> New bill
             </Link>
@@ -75,6 +78,7 @@ export default async function SalesPage({
                   <th>Prescribed by</th>
                   <th className="text-right">Amount</th>
                   <th className="text-right">Status</th>
+                  <th className="text-right">Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -83,9 +87,14 @@ export default async function SalesPage({
                   const paid = !sale.creditAmount || sale.creditAmount <= 0;
                   const partial = !paid && (sale.paidAmount ?? 0) > 0;
                   return (
-                    <tr key={sale.id}>
+                    <tr key={sale.id} className="hover:bg-ink-50/70 transition-colors">
                       <td>
-                        <span className="font-mono text-[12.5px] font-medium text-ink-900">{sale.invoiceNo}</span>
+                        <Link
+                          href={`/dashboard/sales/${sale.id}`}
+                          className="font-mono text-[12.5px] font-bold text-brand-700 hover:text-brand-900 hover:underline"
+                        >
+                          {sale.invoiceNo}
+                        </Link>
                       </td>
                       <td className="text-ink-600 num whitespace-nowrap">
                         {format(new Date(sale.completedAt ?? sale.createdAt), "d MMM yyyy")}
@@ -94,17 +103,35 @@ export default async function SalesPage({
                       <td>
                         <div className="flex items-center gap-2.5">
                           <Avatar name={name} size="sm" />
-                          <span className="text-ink-800">{name}</span>
+                          <span className="text-ink-800 font-medium">{name}</span>
                         </div>
                       </td>
                       <td className="text-ink-600">{sale.doctorName || <span className="text-ink-400">—</span>}</td>
-                      <td className="text-right font-medium text-ink-900 num">{formatINR(sale.totalAmount)}</td>
+                      <td className="text-right font-bold text-ink-900 num">{formatINR(sale.totalAmount)}</td>
                       <td className="text-right">
                         <span
                           className={`badge badge-dot ${paid ? "badge-success" : partial ? "badge-warning" : "badge-danger"}`}
                         >
                           {paid ? "Paid" : partial ? "Partial" : "Unpaid"}
                         </span>
+                      </td>
+                      <td className="text-right">
+                        <div className="inline-flex items-center gap-1.5">
+                          <Link
+                            href={`/dashboard/sales/${sale.id}`}
+                            className="btn btn-secondary btn-icon !h-7 !w-7"
+                            title="View Invoice Details"
+                          >
+                            <Eye className="h-3.5 w-3.5" />
+                          </Link>
+                          <Link
+                            href={`/dashboard/sales/${sale.id}/print?format=thermal`}
+                            className="btn btn-secondary btn-icon !h-7 !w-7"
+                            title="Print Thermal 80mm Slip"
+                          >
+                            <Printer className="h-3.5 w-3.5" />
+                          </Link>
+                        </div>
                       </td>
                     </tr>
                   );
