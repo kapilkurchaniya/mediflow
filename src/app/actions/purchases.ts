@@ -6,6 +6,7 @@ import { getCurrentSession, requireAuth } from "@/server/auth";
 import { recordStockMovement } from "@/server/domain/stock";
 import { nextDocNumber } from "@/server/domain/sequence";
 import { revalidatePath } from "next/cache";
+import { postPurchaseJournalEntry } from "@/server/domain/accounting";
 
 export async function getPurchases(dateFrom?: string | null, dateTo?: string | null) {
   const { session, user } = await requireAuth();
@@ -78,6 +79,8 @@ export async function createPurchaseInvoice(
       });
 
       const totalInvoiceAmount = grossAmount - totalDiscountAmount + totalTaxAmount;
+      const cgst = Math.floor(totalTaxAmount / 2);
+      const sgst = totalTaxAmount - cgst;
 
       // 2. Generate Internal Purchase Number (gap-free, row-locked)
       const purchaseNo = await nextDocNumber(tx, session.tenantId, session.storeId, "purchase", "PUR");
@@ -93,8 +96,8 @@ export async function createPurchaseInvoice(
         grossAmount,
         discountAmount: totalDiscountAmount,
         taxableAmount: grossAmount - totalDiscountAmount,
-        cgst: totalTaxAmount / 2,
-        sgst: totalTaxAmount / 2,
+        cgst,
+        sgst,
         igst: 0,
         totalAmount: totalInvoiceAmount,
         status: "posted",
@@ -169,18 +172,35 @@ export async function createPurchaseInvoice(
           discountAmount: item.discountAmount,
           taxableAmount: item.taxableAmount,
           gstRateBp: item.gstRateBp,
-          cgst: item.taxAmount / 2,
-          sgst: item.taxAmount / 2,
+          cgst: Math.floor(item.taxAmount / 2),
+          sgst: item.taxAmount - Math.floor(item.taxAmount / 2),
           igst: 0,
           totalAmount: item.totalAmount,
         });
       }
 
-      // (Optional) Here we would insert into journal_entries to debit Inventory/Purchases and credit Accounts Payable (Supplier)
-      // Since accounts might not be fully seeded yet, we can skip strict double-entry insert for this MVP step and rely on the purchase record.
+      // 5. Post Double-Entry Journal Entry
+      await postPurchaseJournalEntry({
+        tx,
+        tenantId: session.tenantId,
+        storeId: session.storeId,
+        userId: user.id,
+        purchaseId: purchase.id,
+        purchaseNo,
+        supplierId,
+        supplierInvoiceNo,
+        invoiceDate,
+        taxableAmount: grossAmount - totalDiscountAmount,
+        cgst,
+        sgst,
+        igst: 0,
+        totalAmount: totalInvoiceAmount,
+      });
     });
 
     revalidatePath("/dashboard/purchases");
+    revalidatePath("/dashboard/accounting");
+    revalidatePath("/dashboard/inventory/batches");
     return { success: true };
   } catch (err: unknown) {
     if ((err instanceof Error ? err.message : String(err))?.includes("purchases_supplier_invoice_uq")) {
