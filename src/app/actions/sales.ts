@@ -9,6 +9,7 @@ import { revalidatePath } from "next/cache";
 import { sendWhatsAppReceipt } from "@/server/whatsapp";
 import { computeSaleTotals, type SaleLineInput } from "@/lib/money";
 import { format } from "date-fns";
+import { postSaleJournalEntry } from "@/server/domain/accounting";
 
 export async function getSales(dateFrom?: string | null, dateTo?: string | null) {
   const { session, user } = await requireAuth();
@@ -46,7 +47,7 @@ export async function searchPosItems(query: string) {
   const lowerQuery = query.toLowerCase();
   const todayStr = format(new Date(), 'yyyy-MM-dd');
 
-  // Find medicines matching query
+  // Find medicines matching query (by name, barcode, or generic composition)
   const medicines = await db
     .select()
     .from(schema.medicines)
@@ -56,11 +57,12 @@ export async function searchPosItems(query: string) {
         eq(schema.medicines.isActive, true),
         or(
           ilike(schema.medicines.name, `%${lowerQuery}%`),
-          ilike(schema.medicines.barcode, `%${lowerQuery}%`)
+          ilike(schema.medicines.barcode, `%${lowerQuery}%`),
+          ilike(schema.medicines.genericName, `%${lowerQuery}%`)
         )
       )
     )
-    .limit(20);
+    .limit(25);
 
   if (medicines.length === 0) return [];
 
@@ -88,9 +90,60 @@ export async function searchPosItems(query: string) {
       medicine: med,
       batches: medBatches,
     };
-  }).filter((res) => res.batches.length > 0); // Only return if they have stock
+  }); // Keep all so cashiers can see if an item is out of stock and find substitutes
 
   return results;
+}
+
+// Find substitutes with identical generic composition in stock
+export async function findSubstitutes(genericName: string, excludeMedicineId?: string) {
+  const { session } = await requireAuth();
+  if (!genericName || genericName.trim().length < 2) return [];
+
+  const todayStr = format(new Date(), 'yyyy-MM-dd');
+  const cleanGeneric = genericName.trim().toLowerCase();
+
+  const conditions = [
+    eq(schema.medicines.tenantId, session.tenantId),
+    eq(schema.medicines.isActive, true),
+    ilike(schema.medicines.genericName, `%${cleanGeneric}%`),
+  ];
+  if (excludeMedicineId) {
+    conditions.push(sql`${schema.medicines.id} != ${excludeMedicineId}`);
+  }
+
+  const medicines = await db
+    .select()
+    .from(schema.medicines)
+    .where(and(...conditions))
+    .limit(10);
+
+  if (medicines.length === 0) return [];
+  const medicineIds = medicines.map((m) => m.id);
+
+  const batches = await db
+    .select()
+    .from(schema.batches)
+    .where(
+      and(
+        eq(schema.batches.storeId, session.storeId),
+        gt(schema.batches.qtyOnHand, 0),
+        gt(schema.batches.expiryDate, todayStr),
+        inArray(schema.batches.medicineId, medicineIds)
+      )
+    )
+    .orderBy(schema.batches.expiryDate);
+
+  return medicines
+    .map((med) => {
+      const medBatches = batches.filter((b) => b.medicineId === med.id);
+      return {
+        medicine: med,
+        batches: medBatches,
+        totalStock: medBatches.reduce((acc, b) => acc + b.qtyOnHand, 0),
+      };
+    })
+    .filter((res) => res.batches.length > 0);
 }
 
 export type PosItemInput = {
@@ -114,9 +167,10 @@ export async function createSaleInvoice(
 
   try {
     let customerPhone = "";
+    let customerName = "";
     if (customerId?.trim()) {
       const [customer] = await db
-        .select({ phone: schema.customers.phone })
+        .select({ phone: schema.customers.phone, name: schema.customers.name })
         .from(schema.customers)
         .where(
           and(
@@ -125,6 +179,7 @@ export async function createSaleInvoice(
           )
         );
       if (customer?.phone) customerPhone = customer.phone;
+      if (customer?.name) customerName = customer.name;
     }
 
     const [store] = await db
@@ -285,10 +340,33 @@ export async function createSaleInvoice(
         });
       }
 
+      // 6. Post Double-Entry Journal Entry
+      await postSaleJournalEntry({
+        tx,
+        tenantId: session.tenantId,
+        storeId: session.storeId,
+        userId: user.id,
+        saleId: sale.id,
+        invoiceNo,
+        invoiceDate: new Date(),
+        customerId: customerId?.trim() ? customerId.trim() : null,
+        customerName: customerName || null,
+        paymentMethod,
+        taxableAmount: totals.taxable,
+        cgst: totals.cgst,
+        sgst: totals.sgst,
+        igst: totals.igst,
+        roundOff: totals.roundOff,
+        totalAmount: totals.total,
+        paidAmount,
+        creditAmount: amountDue > 0 ? amountDue : 0,
+      });
+
       return sale.id;
     });
 
     revalidatePath("/dashboard/sales");
+    revalidatePath("/dashboard/accounting");
 
     if (customerPhone) {
       // In a real app we'd queue this out of band, but keeping it simple
