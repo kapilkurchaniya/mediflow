@@ -1,7 +1,7 @@
 "use server";
 
 import { db, schema } from "@/server/db";
-import { eq, desc, ilike, or } from "drizzle-orm";
+import { eq, and, desc, ilike, or } from "drizzle-orm";
 import { getCurrentSession, requireAuth } from "@/server/auth";
 import { revalidatePath } from "next/cache";
 
@@ -65,10 +65,23 @@ export async function createManufacturer(name: string) {
 
 // --- Medicines ---
 
-export async function getMedicines(searchQuery?: string) {
+export async function getMedicines(searchQuery?: string, limit = 100, offset = 0) {
   const { session } = await requireAuth();
 
-  const query = db
+  const conditions = [eq(schema.medicines.tenantId, session.tenantId)];
+
+  if (searchQuery?.trim()) {
+    const q = `%${searchQuery.trim().toLowerCase()}%`;
+    conditions.push(
+      or(
+        ilike(schema.medicines.name, q),
+        ilike(schema.medicines.genericName, q),
+        ilike(schema.medicines.barcode, q)
+      )!
+    );
+  }
+
+  return db
     .select({
       medicine: schema.medicines,
       manufacturer: schema.manufacturers,
@@ -77,23 +90,10 @@ export async function getMedicines(searchQuery?: string) {
     .from(schema.medicines)
     .leftJoin(schema.manufacturers, eq(schema.medicines.manufacturerId, schema.manufacturers.id))
     .leftJoin(schema.categories, eq(schema.medicines.categoryId, schema.categories.id))
-    .where(eq(schema.medicines.tenantId, session.tenantId))
-    .orderBy(desc(schema.medicines.createdAt));
-
-  const results = await query;
-
-  if (searchQuery) {
-    const lowerQuery = searchQuery.toLowerCase();
-    // basic filter, in a real app this would use the `pg_trgm` indexes with SQL conditions
-    return results.filter(
-      (row) =>
-        row.medicine.name.toLowerCase().includes(lowerQuery) ||
-        (row.medicine.genericName && row.medicine.genericName.toLowerCase().includes(lowerQuery)) ||
-        (row.medicine.barcode && row.medicine.barcode.toLowerCase().includes(lowerQuery))
-    );
-  }
-
-  return results;
+    .where(and(...conditions))
+    .orderBy(desc(schema.medicines.createdAt))
+    .limit(limit)
+    .offset(offset);
 }
 
 export async function createMedicine(formData: FormData) {

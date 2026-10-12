@@ -1,33 +1,56 @@
 "use server";
 
 import { db, schema } from "@/server/db";
-import { eq, ilike, and, desc } from "drizzle-orm";
+import { eq, ilike, and, desc, or } from "drizzle-orm";
 import { getCurrentSession, requireAuth } from "@/server/auth";
 import { revalidatePath } from "next/cache";
 
-export async function getCustomers(searchQuery?: string) {
+export async function getCustomers(searchQuery?: string, limit = 50) {
   const { session } = await requireAuth();
 
-  const query = db
-    .select()
-    .from(schema.customers)
-    .where(eq(schema.customers.tenantId, session.tenantId))
-    .orderBy(desc(schema.customers.createdAt));
+  const conditions = [eq(schema.customers.tenantId, session.tenantId)];
 
-  const results = await query;
-
-  if (searchQuery) {
-    const lowerQuery = searchQuery.toLowerCase();
-    return results.filter(
-      (c) =>
-        c.name.toLowerCase().includes(lowerQuery) ||
-        (c.phone && c.phone.includes(lowerQuery)) ||
-        (c.email && c.email.toLowerCase().includes(lowerQuery))
+  if (searchQuery?.trim()) {
+    const q = `%${searchQuery.trim().toLowerCase()}%`;
+    conditions.push(
+      or(
+        ilike(schema.customers.name, q),
+        ilike(schema.customers.phone, q),
+        ilike(schema.customers.email, q)
+      )!
     );
   }
 
-  return results;
+  return db
+    .select()
+    .from(schema.customers)
+    .where(and(...conditions))
+    .orderBy(desc(schema.customers.createdAt))
+    .limit(limit);
 }
+
+export async function createQuickCustomer(name: string, phone?: string) {
+  const { session } = await requireAuth();
+  if (!name?.trim()) return { error: "Name is required" };
+
+  try {
+    const [customer] = await db
+      .insert(schema.customers)
+      .values({
+        tenantId: session.tenantId,
+        name: name.trim(),
+        phone: phone?.trim() || null,
+        isActive: true,
+      })
+      .returning({ id: schema.customers.id, name: schema.customers.name, phone: schema.customers.phone });
+
+    revalidatePath("/dashboard/customers");
+    return { success: true, customer };
+  } catch (err: unknown) {
+    return { error: (err instanceof Error ? err.message : String(err)) || "Failed to create customer" };
+  }
+}
+
 
 export async function createCustomer(formData: FormData) {
   const { session } = await requireAuth();
