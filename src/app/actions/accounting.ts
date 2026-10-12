@@ -3,16 +3,20 @@
 import { db, schema } from "@/server/db";
 import { eq, and, sql, desc, gte, lte } from "drizzle-orm";
 import { getCurrentSession } from "@/server/auth";
+import { getOrSeedAccounts } from "@/server/domain/accounting";
 
 export async function getAccounts() {
   const { session } = await getCurrentSession();
   if (!session?.tenantId) throw new Error("Unauthorized");
 
+  // Ensure standard accounts exist
+  await getOrSeedAccounts(db, session.tenantId);
+
   return db
     .select()
     .from(schema.accounts)
     .where(eq(schema.accounts.tenantId, session.tenantId))
-    .orderBy(schema.accounts.name);
+    .orderBy(schema.accounts.code);
 }
 
 export async function getJournalLines(dateFrom?: string | null, dateTo?: string | null) {
@@ -49,6 +53,9 @@ export async function getTrialBalance(dateFrom?: string | null, dateTo?: string 
   const { session } = await getCurrentSession();
   if (!session?.tenantId || !session?.storeId) throw new Error("Unauthorized");
 
+  // Ensure accounts are seeded
+  await getOrSeedAccounts(db, session.tenantId);
+
   // Build date condition for journal entries
   let dateCondition = sql``;
   if (dateFrom && dateTo) {
@@ -68,8 +75,14 @@ export async function getTrialBalance(dateFrom?: string | null, dateTo?: string 
       COALESCE(SUM(jl.debit), 0) as total_debit,
       COALESCE(SUM(jl.credit), 0) as total_credit
     FROM ${schema.accounts} a
-    LEFT JOIN ${schema.journalLines} jl ON a.id = jl.account_id 
-    LEFT JOIN ${schema.journalEntries} je ON jl.entry_id = je.id AND je.store_id = ${session.storeId} ${dateCondition}
+    LEFT JOIN (
+      ${schema.journalLines} jl
+      INNER JOIN ${schema.journalEntries} je 
+        ON jl.entry_id = je.id 
+        AND je.tenant_id = ${session.tenantId}
+        AND (je.store_id = ${session.storeId} OR je.store_id IS NULL)
+        ${dateCondition}
+    ) ON a.id = jl.account_id
     WHERE a.tenant_id = ${session.tenantId}
     GROUP BY a.id, a.code, a.name, a.type
     HAVING COALESCE(SUM(jl.debit), 0) > 0 OR COALESCE(SUM(jl.credit), 0) > 0
@@ -86,4 +99,5 @@ export async function getTrialBalance(dateFrom?: string | null, dateTo?: string 
     balance: Number(r.total_debit) - Number(r.total_credit),
   }));
 }
+
 
