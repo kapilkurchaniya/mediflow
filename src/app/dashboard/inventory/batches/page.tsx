@@ -7,6 +7,8 @@ import { formatINR, formatNumber, daysUntil } from "@/lib/format";
 import { DateRangeFilter } from "@/app/components/DateRangeFilter";
 import { resolveDateRange } from "@/lib/date-range";
 
+import { ExportButton } from "@/app/components/ExportButton";
+
 export const metadata = { title: "Batches & stock" };
 
 function ExpiryBadge({ date }: { date: string }) {
@@ -43,6 +45,11 @@ export default async function BatchesPage({
         description="Batch-level stock on hand, expiry exposure and purchase-cost valuation."
         actions={
           <>
+            <ExportButton
+              endpoint="/api/export/batches"
+              from={dateRange.from}
+              to={dateRange.to}
+            />
             <Link href="/dashboard/inventory/import" className="btn btn-secondary">
               <Upload /> Import CSV
             </Link>
