@@ -23,7 +23,24 @@ export default async function PrintInvoicePage({
   const { sale, items, customer, store, tenant } = data;
 
   return (
-    <div className="min-h-screen bg-ink-100 py-6 px-4 font-sans text-ink-900">
+    <div className="min-h-screen bg-ink-100 py-6 px-4 font-sans text-ink-900 print:bg-white print:p-0 print:m-0 print:min-h-0">
+      {/* Dynamic print page styling tailored for 80mm thermal roll vs A4 GST Tax invoice */}
+      <style
+        dangerouslySetInnerHTML={{
+          __html: isThermal
+            ? `@media print {
+                @page { size: 80mm auto; margin: 2mm 3mm; }
+                body { margin: 0 !important; padding: 0 !important; }
+                #invoice-printable { width: 100% !important; max-width: 100% !important; margin: 0 !important; padding: 0 !important; }
+              }`
+            : `@media print {
+                @page { size: A4 portrait; margin: 8mm; }
+                body { margin: 0 !important; padding: 0 !important; }
+                #invoice-printable { width: 100% !important; max-width: 100% !important; margin: 0 !important; padding: 0 !important; }
+              }`,
+        }}
+      />
+
       {/* Top action bar (hidden during print) */}
       <div className="max-w-3xl mx-auto mb-6 flex flex-wrap gap-3 justify-between items-center print:hidden">
         <Link
@@ -60,7 +77,7 @@ export default async function PrintInvoicePage({
         /* ──────────────── 80mm Thermal POS Slip Format ──────────────── */
         <div
           id="invoice-printable"
-          className="max-w-[80mm] mx-auto bg-white p-4 shadow-xl border border-ink-200 print:shadow-none print:border-none print:p-0 font-mono text-[11px] leading-tight text-black"
+          className="max-w-[80mm] mx-auto bg-white p-4 shadow-xl border border-ink-200 print:shadow-none print:border-none print:p-0 print:m-0 font-mono text-[11px] leading-tight text-black"
         >
           {/* Pharmacy Header */}
           <div className="text-center pb-2 border-b border-dashed border-black">
@@ -147,7 +164,7 @@ export default async function PrintInvoicePage({
         /* ──────────────── Full A4 GST Tax Invoice Format ──────────────── */
         <div
           id="invoice-printable"
-          className="max-w-3xl mx-auto bg-white p-8 sm:p-12 shadow-xl rounded-xl border border-ink-200 print:shadow-none print:p-0 print:border-none print:rounded-none"
+          className="max-w-3xl mx-auto bg-white p-8 sm:p-12 shadow-xl rounded-xl border border-ink-200 print:shadow-none print:p-0 print:border-none print:rounded-none print:m-0"
         >
           {/* Header Section */}
           <div className="flex justify-between items-start border-b border-ink-200 pb-6 mb-6">
