@@ -28,7 +28,7 @@ import {
   RotateCcw,
 } from "lucide-react";
 import Link from "next/link";
-import { redirect } from "next/navigation";
+import { useRouter } from "next/navigation";
 
 interface SearchResult {
   medicine: {
@@ -105,6 +105,7 @@ function playSound(type: "beep" | "chime") {
 }
 
 export default function POSPage() {
+  const router = useRouter();
   const [customers, setCustomers] = useState<{ id: string; name: string; phone?: string | null }[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
@@ -420,7 +421,8 @@ export default function POSPage() {
       const res = await createSaleInvoice(customerId, doctorName, cart, paymentMethod, netPayable);
       if (res.success && res.saleId) {
         if (soundEnabled) playSound("chime");
-        redirect(`/dashboard/sales/${res.saleId}/print?format=thermal`);
+        router.push(`/dashboard/sales/${res.saleId}/print?format=thermal`);
+        return { success: true, error: undefined };
       }
       return res;
     },

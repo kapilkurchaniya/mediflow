@@ -1,6 +1,6 @@
 import { schema } from "@/server/db";
 import { eq, and, sql } from "drizzle-orm";
-import type { Tx } from "@/server/db";
+import type { DbOrTx, Tx } from "@/server/db";
 import { nextDocNumber } from "./sequence";
 import { format } from "date-fns";
 
@@ -28,7 +28,7 @@ export const DEFAULT_ACCOUNTS = [
  * Ensures all default system ledger accounts exist for the given tenant.
  * Returns a map of systemKey -> accountId for quick lookups.
  */
-export async function getOrSeedAccounts(tx: Tx, tenantId: string): Promise<Record<string, string>> {
+export async function getOrSeedAccounts(tx: DbOrTx, tenantId: string): Promise<Record<string, string>> {
   const existing = await tx
     .select({ id: schema.accounts.id, systemKey: schema.accounts.systemKey })
     .from(schema.accounts)
