@@ -3,8 +3,17 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect } from "react";
-import { Bell, ChevronRight, HelpCircle, Plus, Search } from "lucide-react";
+import {
+  ChevronRight,
+  HelpCircle,
+  Plus,
+  Search,
+  Menu,
+  WifiOff,
+} from "lucide-react";
 import { LogoMark } from "./ui";
+import { useShell } from "./ShellContext";
+import { NotificationsPopover } from "./NotificationsPopover";
 
 const LABELS: Record<string, string> = {
   dashboard: "Overview",
@@ -24,21 +33,19 @@ const LABELS: Record<string, string> = {
 export function Topbar() {
   const pathname = usePathname();
   const router = useRouter();
+  const {
+    toggleMobile,
+    setCommandOpen,
+    setShortcutsOpen,
+    isOnline,
+  } = useShell();
 
-  // Global keyboard shortcuts used by counter staff.
+  // Global F2 shortcut for new POS bill
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      const target = e.target as HTMLElement | null;
-      const typing = target && ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName);
       if (e.key === "F2") {
         e.preventDefault();
         router.push("/dashboard/sales/pos");
-      } else if (!typing && e.key === "/" ) {
-        const el = document.querySelector<HTMLInputElement>('input[type="search"]');
-        if (el) {
-          e.preventDefault();
-          el.focus();
-        }
       }
     };
     window.addEventListener("keydown", onKey);
@@ -52,11 +59,23 @@ export function Topbar() {
   }));
 
   return (
-    <header className="sticky top-0 z-20 flex h-14 shrink-0 items-center gap-4 border-b border-ink-200/50 bg-white/40 px-4 backdrop-blur-2xl sm:px-6 print:hidden">
-      <Link href="/dashboard" className="lg:hidden" aria-label="Home">
+    <header className="sticky top-0 z-20 flex h-14 shrink-0 items-center gap-3 sm:gap-4 border-b border-ink-200/50 bg-white/60 px-3 sm:px-6 backdrop-blur-2xl print:hidden select-none">
+      {/* Mobile Hamburger Menu Toggle */}
+      <button
+        type="button"
+        onClick={toggleMobile}
+        className="btn btn-ghost btn-icon lg:hidden text-ink-700"
+        aria-label="Open mobile menu"
+      >
+        <Menu className="h-5 w-5" />
+      </button>
+
+      {/* Brand logo mark on small screens */}
+      <Link href="/dashboard" className="lg:hidden flex items-center" aria-label="Home">
         <LogoMark />
       </Link>
 
+      {/* Breadcrumbs */}
       <nav aria-label="Breadcrumb" className="min-w-0 flex-1">
         <ol className="flex items-center gap-1 text-[13px]">
           {crumbs.map((c, i) => {
@@ -67,7 +86,10 @@ export function Topbar() {
                 {last ? (
                   <span className="truncate font-medium text-ink-900">{c.label}</span>
                 ) : (
-                  <Link href={c.href} className="truncate text-ink-500 transition-colors hover:text-ink-900">
+                  <Link
+                    href={c.href}
+                    className="truncate text-ink-500 transition-colors hover:text-ink-900"
+                  >
                     {c.label}
                   </Link>
                 )}
@@ -77,30 +99,61 @@ export function Topbar() {
         </ol>
       </nav>
 
-      <div className="hidden md:flex items-center">
+      {/* Offline Status Sentinel Pill */}
+      {!isOnline && (
+        <div
+          role="alert"
+          className="flex items-center gap-1.5 rounded-full bg-red-100 px-2.5 py-1 text-[11.5px] font-medium text-red-700 border border-red-200"
+        >
+          <WifiOff className="h-3.5 w-3.5 animate-pulse text-red-600" />
+          <span className="hidden sm:inline">Offline Mode</span>
+        </div>
+      )}
+
+      {/* Quick Search Trigger (Cmd+K) */}
+      <div className="flex items-center">
         <button
           type="button"
-          onClick={() => document.querySelector<HTMLInputElement>('input[type="search"]')?.focus()}
-          className="flex h-8 w-64 items-center gap-2 rounded-md border border-ink-200 bg-ink-50/60 px-2.5 text-[13px] text-ink-400 transition-colors hover:border-ink-300 hover:bg-white"
+          onClick={() => setCommandOpen(true)}
+          className="flex h-8 w-9 sm:w-56 md:w-64 items-center justify-center sm:justify-start gap-2 rounded-md border border-ink-200 bg-ink-50/70 px-2 sm:px-2.5 text-[13px] text-ink-400 transition-colors hover:border-ink-300 hover:bg-white"
+          title="Command Palette (Cmd+K)"
+          aria-label="Search or type a command"
         >
-          <Search className="h-3.5 w-3.5" />
-          <span className="flex-1 text-left">Search…</span>
-          <span className="kbd">/</span>
+          <Search className="h-3.5 w-3.5 shrink-0 text-ink-500" />
+          <span className="hidden sm:inline flex-1 text-left truncate">
+            Search or jump to…
+          </span>
+          <span className="kbd hidden sm:inline-flex text-[10px]">⌘K</span>
         </button>
       </div>
 
+      {/* Action Controls */}
       <div className="flex items-center gap-1">
-        <button type="button" className="btn btn-ghost btn-icon" aria-label="Help">
-          <HelpCircle />
+        {/* Help & Shortcuts Button */}
+        <button
+          type="button"
+          onClick={() => setShortcutsOpen(true)}
+          className="btn btn-ghost btn-icon text-ink-500 hover:text-ink-900"
+          aria-label="Keyboard Shortcuts"
+          title="Keyboard Shortcuts (?)"
+        >
+          <HelpCircle className="h-4 w-4" />
         </button>
-        <button type="button" className="btn btn-ghost btn-icon relative" aria-label="Notifications">
-          <Bell />
-          <span className="absolute right-2 top-2 h-1.5 w-1.5 rounded-full bg-red-500 ring-2 ring-white" />
-        </button>
-        <Link href="/dashboard/sales/pos" className="btn btn-primary btn-sm ml-1.5">
-          <Plus />
+
+        {/* Notifications Popover */}
+        <NotificationsPopover />
+
+        {/* New POS Bill Action */}
+        <Link
+          href="/dashboard/sales/pos"
+          className="btn btn-primary btn-sm ml-1 shrink-0"
+          title="New POS Bill (F2)"
+        >
+          <Plus className="h-4 w-4" />
           <span className="hidden sm:inline">New bill</span>
-          <span className="kbd hidden sm:inline-flex !border-white/20 !bg-white/10 !text-white/80 !shadow-none">F2</span>
+          <span className="kbd hidden md:inline-flex !border-white/20 !bg-white/10 !text-white/80 !shadow-none text-[10px]">
+            F2
+          </span>
         </Link>
       </div>
     </header>
