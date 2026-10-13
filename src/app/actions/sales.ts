@@ -286,6 +286,7 @@ export async function createSaleInvoice(
       }).returning({ id: schema.sales.id });
 
       // 4. Process Items & Update Stock
+      const saleItemsToInsert = [];
       for (let i = 0; i < processedItems.length; i++) {
         const item = processedItems[i];
         const lineRes = totals.lines[i];
@@ -305,8 +306,7 @@ export async function createSaleInvoice(
           userId: user.id,
         });
 
-        // Record Sale Item
-        await tx.insert(schema.saleItems).values({
+        saleItemsToInsert.push({
           tenantId: session.tenantId,
           saleId: sale.id,
           medicineId: item.medicineId,
@@ -327,6 +327,10 @@ export async function createSaleInvoice(
           totalAmount: lineRes.total,
           unitCost: item.batch.purchaseRate,
         });
+      }
+
+      if (saleItemsToInsert.length > 0) {
+        await tx.insert(schema.saleItems).values(saleItemsToInsert);
       }
 
       // 5. Record Payment
@@ -358,7 +362,7 @@ export async function createSaleInvoice(
         igst: totals.igst,
         roundOff: totals.roundOff,
         totalAmount: totals.total,
-        paidAmount,
+        paidAmount: amountPaid,
         creditAmount: amountDue > 0 ? amountDue : 0,
       });
 

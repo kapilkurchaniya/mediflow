@@ -211,3 +211,71 @@
     transition-duration: 0.01ms !important;
   }
 }
+
+/* ==========================================================================
+   Print Optimization for Invoices & Receipts
+   ========================================================================== */
+@media print {
+  @page {
+    margin: 3mm;
+  }
+
+  /* 1. Global Shell & Navigation Nullification */
+  header,
+  nav,
+  aside,
+  [role="navigation"],
+  [role="dialog"],
+  .print\:hidden,
+  .print-hidden,
+  button,
+  .btn {
+    display: none !important;
+    visibility: hidden !important;
+  }
+
+  html,
+  body {
+    height: auto !important;
+    min-height: auto !important;
+    overflow: visible !important;
+    background: #ffffff !important;
+    color: #000000 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  main,
+  .page {
+    height: auto !important;
+    overflow: visible !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    animation: none !important;
+    display: block !important;
+  }
+
+  /* 2. Strict Bill Isolation:
+     Hide everything on the page, and only reveal #invoice-printable */
+  body * {
+    visibility: hidden !important;
+  }
+
+  #invoice-printable,
+  #invoice-printable * {
+    visibility: visible !important;
+  }
+
+  #invoice-printable {
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 100% !important;
+    box-shadow: none !important;
+    border: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #ffffff !important;
+  }
+}
+
