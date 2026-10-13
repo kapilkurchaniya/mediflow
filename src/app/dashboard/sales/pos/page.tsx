@@ -130,9 +130,6 @@ export default function POSPage() {
   const [substitutesList, setSubstitutesList] = useState<SubstituteItem[]>([]);
   const [isLoadingSubstitutes, setIsLoadingSubstitutes] = useState(false);
 
-  // Rx validation alert
-  const [rxWarning, setRxWarning] = useState(false);
-
   const [cart, setCart] = useState<
     (PosItemInput & {
       medicineName: string;
@@ -145,6 +142,9 @@ export default function POSPage() {
     })[]
   >([]);
 
+  // Rx validation alert (derived directly from cart)
+  const rxWarning = cart.some((i) => Boolean(i.rxRequired));
+
   const searchInputRef = useRef<HTMLInputElement>(null);
   const barcodeBufferRef = useRef<{ buffer: string; lastTime: number }>({ buffer: "", lastTime: 0 });
 
@@ -155,12 +155,6 @@ export default function POSPage() {
     });
     if (searchInputRef.current) searchInputRef.current.focus();
   }, []);
-
-  // Update Rx warning flag whenever cart changes
-  useEffect(() => {
-    const hasRx = cart.some((i) => i.rxRequired);
-    setRxWarning(hasRx);
-  }, [cart]);
 
   // Add item to cart
   const addToCart = useCallback(
