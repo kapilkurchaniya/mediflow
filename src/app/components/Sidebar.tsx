@@ -82,7 +82,7 @@ export function Sidebar({
     .join("");
 
   return (
-    <aside className="hidden lg:flex w-[248px] shrink-0 flex-col border-r border-ink-200/50 bg-white/40 backdrop-blur-2xl">
+    <aside className="hidden lg:flex w-[248px] shrink-0 flex-col border-r border-ink-200/50 bg-white/40 backdrop-blur-2xl print:hidden">
       {/* Brand */}
       <div className="flex h-14 items-center px-4">
         <Link href="/dashboard" aria-label="MediFlow home">

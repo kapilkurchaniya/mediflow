@@ -386,7 +386,7 @@ export function AIAssistant() {
         aria-expanded={isOpen}
         aria-label="Open assistant"
         className={clsx(
-          "fixed bottom-5 right-5 z-40 flex h-10 items-center gap-2 rounded-full bg-ink-900 pl-3 pr-3.5 text-[13px] font-medium text-white",
+          "fixed bottom-5 right-5 z-40 flex h-10 items-center gap-2 rounded-full bg-ink-900 pl-3 pr-3.5 text-[13px] font-medium text-white print:hidden",
           "shadow-[0_8px_24px_-6px_rgb(0_0_0_/_0.35)] ring-1 ring-white/10 transition-all duration-200 hover:bg-ink-800",
           isOpen && "pointer-events-none translate-y-2 opacity-0",
         )}
@@ -404,7 +404,7 @@ export function AIAssistant() {
         role="dialog"
         aria-label="MediFlow assistant"
         className={clsx(
-          "fixed bottom-5 right-5 z-50 flex flex-col w-[390px] sm:w-[440px] h-[570px] sm:h-[620px] origin-bottom-right overflow-hidden rounded-2xl border border-ink-150 bg-white",
+          "fixed bottom-5 right-5 z-50 flex flex-col w-[390px] sm:w-[440px] h-[570px] sm:h-[620px] origin-bottom-right overflow-hidden rounded-2xl border border-ink-150 bg-white print:hidden",
           "shadow-[var(--shadow-pop)] transition-all duration-200 ease-out",
           isOpen ? "scale-100 opacity-100" : "pointer-events-none scale-95 opacity-0",
         )}
