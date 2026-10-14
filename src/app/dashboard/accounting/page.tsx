@@ -82,7 +82,7 @@ export default async function AccountingPage({
                   </tr>
                 </thead>
                 <tbody>
-                  {trialBalance.map((row: any) => (
+                  {trialBalance.map((row) => (
                     <tr key={row.id}>
                       <td className="font-mono text-[12px] text-ink-500">{row.code}</td>
                       <td className="cell-primary">{row.name}</td>

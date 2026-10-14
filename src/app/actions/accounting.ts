@@ -49,7 +49,17 @@ export async function getJournalLines(dateFrom?: string | null, dateTo?: string 
     .limit(50);
 }
 
-export async function getTrialBalance(dateFrom?: string | null, dateTo?: string | null) {
+export interface TrialBalanceRow {
+  id: string;
+  code: string;
+  name: string;
+  type: string;
+  totalDebit: number;
+  totalCredit: number;
+  balance: number;
+}
+
+export async function getTrialBalance(dateFrom?: string | null, dateTo?: string | null): Promise<TrialBalanceRow[]> {
   const { session } = await getCurrentSession();
   if (!session?.tenantId || !session?.storeId) throw new Error("Unauthorized");
 
@@ -90,14 +100,15 @@ export async function getTrialBalance(dateFrom?: string | null, dateTo?: string 
   `);
 
   return results.rows.map((r: Record<string, unknown>) => ({
-    id: r.id,
-    code: r.code,
-    name: r.name,
-    type: r.type,
+    id: String(r.id),
+    code: String(r.code),
+    name: String(r.name),
+    type: String(r.type),
     totalDebit: Number(r.total_debit),
     totalCredit: Number(r.total_credit),
     balance: Number(r.total_debit) - Number(r.total_credit),
   }));
 }
+
 
 
