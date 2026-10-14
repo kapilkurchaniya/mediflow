@@ -1,10 +1,10 @@
 import { getSaleById } from "@/app/actions/sales";
 import { notFound } from "next/navigation";
 import { format } from "date-fns";
-import { Printer, ArrowLeft, Send, CheckCircle2, AlertCircle, Receipt, User, Stethoscope, Store } from "lucide-react";
+import { Printer, Receipt, User, Stethoscope } from "lucide-react";
 import Link from "next/link";
 import { PageHeader } from "@/app/components/ui";
-import { formatINR, formatNumber } from "@/lib/format";
+import { formatINR } from "@/lib/format";
 
 export const metadata = { title: "Invoice Details" };
 
@@ -18,7 +18,7 @@ export default async function SaleDetailPage({
 
   if (!data) return notFound();
 
-  const { sale, items, customer, store, tenant } = data;
+  const { sale, items, customer, store } = data;
   const isPaid = !sale.creditAmount || sale.creditAmount <= 0;
   const isPartial = !isPaid && (sale.paidAmount ?? 0) > 0;
 

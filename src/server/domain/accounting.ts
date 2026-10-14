@@ -115,7 +115,6 @@ export async function postSaleJournalEntry(params: PostSaleJournalParams) {
     sgst,
     igst,
     roundOff,
-    totalAmount,
     paidAmount,
     creditAmount,
   } = params;
