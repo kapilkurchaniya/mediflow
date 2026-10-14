@@ -228,17 +228,22 @@ export function CommandPalette() {
     );
   }, [items, query]);
 
-  // Reset selected index when filtered list changes
-  useEffect(() => {
+  // Reset selected index when query changes (React recommended pattern: adjust state during render)
+  const [prevQuery, setPrevQuery] = useState(query);
+  if (prevQuery !== query) {
+    setPrevQuery(query);
     setSelectedIndex(0);
-  }, [query]);
+  }
 
-  // Focus input when dialog opens
+  // Focus input and clear query when dialog opens
   useEffect(() => {
     if (commandOpen) {
-      setQuery("");
-      setSelectedIndex(0);
-      setTimeout(() => inputRef.current?.focus(), 50);
+      const timer = setTimeout(() => {
+        setQuery("");
+        setSelectedIndex(0);
+        inputRef.current?.focus();
+      }, 10);
+      return () => clearTimeout(timer);
     }
   }, [commandOpen]);
 

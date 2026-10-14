@@ -1,7 +1,22 @@
 "use client";
 
-import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
+import React, { createContext, useContext, useState, useEffect, useCallback, useSyncExternalStore, useRef } from "react";
 import { usePathname } from "next/navigation";
+
+function subscribeOnline(callback: () => void) {
+  window.addEventListener("online", callback);
+  window.addEventListener("offline", callback);
+  return () => {
+    window.removeEventListener("online", callback);
+    window.removeEventListener("offline", callback);
+  };
+}
+function getOnlineSnapshot() {
+  return navigator.onLine;
+}
+function getServerSnapshot() {
+  return true;
+}
 
 interface ShellContextType {
   // Mobile drawer state
@@ -52,23 +67,19 @@ export function ShellProvider({
 }) {
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [collapsed, setCollapsedState] = useState(false);
+  const [collapsed, setCollapsedState] = useState(() => {
+    if (typeof window === "undefined") return false;
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY_COLLAPSED);
+      return saved !== null ? saved === "true" : false;
+    } catch {
+      return false;
+    }
+  });
   const [commandOpen, setCommandOpen] = useState(false);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
-  const [isOnline, setIsOnline] = useState(true);
-
-  // Load persisted sidebar collapsed state on mount
-  useEffect(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY_COLLAPSED);
-      if (saved !== null) {
-        setCollapsedState(saved === "true");
-      }
-    } catch {
-      // localStorage may be disabled or restricted
-    }
-  }, []);
+  const isOnline = useSyncExternalStore(subscribeOnline, getOnlineSnapshot, getServerSnapshot);
 
   const setCollapsed = useCallback((val: boolean) => {
     setCollapsedState(val);
@@ -94,26 +105,14 @@ export function ShellProvider({
   const toggleMobile = useCallback(() => setMobileOpen((o) => !o), []);
 
   // Close mobile drawer and popovers on route change
+  const prevPathnameRef = useRef(pathname);
   useEffect(() => {
-    setMobileOpen(false);
-    setNotificationsOpen(false);
+    if (prevPathnameRef.current !== pathname) {
+      prevPathnameRef.current = pathname;
+      setMobileOpen(false);
+      setNotificationsOpen(false);
+    }
   }, [pathname]);
-
-  // Network connectivity listener
-  useEffect(() => {
-    setIsOnline(typeof navigator !== "undefined" ? navigator.onLine : true);
-
-    const handleOnline = () => setIsOnline(true);
-    const handleOffline = () => setIsOnline(false);
-
-    window.addEventListener("online", handleOnline);
-    window.addEventListener("offline", handleOffline);
-
-    return () => {
-      window.removeEventListener("online", handleOnline);
-      window.removeEventListener("offline", handleOffline);
-    };
-  }, []);
 
   // Global keyboard shortcuts (Cmd+K, Ctrl+B, ?, Esc)
   useEffect(() => {

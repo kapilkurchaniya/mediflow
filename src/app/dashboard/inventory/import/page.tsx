@@ -36,7 +36,7 @@ export default function SmartImportPage() {
       header: true,
       skipEmptyLines: true,
       complete: (results) => {
-        const rows: ParsedRow[] = results.data.map((row: any) => {
+        const rows: ParsedRow[] = (results.data as Record<string, string>[]).map((row) => {
           return mapAndValidateRow(row);
         });
         setParsedData(rows);
