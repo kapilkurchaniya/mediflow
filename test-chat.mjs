@@ -2,7 +2,6 @@
 import fetch from "node-fetch";
 import { db } from "./src/server/db/index.js";
 import { schema } from "./src/server/db/index.js";
-import { eq } from "drizzle-orm";
 
 async function testChat() {
   console.log("Fetching a valid session...");

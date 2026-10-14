@@ -2,7 +2,7 @@
 
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { useCallback, useMemo } from "react";
-import { Calendar, ChevronDown } from "lucide-react";
+import { Calendar } from "lucide-react";
 import clsx from "clsx";
 
 const PRESETS = [
@@ -104,16 +104,6 @@ export function DateRangeFilter() {
     [updateParams],
   );
 
-  // Resolve the active label
-  const activeLabel = useMemo(() => {
-    if (isCustom) {
-      const parts: string[] = [];
-      if (customFrom) parts.push(customFrom);
-      if (customTo) parts.push(customTo);
-      return parts.join(" → ") || "Custom range";
-    }
-    return PRESETS.find((p) => p.key === activePreset)?.label || "All time";
-  }, [activePreset, isCustom, customFrom, customTo]);
 
   return (
     <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:flex-wrap">
