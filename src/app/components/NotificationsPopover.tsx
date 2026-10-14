@@ -9,7 +9,6 @@ import {
   ArrowRight,
   CheckCheck,
   CheckCircle2,
-  AlertTriangle,
 } from "lucide-react";
 import { useShell } from "./ShellContext";
 import clsx from "clsx";

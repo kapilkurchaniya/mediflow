@@ -1,7 +1,7 @@
 import { getSaleById } from "@/app/actions/sales";
 import { notFound } from "next/navigation";
 import { format } from "date-fns";
-import { ArrowLeft, Printer, Receipt, FileText } from "lucide-react";
+import { ArrowLeft, Printer, Receipt } from "lucide-react";
 import Link from "next/link";
 import PrintButton from "./PrintButton";
 import { formatINR } from "@/lib/format";
