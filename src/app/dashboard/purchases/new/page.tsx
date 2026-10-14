@@ -4,8 +4,7 @@ import { useActionState, useEffect, useState } from "react";
 import { createPurchaseInvoice, PurchaseItemInput } from "@/app/actions/purchases";
 import { getSuppliers } from "@/app/actions/suppliers";
 import { getMedicines } from "@/app/actions/inventory";
-import { ArrowLeft, Save, Plus, Trash2, Calendar, FileText, Truck, AlertCircle } from "lucide-react";
-import Link from "next/link";
+import { Save, Plus, Trash2, FileText, Truck, AlertCircle } from "lucide-react";
 import { redirect } from "next/navigation";
 import { PageHeader } from "@/app/components/ui";
 import { formatINR } from "@/lib/format";
@@ -34,7 +33,7 @@ export default function NewPurchasePage() {
   }, []);
 
   const [state, formAction, isPending] = useActionState(
-    async (prevState: { error?: string; success?: boolean } | null, formData: FormData) => {
+    async (_prevState: { error?: string; success?: boolean } | null, _formData: FormData) => {
       if (!supplierId) return { error: "Please select a supplier." };
       if (!supplierInvoiceNo.trim()) return { error: "Supplier invoice number is required." };
       if (items.length === 0) return { error: "Please add at least one line item." };

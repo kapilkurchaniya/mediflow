@@ -43,7 +43,7 @@ export function ExportButton({
       a.click();
       a.remove();
       window.URL.revokeObjectURL(downloadUrl);
-    } catch (err) {
+    } catch {
       alert("Failed to export data. Please try again.");
     } finally {
       setIsExporting(false);
