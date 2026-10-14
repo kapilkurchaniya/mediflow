@@ -17,10 +17,8 @@ import {
   AlertTriangle,
   Sparkles,
   X,
-  Layers,
   Volume2,
   VolumeX,
-  CheckCircle2,
   PackageX,
   CreditCard,
   QrCode,
@@ -402,7 +400,7 @@ export default function POSPage() {
   const netPayable = totals.total;
 
   const [state, formAction, isPending] = useActionState(
-    async (prevState: { error?: string; success?: boolean } | null, formData: FormData) => {
+    async (_prevState: { error?: string; success?: boolean } | null, _formData: FormData) => {
       if (cart.length === 0) return { error: "Cart is empty" };
 
       // Schedule H validation: require doctor name if Rx drug in cart

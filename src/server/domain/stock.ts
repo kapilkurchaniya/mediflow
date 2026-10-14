@@ -1,5 +1,5 @@
-import { db, schema } from "@/server/db";
-import { eq, sql } from "drizzle-orm";
+import { schema } from "@/server/db";
+import { eq } from "drizzle-orm";
 import type { Tx } from "@/server/db";
 
 export type StockMovementType =
