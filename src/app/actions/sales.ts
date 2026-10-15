@@ -10,6 +10,11 @@ import { sendWhatsAppReceipt } from "@/server/whatsapp";
 import { computeSaleTotals, type SaleLineInput } from "@/lib/money";
 import { format } from "date-fns";
 import { postSaleJournalEntry } from "@/server/domain/accounting";
+import {
+  validateDispensingCompliance,
+  recordDispensingLog,
+  isScheduledDrug,
+} from "@/server/domain/compliance";
 
 export async function getSales(dateFrom?: string | null, dateTo?: string | null) {
   const { session, user } = await requireAuth();
@@ -154,12 +159,27 @@ export type PosItemInput = {
   discountBp: number; // basis points
 };
 
+export type ComplianceDetailsInput = {
+  doctorName?: string;
+  doctorRegNo?: string;
+  doctorAddress?: string;
+  patientName?: string;
+  patientAge?: number;
+  patientGender?: string;
+  patientAddress?: string;
+  patientPhone?: string;
+  prescriptionRef?: string;
+  prescriptionDate?: string;
+  prescriptionId?: string;
+};
+
 export async function createSaleInvoice(
   customerId: string | undefined,
   doctorName: string,
   items: PosItemInput[],
   paymentMethod: string,
-  amountPaid: number // paise
+  amountPaid: number, // paise
+  complianceDetails?: ComplianceDetailsInput
 ) {
   const { session, user } = await requireAuth();
 
@@ -170,7 +190,13 @@ export async function createSaleInvoice(
     let customerName = "";
     if (customerId?.trim()) {
       const [customer] = await db
-        .select({ phone: schema.customers.phone, name: schema.customers.name })
+        .select({
+          phone: schema.customers.phone,
+          name: schema.customers.name,
+          age: schema.customers.age,
+          gender: schema.customers.gender,
+          address: schema.customers.address,
+        })
         .from(schema.customers)
         .where(
           and(
@@ -251,6 +277,29 @@ export async function createSaleInvoice(
         };
       });
 
+      // 1.1 Drug Compliance Validation (Drugs & Cosmetics Act)
+      const effectiveDoctorName = complianceDetails?.doctorName || doctorName;
+      const effectivePatientName = complianceDetails?.patientName || customerName;
+
+      const complianceCheck = validateDispensingCompliance({
+        items: processedItems.map((p) => ({
+          medicineName: p.medicine.name,
+          schedule: p.medicine.schedule,
+          rxRequired: p.medicine.rxRequired,
+          qty: p.qty,
+        })),
+        doctorName: effectiveDoctorName,
+        doctorRegNo: complianceDetails?.doctorRegNo,
+        patientName: effectivePatientName,
+        patientAddress: complianceDetails?.patientAddress,
+        patientAge: complianceDetails?.patientAge,
+        prescriptionRef: complianceDetails?.prescriptionRef,
+      });
+
+      if (!complianceCheck.valid) {
+        throw new Error(complianceCheck.errors.join("; "));
+      }
+
       // Compute GST-inclusive totals (replaces manual 5% math)
       const isInterState = false; // Could determine this based on customer vs store state code
       const totals = computeSaleTotals(lineInputs, isInterState);
@@ -269,7 +318,15 @@ export async function createSaleInvoice(
         storeId: session.storeId,
         invoiceNo,
         customerId: customerId?.trim() ? customerId.trim() : null,
-        doctorName: doctorName?.trim() ? doctorName.trim() : null,
+        doctorName: effectiveDoctorName?.trim() ? effectiveDoctorName.trim() : null,
+        doctorRegNo: complianceDetails?.doctorRegNo?.trim() || null,
+        doctorAddress: complianceDetails?.doctorAddress?.trim() || null,
+        patientAge: complianceDetails?.patientAge ?? null,
+        patientGender: complianceDetails?.patientGender || null,
+        patientAddress: complianceDetails?.patientAddress?.trim() || null,
+        prescriptionId: complianceDetails?.prescriptionId || null,
+        prescriptionRef: complianceDetails?.prescriptionRef?.trim() || null,
+        pharmacistId: user.id,
         grossAmount: totals.gross,
         discountAmount: totals.discount,
         taxableAmount: totals.taxable,
@@ -329,8 +386,45 @@ export async function createSaleInvoice(
         });
       }
 
+      let insertedItems: Array<{ id: string }> = [];
       if (saleItemsToInsert.length > 0) {
-        await tx.insert(schema.saleItems).values(saleItemsToInsert);
+        insertedItems = await tx.insert(schema.saleItems).values(saleItemsToInsert).returning({ id: schema.saleItems.id });
+      }
+
+      // 4.1 Record Statutory Dispensing Register Entries for Controlled Drugs
+      for (let i = 0; i < processedItems.length; i++) {
+        const item = processedItems[i];
+        const insertedSaleItem = insertedItems[i];
+        if (isScheduledDrug(item.medicine.schedule) && insertedSaleItem) {
+          await recordDispensingLog({
+            tx,
+            tenantId: session.tenantId,
+            storeId: session.storeId,
+            saleId: sale.id,
+            saleItemId: insertedSaleItem.id,
+            medicineId: item.medicineId,
+            batchId: item.batchId,
+            medicineName: item.medicine.name,
+            batchNo: item.batch.batchNo,
+            expiryDate: item.batch.expiryDate,
+            manufacturerName: null,
+            schedule: item.medicine.schedule,
+            patientName: effectivePatientName || "Walk-in Patient",
+            patientAge: complianceDetails?.patientAge ?? null,
+            patientGender: complianceDetails?.patientGender || null,
+            patientAddress: complianceDetails?.patientAddress || null,
+            patientPhone: complianceDetails?.patientPhone || customerPhone || null,
+            doctorName: effectiveDoctorName || "Registered Medical Practitioner",
+            doctorRegNo: complianceDetails?.doctorRegNo || null,
+            doctorAddress: complianceDetails?.doctorAddress || null,
+            prescriptionRef: complianceDetails?.prescriptionRef || null,
+            prescriptionDate: complianceDetails?.prescriptionDate || format(new Date(), "yyyy-MM-dd"),
+            quantityDispensed: item.qty,
+            pharmacistId: user.id,
+            pharmacistName: user.name,
+            pharmacistRegNo: (user as unknown as { pharmacistRegNo?: string }).pharmacistRegNo || null,
+          });
+        }
       }
 
       // 5. Record Payment
