@@ -1,4 +1,4 @@
-import React from "react";
+ import React from "react";
 import { getComplianceOverview, getDispensingLogs } from "@/app/actions/compliance";
 import { ComplianceRegisterView } from "../ComplianceRegisterView";
 
