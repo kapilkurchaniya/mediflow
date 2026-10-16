@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect, useActionState, useCallback } from "react";
 import { searchPosItems, createSaleInvoice, findSubstitutes, PosItemInput } from "@/app/actions/sales";
 import { getCustomers, createQuickCustomer } from "@/app/actions/customers";
+import { getDoctors } from "@/app/actions/compliance";
 import { computeSaleTotals } from "@/lib/money";
 import { formatINR, formatNumber } from "@/lib/format";
 import {
@@ -24,6 +25,7 @@ import {
   QrCode,
   Banknote,
   RotateCcw,
+  ShieldAlert,
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -35,6 +37,7 @@ interface SearchResult {
     genericName?: string | null;
     gstRateBp: number;
     rxRequired?: boolean | null;
+    schedule?: string | null;
   };
   batches: {
     id: string;
@@ -128,6 +131,19 @@ export default function POSPage() {
   const [substitutesList, setSubstitutesList] = useState<SubstituteItem[]>([]);
   const [isLoadingSubstitutes, setIsLoadingSubstitutes] = useState(false);
 
+  // Compliance & Prescriber state
+  const [doctorsList, setDoctorsList] = useState<Array<{ id: string; name: string; regNo: string; hospital?: string | null }>>([]);
+  const [selectedDoctorId, setSelectedDoctorId] = useState("");
+  const [doctorRegNo, setDoctorRegNo] = useState("");
+  const [doctorAddress, setDoctorAddress] = useState("");
+  const [patientAge, setPatientAge] = useState<number | "">("");
+  const [patientGender, setPatientGender] = useState("male");
+  const [patientAddress, setPatientAddress] = useState("");
+  const [prescriptionRef, setPrescriptionRef] = useState("");
+  const [prescriptionDate, setPrescriptionDate] = useState(
+    new Date().toISOString().slice(0, 10)
+  );
+
   const [cart, setCart] = useState<
     (PosItemInput & {
       medicineName: string;
@@ -137,22 +153,45 @@ export default function POSPage() {
       qtyOnHand: number;
       gstRateBp: number;
       rxRequired?: boolean | null;
+      schedule?: string | null;
     })[]
   >([]);
 
   // Rx validation alert (derived directly from cart)
   const rxWarning = cart.some((i) => Boolean(i.rxRequired));
+  const controlledItems = cart.filter(
+    (i) => i.schedule && ["H", "H1", "X", "NARCOTIC"].includes(i.schedule.toUpperCase())
+  );
+  const isComplianceMandatory = controlledItems.length > 0 || rxWarning;
+  const isH1OrHigher = cart.some(
+    (i) => i.schedule && ["H1", "X", "NARCOTIC"].includes(i.schedule.toUpperCase())
+  );
 
   const searchInputRef = useRef<HTMLInputElement>(null);
   const barcodeBufferRef = useRef<{ buffer: string; lastTime: number }>({ buffer: "", lastTime: 0 });
 
-  // Load customer list on mount
+  // Load customer and doctor lists on mount
   useEffect(() => {
     getCustomers().then((data) => {
       setCustomers(data.map((c) => ({ id: c.id, name: c.name, phone: c.phone })));
     });
+    getDoctors().then((data) => {
+      setDoctorsList(data.map((d) => ({ id: d.id, name: d.name, regNo: d.regNo, hospital: d.hospital })));
+    });
     if (searchInputRef.current) searchInputRef.current.focus();
   }, []);
+
+  const handleDoctorSelect = (docId: string) => {
+    setSelectedDoctorId(docId);
+    if (docId) {
+      const doc = doctorsList.find((d) => d.id === docId);
+      if (doc) {
+        setDoctorName(doc.name);
+        setDoctorRegNo(doc.regNo);
+        setDoctorAddress(doc.hospital || "");
+      }
+    }
+  };
 
   // Add item to cart
   const addToCart = useCallback(
@@ -188,6 +227,7 @@ export default function POSPage() {
               discountBp: 0,
               gstRateBp: medicine.gstRateBp,
               rxRequired: medicine.rxRequired,
+              schedule: medicine.schedule,
             },
           ];
         }
@@ -403,14 +443,31 @@ export default function POSPage() {
     async (_prevState: { error?: string; success?: boolean } | null, _formData: FormData) => {
       if (cart.length === 0) return { error: "Cart is empty" };
 
-      // Schedule H validation: require doctor name if Rx drug in cart
-      if (rxWarning && !doctorName.trim()) {
+      // Drug Compliance validation: require doctor name if Rx or controlled drug in cart
+      if (isComplianceMandatory && !doctorName.trim()) {
         return {
           error: "Doctor's name is mandatory for Schedule H / Prescription (Rx) medicines in this bill.",
         };
       }
+      if (isH1OrHigher && !doctorRegNo.trim()) {
+        return {
+          error: "Doctor Medical Council Registration Number is mandatory for Schedule H1 / Schedule X drugs under D&C Rules.",
+        };
+      }
 
-      const res = await createSaleInvoice(customerId, doctorName, cart, paymentMethod, netPayable);
+      const complianceDetails = isComplianceMandatory ? {
+        doctorName: doctorName.trim(),
+        doctorRegNo: doctorRegNo.trim() || undefined,
+        doctorAddress: doctorAddress.trim() || undefined,
+        patientName: customers.find((c) => c.id === customerId)?.name || undefined,
+        patientAge: patientAge === "" ? undefined : Number(patientAge),
+        patientGender,
+        patientAddress: patientAddress.trim() || undefined,
+        prescriptionRef: prescriptionRef.trim() || undefined,
+        prescriptionDate,
+      } : undefined;
+
+      const res = await createSaleInvoice(customerId, doctorName, cart, paymentMethod, netPayable, complianceDetails);
       if (res.success && res.saleId) {
         if (soundEnabled) playSound("chime");
         router.push(`/dashboard/sales/${res.saleId}/print?format=thermal`);
@@ -666,9 +723,20 @@ export default function POSPage() {
                     return (
                       <tr key={`${item.batchId}-${index}`} className="hover:bg-ink-50/60">
                         <td>
-                          <div className="flex items-center gap-1.5">
+                          <div className="flex items-center gap-1.5 flex-wrap">
                             <span className="font-semibold text-ink-900">{item.medicineName}</span>
                             {item.rxRequired && <span className="badge badge-danger !text-[9.5px] !px-1">Rx</span>}
+                            {item.schedule && item.schedule !== "none" && (
+                              <span className={`badge !text-[9px] !px-1 font-bold ${
+                                item.schedule.toUpperCase() === "H1" ? "!bg-rose-100 !text-rose-800 !border-rose-300" :
+                                item.schedule.toUpperCase() === "H" ? "!bg-amber-100 !text-amber-800 !border-amber-300" :
+                                item.schedule.toUpperCase() === "X" ? "!bg-purple-100 !text-purple-800 !border-purple-300" :
+                                item.schedule.toUpperCase() === "NARCOTIC" ? "!bg-red-100 !text-red-900 !border-red-400" :
+                                "badge-neutral"
+                              }`}>
+                                Sched {item.schedule}
+                              </span>
+                            )}
                           </div>
                           <div className="cell-sub font-mono">
                             Batch: {item.batchNo} · Exp: {item.expiryDate}
@@ -754,20 +822,114 @@ export default function POSPage() {
             </div>
 
             <div>
-              <label className={`label text-[12px] flex items-center justify-between ${rxWarning ? "text-red-700 font-semibold" : ""}`}>
+              <label className={`label text-[12px] flex items-center justify-between ${isComplianceMandatory ? "text-amber-800 font-semibold" : ""}`}>
                 <span className="flex items-center">
-                  <Stethoscope className="h-3 w-3 mr-1" /> Prescribed By
+                  <Stethoscope className="h-3 w-3 mr-1 text-brand-600" /> Prescribed By
                 </span>
-                {rxWarning && <span className="text-[11px] text-red-600 font-bold">* Required for Rx</span>}
+                {isComplianceMandatory && <span className="text-[11px] text-amber-700 font-bold">* Required for Rx</span>}
               </label>
+
+              {doctorsList.length > 0 && (
+                <select
+                  value={selectedDoctorId}
+                  onChange={(e) => handleDoctorSelect(e.target.value)}
+                  className="select text-[12px] mb-1.5"
+                >
+                  <option value="">— Select from Doctor Registry —</option>
+                  {doctorsList.map((d) => (
+                    <option key={d.id} value={d.id}>
+                      {d.name} ({d.regNo})
+                    </option>
+                  ))}
+                </select>
+              )}
+
               <input
                 type="text"
                 value={doctorName}
                 onChange={(e) => setDoctorName(e.target.value)}
                 placeholder="Dr. Name (e.g. Dr. Sharma)"
-                className={`input text-[13px] ${rxWarning && !doctorName.trim() ? "!border-red-400 !bg-red-50/20" : ""}`}
+                className={`input text-[13px] ${isComplianceMandatory && !doctorName.trim() ? "!border-amber-400 !bg-amber-50/20" : ""}`}
               />
             </div>
+
+            {/* Statutory Compliance Panel for Schedule H, H1, X, Narcotics */}
+            {isComplianceMandatory && (
+              <div className="rounded-xl bg-amber-50/60 border border-amber-200 p-2.5 space-y-2 mt-2">
+                <div className="flex items-center justify-between text-amber-950 font-semibold text-[11px] uppercase tracking-wider">
+                  <span className="flex items-center gap-1">
+                    <ShieldAlert className="h-3.5 w-3.5 text-amber-600" />
+                    Statutory Register Details
+                  </span>
+                  {isH1OrHigher && (
+                    <span className="badge badge-danger !text-[9px] !px-1">Form 35 / H1</span>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  <div>
+                    <label className="text-[10.5px] font-medium text-ink-600">
+                      Council Reg No {isH1OrHigher && <span className="text-red-600 font-bold">*</span>}
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="MCI-12345"
+                      value={doctorRegNo}
+                      onChange={(e) => setDoctorRegNo(e.target.value)}
+                      className="input !h-7 text-[12px] font-mono"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10.5px] font-medium text-ink-600">Rx Slip / Ref No</label>
+                    <input
+                      type="text"
+                      placeholder="Slip # / Ref"
+                      value={prescriptionRef}
+                      onChange={(e) => setPrescriptionRef(e.target.value)}
+                      className="input !h-7 text-[12px] font-mono"
+                    />
+                  </div>
+                </div>
+
+                {isH1OrHigher && (
+                  <div className="space-y-1.5 pt-1.5 border-t border-amber-200/60 text-xs">
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="text-[10.5px] font-medium text-ink-600">Patient Age & Gender</label>
+                        <div className="flex gap-1">
+                          <input
+                            type="number"
+                            placeholder="Age"
+                            value={patientAge}
+                            onChange={(e) => setPatientAge(e.target.value === "" ? "" : Number(e.target.value))}
+                            className="input !h-7 text-[12px] w-14"
+                          />
+                          <select
+                            value={patientGender}
+                            onChange={(e) => setPatientGender(e.target.value)}
+                            className="select !h-7 text-[12px] flex-1"
+                          >
+                            <option value="male">M</option>
+                            <option value="female">F</option>
+                            <option value="other">O</option>
+                          </select>
+                        </div>
+                      </div>
+                      <div>
+                        <label className="text-[10.5px] font-medium text-ink-600">Patient Full Address *</label>
+                        <input
+                          type="text"
+                          placeholder="Street, City, Pin"
+                          value={patientAddress}
+                          onChange={(e) => setPatientAddress(e.target.value)}
+                          className="input !h-7 text-[12px]"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Payment & Net Payable Summary */}
