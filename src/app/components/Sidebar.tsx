@@ -23,6 +23,9 @@ import {
   X,
   Check,
   Building2,
+  ShieldAlert,
+  FileText,
+  Stethoscope,
   type LucideIcon,
 } from "lucide-react";
 import { Logo, LogoMark } from "./ui";
@@ -49,6 +52,15 @@ const NAV: { heading?: string; items: NavItem[] }[] = [
     items: [
       { href: "/dashboard/sales", label: "Sales & invoices", icon: Receipt },
       { href: "/dashboard/purchases", label: "Purchases (GRN)", icon: FileInput },
+    ],
+  },
+  {
+    heading: "Compliance (Rx)",
+    items: [
+      { href: "/dashboard/compliance", label: "Drug registers", icon: ShieldAlert, exact: true },
+      { href: "/dashboard/compliance/schedule-h1", label: "Schedule H1 (Form 35)", icon: ShieldAlert },
+      { href: "/dashboard/compliance/prescriptions", label: "Prescriptions (Rx)", icon: FileText },
+      { href: "/dashboard/compliance/doctors", label: "Doctor master", icon: Stethoscope },
     ],
   },
   {
