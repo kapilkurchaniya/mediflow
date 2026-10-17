@@ -1,5 +1,20 @@
 import { getTrialBalance, getJournalLines } from "@/app/actions/accounting";
-import { BookOpenText, Scale, ArrowDownLeft, ArrowUpRight, CheckCircle2, AlertTriangle } from "lucide-react";
+import {
+  BookOpenText,
+  Scale,
+  ArrowDownLeft,
+  ArrowUpRight,
+  CheckCircle2,
+  AlertTriangle,
+  FileSpreadsheet,
+  TrendingUp,
+  Landmark,
+  Banknote,
+  Users,
+  ChevronRight,
+  ArrowRight,
+} from "lucide-react";
+import Link from "next/link";
 import { format } from "date-fns";
 import { PageHeader, StatCard, EmptyState } from "@/app/components/ui";
 import { formatINR } from "@/lib/format";
@@ -7,6 +22,44 @@ import { DateRangeFilter } from "@/app/components/DateRangeFilter";
 import { resolveDateRange } from "@/lib/date-range";
 
 export const metadata = { title: "Accounting" };
+
+const FINANCIAL_STATEMENTS = [
+  {
+    href: "/dashboard/accounting/trial-balance",
+    title: "Trial Balance",
+    desc: "Multi-column ledger movements & closing balances",
+    icon: Scale,
+    tone: "text-sky-600 bg-sky-50 border-sky-200",
+  },
+  {
+    href: "/dashboard/accounting/profit-loss",
+    title: "Profit & Loss",
+    desc: "Revenue, cost of goods, and operational margin",
+    icon: TrendingUp,
+    tone: "text-emerald-600 bg-emerald-50 border-emerald-200",
+  },
+  {
+    href: "/dashboard/accounting/balance-sheet",
+    title: "Balance Sheet",
+    desc: "Assets, liabilities, and owners' equity statement",
+    icon: Landmark,
+    tone: "text-indigo-600 bg-indigo-50 border-indigo-200",
+  },
+  {
+    href: "/dashboard/accounting/cash-flow",
+    title: "Cash Flow",
+    desc: "Counter cash, UPI receipts, and liquidity tracking",
+    icon: Banknote,
+    tone: "text-amber-600 bg-amber-50 border-amber-200",
+  },
+  {
+    href: "/dashboard/accounting/outstanding",
+    title: "Outstanding & Ageing",
+    desc: "Customer credit debtors & supplier payables",
+    icon: Users,
+    tone: "text-rose-600 bg-rose-50 border-rose-200",
+  },
+];
 
 export default async function AccountingPage({
   searchParams,
@@ -27,7 +80,6 @@ export default async function AccountingPage({
   const totalCredit = trialBalance.reduce((sum, row) => sum + row.totalCredit, 0);
   const balanced = totalDebit === totalCredit;
 
-  // Build the period label for display
   const periodLabel = dateRange.from && dateRange.to
     ? `${format(new Date(dateRange.from), "d MMM yyyy")} – ${format(new Date(dateRange.to), "d MMM yyyy")}`
     : `As of ${format(new Date(), "d MMM yyyy")}`;
@@ -35,21 +87,57 @@ export default async function AccountingPage({
   return (
     <div className="page space-y-6">
       <PageHeader
-        title="Accounting"
-        description="Double-entry trial balance and day book, posted automatically from sales and purchases."
+        eyebrow="Double-Entry Financials"
+        title="Accounting & Day Book"
+        description="Double-entry ledger, day book, and statutory statements posted automatically from POS and GRN."
+        actions={
+          <Link href="/dashboard/accounting/trial-balance" className="btn btn-primary">
+            <FileSpreadsheet /> Full Trial Balance
+          </Link>
+        }
       />
 
       {/* Date Range Filter */}
-      <div className="card px-4 py-3">
+      <div className="card px-4 py-3 bg-white/70 backdrop-blur-xs">
         <DateRangeFilter />
       </div>
 
+      {/* Statement Quick Links */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5">
+        {FINANCIAL_STATEMENTS.map((stmt) => {
+          const Icon = stmt.icon;
+          return (
+            <Link
+              key={stmt.href}
+              href={stmt.href}
+              className="card card-interactive p-4 group flex flex-col justify-between"
+            >
+              <div>
+                <div className={`h-9 w-9 rounded-lg border flex items-center justify-center mb-3 ${stmt.tone}`}>
+                  <Icon className="h-5 w-5" />
+                </div>
+                <h3 className="text-[14px] font-semibold text-ink-900 group-hover:text-brand-700 transition-colors">
+                  {stmt.title}
+                </h3>
+                <p className="text-[12px] text-ink-500 mt-1 leading-snug">
+                  {stmt.desc}
+                </p>
+              </div>
+              <div className="mt-4 flex items-center gap-1 text-[12px] font-medium text-brand-600 group-hover:translate-x-0.5 transition-transform">
+                <span>Open statement</span>
+                <ChevronRight className="h-3.5 w-3.5" />
+              </div>
+            </Link>
+          );
+        })}
+      </div>
+
       <section className="grid grid-cols-1 gap-4 md:grid-cols-3">
-        <StatCard label="Total debits" value={formatINR(totalDebit)} icon={ArrowDownLeft} tone="info" />
-        <StatCard label="Total credits" value={formatINR(totalCredit)} icon={ArrowUpRight} tone="neutral" />
+        <StatCard label="Total Debits" value={formatINR(totalDebit)} icon={ArrowDownLeft} tone="info" />
+        <StatCard label="Total Credits" value={formatINR(totalCredit)} icon={ArrowUpRight} tone="neutral" />
         <StatCard
-          label="Ledger status"
-          value={balanced ? "Balanced" : "Out of balance"}
+          label="Ledger Status"
+          value={balanced ? "Balanced" : "Out of Balance"}
           icon={balanced ? CheckCircle2 : AlertTriangle}
           tone={balanced ? "brand" : "danger"}
           footnote={balanced ? "Debits equal credits" : `Difference ${formatINR(Math.abs(totalDebit - totalCredit))}`}
@@ -57,14 +145,19 @@ export default async function AccountingPage({
       </section>
 
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-5">
-        {/* Trial balance */}
+        {/* Trial balance preview */}
         <div className="card overflow-hidden xl:col-span-3 flex flex-col max-h-[640px]">
-          <div className="card-header">
+          <div className="card-header border-b border-ink-150">
             <div className="flex items-center gap-2">
               <Scale className="h-4 w-4 text-ink-400" />
-              <h2 className="card-title">Trial balance</h2>
+              <h2 className="card-title">Trial Balance Preview</h2>
             </div>
-            <span className="text-[12.5px] text-ink-500">{periodLabel}</span>
+            <div className="flex items-center gap-2">
+              <span className="text-[12px] text-ink-500">{periodLabel}</span>
+              <Link href="/dashboard/accounting/trial-balance" className="btn btn-ghost btn-sm text-[12px]">
+                Detailed <ArrowRight className="h-3 w-3 ml-1" />
+              </Link>
+            </div>
           </div>
 
           {trialBalance.length === 0 ? (
@@ -98,15 +191,6 @@ export default async function AccountingPage({
                     </tr>
                   ))}
                 </tbody>
-                <tfoot className="sticky bottom-0 bg-ink-50">
-                  <tr className="border-t-2 border-ink-200">
-                    <td colSpan={3} className="px-4 py-3 text-[12px] font-semibold uppercase tracking-wide text-ink-600">
-                      Total
-                    </td>
-                    <td className="px-4 py-3 text-right font-semibold text-ink-900 num">{formatINR(totalDebit)}</td>
-                    <td className="px-4 py-3 text-right font-semibold text-ink-900 num">{formatINR(totalCredit)}</td>
-                  </tr>
-                </tfoot>
               </table>
             </div>
           )}
@@ -114,51 +198,51 @@ export default async function AccountingPage({
 
         {/* Day book */}
         <div className="card overflow-hidden xl:col-span-2 flex flex-col max-h-[640px]">
-          <div className="card-header">
+          <div className="card-header border-b border-ink-150">
             <div className="flex items-center gap-2">
               <BookOpenText className="h-4 w-4 text-ink-400" />
-              <h2 className="card-title">Day book</h2>
+              <h2 className="card-title">Day Book (Journal)</h2>
             </div>
-            <span className="text-[12.5px] text-ink-500">
-              {dateRange.from ? "Filtered postings" : "Recent postings"}
-            </span>
+            <span className="text-[12px] text-ink-500">Recent 50 lines</span>
           </div>
 
           {journalLines.length === 0 ? (
-            <EmptyState icon={BookOpenText} title="No journal entries" description="Entries post automatically when you bill or receive stock." compact />
+            <EmptyState icon={BookOpenText} title="No journal entries" description="Vouchers appear here chronologically as sales and purchases occur." compact />
           ) : (
-            <ul className="flex-1 overflow-y-auto divide-y divide-ink-100">
-              {journalLines.map(({ line, entry, account }) => {
-                const isDebit = (line.debit ?? 0) > 0;
-                return (
-                  <li key={line.id} className="flex items-start gap-3 px-5 py-3 transition-colors hover:bg-ink-50/70">
-                    <span
-                      className={`mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded text-[10px] font-bold ${
-                        isDebit ? "bg-sky-50 text-sky-700" : "bg-ink-100 text-ink-600"
-                      }`}
-                    >
-                      {isDebit ? "Dr" : "Cr"}
-                    </span>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-baseline justify-between gap-3">
-                        <p className="truncate text-[13px] font-medium text-ink-900">{account.name}</p>
-                        <p className="shrink-0 text-[13px] font-medium text-ink-900 num">
-                          {formatINR(isDebit ? line.debit : line.credit)}
-                        </p>
+            <div className="flex-1 overflow-y-auto">
+              <ul className="divide-y divide-ink-100">
+                {journalLines.map(({ line, entry, account }) => (
+                  <li key={line.id} className="p-3.5 hover:bg-ink-50/70 transition-colors">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono text-[11px] font-bold text-ink-500">
+                          {entry.entryNo}
+                        </span>
+                        <span className="text-[11.5px] text-ink-400 num">
+                          {format(new Date(entry.entryDate), "d MMM")}
+                        </span>
                       </div>
-                      <div className="mt-0.5 flex items-center justify-between gap-3 text-[12px] text-ink-500">
-                        <p className="truncate" title={entry.narration}>
-                          {entry.narration}
-                        </p>
-                        <p className="shrink-0 num">
-                          <span className="font-mono">{entry.entryNo}</span> · {format(new Date(entry.entryDate), "d MMM")}
-                        </p>
-                      </div>
+                      <span className="num font-semibold text-[13px] text-ink-900">
+                        {line.debit > 0 ? `Dr ${formatINR(line.debit)}` : `Cr ${formatINR(line.credit)}`}
+                      </span>
                     </div>
+                    <div className="mt-1 flex items-center justify-between text-[12.5px]">
+                      <span className="text-ink-800 font-medium truncate max-w-[200px]">
+                        {account.name}
+                      </span>
+                      <span className="text-[11.5px] text-ink-500 font-mono">
+                        {account.code}
+                      </span>
+                    </div>
+                    {entry.narration && (
+                      <p className="mt-1 text-[11.5px] text-ink-400 truncate">
+                        {entry.narration}
+                      </p>
+                    )}
                   </li>
-                );
-              })}
-            </ul>
+                ))}
+              </ul>
+            </div>
           )}
         </div>
       </div>
