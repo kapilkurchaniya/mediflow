@@ -73,9 +73,14 @@ export default async function PurchasesPage({
               </thead>
               <tbody>
                 {purchases.map(({ purchase, supplier }) => (
-                  <tr key={purchase.id}>
+                  <tr key={purchase.id} className="hover:bg-ink-50/70 transition-colors">
                     <td>
-                      <span className="font-mono text-[12.5px] font-medium text-ink-900">{purchase.supplierInvoiceNo}</span>
+                      <Link
+                        href={`/dashboard/purchases/${purchase.id}`}
+                        className="font-mono text-[12.5px] font-bold text-brand-700 hover:text-brand-900 hover:underline"
+                      >
+                        {purchase.supplierInvoiceNo}
+                      </Link>
                       <div className="cell-sub font-mono">{purchase.purchaseNo}</div>
                     </td>
                     <td className="text-ink-600 num whitespace-nowrap">
