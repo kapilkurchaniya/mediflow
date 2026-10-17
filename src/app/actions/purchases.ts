@@ -34,6 +34,46 @@ export async function getPurchases(dateFrom?: string | null, dateTo?: string | n
     .orderBy(desc(schema.purchases.invoiceDate));
 }
 
+export async function getPurchaseById(purchaseId: string) {
+  const { session } = await requireAuth();
+
+  const [res] = await db
+    .select({
+      purchase: schema.purchases,
+      supplier: schema.suppliers,
+      store: schema.stores,
+    })
+    .from(schema.purchases)
+    .innerJoin(schema.suppliers, eq(schema.purchases.supplierId, schema.suppliers.id))
+    .innerJoin(schema.stores, eq(schema.purchases.storeId, schema.stores.id))
+    .where(
+      and(
+        eq(schema.purchases.id, purchaseId),
+        eq(schema.purchases.tenantId, session.tenantId),
+        eq(schema.purchases.storeId, session.storeId)
+      )
+    )
+    .limit(1);
+
+  if (!res) return null;
+
+  const items = await db
+    .select({
+      item: schema.purchaseItems,
+      medicine: schema.medicines,
+    })
+    .from(schema.purchaseItems)
+    .innerJoin(schema.medicines, eq(schema.purchaseItems.medicineId, schema.medicines.id))
+    .where(eq(schema.purchaseItems.purchaseId, purchaseId));
+
+  return {
+    purchase: res.purchase,
+    supplier: res.supplier,
+    store: res.store,
+    items,
+  };
+}
+
 export type PurchaseItemInput = {
   medicineId: string;
   batchNo: string;
