@@ -26,6 +26,7 @@ import {
   ShieldAlert,
   FileText,
   Stethoscope,
+  BarChart3,
   type LucideIcon,
 } from "lucide-react";
 import { Logo, LogoMark } from "./ui";
@@ -73,7 +74,10 @@ const NAV: { heading?: string; items: NavItem[] }[] = [
   },
   {
     heading: "Finance",
-    items: [{ href: "/dashboard/accounting", label: "Accounting", icon: BookOpenText }],
+    items: [
+      { href: "/dashboard/accounting", label: "Accounting", icon: BookOpenText },
+      { href: "/dashboard/reports", label: "Reports & Analytics", icon: BarChart3 },
+    ],
   },
   {
     heading: "Directory",
