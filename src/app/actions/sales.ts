@@ -15,6 +15,7 @@ import {
   recordDispensingLog,
   isScheduledDrug,
 } from "@/server/domain/compliance";
+import { createGstDocumentFromSale } from "@/server/domain/gst";
 
 export async function getSales(dateFrom?: string | null, dateTo?: string | null) {
   const { session, user } = await requireAuth();
@@ -460,11 +461,23 @@ export async function createSaleInvoice(
         creditAmount: amountDue > 0 ? amountDue : 0,
       });
 
+      // 7. Record GST Document
+      try {
+        await createGstDocumentFromSale(tx, {
+          saleId: sale.id,
+          tenantId: session.tenantId,
+          storeId: session.storeId,
+        });
+      } catch (gstErr) {
+        console.error("Warning: GST Document auto-creation error:", gstErr);
+      }
+
       return sale.id;
     });
 
     revalidatePath("/dashboard/sales");
     revalidatePath("/dashboard/accounting");
+    revalidatePath("/dashboard/gst");
 
     if (customerPhone) {
       // In a real app we'd queue this out of band, but keeping it simple

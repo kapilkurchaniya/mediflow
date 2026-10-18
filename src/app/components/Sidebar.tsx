@@ -27,6 +27,10 @@ import {
   FileText,
   Stethoscope,
   BarChart3,
+  Landmark,
+  ReceiptText,
+  QrCode,
+  FileSpreadsheet,
   type LucideIcon,
 } from "lucide-react";
 import { Logo, LogoMark } from "./ui";
@@ -70,6 +74,16 @@ const NAV: { heading?: string; items: NavItem[] }[] = [
       { href: "/dashboard/inventory", label: "Item master", icon: Pill, exact: true },
       { href: "/dashboard/inventory/batches", label: "Batches & stock", icon: Boxes },
       { href: "/dashboard/inventory/import", label: "Bulk import", icon: Upload },
+    ],
+  },
+  {
+    heading: "GST & Tax",
+    items: [
+      { href: "/dashboard/gst", label: "GST Overview", icon: Landmark, exact: true },
+      { href: "/dashboard/gst/outward", label: "Outward (GSTR-1)", icon: ReceiptText },
+      { href: "/dashboard/gst/inward", label: "Inward (ITC)", icon: FileSpreadsheet },
+      { href: "/dashboard/gst/e-invoice", label: "E-Invoice & E-Way", icon: QrCode },
+      { href: "/dashboard/gst/returns", label: "Returns & Filing", icon: Landmark },
     ],
   },
   {
