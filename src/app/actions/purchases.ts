@@ -7,6 +7,7 @@ import { recordStockMovement } from "@/server/domain/stock";
 import { nextDocNumber } from "@/server/domain/sequence";
 import { revalidatePath } from "next/cache";
 import { postPurchaseJournalEntry } from "@/server/domain/accounting";
+import { createGstDocumentFromPurchase } from "@/server/domain/gst";
 
 export async function getPurchases(dateFrom?: string | null, dateTo?: string | null) {
   const { session, user } = await requireAuth();
@@ -236,10 +237,22 @@ export async function createPurchaseInvoice(
         igst: 0,
         totalAmount: totalInvoiceAmount,
       });
+
+      // 6. Record Inward GST Document (ITC claim)
+      try {
+        await createGstDocumentFromPurchase(tx, {
+          purchaseId: purchase.id,
+          tenantId: session.tenantId,
+          storeId: session.storeId,
+        });
+      } catch (gstErr) {
+        console.error("Warning: Purchase GST Document auto-creation error:", gstErr);
+      }
     });
 
     revalidatePath("/dashboard/purchases");
     revalidatePath("/dashboard/accounting");
+    revalidatePath("/dashboard/gst");
     revalidatePath("/dashboard/inventory/batches");
     return { success: true };
   } catch (err: unknown) {
