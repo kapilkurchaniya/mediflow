@@ -26,9 +26,15 @@ import {
   Banknote,
   RotateCcw,
   ShieldAlert,
+  BookmarkCheck,
+  Layers,
+  Tag,
+  Loader2,
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { createPromiseOrder } from "@/app/actions/promise-orders";
+import { checkItemScheme } from "@/app/actions/schemes";
 
 interface SearchResult {
   medicine: {
@@ -38,6 +44,8 @@ interface SearchResult {
     gstRateBp: number;
     rxRequired?: boolean | null;
     schedule?: string | null;
+    rackCode?: string | null;
+    rackName?: string | null;
   };
   batches: {
     id: string;
@@ -154,8 +162,18 @@ export default function POSPage() {
       gstRateBp: number;
       rxRequired?: boolean | null;
       schedule?: string | null;
+      schemeText?: string;
     })[]
   >([]);
+
+  // Promise Order modal state
+  const [isPromiseModalOpen, setIsPromiseModalOpen] = useState(false);
+  const [promiseMed, setPromiseMed] = useState<{ id: string; name: string } | null>(null);
+  const [promiseCustName, setPromiseCustName] = useState("");
+  const [promiseCustPhone, setPromiseCustPhone] = useState("");
+  const [promiseQty, setPromiseQty] = useState(1);
+  const [promiseNotes, setPromiseNotes] = useState("");
+  const [isSavingPromise, setIsSavingPromise] = useState(false);
 
   // Rx validation alert (derived directly from cart)
   const rxWarning = cart.some((i) => Boolean(i.rxRequired));
@@ -237,6 +255,30 @@ export default function POSPage() {
       setSearchResults([]);
       setSelectedResultIndex(0);
       searchInputRef.current?.focus();
+
+      // Check for trade schemes on item
+      checkItemScheme({
+        medicineId: medicine.id,
+        qty: 1,
+        unitPricePaise: batch.saleRate || batch.mrp,
+      }).then((schemeResult) => {
+        if (schemeResult) {
+          setCart((curr) =>
+            curr.map((c) =>
+              c.batchId === batch.id
+                ? {
+                    ...c,
+                    schemeText: schemeResult.description,
+                    discountBp:
+                      schemeResult.discountAmount > 0 && c.rate > 0
+                        ? Math.round((schemeResult.discountAmount / (c.qty * c.rate)) * 10000)
+                        : c.discountBp,
+                  }
+                : c
+            )
+          );
+        }
+      });
     },
     [soundEnabled]
   );
@@ -252,6 +294,44 @@ export default function POSPage() {
       setSubstitutesList(list as SubstituteItem[]);
     } finally {
       setIsLoadingSubstitutes(false);
+    }
+  };
+
+  // Open promise order modal for out of stock item
+  const openPromiseModal = (med: { id: string; name: string }) => {
+    setPromiseMed(med);
+    const cust = customers.find((c) => c.id === customerId);
+    setPromiseCustName(cust?.name || "");
+    setPromiseCustPhone(cust?.phone || "");
+    setPromiseQty(1);
+    setPromiseNotes("");
+    setIsPromiseModalOpen(true);
+  };
+
+  const handleSavePromiseOrder = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!promiseMed || !promiseCustName.trim() || !promiseCustPhone.trim()) return;
+    setIsSavingPromise(true);
+    try {
+      const res = await createPromiseOrder({
+        medicineId: promiseMed.id,
+        medicineName: promiseMed.name,
+        customerName: promiseCustName.trim(),
+        customerPhone: promiseCustPhone.trim(),
+        qtyRequested: promiseQty,
+        notes: promiseNotes.trim() || undefined,
+        customerId: customerId || undefined,
+      });
+      if (res.error) {
+        alert("Failed to save promise order: " + res.error);
+      } else {
+        setIsPromiseModalOpen(false);
+        alert(`Promise order successfully recorded for ${promiseCustName}!`);
+      }
+    } catch (err) {
+      alert("Error: " + (err instanceof Error ? err.message : String(err)));
+    } finally {
+      setIsSavingPromise(false);
     }
   };
 
@@ -575,9 +655,14 @@ export default function POSPage() {
                       return (
                         <tr key={res.medicine.id} className="bg-amber-50/40">
                           <td>
-                            <div className="flex items-center gap-1.5">
+                            <div className="flex items-center gap-1.5 flex-wrap">
                               <span className="font-semibold text-ink-700">{res.medicine.name}</span>
                               <span className="badge badge-warning !text-[10px]">Out of Stock</span>
+                              {res.medicine.rackCode && (
+                                <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-mono font-semibold bg-ink-100 text-ink-700">
+                                  <Layers className="h-2.5 w-2.5 inline" /> Rack: {res.medicine.rackCode}
+                                </span>
+                              )}
                             </div>
                             <div className="text-[12px] text-ink-500 font-mono">
                               {res.medicine.genericName || "—"}
@@ -587,15 +672,25 @@ export default function POSPage() {
                             0 units on shelf
                           </td>
                           <td className="text-right">
-                            {res.medicine.genericName && (
+                            <div className="flex items-center justify-end gap-1.5">
+                              {res.medicine.genericName && (
+                                <button
+                                  type="button"
+                                  onClick={() => openSubstituteFinder(res.medicine.genericName!, res.medicine.id)}
+                                  className="btn btn-secondary btn-sm !text-brand-700 !border-brand-200 hover:!bg-brand-50"
+                                >
+                                  <Sparkles className="h-3 w-3 mr-1" /> Substitutes
+                                </button>
+                              )}
                               <button
                                 type="button"
-                                onClick={() => openSubstituteFinder(res.medicine.genericName!, res.medicine.id)}
-                                className="btn btn-secondary btn-sm !text-brand-700 !border-brand-200 hover:!bg-brand-50"
+                                onClick={() => openPromiseModal(res.medicine)}
+                                className="btn btn-secondary btn-sm !text-amber-800 !border-amber-300 hover:!bg-amber-100"
+                                title="Record patient demand for out-of-stock item"
                               >
-                                <Sparkles className="h-3 w-3 mr-1" /> Substitutes
+                                <BookmarkCheck className="h-3 w-3 mr-1" /> Promise Order
                               </button>
-                            )}
+                            </div>
                           </td>
                         </tr>
                       );
@@ -614,8 +709,13 @@ export default function POSPage() {
                           onClick={() => addToCart(res.medicine, batch)}
                         >
                           <td>
-                            <div className="flex items-center gap-1.5">
+                            <div className="flex items-center gap-1.5 flex-wrap">
                               <span className="font-semibold text-ink-900">{res.medicine.name}</span>
+                              {res.medicine.rackCode && (
+                                <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-mono font-semibold bg-brand-50 text-brand-700 border border-brand-200" title={`Storage Location: ${res.medicine.rackCode}`}>
+                                  <Layers className="h-2.5 w-2.5 inline" /> Rack: {res.medicine.rackCode}
+                                </span>
+                              )}
                               {res.medicine.rxRequired && (
                                 <span className="badge badge-danger !text-[9.5px] !px-1">Rx</span>
                               )}
@@ -741,6 +841,11 @@ export default function POSPage() {
                           <div className="cell-sub font-mono">
                             Batch: {item.batchNo} · Exp: {item.expiryDate}
                           </div>
+                          {item.schemeText && (
+                            <div className="mt-1 flex items-center gap-1 text-[10.5px] font-semibold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200 w-fit">
+                              <Tag className="h-2.5 w-2.5" /> {item.schemeText}
+                            </div>
+                          )}
                         </td>
                         <td className="text-center">
                           <input
@@ -1188,6 +1293,103 @@ export default function POSPage() {
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Promise Order Modal */}
+      {isPromiseModalOpen && promiseMed && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4">
+          <form
+            onSubmit={handleSavePromiseOrder}
+            className="card max-w-md w-full p-6 shadow-xl space-y-4"
+          >
+            <div className="flex items-center justify-between pb-3 border-b border-ink-150">
+              <div className="flex items-center gap-2">
+                <BookmarkCheck className="h-5 w-5 text-brand-600" />
+                <h3 className="text-sm font-bold text-ink-900">
+                  Record Promise Order
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsPromiseModalOpen(false)}
+                className="btn btn-ghost btn-icon h-7 w-7"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="p-3 bg-amber-50 rounded-lg border border-amber-200 text-amber-900 text-xs leading-relaxed">
+              <span className="font-bold">{promiseMed.name}</span> is currently out of stock. Capture patient details to place supplier order and notify customer when stock arrives.
+            </div>
+
+            <div className="space-y-3 text-xs">
+              <div>
+                <label className="label">Patient / Customer Name *</label>
+                <input
+                  type="text"
+                  value={promiseCustName}
+                  onChange={(e) => setPromiseCustName(e.target.value)}
+                  placeholder="e.g. Sunil Kumar"
+                  className="input text-xs"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="label">Mobile Number *</label>
+                <input
+                  type="tel"
+                  value={promiseCustPhone}
+                  onChange={(e) => setPromiseCustPhone(e.target.value)}
+                  placeholder="e.g. 9876543210"
+                  className="input text-xs font-mono"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="label">Quantity Needed *</label>
+                <input
+                  type="number"
+                  min="1"
+                  value={promiseQty}
+                  onChange={(e) => setPromiseQty(Number(e.target.value))}
+                  className="input text-xs font-mono"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="label">Urgency / Instructions (Optional)</label>
+                <textarea
+                  value={promiseNotes}
+                  onChange={(e) => setPromiseNotes(e.target.value)}
+                  placeholder="e.g. Patient needs for post-op treatment"
+                  rows={2}
+                  className="input text-xs"
+                />
+              </div>
+            </div>
+
+            <div className="pt-3 border-t border-ink-150 flex items-center justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setIsPromiseModalOpen(false)}
+                className="btn btn-secondary text-xs"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={isSavingPromise}
+                className="btn btn-primary text-xs"
+              >
+                {isSavingPromise ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" /> : null}
+                Save Promise Order
+              </button>
+            </div>
+          </form>
         </div>
       )}
     </div>
