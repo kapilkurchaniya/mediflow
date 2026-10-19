@@ -189,7 +189,8 @@ export async function createSaleInvoice(
   items: PosItemInput[],
   paymentMethod: string,
   amountPaid: number, // paise
-  complianceDetails?: ComplianceDetailsInput
+  complianceDetails?: ComplianceDetailsInput,
+  medicalRepId?: string
 ) {
   const { session, user } = await requireAuth();
 
@@ -328,6 +329,7 @@ export async function createSaleInvoice(
         storeId: session.storeId,
         invoiceNo,
         customerId: customerId?.trim() ? customerId.trim() : null,
+        medicalRepId: medicalRepId?.trim() || null,
         doctorName: effectiveDoctorName?.trim() ? effectiveDoctorName.trim() : null,
         doctorRegNo: complianceDetails?.doctorRegNo?.trim() || null,
         doctorAddress: complianceDetails?.doctorAddress?.trim() || null,
