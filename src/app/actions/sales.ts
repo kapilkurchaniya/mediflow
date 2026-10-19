@@ -55,8 +55,13 @@ export async function searchPosItems(query: string) {
 
   // Find medicines matching query (by name, barcode, or generic composition)
   const medicines = await db
-    .select()
+    .select({
+      medicine: schema.medicines,
+      rackCode: schema.racks.code,
+      rackName: schema.racks.name,
+    })
     .from(schema.medicines)
+    .leftJoin(schema.racks, eq(schema.medicines.rackId, schema.racks.id))
     .where(
       and(
         eq(schema.medicines.tenantId, session.tenantId),
@@ -72,7 +77,7 @@ export async function searchPosItems(query: string) {
 
   if (medicines.length === 0) return [];
 
-  const medicineIds = medicines.map((m) => m.id);
+  const medicineIds = medicines.map((m) => m.medicine.id);
 
   // Get active batches for these medicines, ordered by expiry (nearest first)
   // Ensure we don't sell expired stock
@@ -90,10 +95,14 @@ export async function searchPosItems(query: string) {
     .orderBy(schema.batches.expiryDate);
 
   // Group batches by medicine
-  const results = medicines.map((med) => {
-    const medBatches = batches.filter((b) => b.medicineId === med.id);
+  const results = medicines.map(({ medicine, rackCode, rackName }) => {
+    const medBatches = batches.filter((b) => b.medicineId === medicine.id);
     return {
-      medicine: med,
+      medicine: {
+        ...medicine,
+        rackCode,
+        rackName,
+      },
       batches: medBatches,
     };
   }); // Keep all so cashiers can see if an item is out of stock and find substitutes

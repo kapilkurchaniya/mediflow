@@ -86,10 +86,12 @@ export async function getMedicines(searchQuery?: string, limit = 100, offset = 0
       medicine: schema.medicines,
       manufacturer: schema.manufacturers,
       category: schema.categories,
+      rack: schema.racks,
     })
     .from(schema.medicines)
     .leftJoin(schema.manufacturers, eq(schema.medicines.manufacturerId, schema.manufacturers.id))
     .leftJoin(schema.categories, eq(schema.medicines.categoryId, schema.categories.id))
+    .leftJoin(schema.racks, eq(schema.medicines.rackId, schema.racks.id))
     .where(and(...conditions))
     .orderBy(desc(schema.medicines.createdAt))
     .limit(limit)
@@ -103,6 +105,7 @@ export async function createMedicine(formData: FormData) {
   const genericName = formData.get("genericName") as string;
   const manufacturerId = formData.get("manufacturerId") as string;
   const categoryId = formData.get("categoryId") as string;
+  const rackId = formData.get("rackId") as string;
   const unit = (formData.get("unit") as string) || "strip";
   const packSize = formData.get("packSize") as string;
   const barcode = formData.get("barcode") as string;
@@ -129,6 +132,7 @@ export async function createMedicine(formData: FormData) {
       genericName: genericName || null,
       manufacturerId: manufacturerId || null,
       categoryId: categoryId || null,
+      rackId: rackId?.trim() || null,
       unit,
       packSize: packSize || null,
       barcode: barcode || null,
