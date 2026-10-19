@@ -202,6 +202,24 @@ export const categories = pgTable(
   (t) => [uniqueIndex("categories_tenant_name_uq").on(t.tenantId, sql`lower(${t.name})`)],
 );
 
+export const racks = pgTable(
+  "racks",
+  {
+    id: id(),
+    tenantId: tenantId(),
+    storeId: storeId(),
+    code: text("code").notNull(), // "R1-S3" (Rack 1, Shelf 3)
+    name: text("name").notNull(), // "Counter Left Rack"
+    description: text("description"),
+    isActive: boolean("is_active").notNull().default(true),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    uniqueIndex("racks_store_code_uq").on(t.storeId, sql`lower(${t.code})`),
+    index("racks_tenant_store_idx").on(t.tenantId, t.storeId),
+  ],
+);
+
 export const medicines = pgTable(
   "medicines",
   {
@@ -216,6 +234,7 @@ export const medicines = pgTable(
     unit: text("unit").notNull().default("strip"),
     manufacturerId: uuid("manufacturer_id").references(() => manufacturers.id),
     categoryId: uuid("category_id").references(() => categories.id),
+    rackId: uuid("rack_id").references(() => racks.id),
     barcode: text("barcode"),
     hsn: text("hsn"),
     gstRateBp: integer("gst_rate_bp").notNull().default(1200),
@@ -936,3 +955,67 @@ export type GstDocument = typeof gstDocuments.$inferSelect;
 export type NewGstDocument = typeof gstDocuments.$inferInsert;
 export type EInvoiceLog = typeof eInvoiceLogs.$inferSelect;
 export type NewEInvoiceLog = typeof eInvoiceLogs.$inferInsert;
+
+/* ───────────────────────────── Schemes, Racks & Promise Orders (Phase 4) ───────────────────────────── */
+
+export const schemes = pgTable(
+  "schemes",
+  {
+    id: id(),
+    tenantId: tenantId(),
+    storeId: uuid("store_id"), // null = tenant-wide
+    name: text("name").notNull(),
+    schemeType: text("scheme_type").notNull(), // free_qty | percentage | flat | tiered
+    supplierId: uuid("supplier_id").references(() => suppliers.id),
+    medicineId: uuid("medicine_id").references(() => medicines.id),
+    categoryId: uuid("category_id").references(() => categories.id),
+    buyQty: integer("buy_qty").notNull().default(0), // for Buy X Get Y (e.g. 10)
+    freeQty: integer("free_qty").notNull().default(0), // free qty (e.g. 1)
+    discountBp: integer("discount_bp").notNull().default(0), // percentage discount (e.g. 500 = 5%)
+    flatDiscount: money("flat_discount"), // flat discount in paise
+    minQty: integer("min_qty").notNull().default(1), // minimum purchase qty to trigger
+    validFrom: date("valid_from"),
+    validTo: date("valid_to"),
+    isActive: boolean("is_active").notNull().default(true),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    index("schemes_tenant_idx").on(t.tenantId, t.isActive),
+    index("schemes_medicine_idx").on(t.medicineId),
+    index("schemes_supplier_idx").on(t.supplierId),
+  ],
+);
+
+export const promiseOrders = pgTable(
+  "promise_orders",
+  {
+    id: id(),
+    tenantId: tenantId(),
+    storeId: storeId(),
+    customerId: uuid("customer_id").references(() => customers.id),
+    customerName: text("customer_name").notNull(),
+    customerPhone: text("customer_phone").notNull(),
+    medicineId: uuid("medicine_id").references(() => medicines.id),
+    medicineName: text("medicine_name").notNull(),
+    qtyRequested: integer("qty_requested").notNull(),
+    status: text("status").notNull().default("pending"), // pending | ordered | fulfilled | cancelled
+    saleId: uuid("sale_id").references(() => sales.id),
+    purchaseOrderId: uuid("purchase_order_id").references(() => purchaseOrders.id),
+    notes: text("notes"),
+    promisedDate: date("promised_date"),
+    createdBy: uuid("created_by").notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    index("promise_orders_tenant_status_idx").on(t.tenantId, t.status),
+    index("promise_orders_store_idx").on(t.storeId, t.status),
+    index("promise_orders_medicine_idx").on(t.medicineId),
+  ],
+);
+
+export type Rack = typeof racks.$inferSelect;
+export type NewRack = typeof racks.$inferInsert;
+export type Scheme = typeof schemes.$inferSelect;
+export type NewScheme = typeof schemes.$inferInsert;
+export type PromiseOrder = typeof promiseOrders.$inferSelect;
+export type NewPromiseOrder = typeof promiseOrders.$inferInsert;
