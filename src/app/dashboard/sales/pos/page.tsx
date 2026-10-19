@@ -35,6 +35,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createPromiseOrder } from "@/app/actions/promise-orders";
 import { checkItemScheme } from "@/app/actions/schemes";
+import { getMedicalReps } from "@/app/actions/medical-reps";
 
 interface SearchResult {
   medicine: {
@@ -151,6 +152,8 @@ export default function POSPage() {
   const [prescriptionDate, setPrescriptionDate] = useState(
     new Date().toISOString().slice(0, 10)
   );
+  const [medicalRepsList, setMedicalRepsList] = useState<Array<{ id: string; name: string; companyName: string | null }>>([]);
+  const [selectedMedicalRepId, setSelectedMedicalRepId] = useState("");
 
   const [cart, setCart] = useState<
     (PosItemInput & {
@@ -195,6 +198,9 @@ export default function POSPage() {
     });
     getDoctors().then((data) => {
       setDoctorsList(data.map((d) => ({ id: d.id, name: d.name, regNo: d.regNo, hospital: d.hospital })));
+    });
+    getMedicalReps().then((data) => {
+      setMedicalRepsList(data.filter((r) => r.isActive).map((r) => ({ id: r.id, name: r.name, companyName: r.companyName })));
     });
     if (searchInputRef.current) searchInputRef.current.focus();
   }, []);
@@ -547,7 +553,15 @@ export default function POSPage() {
         prescriptionDate,
       } : undefined;
 
-      const res = await createSaleInvoice(customerId, doctorName, cart, paymentMethod, netPayable, complianceDetails);
+      const res = await createSaleInvoice(
+        customerId,
+        doctorName,
+        cart,
+        paymentMethod,
+        netPayable,
+        complianceDetails,
+        selectedMedicalRepId || undefined
+      );
       if (res.success && res.saleId) {
         if (soundEnabled) playSound("chime");
         router.push(`/dashboard/sales/${res.saleId}/print?format=thermal`);
@@ -956,6 +970,22 @@ export default function POSPage() {
                 placeholder="Dr. Name (e.g. Dr. Sharma)"
                 className={`input text-[13px] ${isComplianceMandatory && !doctorName.trim() ? "!border-amber-400 !bg-amber-50/20" : ""}`}
               />
+
+              {/* Optional Medical Representative / Broker */}
+              {medicalRepsList.length > 0 && (
+                <select
+                  value={selectedMedicalRepId}
+                  onChange={(e) => setSelectedMedicalRepId(e.target.value)}
+                  className="select text-[12px] mt-1.5"
+                >
+                  <option value="">— Medical Rep / Consultant (Optional) —</option>
+                  {medicalRepsList.map((m) => (
+                    <option key={m.id} value={m.id}>
+                      MR: {m.name} {m.companyName ? `(${m.companyName})` : ""}
+                    </option>
+                  ))}
+                </select>
+              )}
             </div>
 
             {/* Statutory Compliance Panel for Schedule H, H1, X, Narcotics */}
