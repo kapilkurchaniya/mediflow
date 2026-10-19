@@ -279,6 +279,22 @@ export const suppliers = pgTable(
   (t) => [index("suppliers_tenant_idx").on(t.tenantId)],
 );
 
+/* ───────────────────────────── Customer Groups / Family Ledger (Phase 6) ───────────────────────────── */
+
+export const customerGroups = pgTable(
+  "customer_groups",
+  {
+    id: id(),
+    tenantId: tenantId(),
+    name: text("name").notNull(), // e.g. "Sharma Family"
+    primaryCustomerId: uuid("primary_customer_id"), // head of household
+    creditLimit: money("credit_limit"), // pooled family credit limit
+    notes: text("notes"),
+    createdAt: createdAt(),
+  },
+  (t) => [index("customer_groups_tenant_idx").on(t.tenantId)],
+);
+
 export const customers = pgTable(
   "customers",
   {
@@ -289,8 +305,10 @@ export const customers = pgTable(
     email: text("email"),
     address: text("address"),
     gstin: text("gstin"),
+    groupId: uuid("group_id").references(() => customerGroups.id),
     creditLimit: money("credit_limit"),
     openingBalance: money("opening_balance"),
+    loyaltyPoints: integer("loyalty_points").notNull().default(0),
     notes: text("notes"),
     age: integer("age"),
     gender: text("gender"), // male | female | other
@@ -302,6 +320,7 @@ export const customers = pgTable(
   (t) => [
     index("customers_tenant_idx").on(t.tenantId),
     index("customers_phone_idx").on(t.tenantId, t.phone),
+    index("customers_group_idx").on(t.groupId),
   ],
 );
 
@@ -1174,4 +1193,69 @@ export type BankStatement = typeof bankStatements.$inferSelect;
 export type NewBankStatement = typeof bankStatements.$inferInsert;
 export type BankStatementLine = typeof bankStatementLines.$inferSelect;
 export type NewBankStatementLine = typeof bankStatementLines.$inferInsert;
+export type CustomerGroup = typeof customerGroups.$inferSelect;
+export type NewCustomerGroup = typeof customerGroups.$inferInsert;
+
+/* ───────────────────────────── Advanced Features: Loyalty, eRetail & Omnichannel (Phase 6) ───────────────────────────── */
+
+export const loyaltyConfigs = pgTable("loyalty_configs", {
+  id: id(),
+  tenantId: tenantId(),
+  pointsPerRupee: integer("points_per_rupee").notNull().default(1), // 1 point per ₹100 spent (can be scaled)
+  redemptionValuePaise: integer("redemption_value_paise").notNull().default(100), // 1 point = 100 paise = ₹1.00
+  minRedemptionPoints: integer("min_redemption_points").notNull().default(10), // minimum points required to redeem
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: createdAt(),
+});
+
+export const loyaltyTransactions = pgTable(
+  "loyalty_transactions",
+  {
+    id: id(),
+    tenantId: tenantId(),
+    customerId: uuid("customer_id").notNull().references(() => customers.id, { onDelete: "cascade" }),
+    type: text("type").notNull(), // earn | redeem | expire | adjust
+    points: integer("points").notNull(), // positive for earn/adjust, negative for redeem/expire
+    balanceAfter: integer("balance_after").notNull(),
+    saleId: uuid("sale_id").references(() => sales.id),
+    note: text("note"),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    index("loyalty_tx_customer_idx").on(t.customerId, t.createdAt),
+    index("loyalty_tx_tenant_idx").on(t.tenantId),
+  ],
+);
+
+export const externalOrders = pgTable(
+  "external_orders",
+  {
+    id: id(),
+    tenantId: tenantId(),
+    storeId: uuid("store_id").references(() => stores.id),
+    source: text("source").notNull().default("whatsapp"), // whatsapp | eretail | phone | web
+    orderNo: text("order_no").notNull(),
+    customerId: uuid("customer_id").references(() => customers.id),
+    customerName: text("customer_name").notNull(),
+    customerPhone: text("customer_phone").notNull(),
+    status: text("status").notNull().default("received"), // received | accepted | preparing | ready | delivered | cancelled
+    items: jsonb("items").notNull(), // Array<{ medicineId: string; name: string; qty: number; rate: number }>
+    totalAmount: money("total_amount"), // paise
+    notes: text("notes"),
+    saleId: uuid("sale_id").references(() => sales.id),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    index("ext_orders_tenant_status_idx").on(t.tenantId, t.status),
+    index("ext_orders_customer_phone_idx").on(t.tenantId, t.customerPhone),
+  ],
+);
+
+export type LoyaltyConfig = typeof loyaltyConfigs.$inferSelect;
+export type NewLoyaltyConfig = typeof loyaltyConfigs.$inferInsert;
+export type LoyaltyTransaction = typeof loyaltyTransactions.$inferSelect;
+export type NewLoyaltyTransaction = typeof loyaltyTransactions.$inferInsert;
+export type ExternalOrder = typeof externalOrders.$inferSelect;
+export type NewExternalOrder = typeof externalOrders.$inferInsert;
+
 
