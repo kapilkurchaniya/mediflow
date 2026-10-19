@@ -46,6 +46,7 @@ export default async function InventoryPage({
                 <tr>
                   <th>Item</th>
                   <th>Category</th>
+                  <th>Rack</th>
                   <th>Pack</th>
                   <th>HSN / GST</th>
                   <th className="text-right">MRP</th>
@@ -54,7 +55,7 @@ export default async function InventoryPage({
                 </tr>
               </thead>
               <tbody>
-                {items.map(({ medicine, manufacturer, category }) => (
+                {items.map(({ medicine, manufacturer, category, rack }) => (
                   <tr key={medicine.id}>
                     <td className="max-w-[320px]">
                       <div className="flex items-center gap-2">
@@ -67,6 +68,15 @@ export default async function InventoryPage({
                       </div>
                     </td>
                     <td className="text-ink-600">{category?.name || <span className="text-ink-400">Uncategorised</span>}</td>
+                    <td>
+                      {rack?.code ? (
+                        <span className="inline-flex items-center gap-1 font-mono text-[11px] font-semibold bg-brand-50 text-brand-700 px-1.5 py-0.5 rounded border border-brand-200">
+                          {rack.code}
+                        </span>
+                      ) : (
+                        <span className="text-ink-400 text-xs">—</span>
+                      )}
+                    </td>
                     <td>
                       <span className="capitalize text-ink-800">{medicine.unit}</span>
                       {medicine.packSize && <div className="cell-sub">{medicine.packSize}</div>}

@@ -2,6 +2,7 @@
 
 import { useActionState, useEffect, useState } from "react";
 import { createMedicine, getCategories, getManufacturers, createCategory, createManufacturer } from "@/app/actions/inventory";
+import { getRacks } from "@/app/actions/racks";
 import { AlertCircle, Check, Plus } from "lucide-react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
@@ -42,13 +43,15 @@ function InlineCreate({
 export default function NewMedicinePage() {
   const [categories, setCategories] = useState<{ id: string; name: string }[]>([]);
   const [manufacturers, setManufacturers] = useState<{ id: string; name: string }[]>([]);
+  const [racks, setRacks] = useState<{ id: string; code: string; name: string }[]>([]);
   const [newCatName, setNewCatName] = useState("");
   const [newMfgName, setNewMfgName] = useState("");
 
   useEffect(() => {
-    // Load categories and manufacturers on mount
+    // Load categories, manufacturers, and racks on mount
     getCategories().then(setCategories);
     getManufacturers().then(setManufacturers);
+    getRacks().then((data) => setRacks(data || []));
   }, []);
 
   const [state, formAction, isPending] = useActionState(async (prevState: { error?: string; success?: boolean } | null, formData: FormData) => {
@@ -187,6 +190,19 @@ export default function NewMedicinePage() {
                 </span>
               </span>
             </label>
+          </FormSection>
+
+          <FormSection title="Storage location" description="Physical shelf or rack where this item is kept in the store.">
+            <Field label="Rack / Shelf" htmlFor="rackId" hint="Shown on POS search results so billing staff can locate items instantly." className="sm:col-span-2">
+              <select id="rackId" name="rackId" className="input">
+                <option value="">No rack assigned</option>
+                {racks.map((r) => (
+                  <option key={r.id} value={r.id}>
+                    {r.code} — {r.name}
+                  </option>
+                ))}
+              </select>
+            </Field>
           </FormSection>
         </div>
 
