@@ -31,6 +31,9 @@ import {
   ReceiptText,
   QrCode,
   FileSpreadsheet,
+  BookmarkCheck,
+  Layers,
+  Tag,
   type LucideIcon,
 } from "lucide-react";
 import { Logo, LogoMark } from "./ui";
@@ -57,6 +60,7 @@ const NAV: { heading?: string; items: NavItem[] }[] = [
     items: [
       { href: "/dashboard/sales", label: "Sales & invoices", icon: Receipt },
       { href: "/dashboard/purchases", label: "Purchases (GRN)", icon: FileInput },
+      { href: "/dashboard/sales/promise-orders", label: "Promise orders", icon: BookmarkCheck },
     ],
   },
   {
@@ -73,6 +77,8 @@ const NAV: { heading?: string; items: NavItem[] }[] = [
     items: [
       { href: "/dashboard/inventory", label: "Item master", icon: Pill, exact: true },
       { href: "/dashboard/inventory/batches", label: "Batches & stock", icon: Boxes },
+      { href: "/dashboard/settings/racks", label: "Racks & shelves", icon: Layers },
+      { href: "/dashboard/settings/schemes", label: "Trade schemes", icon: Tag },
       { href: "/dashboard/inventory/import", label: "Bulk import", icon: Upload },
     ],
   },
