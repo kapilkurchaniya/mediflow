@@ -20,9 +20,14 @@ export default async function CustomersPage({
         title="Customers"
         description="Patients and accounts with contact details and credit limits."
         actions={
-          <Link href="/dashboard/customers/new" className="btn btn-primary">
-            <Plus /> Add customer
-          </Link>
+          <div className="flex items-center gap-2">
+            <Link href="/dashboard/customers/groups" className="btn btn-secondary">
+              <Users className="h-4 w-4" /> Family Groups
+            </Link>
+            <Link href="/dashboard/customers/new" className="btn btn-primary">
+              <Plus /> Add customer
+            </Link>
+          </div>
         }
       />
 
@@ -38,7 +43,7 @@ export default async function CustomersPage({
                 <tr>
                   <th>Customer</th>
                   <th>Phone</th>
-                  <th>GSTIN</th>
+                  <th>Loyalty Points</th>
                   <th className="text-right">Credit limit</th>
                   <th className="text-right">Status</th>
                 </tr>
@@ -61,7 +66,15 @@ export default async function CustomersPage({
                         <span className="text-ink-400">—</span>
                       )}
                     </td>
-                    <td className="font-mono text-[12px] text-ink-700">{c.gstin || <span className="text-ink-400">—</span>}</td>
+                    <td>
+                      <Link
+                        href={`/dashboard/customers/${c.id}/loyalty`}
+                        className="inline-flex items-center gap-1 font-mono text-[11px] font-semibold px-2 py-0.5 rounded bg-amber-50 text-amber-800 border border-amber-200 hover:bg-amber-100"
+                        title="View points ledger"
+                      >
+                        {c.loyaltyPoints || 0} pts
+                      </Link>
+                    </td>
                     <td className="text-right num text-ink-900">
                       {c.creditLimit > 0 ? formatINR(c.creditLimit) : <span className="text-ink-400">No credit</span>}
                     </td>

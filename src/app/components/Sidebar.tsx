@@ -37,6 +37,8 @@ import {
   MessageSquare,
   Bell,
   Percent,
+  Package,
+  Coins,
   type LucideIcon,
 } from "lucide-react";
 import { Logo, LogoMark } from "./ui";
@@ -62,6 +64,7 @@ const NAV: { heading?: string; items: NavItem[] }[] = [
     heading: "Operations",
     items: [
       { href: "/dashboard/sales", label: "Sales & invoices", icon: Receipt },
+      { href: "/dashboard/orders", label: "Omnichannel orders", icon: Package },
       { href: "/dashboard/purchases", label: "Purchases (GRN)", icon: FileInput },
       { href: "/dashboard/sales/promise-orders", label: "Promise orders", icon: BookmarkCheck },
     ],
@@ -116,7 +119,9 @@ const NAV: { heading?: string; items: NavItem[] }[] = [
     items: [
       { href: "/dashboard/suppliers", label: "Suppliers", icon: Truck },
       { href: "/dashboard/customers", label: "Customers", icon: Users },
+      { href: "/dashboard/customers/groups", label: "Family groups", icon: Users },
       { href: "/dashboard/settings/medical-reps", label: "Medical reps (MR)", icon: Users },
+      { href: "/dashboard/settings/loyalty", label: "Loyalty rewards", icon: Coins },
     ],
   },
 ];
