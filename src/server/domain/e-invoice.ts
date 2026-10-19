@@ -114,10 +114,11 @@ export function calculateIrnHash(
 }
 
 /**
- * Standard NIC IRP Provider (Supports Sandboxing, Mocking, and Live Integration)
+ * Simulated IRP Provider — generates mathematically correct IRNs locally.
+ * NOT a valid e-invoice. Never use in production without a real GSP.
  */
-export class NICIRPProvider implements IRPProvider {
-  name = "NIC-IRP-Sandbox";
+export class SimulatedIRPProvider implements IRPProvider {
+  name = "SIMULATOR";
 
   async generateIRN(payload: EInvoicePayload): Promise<IRNResult> {
     const docDateParts = payload.documentDetails.documentDate.split("/");
@@ -191,7 +192,19 @@ export class NICIRPProvider implements IRPProvider {
   }
 }
 
-export const defaultIRPProvider = new NICIRPProvider();
+export const defaultIRPProvider = new SimulatedIRPProvider();
+
+/** Valid EINVOICE_MODE values */
+export type EInvoiceMode = "disabled" | "simulator" | "sandbox" | "production";
+
+/** Returns the current e-invoice mode from env (defaults to 'disabled'). */
+export function getEInvoiceMode(): EInvoiceMode {
+  const mode = process.env.EINVOICE_MODE ?? "disabled";
+  if (["disabled", "simulator", "sandbox", "production"].includes(mode)) {
+    return mode as EInvoiceMode;
+  }
+  return "disabled";
+}
 
 /**
  * Builds NIC-compliant E-Invoice JSON payload from a Sale & Store record.
@@ -367,7 +380,20 @@ export async function generateEInvoiceForDocument(
     provider?: IRPProvider;
   }
 ) {
+  const mode = getEInvoiceMode();
+
+  if (mode === "disabled") {
+    throw new Error(
+      "E-invoicing is not configured. Set EINVOICE_MODE=simulator to test locally, " +
+        "or EINVOICE_MODE=sandbox|production with a real GSP provider."
+    );
+  }
+
   const provider = params.provider || defaultIRPProvider;
+
+  if (mode === "simulator" && provider.name !== "SIMULATOR") {
+    throw new Error("EINVOICE_MODE=simulator but a non-simulator provider was supplied.");
+  }
 
   // 1. Build Payload
   const payload = await buildEInvoicePayload(db, {
@@ -392,12 +418,12 @@ export async function generateEInvoiceForDocument(
       .where(and(eq(schema.gstDocuments.id, params.gstDocumentId), eq(schema.gstDocuments.tenantId, params.tenantId)))
       .returning();
 
-    // 4. Record Audit Log
+    // 4. Record Audit Log (include provider name so SIMULATOR is clearly traceable)
     await db.insert(schema.eInvoiceLogs).values({
       tenantId: params.tenantId,
       gstDocumentId: params.gstDocumentId,
       action: "generate",
-      requestPayload: payload as unknown as Record<string, unknown>,
+      requestPayload: { ...payload, provider: provider.name } as unknown as Record<string, unknown>,
       responsePayload: response as unknown as Record<string, unknown>,
       status: "success",
       errorMessage: null,
