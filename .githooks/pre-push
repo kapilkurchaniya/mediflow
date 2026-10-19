@@ -1,0 +1,42 @@
+#!/usr/bin/env bash
+# MediFlow lane guard (see docs/07-git-workflow.md).
+# Blocks pushes to main/master and to the other developer's lane branches.
+# Installed automatically by `npm install` (the "prepare" script sets core.hooksPath).
+set -euo pipefail
+
+lane="$(git config --get mediflow.lane || true)"
+if [ "$lane" != "a" ] && [ "$lane" != "b" ]; then
+  echo "✋ Your lane is not configured. Run ONE of these once in this repo:"
+  echo "     git config mediflow.lane a    # overxpowered  → may push lane-a/*"
+  echo "     git config mediflow.lane b    # kapilkurchaniya → may push lane-b/*"
+  exit 1
+fi
+
+zero="0000000000000000000000000000000000000000"
+
+while read -r local_ref local_sha remote_ref remote_sha; do
+  case "$remote_ref" in
+    refs/tags/*) continue ;;
+  esac
+  branch="${remote_ref#refs/heads/}"
+
+  if [ "$local_sha" = "$zero" ]; then
+    echo "✋ Deleting remote branch '$branch' is blocked by the lane guard. Delete it on GitHub if you really mean it."
+    exit 1
+  fi
+
+  case "$branch" in
+    main | master)
+      echo "✋ Direct pushes to '$branch' are not allowed. Push to lane-$lane/* and open a Pull Request."
+      exit 1
+      ;;
+    lane-"$lane"/*)
+      ;;
+    *)
+      echo "✋ '$branch' is not a lane-$lane/* branch. Lane $lane may only push to lane-$lane/*."
+      exit 1
+      ;;
+  esac
+done
+
+exit 0

@@ -1,0 +1,89 @@
+# Who reviews what. The OTHER lane's owner is always asked to review a PR (see docs/07-git-workflow.md).
+# Later rules override earlier ones.
+
+# Default: both developers
+*                                   @OVERxPOWERED @kapilkurchaniya
+
+# ── Lane A · overxpowered: platform, POS/sales, inventory & stock, accounting core, offline, ops
+/src/server/auth.ts                 @OVERxPOWERED
+/src/server/action.ts               @OVERxPOWERED
+/src/server/rbac.ts                 @OVERxPOWERED
+/src/server/audit.ts                @OVERxPOWERED
+/src/server/db/                     @OVERxPOWERED
+/src/server/domain/stock.ts         @OVERxPOWERED
+/src/server/domain/sequence.ts      @OVERxPOWERED
+/src/server/domain/accounting.ts    @OVERxPOWERED
+/src/server/domain/sales/           @OVERxPOWERED
+/src/server/domain/transfers.ts     @OVERxPOWERED
+/src/app/actions/auth.ts            @OVERxPOWERED
+/src/app/actions/sales.ts           @OVERxPOWERED
+/src/app/actions/stock.ts           @OVERxPOWERED
+/src/app/actions/inventory.ts       @OVERxPOWERED
+/src/app/actions/racks.ts           @OVERxPOWERED
+/src/app/actions/accounting.ts      @OVERxPOWERED
+/src/app/actions/settings.ts        @OVERxPOWERED
+/src/app/dashboard/sales/           @OVERxPOWERED
+/src/app/dashboard/inventory/       @OVERxPOWERED
+/src/app/dashboard/accounting/      @OVERxPOWERED
+/src/app/dashboard/settings/        @OVERxPOWERED
+/src/offline/                       @OVERxPOWERED
+/.github/                           @OVERxPOWERED
+
+# ── Lane B · kapilkurchaniya: purchasing, compliance, GST, CRM/loyalty, comms, reports, AI, import
+/src/server/domain/gst.ts                   @kapilkurchaniya
+/src/server/domain/e-invoice.ts             @kapilkurchaniya
+/src/server/domain/compliance.ts            @kapilkurchaniya
+/src/server/domain/loyalty.ts               @kapilkurchaniya
+/src/server/domain/family-ledger.ts         @kapilkurchaniya
+/src/server/domain/whatsapp.ts              @kapilkurchaniya
+/src/server/domain/sms.ts                   @kapilkurchaniya
+/src/server/domain/reminders.ts             @kapilkurchaniya
+/src/server/domain/reports.ts               @kapilkurchaniya
+/src/server/domain/schemes.ts               @kapilkurchaniya
+/src/server/domain/bank-reconciliation.ts   @kapilkurchaniya
+/src/server/domain/purchasing/              @kapilkurchaniya
+/src/server/domain/import/                  @kapilkurchaniya
+/src/server/jobs/                           @kapilkurchaniya
+/src/server/ai.ts                           @kapilkurchaniya
+/src/app/api/chat/                          @kapilkurchaniya
+/src/app/api/v1/                            @kapilkurchaniya
+/src/app/api/webhooks/                      @kapilkurchaniya
+/src/app/actions/purchases.ts               @kapilkurchaniya
+/src/app/actions/suppliers.ts               @kapilkurchaniya
+/src/app/actions/compliance.ts              @kapilkurchaniya
+/src/app/actions/gst.ts                     @kapilkurchaniya
+/src/app/actions/customers.ts               @kapilkurchaniya
+/src/app/actions/customer-groups.ts         @kapilkurchaniya
+/src/app/actions/loyalty.ts                 @kapilkurchaniya
+/src/app/actions/external-orders.ts         @kapilkurchaniya
+/src/app/actions/whatsapp.ts                @kapilkurchaniya
+/src/app/actions/sms.ts                     @kapilkurchaniya
+/src/app/actions/reminders.ts               @kapilkurchaniya
+/src/app/actions/reports.ts                 @kapilkurchaniya
+/src/app/actions/dashboard.ts               @kapilkurchaniya
+/src/app/actions/schemes.ts                 @kapilkurchaniya
+/src/app/actions/medical-reps.ts            @kapilkurchaniya
+/src/app/actions/promise-orders.ts          @kapilkurchaniya
+/src/app/actions/bank-reconciliation.ts     @kapilkurchaniya
+/src/app/actions/inventory-import.ts        @kapilkurchaniya
+/src/app/actions/ai-enrichment.ts           @kapilkurchaniya
+/src/app/dashboard/purchases/               @kapilkurchaniya
+/src/app/dashboard/suppliers/               @kapilkurchaniya
+/src/app/dashboard/compliance/              @kapilkurchaniya
+/src/app/dashboard/gst/                     @kapilkurchaniya
+/src/app/dashboard/customers/               @kapilkurchaniya
+/src/app/dashboard/orders/                  @kapilkurchaniya
+/src/app/dashboard/whatsapp/                @kapilkurchaniya
+/src/app/dashboard/reminders/               @kapilkurchaniya
+/src/app/dashboard/reports/                 @kapilkurchaniya
+/src/app/dashboard/import/                  @kapilkurchaniya
+
+# ── Shared hot-spots: always both (keep PRs touching these small)
+/src/server/db/schema/index.ts      @OVERxPOWERED @kapilkurchaniya
+/drizzle/                           @OVERxPOWERED @kapilkurchaniya
+/src/lib/permissions.ts             @OVERxPOWERED @kapilkurchaniya
+/src/app/components/                @OVERxPOWERED @kapilkurchaniya
+/package.json                       @OVERxPOWERED @kapilkurchaniya
+/package-lock.json                  @OVERxPOWERED @kapilkurchaniya
+/ROADMAP.md                         @OVERxPOWERED @kapilkurchaniya
+/docs/                              @OVERxPOWERED @kapilkurchaniya
