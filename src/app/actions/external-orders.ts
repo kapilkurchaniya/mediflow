@@ -80,23 +80,27 @@ export async function createExternalOrder(data: {
     .where(and(eq(schema.customers.tenantId, tenantId), eq(schema.customers.phone, cleanPhone)))
     .limit(1);
 
-  const [order] = await db
-    .insert(schema.externalOrders)
-    .values({
-      tenantId,
-      storeId: storeId || null,
-      source: data.source || "whatsapp",
-      orderNo,
-      customerId: cust?.id || null,
-      customerName: data.customerName.trim(),
-      customerPhone: cleanPhone,
-      status: "received",
-      items: data.items,
-      totalAmount: data.totalAmountPaise,
-      notes: data.notes?.trim() || null,
-    })
-    .returning();
+  try {
+    const [order] = await db
+      .insert(schema.externalOrders)
+      .values({
+        tenantId,
+        storeId: storeId || null,
+        source: data.source || "whatsapp",
+        orderNo,
+        customerId: cust?.id || null,
+        customerName: data.customerName.trim(),
+        customerPhone: cleanPhone,
+        status: "received",
+        items: data.items,
+        totalAmount: data.totalAmountPaise,
+        notes: data.notes?.trim() || null,
+      })
+      .returning();
 
-  revalidatePath("/dashboard/orders");
-  return { success: true, order };
+    revalidatePath("/dashboard/orders");
+    return { success: true, order };
+  } catch (err: unknown) {
+    return { error: (err instanceof Error ? err.message : String(err)) || "Failed to create order" };
+  }
 }

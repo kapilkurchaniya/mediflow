@@ -16,6 +16,7 @@ import {
   isScheduledDrug,
 } from "@/server/domain/compliance";
 import { createGstDocumentFromSale } from "@/server/domain/gst";
+import { LoyaltyService } from "@/server/domain/loyalty";
 
 export async function getSales(dateFrom?: string | null, dateTo?: string | null) {
   const { session, user } = await requireAuth();
@@ -481,6 +482,20 @@ export async function createSaleInvoice(
         });
       } catch (gstErr) {
         console.error("Warning: GST Document auto-creation error:", gstErr);
+      }
+
+      // 8. Earn Loyalty Points
+      if (customerId?.trim()) {
+        try {
+          await LoyaltyService.earnPoints(tx, {
+            tenantId: session.tenantId,
+            customerId: customerId.trim(),
+            saleAmountPaise: finalTotalAmount,
+            saleId: sale.id,
+          });
+        } catch (loyaltyErr) {
+          console.error("Warning: Loyalty points earning error:", loyaltyErr);
+        }
       }
 
       return sale.id;
