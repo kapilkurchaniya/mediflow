@@ -116,7 +116,7 @@ function playSound(type: "beep" | "chime") {
 
 export default function POSPage() {
   const router = useRouter();
-  const [customers, setCustomers] = useState<{ id: string; name: string; phone?: string | null }[]>([]);
+  const [customers, setCustomers] = useState<{ id: string; name: string; phone?: string | null; loyaltyPoints?: number }[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [isSearching, setIsSearching] = useState(false);
@@ -194,7 +194,7 @@ export default function POSPage() {
   // Load customer and doctor lists on mount
   useEffect(() => {
     getCustomers().then((data) => {
-      setCustomers(data.map((c) => ({ id: c.id, name: c.name, phone: c.phone })));
+      setCustomers(data.map((c) => ({ id: c.id, name: c.name, phone: c.phone, loyaltyPoints: c.loyaltyPoints || 0 })));
     });
     getDoctors().then((data) => {
       setDoctorsList(data.map((d) => ({ id: d.id, name: d.name, regNo: d.regNo, hospital: d.hospital })));
@@ -938,6 +938,22 @@ export default function POSPage() {
                   </option>
                 ))}
               </select>
+
+              {(() => {
+                const sel = customers.find((c) => c.id === customerId);
+                if (!sel || !sel.loyaltyPoints) return null;
+                return (
+                  <div className="mt-1.5 flex items-center justify-between p-2 rounded-lg bg-amber-50/80 border border-amber-200 text-xs">
+                    <span className="flex items-center gap-1 font-semibold text-amber-900">
+                      <Sparkles className="h-3.5 w-3.5 text-amber-600" />
+                      Rewards: <span className="font-mono">{sel.loyaltyPoints} pts</span>
+                    </span>
+                    <span className="text-[11px] text-amber-700 font-medium">
+                      Worth ₹{(sel.loyaltyPoints * 1.0).toFixed(2)}
+                    </span>
+                  </div>
+                );
+              })()}
             </div>
 
             <div>
