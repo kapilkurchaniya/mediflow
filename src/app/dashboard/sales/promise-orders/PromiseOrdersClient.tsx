@@ -22,7 +22,7 @@ interface PromiseOrderItem {
   id: string;
   customerName: string;
   customerPhone: string;
-  medicineId: string;
+  medicineId: string | null;
   medicineName: string;
   qtyRequested: number;
   status: string;
