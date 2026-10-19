@@ -40,8 +40,9 @@ The 1,261-line `src/server/db/schema.ts` gets split so the two lanes stop editin
 
 ```
 src/server/db/schema/
-├── _helpers.ts      id(), tenantId(), storeId(), money(), createdAt(), updatedAt()
+├── _helpers.ts      id(), money(), createdAt(), updatedAt()   (imports no table, so no import cycles)
 ├── platform.ts      tenants, users, stores, sessions, roles, …            (Lane A)
+│                    also exports tenantId() / storeId() FK helpers (they reference tenants/stores)
 ├── catalog.ts       manufacturers, categories, racks, medicines           (Lane A)
 ├── inventory.ts     batches, stock_movements, stock_adjustments, …        (Lane A)
 ├── sales.ts         sales, sale_items, sale_payments, returns, cash       (Lane A)
