@@ -1,0 +1,75 @@
+name: Branch guard
+
+# Enforces the two-lane rules from docs/07-git-workflow.md on GitHub's side,
+# because branch protection is not available to every plan / every account.
+#   - lane-a/* belongs to OVERxPOWERED, lane-b/* belongs to kapilkurchaniya
+#   - PRs into main/master must come from a lane branch, opened by that lane's owner
+#   - main/master only changes through merged PRs (direct pushes are flagged red)
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, edited]
+  push:
+    branches: ["main", "master", "lane-a/**", "lane-b/**"]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  lane-rules:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check lane rules
+        env:
+          EVENT: ${{ github.event_name }}
+          ACTOR: ${{ github.actor }}
+          REF_NAME: ${{ github.ref_name }}
+          PR_HEAD: ${{ github.head_ref }}
+          PR_BASE: ${{ github.base_ref }}
+          PR_AUTHOR: ${{ github.event.pull_request.user.login }}
+          REPO: ${{ github.repository }}
+          SHA: ${{ github.sha }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          lower() { echo "$1" | tr '[:upper:]' '[:lower:]'; }
+          owner_of() {
+            case "$1" in
+              lane-a/*) echo "overxpowered" ;;
+              lane-b/*) echo "kapilkurchaniya" ;;
+              *) echo "" ;;
+            esac
+          }
+
+          if [ "$EVENT" = "pull_request" ]; then
+            if [ "$PR_BASE" = "main" ] || [ "$PR_BASE" = "master" ]; then
+              owner="$(owner_of "$PR_HEAD")"
+              if [ -z "$owner" ]; then
+                echo "::error::PRs into $PR_BASE must come from a lane-a/* or lane-b/* branch (got '$PR_HEAD')."
+                exit 1
+              fi
+              if [ "$(lower "$PR_AUTHOR")" != "$owner" ]; then
+                echo "::error::'$PR_HEAD' belongs to $owner, but this PR was opened by $PR_AUTHOR."
+                exit 1
+              fi
+            fi
+          else
+            case "$REF_NAME" in
+              main | master)
+                prs="$(gh api "repos/$REPO/commits/$SHA/pulls" --jq 'length')"
+                if [ "$prs" = "0" ]; then
+                  echo "::error::Direct push to $REF_NAME by $ACTOR. main only changes through merged Pull Requests."
+                  exit 1
+                fi
+                ;;
+              *)
+                owner="$(owner_of "$REF_NAME")"
+                if [ "$(lower "$ACTOR")" != "$owner" ]; then
+                  echo "::error::$ACTOR pushed to '$REF_NAME', which belongs to $owner."
+                  exit 1
+                fi
+                ;;
+            esac
+          fi
+          echo "✅ Lane rules OK"

@@ -33,6 +33,16 @@ Built with **Next.js 16 (Turbopack)**, **React 19**, **Drizzle ORM**, and **Tail
 
 ---
 
+## 📚 Project documentation
+
+* **[ROADMAP.md](ROADMAP.md)**: the 6-month, two-lane build plan.
+* **[docs/](docs/README.md)**: architecture, current-state audit, database, Indian pharmacy & GST rules, coding standards, offline & multi-store designs, security, glossary.
+* **[CONTRIBUTING.md](CONTRIBUTING.md)**: branch & Pull Request rules (Lane A / Lane B).
+
+> Some setup details below are outdated (e.g. the AI key is `GEMINI_API_KEY`). Trust [docs/08-local-setup.md](docs/08-local-setup.md) until ROADMAP task B0.6 refreshes this README.
+
+---
+
 ## ✨ Key Features & Capabilities
 
 ### 1. ⚡ High-Speed Counter POS Terminal (`/dashboard/sales/pos`)
