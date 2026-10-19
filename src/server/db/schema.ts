@@ -445,6 +445,24 @@ export const stockAdjustments = pgTable("stock_adjustments", {
   createdAt: createdAt(),
 });
 
+/* ───────────────────────────── Medical Representatives / Doctor Commission (Phase 5) ───────────────────────────── */
+
+export const medicalReps = pgTable(
+  "medical_reps",
+  {
+    id: id(),
+    tenantId: tenantId(),
+    name: text("name").notNull(),
+    phone: text("phone"),
+    email: text("email"),
+    companyName: text("company_name"),
+    commissionRateBp: integer("commission_rate_bp").notNull().default(0), // basis points (e.g. 200 = 2.0%)
+    isActive: boolean("is_active").notNull().default(true),
+    createdAt: createdAt(),
+  },
+  (t) => [index("medical_reps_tenant_idx").on(t.tenantId, t.isActive)],
+);
+
 /* ───────────────────────────── Sales ───────────────────────────── */
 
 export const sales = pgTable(
@@ -458,6 +476,7 @@ export const sales = pgTable(
     customerId: uuid("customer_id").references(() => customers.id),
     customerName: text("customer_name"),
     customerPhone: text("customer_phone"),
+    medicalRepId: uuid("medical_rep_id").references(() => medicalReps.id),
     doctorName: text("doctor_name"),
     doctorRegNo: text("doctor_reg_no"),
     doctorAddress: text("doctor_address"),
@@ -1019,3 +1038,140 @@ export type Scheme = typeof schemes.$inferSelect;
 export type NewScheme = typeof schemes.$inferInsert;
 export type PromiseOrder = typeof promiseOrders.$inferSelect;
 export type NewPromiseOrder = typeof promiseOrders.$inferInsert;
+export type MedicalRep = typeof medicalReps.$inferSelect;
+export type NewMedicalRep = typeof medicalReps.$inferInsert;
+
+/* ───────────────────────────── Integrations: WhatsApp, SMS, Banking (Phase 5) ───────────────────────────── */
+
+export const whatsappConfigs = pgTable("whatsapp_configs", {
+  id: id(),
+  tenantId: tenantId(),
+  phoneNumberId: text("phone_number_id"),
+  businessAccountId: text("business_account_id"),
+  accessToken: text("access_token"),
+  webhookVerifyToken: text("webhook_verify_token"),
+  isActive: boolean("is_active").notNull().default(false),
+  createdAt: createdAt(),
+});
+
+export const whatsappTemplates = pgTable("whatsapp_templates", {
+  id: id(),
+  tenantId: tenantId(),
+  name: text("name").notNull(),
+  category: text("category").notNull().default("UTILITY"), // MARKETING | UTILITY | AUTHENTICATION
+  languageCode: text("language_code").notNull().default("en"),
+  header: text("header"),
+  body: text("body").notNull(),
+  footer: text("footer"),
+  variables: jsonb("variables"),
+  status: text("status").notNull().default("approved"), // pending | approved | rejected
+  metaTemplateId: text("meta_template_id"),
+  createdAt: createdAt(),
+});
+
+export const whatsappMessages = pgTable(
+  "whatsapp_messages",
+  {
+    id: id(),
+    tenantId: tenantId(),
+    storeId: uuid("store_id"),
+    direction: text("direction").notNull().default("outbound"), // inbound | outbound
+    customerId: uuid("customer_id").references(() => customers.id),
+    customerPhone: text("customer_phone").notNull(),
+    templateId: uuid("template_id").references(() => whatsappTemplates.id),
+    messageBody: text("message_body").notNull(),
+    messageType: text("message_type").notNull().default("text"), // text | template | document | image
+    status: text("status").notNull().default("sent"), // sent | delivered | read | failed
+    metaMessageId: text("meta_message_id"),
+    errorCode: text("error_code"),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    index("wa_messages_tenant_phone_idx").on(t.tenantId, t.customerPhone),
+    index("wa_messages_customer_idx").on(t.customerId),
+  ],
+);
+
+export const smsConfigs = pgTable("sms_configs", {
+  id: id(),
+  tenantId: tenantId(),
+  provider: text("provider").notNull().default("msg91"), // msg91 | textlocal | twilio
+  apiKey: text("api_key"),
+  senderId: text("sender_id"),
+  isActive: boolean("is_active").notNull().default(false),
+  createdAt: createdAt(),
+});
+
+export const reminders = pgTable(
+  "reminders",
+  {
+    id: id(),
+    tenantId: tenantId(),
+    storeId: uuid("store_id").references(() => stores.id),
+    customerId: uuid("customer_id").references(() => customers.id),
+    customerName: text("customer_name"),
+    customerPhone: text("customer_phone").notNull(),
+    type: text("type").notNull().default("refill"), // refill | followup | payment | custom
+    medicineId: uuid("medicine_id").references(() => medicines.id),
+    scheduledDate: date("scheduled_date").notNull(),
+    message: text("message").notNull(),
+    channel: text("channel").notNull().default("both"), // sms | whatsapp | both
+    status: text("status").notNull().default("pending"), // pending | sent | failed | cancelled
+    sentAt: timestamp("sent_at", { withTimezone: true }),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    index("reminders_tenant_date_idx").on(t.tenantId, t.scheduledDate, t.status),
+    index("reminders_customer_idx").on(t.customerId),
+  ],
+);
+
+export const bankStatements = pgTable("bank_statements", {
+  id: id(),
+  tenantId: tenantId(),
+  storeId: uuid("store_id").references(() => stores.id),
+  bankName: text("bank_name").notNull(),
+  accountNo: text("account_no").notNull(),
+  statementDate: date("statement_date").notNull(),
+  uploadFileName: text("upload_file_name"),
+  status: text("status").notNull().default("completed"), // processing | completed
+  createdAt: createdAt(),
+});
+
+export const bankStatementLines = pgTable(
+  "bank_statement_lines",
+  {
+    id: id(),
+    tenantId: tenantId(),
+    statementId: uuid("statement_id").notNull().references(() => bankStatements.id, { onDelete: "cascade" }),
+    transactionDate: date("transaction_date").notNull(),
+    description: text("description").notNull(),
+    reference: text("reference"),
+    debit: money("debit"), // paise
+    credit: money("credit"), // paise
+    balance: money("balance"), // paise
+    matchedPaymentId: uuid("matched_payment_id").references(() => payments.id),
+    matchStatus: text("match_status").notNull().default("unmatched"), // unmatched | auto_matched | manual_matched | disputed
+    createdAt: createdAt(),
+  },
+  (t) => [
+    index("bank_lines_statement_idx").on(t.statementId),
+    index("bank_lines_match_idx").on(t.matchStatus),
+  ],
+);
+
+export type WhatsAppConfig = typeof whatsappConfigs.$inferSelect;
+export type NewWhatsAppConfig = typeof whatsappConfigs.$inferInsert;
+export type WhatsAppTemplate = typeof whatsappTemplates.$inferSelect;
+export type NewWhatsAppTemplate = typeof whatsappTemplates.$inferInsert;
+export type WhatsAppMessage = typeof whatsappMessages.$inferSelect;
+export type NewWhatsAppMessage = typeof whatsappMessages.$inferInsert;
+export type SmsConfig = typeof smsConfigs.$inferSelect;
+export type NewSmsConfig = typeof smsConfigs.$inferInsert;
+export type Reminder = typeof reminders.$inferSelect;
+export type NewReminder = typeof reminders.$inferInsert;
+export type BankStatement = typeof bankStatements.$inferSelect;
+export type NewBankStatement = typeof bankStatements.$inferInsert;
+export type BankStatementLine = typeof bankStatementLines.$inferSelect;
+export type NewBankStatementLine = typeof bankStatementLines.$inferInsert;
+
