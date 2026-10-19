@@ -34,6 +34,9 @@ import {
   BookmarkCheck,
   Layers,
   Tag,
+  MessageSquare,
+  Bell,
+  Percent,
   type LucideIcon,
 } from "lucide-react";
 import { Logo, LogoMark } from "./ui";
@@ -96,7 +99,16 @@ const NAV: { heading?: string; items: NavItem[] }[] = [
     heading: "Finance",
     items: [
       { href: "/dashboard/accounting", label: "Accounting", icon: BookOpenText },
+      { href: "/dashboard/accounting/bank-reconciliation", label: "Bank reconciliation", icon: Building2 },
       { href: "/dashboard/reports", label: "Reports & Analytics", icon: BarChart3 },
+      { href: "/dashboard/reports/commissions", label: "MR commissions", icon: Percent },
+    ],
+  },
+  {
+    heading: "Comms & Alerts",
+    items: [
+      { href: "/dashboard/whatsapp", label: "WhatsApp inbox", icon: MessageSquare },
+      { href: "/dashboard/reminders", label: "Patient reminders", icon: Bell },
     ],
   },
   {
@@ -104,6 +116,7 @@ const NAV: { heading?: string; items: NavItem[] }[] = [
     items: [
       { href: "/dashboard/suppliers", label: "Suppliers", icon: Truck },
       { href: "/dashboard/customers", label: "Customers", icon: Users },
+      { href: "/dashboard/settings/medical-reps", label: "Medical reps (MR)", icon: Users },
     ],
   },
 ];
