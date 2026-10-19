@@ -1,3 +1,4 @@
+import crypto from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { WhatsAppService } from "@/server/domain/whatsapp";
 import { db, schema } from "@/server/db";
@@ -17,7 +18,8 @@ export async function GET(req: NextRequest) {
       .where(eq(schema.whatsappConfigs.webhookVerifyToken, token))
       .limit(1);
 
-    if (config || token === process.env.WHATSAPP_VERIFY_TOKEN || token === "mediflow_wa_webhook") {
+    // NOTE: Do NOT add a hardcoded fallback token here — use WHATSAPP_VERIFY_TOKEN env var only
+    if (config || token === process.env.WHATSAPP_VERIFY_TOKEN) {
       return new NextResponse(challenge, { status: 200 });
     }
   }
@@ -26,12 +28,34 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
+  const appSecret = process.env.WHATSAPP_APP_SECRET;
+
+  // Read the raw body (required for HMAC validation)
+  const raw = await req.text();
+
+  // Verify HMAC-SHA256 signature if the app secret is configured
+  if (appSecret) {
+    const sig = req.headers.get("x-hub-signature-256") ?? "";
+    const expected =
+      "sha256=" +
+      crypto.createHmac("sha256", appSecret).update(raw).digest("hex");
+
+    const sigValid =
+      sig.length === expected.length &&
+      crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(expected));
+
+    if (!sigValid) {
+      console.warn("[WhatsApp Webhook] Invalid signature — request rejected");
+      return new NextResponse("Invalid signature", { status: 401 });
+    }
+  }
+
   try {
-    const payload = await req.json();
-    await WhatsAppService.handleIncomingWebhook(payload);
+    await WhatsAppService.handleIncomingWebhook(JSON.parse(raw));
     return NextResponse.json({ status: "ok" });
   } catch (err: unknown) {
     console.error("[WhatsApp Webhook Error]:", err);
-    return NextResponse.json({ error: (err instanceof Error ? err.message : String(err)) || "Webhook failed" }, { status: 400 });
+    // Do NOT echo internal error messages back to callers
+    return NextResponse.json({ error: "Webhook processing failed" }, { status: 400 });
   }
 }

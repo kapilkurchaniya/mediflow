@@ -237,7 +237,7 @@ export const medicines = pgTable(
     rackId: uuid("rack_id").references(() => racks.id),
     barcode: text("barcode"),
     hsn: text("hsn"),
-    gstRateBp: integer("gst_rate_bp").notNull().default(1200),
+    gstRateBp: integer("gst_rate_bp").notNull().default(500), // GST 2.0: most pharma HSN 3003/3004 @ 5%
     mrp: money("mrp"),
     salePrice: money("sale_price"),
     purchasePrice: money("purchase_price"),
