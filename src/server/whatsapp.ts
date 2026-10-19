@@ -1,14 +1,29 @@
-// Mock WhatsApp Integration for MediFlow
-export async function sendWhatsAppReceipt(customerPhone: string, invoiceNo: string, amount: number, pdfLink?: string) {
-  if (!customerPhone) return;
+import { WhatsAppService } from "@/server/domain/whatsapp";
+import { db, schema } from "@/server/db";
 
-  const formattedAmount = (amount / 100).toFixed(2);
-  const message = `Hello from MediFlow Pharmacy!\n\nYour bill ${invoiceNo} for ₹${formattedAmount} is generated. Thank you for shopping with us!${pdfLink ? `\n\nDownload Receipt: ${pdfLink}` : ''}`;
+/**
+ * Dispatches an automated tax invoice receipt via WhatsApp Business API
+ */
+export async function sendWhatsAppReceipt(
+  customerPhone: string,
+  invoiceNo: string,
+  amount: number,
+  pdfLink?: string,
+  tenantId?: string
+) {
+  if (!customerPhone) return { success: false, error: "No phone number provided" };
 
-  console.log(`[WhatsApp API Mock] Sending to ${customerPhone}:\n${message}`);
-  
-  // In a real app, you would integrate with Meta WhatsApp Business API or Twilio here.
-  // const res = await fetch("https://graph.facebook.com/v17.0/.../messages", { ... })
+  let resolvedTenantId = tenantId;
+  if (!resolvedTenantId) {
+    const [c] = await db.select({ tenantId: schema.whatsappConfigs.tenantId }).from(schema.whatsappConfigs).limit(1);
+    resolvedTenantId = c?.tenantId || "default";
+  }
 
-  return { success: true, messageId: `wa_msg_${Date.now()}` };
+  return WhatsAppService.sendInvoiceReceipt({
+    tenantId: resolvedTenantId,
+    customerPhone,
+    invoiceNo,
+    totalAmountPaise: amount,
+    pdfUrl: pdfLink,
+  });
 }
