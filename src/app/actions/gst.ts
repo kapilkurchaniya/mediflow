@@ -1,9 +1,11 @@
 "use server";
 
 import { db, schema } from "@/server/db";
-import { eq, and, desc, gte, lte, sql } from "drizzle-orm";
+import { eq, and, desc, gte, lte, sql, ilike } from "drizzle-orm";
 import { requireAuth } from "@/server/auth";
+import { requirePermission } from "@/server/rbac";
 import { revalidatePath } from "next/cache";
+import { isValidGstRateBp, type GstRateBp, GST_RATES_BP } from "@/lib/regulatory";
 import {
   buildGstr1Data,
   buildGstr2Data,
@@ -313,5 +315,153 @@ async function syncPendingGstDocuments(tenantId: string, storeId: string) {
     }
   } catch (err) {
     console.error("GST document auto-sync notice:", err);
+  }
+}
+
+/**
+ * Returns current count of catalog medicines by GST rate (B1.6).
+ */
+export async function getGstRateDistribution() {
+  const { session } = await requireAuth();
+
+  const rows = await db
+    .select({
+      gstRateBp: schema.medicines.gstRateBp,
+      count: sql<number>`count(*)::int`,
+    })
+    .from(schema.medicines)
+    .where(
+      and(
+        eq(schema.medicines.tenantId, session.tenantId),
+        eq(schema.medicines.isActive, true)
+      )
+    )
+    .groupBy(schema.medicines.gstRateBp)
+    .orderBy(schema.medicines.gstRateBp);
+
+  return rows;
+}
+
+/**
+ * Previews medicine count and sample for a proposed GST re-rate (B1.6).
+ */
+export async function previewGstRerate(params: {
+  fromRateBp: number;
+  hsnPrefix?: string;
+}) {
+  const { session } = await requireAuth();
+
+  const conditions = [
+    eq(schema.medicines.tenantId, session.tenantId),
+    eq(schema.medicines.gstRateBp, params.fromRateBp),
+    eq(schema.medicines.isActive, true),
+  ];
+
+  if (params.hsnPrefix && params.hsnPrefix.trim().length > 0) {
+    conditions.push(ilike(schema.medicines.hsn, `${params.hsnPrefix.trim()}%`));
+  }
+
+  const [countRes] = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(schema.medicines)
+    .where(and(...conditions));
+
+  const sample = await db
+    .select({
+      id: schema.medicines.id,
+      name: schema.medicines.name,
+      hsn: schema.medicines.hsn,
+      mrp: schema.medicines.mrp,
+      gstRateBp: schema.medicines.gstRateBp,
+    })
+    .from(schema.medicines)
+    .where(and(...conditions))
+    .limit(8);
+
+  return {
+    count: countRes?.count ?? 0,
+    sample,
+  };
+}
+
+/**
+ * Bulk updates master catalog GST rates with audit logging (B1.6).
+ * Protected by permission: medicine.manage.
+ * Only the master is changed; historical sale_items and purchase_items keep their stored rate.
+ */
+export async function bulkUpdateGstRates(params: {
+  fromRateBp: number;
+  toRateBp: number;
+  hsnPrefix?: string;
+  reason?: string;
+}) {
+  const ctx = await requirePermission("medicine.manage");
+
+  if (!isValidGstRateBp(params.fromRateBp)) {
+    return { error: `Invalid source GST rate: ${params.fromRateBp} bp` };
+  }
+  if (!isValidGstRateBp(params.toRateBp)) {
+    return { error: `Invalid target GST rate: ${params.toRateBp} bp` };
+  }
+  if (params.fromRateBp === params.toRateBp) {
+    return { error: "Source and target GST rates must be different" };
+  }
+
+  try {
+    const updatedCount = await db.transaction(async (tx) => {
+      const conditions = [
+        eq(schema.medicines.tenantId, ctx.tenantId),
+        eq(schema.medicines.gstRateBp, params.fromRateBp),
+      ];
+
+      if (params.hsnPrefix && params.hsnPrefix.trim().length > 0) {
+        conditions.push(ilike(schema.medicines.hsn, `${params.hsnPrefix.trim()}%`));
+      }
+
+      const updatedMedicines = await tx
+        .update(schema.medicines)
+        .set({
+          gstRateBp: params.toRateBp,
+          updatedAt: new Date(),
+        })
+        .where(and(...conditions))
+        .returning({ id: schema.medicines.id });
+
+      if (updatedMedicines.length > 0) {
+        // Record single audit row for this bulk batch modification
+        await tx.insert(schema.auditLogs).values({
+          tenantId: ctx.tenantId,
+          storeId: ctx.storeId,
+          userId: ctx.userId,
+          action: "medicine.gst_rerate",
+          entityType: "medicine_batch_rerate",
+          entityId: null,
+          oldValue: {
+            gstRateBp: params.fromRateBp,
+            hsnPrefix: params.hsnPrefix?.trim() || null,
+          },
+          newValue: {
+            gstRateBp: params.toRateBp,
+            count: updatedMedicines.length,
+          },
+          reason: params.reason?.trim() || "GST 2.0 Notification Medicine Rate Rationalisation",
+        });
+      }
+
+      return updatedMedicines.length;
+    });
+
+    revalidatePath("/dashboard/gst");
+    revalidatePath("/dashboard/gst/rates");
+    revalidatePath("/dashboard/inventory");
+
+    return {
+      success: true,
+      count: updatedCount,
+    };
+  } catch (err: unknown) {
+    return {
+      error: err instanceof Error ? err.message : String(err) || "Failed to update GST rates",
+    };
   }
 }
