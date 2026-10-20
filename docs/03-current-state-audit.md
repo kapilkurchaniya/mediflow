@@ -63,10 +63,10 @@ Legend: ✅ works · 🟡 partial / has gaps · 🔴 table exists but no code ·
 
 | # | Finding | Location | Impact |
 |---|---|---|---|
-| C1 | `try/catch` around queries **inside** a transaction (GST document, loyalty). In Postgres, a failed statement aborts the whole transaction. Catching the JS error doesn't help: the next statement or `COMMIT` fails with "current transaction is aborted". | `actions/sales.ts:483,496` | A loyalty or GST bug makes the **whole sale fail** with a confusing error. Fix: wrap optional steps in `tx.transaction(...)`, which creates a savepoint, or move them to the outbox. |
+| C1 ✅ fixed in A0.7 | `try/catch` around queries **inside** a transaction (GST document, loyalty). In Postgres, a failed statement aborts the whole transaction. Catching the JS error doesn't help: the next statement or `COMMIT` fails with "current transaction is aborted". | `actions/sales.ts:483,496` | A loyalty or GST bug makes the **whole sale fail** with a confusing error. Fix: wrap optional steps in `tx.transaction(...)`, which creates a savepoint, or move them to the outbox. |
 | C2 | GST 2.0: default rate 12% is wrong for most medicines (now 5%). No rate catalogue. | `schema.ts:240` | Wrong tax on new items. |
 | C3 | `isInterState = false` always. | `actions/sales.ts:316` | Wrong CGST/SGST vs IGST for B2B customers in other states. |
-| C4 | Invoice numbers can exceed **16 characters** (GST Rule 46 limit) if the prefix is long. Nothing validates this. | `domain/sequence.ts` | Non-compliant invoices. |
+| C4 ✅ fixed in A0.7 | Invoice numbers can exceed **16 characters** (GST Rule 46 limit) if the prefix is long. Nothing validates this. | `domain/sequence.ts` | Non-compliant invoices. |
 | C5 | Migrations don't match the schema. A fresh `npm run db:migrate` creates only 37 of ~58 tables. | `drizzle/` | New environments (CI, production, Kapil's or your machine) break. |
 | C6 | `scripts/Indian-Medicine-Dataset` is committed as a git **submodule pointer** with no `.gitmodules` file. | repo root | Fresh clones get an empty folder; the seed script fails. |
 | C7 | README documents `GOOGLE_GENERATIVE_AI_API_KEY` and `SESSION_SECRET`. The code reads `GEMINI_API_KEY` and never reads `SESSION_SECRET`. `env.ts` validates only `DATABASE_URL`. | `README.md`, `src/env.ts` | Setup confusion; missing keys fail at runtime instead of at boot. |

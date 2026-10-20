@@ -74,6 +74,18 @@ describe("nextDocNumber", () => {
     expect(n.length).toBeLessThanOrEqual(16);
   });
 
-  // Roadmap A0.7 makes longer prefixes fail loudly instead of producing a non-compliant invoice number.
-  it.todo("rejects a prefix that pushes the number past 16 characters");
+  it("refuses to issue a sale number longer than 16 characters (GST Rule 46) and does not burn a serial", async () => {
+    const tenant = await makeTenant(t.db);
+    const store = await makeStore(t.db, tenant.id);
+    const now = new Date(2026, 9, 20);
+    await expect(next(tenant.id, store.id, "sale", "BILL", now)).rejects.toMatchObject({ code: "INVOICE_NO_TOO_LONG" });
+    // the failed attempt rolled back with its transaction: the next valid bill is still number 1
+    expect(await next(tenant.id, store.id, "sale", "INV", now)).toBe("INV/26-27/000001");
+  });
+
+  it("only sale invoices are length-checked (other documents are not GST tax invoices)", async () => {
+    const tenant = await makeTenant(t.db);
+    const store = await makeStore(t.db, tenant.id);
+    expect(await next(tenant.id, store.id, "purchase_order", "PURCHASE", new Date(2026, 9, 20))).toBe("PURCHASE/26-27/000001");
+  });
 });

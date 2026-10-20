@@ -3,6 +3,7 @@
 import { db, schema } from "@/server/db";
 import { eq } from "drizzle-orm";
 import { requireAuth } from "@/server/auth";
+import { validateInvoicePrefix } from "@/lib/invoice-no";
 import { revalidatePath } from "next/cache";
 
 export async function getStoreSettings() {
@@ -69,6 +70,11 @@ export async function updateStoreSettings(formData: FormData) {
 
   if (!name) {
     return { error: "Pharmacy name is required." };
+  }
+
+  const prefixError = validateInvoicePrefix(invoicePrefix);
+  if (prefixError) {
+    return { error: prefixError };
   }
 
   try {

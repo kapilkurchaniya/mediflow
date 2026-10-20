@@ -903,7 +903,7 @@ When you start a phase, list your 🤝 items in the Monday sync and merge them b
 
 Tick items in PRs. One line per task, in the same order as above.
 
-**Phase 0** — A: [x] A0.1 [x] A0.2 [x] A0.3 [x] A0.4 [x] A0.5 [ ] A0.6 [ ] A0.7 · B: [ ] B0.1 [ ] B0.2 [ ] B0.3 [ ] B0.4 [ ] B0.5 [ ] B0.6 [ ] B0.7 [ ] B0.8
+**Phase 0** — A: [x] A0.1 [x] A0.2 [x] A0.3 [x] A0.4 [x] A0.5 [ ] A0.6 [x] A0.7 · B: [ ] B0.1 [ ] B0.2 [ ] B0.3 [ ] B0.4 [ ] B0.5 [ ] B0.6 [ ] B0.7 [ ] B0.8
 **Phase 1** — A: [ ] A1.1 [ ] A1.2 [ ] A1.3 [ ] A1.4 [ ] A1.5 [ ] A1.6 [ ] A1.7 · B: [ ] B1.1 [ ] B1.2 [ ] B1.3 [ ] B1.4 [ ] B1.5 [ ] B1.6
 **Phase 2** — A: [ ] A2.1 [ ] A2.2 [ ] A2.3 [ ] A2.4 [ ] A2.5 [ ] A2.6 [ ] A2.7 [ ] A2.8 [ ] A2.9 · B: [ ] B2.1 [ ] B2.2 [ ] B2.3 [ ] B2.4 [ ] B2.5 [ ] B2.6 [ ] B2.7
 **Phase 3** — A: [ ] A3.1 [ ] A3.2 [ ] A3.3 [ ] A3.4 [ ] A3.5 [ ] A3.6 · B: [ ] B3.1 [ ] B3.2 [ ] B3.3 [ ] B3.4 [ ] B3.5
