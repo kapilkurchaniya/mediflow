@@ -1,8 +1,14 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
-const publicRoutes = ["/login", "/register", "/api/webhook", "/api/chat"]; // Routes that do not require authentication
-const authRoutes = ["/login", "/register"]; // Routes for unauthenticated users only (redirect to dashboard if logged in)
+/** Routes that redirect authenticated users away (login/register pages). */
+const authRoutes = ["/login", "/register"];
+
+/**
+ * API routes that authenticate themselves (API key, HMAC, etc.) and must NOT
+ * be redirected to /login when the session cookie is absent.
+ */
+const selfAuthPrefixes = ["/api/v1", "/api/webhooks"];
 
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
@@ -10,36 +16,45 @@ export async function proxy(request: NextRequest) {
   // Let Next.js handle internal files, public assets, etc.
   if (
     pathname.startsWith("/_next") ||
-    pathname.startsWith("/api/trpc") || // If trpc is used
+    pathname.startsWith("/api/trpc") ||
     pathname.includes(".")
   ) {
     return NextResponse.next();
   }
 
-  // Check for the session cookie
-  // Note: We don't validate the token against the DB here because `proxy` runs in Node.js
-  // but it's often more efficient to do DB checks in layouts/pages directly if we want granular data.
-  // However, we can perform basic presence checks.
+  // Self-authenticating API routes — pass through without session check.
+  // They'll return 401 JSON if the key/signature is missing or invalid.
+  if (selfAuthPrefixes.some((prefix) => pathname.startsWith(prefix))) {
+    return NextResponse.next();
+  }
+
   const hasSession = request.cookies.has("mediflow_session");
 
-  const isPublicRoute = publicRoutes.includes(pathname);
-  const isAuthRoute = authRoutes.includes(pathname);
-
-  if (isAuthRoute) {
+  // Auth pages: redirect logged-in users to the dashboard.
+  if (authRoutes.includes(pathname)) {
     if (hasSession) {
       return NextResponse.redirect(new URL("/dashboard", request.url));
     }
     return NextResponse.next();
   }
 
-  if (!hasSession && !isPublicRoute && pathname !== "/") {
+  // All other /api/* routes (e.g. /api/chat) require a session.
+  // Return 401 JSON instead of redirecting — clients can't follow cookie redirects.
+  if (pathname.startsWith("/api/")) {
+    if (!hasSession) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    return NextResponse.next();
+  }
+
+  // Dashboard and all other pages — redirect to login if no session.
+  if (!hasSession && pathname !== "/") {
     let from = pathname;
     if (request.nextUrl.search) {
       from += request.nextUrl.search;
     }
-    
     return NextResponse.redirect(
-      new URL(`/login?redirect=${encodeURIComponent(from)}`, request.url)
+      new URL(`/login?redirect=${encodeURIComponent(from)}`, request.url),
     );
   }
 
