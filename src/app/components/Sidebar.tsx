@@ -5,126 +5,19 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import clsx from "clsx";
 import {
-  LayoutGrid,
-  Pill,
-  Boxes,
-  FileInput,
-  Receipt,
-  ScanLine,
-  BookOpenText,
-  Truck,
-  Users,
   Settings,
   LogOut,
   ChevronsUpDown,
-  Upload,
   PanelLeftClose,
   PanelLeftOpen,
   X,
   Check,
   Building2,
-  ShieldAlert,
-  FileText,
-  Stethoscope,
-  BarChart3,
-  Landmark,
-  ReceiptText,
-  QrCode,
-  FileSpreadsheet,
-  BookmarkCheck,
-  Layers,
-  Tag,
-  MessageSquare,
-  Bell,
-  Percent,
-  Package,
-  Coins,
-  type LucideIcon,
 } from "lucide-react";
 import { Logo, LogoMark } from "./ui";
 import { logoutAction } from "@/app/actions/auth";
 import { useShell } from "./ShellContext";
-
-type NavItem = {
-  href: string;
-  label: string;
-  icon: LucideIcon;
-  exact?: boolean;
-  shortcut?: string;
-};
-
-const NAV: { heading?: string; items: NavItem[] }[] = [
-  {
-    items: [
-      { href: "/dashboard", label: "Overview", icon: LayoutGrid, exact: true },
-      { href: "/dashboard/sales/pos", label: "New bill", icon: ScanLine, shortcut: "F2" },
-    ],
-  },
-  {
-    heading: "Operations",
-    items: [
-      { href: "/dashboard/sales", label: "Sales & invoices", icon: Receipt },
-      { href: "/dashboard/orders", label: "Omnichannel orders", icon: Package },
-      { href: "/dashboard/purchases", label: "Purchases (GRN)", icon: FileInput },
-      { href: "/dashboard/sales/promise-orders", label: "Promise orders", icon: BookmarkCheck },
-    ],
-  },
-  {
-    heading: "Compliance (Rx)",
-    items: [
-      { href: "/dashboard/compliance", label: "Drug registers", icon: ShieldAlert, exact: true },
-      { href: "/dashboard/compliance/schedule-h1", label: "Schedule H1 (Form 35)", icon: ShieldAlert },
-      { href: "/dashboard/compliance/prescriptions", label: "Prescriptions (Rx)", icon: FileText },
-      { href: "/dashboard/compliance/doctors", label: "Doctor master", icon: Stethoscope },
-    ],
-  },
-  {
-    heading: "Inventory",
-    items: [
-      { href: "/dashboard/inventory", label: "Item master", icon: Pill, exact: true },
-      { href: "/dashboard/inventory/batches", label: "Batches & stock", icon: Boxes },
-      { href: "/dashboard/settings/racks", label: "Racks & shelves", icon: Layers },
-      { href: "/dashboard/settings/schemes", label: "Trade schemes", icon: Tag },
-      { href: "/dashboard/inventory/import", label: "Bulk import", icon: Upload },
-    ],
-  },
-  {
-    heading: "GST & Tax",
-    items: [
-      { href: "/dashboard/gst", label: "GST Overview", icon: Landmark, exact: true },
-      { href: "/dashboard/gst/outward", label: "Outward (GSTR-1)", icon: ReceiptText },
-      { href: "/dashboard/gst/inward", label: "Inward (ITC)", icon: FileSpreadsheet },
-      { href: "/dashboard/gst/e-invoice", label: "E-Invoice & E-Way", icon: QrCode },
-      { href: "/dashboard/gst/returns", label: "Returns & Filing", icon: Landmark },
-    ],
-  },
-  {
-    heading: "Finance",
-    items: [
-      { href: "/dashboard/accounting", label: "Accounting", icon: BookOpenText },
-      { href: "/dashboard/accounting/bank-reconciliation", label: "Bank reconciliation", icon: Building2 },
-      { href: "/dashboard/reports", label: "Reports & Analytics", icon: BarChart3 },
-      { href: "/dashboard/reports/commissions", label: "MR commissions", icon: Percent },
-    ],
-  },
-  {
-    heading: "Comms & Alerts",
-    items: [
-      { href: "/dashboard/whatsapp", label: "WhatsApp inbox", icon: MessageSquare },
-      { href: "/dashboard/reminders", label: "Patient reminders", icon: Bell },
-    ],
-  },
-  {
-    heading: "Directory",
-    items: [
-      { href: "/dashboard/suppliers", label: "Suppliers", icon: Truck },
-      { href: "/dashboard/customers", label: "Customers", icon: Users },
-      { href: "/dashboard/customers/groups", label: "Family groups", icon: Users },
-      { href: "/dashboard/settings/medical-reps", label: "Medical reps (MR)", icon: Users },
-      { href: "/dashboard/settings/loyalty", label: "Loyalty rewards", icon: Coins },
-    ],
-  },
-];
+import { NAV, settingsItem, type NavItem } from "./nav";
 
 function isActive(pathname: string, item: NavItem) {
   if (item.exact) return pathname === item.href || pathname === `${item.href}/new`;
@@ -312,7 +205,7 @@ export function Sidebar({
       {/* Footer Profile & Settings */}
       <div className="border-t border-ink-150/70 p-2.5 space-y-1">
         <Link
-          href="/dashboard/settings"
+          href={settingsItem.href}
           onClick={() => isMobile && setMobileOpen(false)}
           title={isCollapsed ? "Settings" : undefined}
           className={clsx(

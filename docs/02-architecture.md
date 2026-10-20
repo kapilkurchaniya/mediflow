@@ -66,6 +66,7 @@ src/
 │   │   ├── ➕ sync/           Offline POS sync endpoints (Phase 4)
 │   │   └── ➕ cron/           Job runner endpoints (outbox, reminders) (Phase 2B)
 │   ├── components/           App shell: Sidebar, Topbar, CommandPalette, AIAssistant, ui.tsx
+│   │   └── nav/              Navigation config, one file per module; sidebar AND command palette read it
 │   ├── dashboard/            All authenticated pages, one folder per module
 │   ├── login/, register/     Auth pages
 │   └── ➕ manifest.ts         PWA manifest (Phase 4)
