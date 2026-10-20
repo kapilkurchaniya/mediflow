@@ -20,6 +20,7 @@ import { PageHeader, StatCard, EmptyState } from "@/app/components/ui";
 import { formatINR } from "@/lib/format";
 import { DateRangeFilter } from "@/app/components/DateRangeFilter";
 import { resolveDateRange } from "@/lib/date-range";
+import { requirePagePermission } from "@/server/rbac";
 
 export const metadata = { title: "Accounting" };
 
@@ -66,6 +67,7 @@ export default async function AccountingPage({
 }: {
   searchParams: Promise<{ range?: string; from?: string; to?: string }>;
 }) {
+  await requirePagePermission("accounting.view");
   const params = await searchParams;
   const dateRange = resolveDateRange({
     range: params.range,

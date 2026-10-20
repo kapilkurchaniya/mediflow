@@ -5,6 +5,7 @@ import { Printer, Receipt, User, Stethoscope } from "lucide-react";
 import Link from "next/link";
 import { PageHeader } from "@/app/components/ui";
 import { formatINR } from "@/lib/format";
+import { requirePagePermission } from "@/server/rbac";
 
 export const metadata = { title: "Invoice Details" };
 
@@ -13,6 +14,7 @@ export default async function SaleDetailPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
+  await requirePagePermission("sale.view");
   const { id } = await params;
   const data = await getSaleById(id);
 

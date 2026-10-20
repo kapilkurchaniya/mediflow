@@ -16,6 +16,7 @@ Roadmap item:
 - [ ] Touched a shared file (schema index, permissions, Sidebar/nav, package.json)? Told the other lane
 - [ ] Added/updated tests for domain logic
 - [ ] Updated docs if behaviour changed
+- [ ] Updated **A_TEST_GUIDE.md** (Lane A) or **B_TEST_GUIDE.md** (Lane B): new/changed behaviour has test steps with expected results; ⏳ items that landed are ticked
 
 ## How to test
 <!-- Steps the reviewer can follow locally. -->

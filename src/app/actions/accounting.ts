@@ -1,31 +1,29 @@
 "use server";
 
 import { db, schema } from "@/server/db";
+import { requirePermission } from "@/server/rbac";
 import { eq, and, sql, desc, gte, lte } from "drizzle-orm";
-import { getCurrentSession } from "@/server/auth";
 import { getOrSeedAccounts } from "@/server/domain/accounting";
 
 export async function getAccounts() {
-  const { session } = await getCurrentSession();
-  if (!session?.tenantId) throw new Error("Unauthorized");
+  const ctx = await requirePermission("accounting.view");
 
   // Ensure standard accounts exist
-  await getOrSeedAccounts(db, session.tenantId);
+  await getOrSeedAccounts(db, ctx.tenantId);
 
   return db
     .select()
     .from(schema.accounts)
-    .where(eq(schema.accounts.tenantId, session.tenantId))
+    .where(eq(schema.accounts.tenantId, ctx.tenantId))
     .orderBy(schema.accounts.code);
 }
 
 export async function getJournalLines(dateFrom?: string | null, dateTo?: string | null) {
-  const { session } = await getCurrentSession();
-  if (!session?.tenantId || !session?.storeId) throw new Error("Unauthorized");
+  const ctx = await requirePermission("accounting.view");
 
   const conditions = [
-    eq(schema.journalLines.tenantId, session.tenantId),
-    eq(schema.journalEntries.storeId, session.storeId),
+    eq(schema.journalLines.tenantId, ctx.tenantId),
+    eq(schema.journalEntries.storeId, ctx.storeId),
   ];
 
   if (dateFrom) {
@@ -60,11 +58,10 @@ export interface TrialBalanceRow {
 }
 
 export async function getTrialBalance(dateFrom?: string | null, dateTo?: string | null): Promise<TrialBalanceRow[]> {
-  const { session } = await getCurrentSession();
-  if (!session?.tenantId || !session?.storeId) throw new Error("Unauthorized");
+  const ctx = await requirePermission("accounting.view");
 
   // Ensure accounts are seeded
-  await getOrSeedAccounts(db, session.tenantId);
+  await getOrSeedAccounts(db, ctx.tenantId);
 
   // Build date condition for journal entries
   let dateCondition = sql``;
@@ -89,11 +86,11 @@ export async function getTrialBalance(dateFrom?: string | null, dateTo?: string 
       ${schema.journalLines} jl
       INNER JOIN ${schema.journalEntries} je 
         ON jl.entry_id = je.id 
-        AND je.tenant_id = ${session.tenantId}
-        AND (je.store_id = ${session.storeId} OR je.store_id IS NULL)
+        AND je.tenant_id = ${ctx.tenantId}
+        AND (je.store_id = ${ctx.storeId} OR je.store_id IS NULL)
         ${dateCondition}
     ) ON a.id = jl.account_id
-    WHERE a.tenant_id = ${session.tenantId}
+    WHERE a.tenant_id = ${ctx.tenantId}
     GROUP BY a.id, a.code, a.name, a.type
     HAVING COALESCE(SUM(jl.debit), 0) > 0 OR COALESCE(SUM(jl.credit), 0) > 0
     ORDER BY a.type, a.code

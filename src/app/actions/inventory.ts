@@ -2,29 +2,32 @@
 
 import { db, schema } from "@/server/db";
 import { eq, and, desc, ilike, or } from "drizzle-orm";
-import { getCurrentSession, requireAuth } from "@/server/auth";
+import { requirePermission, checkPermission } from "@/server/rbac";
+import { DEFAULT_GST_RATE_BP, isValidGstRateBp } from "@/lib/regulatory";
 import { revalidatePath } from "next/cache";
 
 // --- Categories ---
 
 export async function getCategories() {
-  const { session } = await requireAuth();
+  const ctx = await requirePermission("medicine.view");
 
   return db
     .select()
     .from(schema.categories)
-    .where(eq(schema.categories.tenantId, session.tenantId))
+    .where(eq(schema.categories.tenantId, ctx.tenantId))
     .orderBy(schema.categories.name);
 }
 
 export async function createCategory(name: string) {
-  const { session } = await requireAuth();
+  const auth = await checkPermission("medicine.manage");
+  if (!auth.ok) return { error: auth.error };
+  const ctx = auth.ctx;
 
   try {
     const [category] = await db
       .insert(schema.categories)
       .values({
-        tenantId: session.tenantId,
+        tenantId: ctx.tenantId,
         name,
       })
       .returning();
@@ -37,23 +40,25 @@ export async function createCategory(name: string) {
 // --- Manufacturers ---
 
 export async function getManufacturers() {
-  const { session } = await requireAuth();
+  const ctx = await requirePermission("medicine.view");
 
   return db
     .select()
     .from(schema.manufacturers)
-    .where(eq(schema.manufacturers.tenantId, session.tenantId))
+    .where(eq(schema.manufacturers.tenantId, ctx.tenantId))
     .orderBy(schema.manufacturers.name);
 }
 
 export async function createManufacturer(name: string) {
-  const { session } = await requireAuth();
+  const auth = await checkPermission("medicine.manage");
+  if (!auth.ok) return { error: auth.error };
+  const ctx = auth.ctx;
 
   try {
     const [manufacturer] = await db
       .insert(schema.manufacturers)
       .values({
-        tenantId: session.tenantId,
+        tenantId: ctx.tenantId,
         name,
       })
       .returning();
@@ -66,9 +71,9 @@ export async function createManufacturer(name: string) {
 // --- Medicines ---
 
 export async function getMedicines(searchQuery?: string, limit = 100, offset = 0) {
-  const { session } = await requireAuth();
+  const ctx = await requirePermission("medicine.view");
 
-  const conditions = [eq(schema.medicines.tenantId, session.tenantId)];
+  const conditions = [eq(schema.medicines.tenantId, ctx.tenantId)];
 
   if (searchQuery?.trim()) {
     const q = `%${searchQuery.trim().toLowerCase()}%`;
@@ -99,7 +104,9 @@ export async function getMedicines(searchQuery?: string, limit = 100, offset = 0
 }
 
 export async function createMedicine(formData: FormData) {
-  const { session } = await requireAuth();
+  const auth = await checkPermission("medicine.manage");
+  if (!auth.ok) return { error: auth.error };
+  const ctx = auth.ctx;
 
   const name = formData.get("name") as string;
   const genericName = formData.get("genericName") as string;
@@ -121,13 +128,14 @@ export async function createMedicine(formData: FormData) {
   if (!name) return { error: "Name is required" };
 
   // Parse decimals to integers (basis points / paise)
-  const gstRateBp = gstRateBpStr ? Math.round(parseFloat(gstRateBpStr) * 100) : 1200; // default 12%
+  const gstRateBp = gstRateBpStr ? Math.round(parseFloat(gstRateBpStr) * 100) : DEFAULT_GST_RATE_BP; // GST 2.0: 5%
+  if (!isValidGstRateBp(gstRateBp)) return { error: "Choose a valid GST rate (0%, 5%, 12%, 18% or 28%)." };
   const mrp = mrpStr ? Math.round(parseFloat(mrpStr) * 100) : 0;
   const salePrice = salePriceStr ? Math.round(parseFloat(salePriceStr) * 100) : mrp; // fallback to mrp
 
   try {
     await db.insert(schema.medicines).values({
-      tenantId: session.tenantId,
+      tenantId: ctx.tenantId,
       name,
       genericName: genericName || null,
       manufacturerId: manufacturerId || null,

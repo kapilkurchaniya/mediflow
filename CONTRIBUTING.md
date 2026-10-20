@@ -17,6 +17,10 @@ MediFlow is built by two developers working in parallel **lanes**. Full details 
 
 These are enforced by a local `pre-push` hook (`.githooks/pre-push`, installed by `npm install`), by a CI branch guard (`.github/workflows/branch-guard.yml`), and, where the GitHub plan allows, by branch protection on `main`.
 
+## Manual test guides (keep them current)
+
+[`A_TEST_GUIDE.md`](A_TEST_GUIDE.md) (Lane A) and [`B_TEST_GUIDE.md`](B_TEST_GUIDE.md) (Lane B) describe how to test every phase from the **user** and the **developer** point of view, with the expected result for each step. **A PR that changes behaviour updates the matching guide in the same PR** (new tests, changed steps, ⏳ → ✅). Reviewers check the box in the PR template. `npm run db:reset` creates one login per role so the guides can be followed as written.
+
 ## First-time setup
 
 ```bash

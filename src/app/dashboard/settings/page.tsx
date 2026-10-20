@@ -9,10 +9,12 @@ import {
   User,
   Sliders,
 } from "lucide-react";
+import { requirePagePermission } from "@/server/rbac";
 
 export const metadata = { title: "Settings" };
 
 export default async function SettingsPage() {
+  await requirePagePermission("settings.manage");
   const data = await getStoreSettings();
   const { store, user, tenant } = data;
 

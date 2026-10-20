@@ -59,3 +59,16 @@ export const NAV: { heading?: string; items: NavItem[] }[] = GROUPS.map((g) => (
 
 /** Everything the command palette can jump to. */
 export const PALETTE_NAV_ITEMS: NavItem[] = [...ALL_NAV_ITEMS, settingsItem];
+
+/** Sidebar sections with only the items this user may use (items without a `permission` are always shown). */
+export function visibleNav(permissions: ReadonlySet<string>): typeof NAV {
+  return NAV.map((g) => ({
+    ...g,
+    items: g.items.filter((i) => !i.permission || permissions.has(i.permission)),
+  })).filter((g) => g.items.length > 0);
+}
+
+/** Command-palette destinations this user may use. */
+export function visiblePaletteItems(permissions: ReadonlySet<string>): NavItem[] {
+  return PALETTE_NAV_ITEMS.filter((i) => !i.permission || permissions.has(i.permission));
+}

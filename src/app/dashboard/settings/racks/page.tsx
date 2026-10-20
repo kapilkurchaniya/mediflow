@@ -6,7 +6,7 @@ import { RacksListClient } from "./RacksListClient";
 export const dynamic = "force-dynamic";
 
 export default async function RacksPage() {
-  await requirePagePermission("medicine.view");
+  await requirePagePermission("medicine.manage");
   const racks = await getRacks();
 
   return (

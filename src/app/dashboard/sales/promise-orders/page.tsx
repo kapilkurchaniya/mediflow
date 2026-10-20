@@ -1,6 +1,7 @@
 import { PageHeader } from "@/app/components/ui";
 import { getPromiseOrders } from "@/app/actions/promise-orders";
 import { PromiseOrdersClient } from "./PromiseOrdersClient";
+import { requirePagePermission } from "@/server/rbac";
 
 export const dynamic = "force-dynamic";
 
@@ -9,6 +10,7 @@ export default async function PromiseOrdersPage({
 }: {
   searchParams: Promise<{ status?: string }>;
 }) {
+  await requirePagePermission("sale.view");
   const resolved = await searchParams;
   const orders = await getPromiseOrders({ status: resolved.status });
 

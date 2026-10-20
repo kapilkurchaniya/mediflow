@@ -1,12 +1,14 @@
 import { PageHeader } from "@/app/components/ui";
 import { getWhatsAppConfig } from "@/app/actions/whatsapp";
 import { WhatsAppSettingsClient } from "./WhatsAppSettingsClient";
+import { requirePagePermission } from "@/server/rbac";
 
 export const metadata = {
   title: "WhatsApp API Settings — MediFlow",
 };
 
 export default async function WhatsAppSettingsPage() {
+  await requirePagePermission("settings.manage");
   const config = await getWhatsAppConfig();
 
   return (

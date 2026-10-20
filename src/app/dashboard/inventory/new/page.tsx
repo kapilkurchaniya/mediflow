@@ -138,10 +138,10 @@ export default function NewMedicinePage() {
               </div>
             </Field>
             <Field label="GST rate" htmlFor="gstRateBp">
-              <select id="gstRateBp" name="gstRateBp" className="input" defaultValue="12">
+              <select id="gstRateBp" name="gstRateBp" className="input" defaultValue="5">
                 <option value="0">0% — Exempt</option>
-                <option value="5">5%</option>
-                <option value="12">12% — Standard</option>
+                <option value="5">5% — Most medicines (GST 2.0)</option>
+                <option value="12">12%</option>
                 <option value="18">18%</option>
                 <option value="28">28%</option>
               </select>

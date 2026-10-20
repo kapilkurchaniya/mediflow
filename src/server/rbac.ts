@@ -92,3 +92,23 @@ export async function requirePagePermission(p: Permission): Promise<AuthCtx> {
     throw e;
   }
 }
+
+export type PermissionCheck = { ok: true; ctx: AuthCtx } | { ok: false; error: string };
+
+/**
+ * For legacy form actions (`useActionState`) that report failures as `{ error }` instead of throwing:
+ *
+ *   const auth = await checkPermission("inventory.adjust");
+ *   if (!auth.ok) return { error: auth.error };
+ *   const ctx = auth.ctx;
+ *
+ * New actions should use `protectedAction` instead.
+ */
+export async function checkPermission(p: Permission): Promise<PermissionCheck> {
+  try {
+    return { ok: true, ctx: await requirePermission(p) };
+  } catch (e) {
+    if (e instanceof ForbiddenError) return { ok: false, error: e.message };
+    throw e;
+  }
+}

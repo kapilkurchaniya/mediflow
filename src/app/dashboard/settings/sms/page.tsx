@@ -1,12 +1,14 @@
 import { PageHeader } from "@/app/components/ui";
 import { getSmsConfig } from "@/app/actions/sms";
 import { SmsSettingsClient } from "./SmsSettingsClient";
+import { requirePagePermission } from "@/server/rbac";
 
 export const metadata = {
   title: "SMS Gateway Settings — MediFlow",
 };
 
 export default async function SmsSettingsPage() {
+  await requirePagePermission("settings.manage");
   const config = await getSmsConfig();
 
   return (
