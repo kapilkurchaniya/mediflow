@@ -896,6 +896,28 @@ export function buildGstr1JsonPayload(
     ],
   }));
 
+  const b2clFormatted = gstr1.b2cl.map((inv) => ({
+    pos: inv.placeOfSupply.slice(0, 2),
+    inv: [
+      {
+        inum: inv.docNo,
+        idt: inv.docDate.split("-").reverse().join("-"), // DD-MM-YYYY
+        val: Number((inv.total / 100).toFixed(2)),
+        itms: [
+          {
+            num: 1,
+            itm_det: {
+              txval: Number((inv.taxableAmount / 100).toFixed(2)),
+              rt: Number((DEFAULT_GST_RATE_BP / 100).toFixed(2)),
+              iamt: Number((inv.igst / 100).toFixed(2)),
+              csamt: 0.0,
+            },
+          },
+        ],
+      },
+    ],
+  }));
+
   const hsnFormatted = {
     data: gstr1.hsnSummary.map((h, idx) => ({
       num: idx + 1,
@@ -937,17 +959,19 @@ export function buildGstr1JsonPayload(
     gt: Number((gstr1.totals.grossTotal / 100).toFixed(2)),
     cur_gt: Number((gstr1.totals.grossTotal / 100).toFixed(2)),
     b2b: b2bFormatted,
+    b2cl: b2clFormatted,
     b2cs: gstr1.b2cs.map((item) => ({
-      sply_ty: "INTRA",
+      sply_ty: item.igst > 0 ? "INTER" : "INTRA",
       pos: item.placeOfSupply.slice(0, 2),
       typ: "OE",
-      rt: 12.0,
+      rt: Number(((item.taxRateBp ?? DEFAULT_GST_RATE_BP) / 100).toFixed(2)),
       txval: Number((item.taxableAmount / 100).toFixed(2)),
       camt: Number((item.cgst / 100).toFixed(2)),
       samt: Number((item.sgst / 100).toFixed(2)),
       iamt: Number((item.igst / 100).toFixed(2)),
       csamt: 0.0,
     })),
+    cdnr: [],
     hsn: hsnFormatted,
     doc_issue: docIssueFormatted,
   };
