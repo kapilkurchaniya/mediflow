@@ -7,9 +7,10 @@ export async function nextDocNumber(
   tenantId: string,
   storeId: string,
   docType: string,
-  prefix: string = "INV"
+  prefix: string = "INV",
+  now: Date = new Date()
 ): Promise<string> {
-  const date = new Date();
+  const date = now;
   const year = date.getFullYear();
   const month = date.getMonth() + 1;
   const fiscalYear = month >= 4 ? `${year}-${year + 1}` : `${year - 1}-${year}`;

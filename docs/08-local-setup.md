@@ -20,10 +20,20 @@ git switch lane-a/overxpowered   # or lane-b/kapil
 
 ## 2. Database
 
-Option A, Docker (recommended; `docker-compose.yml` is added in Roadmap A0.4):
+Option A, Docker (recommended):
 
 ```bash
 docker compose up -d db          # Postgres 16 on localhost:5432, user/pass mediflow/mediflow
+                                 # creates databases `mediflow` (app) and `mediflow_test` (tests)
+```
+
+If Docker's bridge networking fails ("operation not supported" on veth), use host networking on another port:
+
+```bash
+docker run -d --name mediflow-db --network host -e POSTGRES_USER=mediflow -e POSTGRES_PASSWORD=mediflow \
+  -e POSTGRES_DB=mediflow postgres:16 -c port=5433
+docker exec mediflow-db psql -p 5433 -U mediflow -d mediflow -c "create database mediflow_test"
+# then use port 5433 in DATABASE_URL (.env) and .env.test
 ```
 
 Option B, local Postgres:
@@ -56,8 +66,8 @@ Copy `.env.example` (added in Roadmap B0.6) to `.env` and fill it in. Today the 
 ## 4. Migrate and seed
 
 ```bash
-npm run db:migrate               # (script added in A0.2; today: npx tsx src/server/db/migrate.ts)
-npx tsx scripts/setup-db.ts      # creates tenant "Apollo Pharmacy", login admin@apollo.com / admin123
+npm run db:migrate
+npm run db:seed                  # creates tenant "Apollo Pharmacy", login admin@apollo.com / admin123
 npx tsx scripts/seed-dataset.ts  # loads the Indian medicine dataset (needs the dataset — see below)
 npx tsx scripts/generate-stock.ts
 ```
@@ -74,7 +84,16 @@ npm run dev                      # http://localhost:3000
 
 Log in with `admin@apollo.com` / `admin123`, or register a new pharmacy at `/register`.
 
-## 6. Before every push
+## 6. Tests
+
+```bash
+cp .env.test.example .env.test   # DATABASE_URL must point at a database whose name contains "test"
+npm test
+```
+
+See [09-testing-strategy.md](09-testing-strategy.md).
+
+## 7. Before every push
 
 ```bash
 npm run typecheck && npm test && npm run lint
@@ -87,7 +106,7 @@ CI runs the same commands plus `npm run build`.
 | Symptom | Cause / fix |
 |---|---|
 | `❌ Invalid environment variables` at boot | `DATABASE_URL` is missing or not a URL |
-| `relation "xyz" does not exist` | Your DB is behind the migrations. Run `npm run db:migrate`. If the DB was made with `push`, recreate it (04-database.md). |
+| `relation "xyz" does not exist` | Your DB is behind the migrations. Run `npm run db:migrate`, or `npm run db:reset` to rebuild a local DB from scratch. |
 | `extension "pg_trgm" is not available` | Install `postgresql-contrib` (Debian/Ubuntu) or use the Docker image |
 | Redirect loop to `/login` | Stale cookie for a deleted session. Clear cookies for localhost. |
 | AI assistant returns 401 | Your session has no store. Log in again after the tenant has a store. |
