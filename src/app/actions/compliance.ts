@@ -253,6 +253,11 @@ export async function createPrescription(data: {
     return { error: "At least one prescribed medicine item is required" };
   }
 
+  const todayStr = new Date().toISOString().slice(0, 10);
+  if (data.validUntil && data.validUntil < todayStr) {
+    return { error: `Prescription validity date (${data.validUntil}) cannot be in the past` };
+  }
+
   try {
     const rxId = await db.transaction(async (tx) => {
       const [insertedRx] = await tx
@@ -371,4 +376,38 @@ export async function exportRegisterCsvData(params: {
   ].join("\r\n");
 
   return { success: true, csvContent };
+}
+
+/**
+ * Cancels a prescription without deletion (B1.4 statutory audit trail preservation).
+ */
+export async function cancelPrescription(prescriptionId: string, reason?: string) {
+  const { session } = await requireAuth();
+
+  const [rx] = await db
+    .select()
+    .from(schema.prescriptions)
+    .where(
+      and(
+        eq(schema.prescriptions.id, prescriptionId),
+        eq(schema.prescriptions.tenantId, session.tenantId)
+      )
+    );
+
+  if (!rx) return { error: "Prescription not found" };
+  if (rx.status === "cancelled") return { error: "Prescription is already cancelled" };
+
+  await db
+    .update(schema.prescriptions)
+    .set({
+      status: "cancelled",
+      notes: reason
+        ? `${rx.notes ? rx.notes + " | " : ""}Cancelled: ${reason.trim()}`
+        : rx.notes,
+      updatedAt: new Date(),
+    })
+    .where(eq(schema.prescriptions.id, prescriptionId));
+
+  revalidatePath("/dashboard/compliance/prescriptions");
+  return { success: true };
 }

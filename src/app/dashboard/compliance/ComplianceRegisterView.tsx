@@ -16,6 +16,7 @@ import {
   Building,
   CheckCircle2,
   Clock,
+  Printer,
 } from "lucide-react";
 import { PageHeader, StatCard, EmptyState } from "@/app/components/ui";
 import { exportRegisterCsvData, getDispensingLogs } from "@/app/actions/compliance";
@@ -197,12 +198,21 @@ export function ComplianceRegisterView({
             <button
               onClick={handleExportCsv}
               disabled={isExporting}
-              className="btn btn-primary text-[13px] flex items-center gap-1.5"
+              className="btn btn-secondary text-[13px] flex items-center gap-1.5"
               title="Download statutory inspection CSV format required by State Drug Control Administration"
             >
               <Download className="h-4 w-4" />
-              {isExporting ? "Generating CSV..." : "Export Statutory CSV"}
+              {isExporting ? "Generating CSV..." : "Export CSV"}
             </button>
+            <Link
+              href={`/dashboard/compliance/${(activeTab === "all" ? "schedule-h1" : activeTab).replace("_", "-")}/print${dateFrom || dateTo ? `?dateFrom=${dateFrom}&dateTo=${dateTo}` : ""}`}
+              target="_blank"
+              className="btn btn-primary text-[13px] flex items-center gap-1.5"
+              title="Open inspector-ready printable statutory register"
+            >
+              <Printer className="h-4 w-4" />
+              Print Register
+            </Link>
           </div>
         }
       />
