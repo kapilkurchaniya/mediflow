@@ -1,6 +1,12 @@
 import { schema } from "@/server/db";
 import { eq, and, desc, gte, lte, ilike, or, sql } from "drizzle-orm";
 import type { Tx, DbOrTx } from "@/server/db";
+import {
+  MIN_REGISTER_RETENTION_YEARS,
+  H1_REGISTER_RETENTION_YEARS,
+  NARCOTIC_REGISTER_RETENTION_YEARS,
+  PRESCRIPTION_REQUIRED_SCHEDULES,
+} from "@/lib/regulatory";
 
 export type StatutoryRegisterType =
   | "schedule_h"
@@ -26,12 +32,12 @@ export const SCHEDULE_RULES: Record<string, ScheduleComplianceRule> = {
   H: {
     schedule: "H",
     isControlled: true,
-    rxRequired: true,
+    rxRequired: PRESCRIPTION_REQUIRED_SCHEDULES.includes("H"),
     statutoryRegister: "schedule_h",
     requiresDoctorReg: true,
     requiresPatientAddress: false,
     requiresDuplicateRx: false,
-    retentionYears: 2,
+    retentionYears: MIN_REGISTER_RETENTION_YEARS,
     label: "Schedule H",
     badgeColor: "amber",
     description: "Prescription-only drug. Dispensing record required with prescriber details (D&C Rules, Rule 65).",
@@ -39,12 +45,12 @@ export const SCHEDULE_RULES: Record<string, ScheduleComplianceRule> = {
   H1: {
     schedule: "H1",
     isControlled: true,
-    rxRequired: true,
+    rxRequired: PRESCRIPTION_REQUIRED_SCHEDULES.includes("H1"),
     statutoryRegister: "schedule_h1",
     requiresDoctorReg: true,
     requiresPatientAddress: true,
     requiresDuplicateRx: false,
-    retentionYears: 3,
+    retentionYears: H1_REGISTER_RETENTION_YEARS,
     label: "Schedule H1",
     badgeColor: "rose",
     description: "Third-generation cephalosporins, anti-TB, & psychotropics. Mandatory dedicated Schedule H1 register preserved for 3 years.",
@@ -52,12 +58,12 @@ export const SCHEDULE_RULES: Record<string, ScheduleComplianceRule> = {
   X: {
     schedule: "X",
     isControlled: true,
-    rxRequired: true,
+    rxRequired: PRESCRIPTION_REQUIRED_SCHEDULES.includes("X"),
     statutoryRegister: "schedule_x",
     requiresDoctorReg: true,
     requiresPatientAddress: true,
     requiresDuplicateRx: true,
-    retentionYears: 2,
+    retentionYears: MIN_REGISTER_RETENTION_YEARS,
     label: "Schedule X",
     badgeColor: "purple",
     description: "Habit-forming psychotropics. Requires duplicate prescription, separate register, and verified ID.",
@@ -70,7 +76,7 @@ export const SCHEDULE_RULES: Record<string, ScheduleComplianceRule> = {
     requiresDoctorReg: true,
     requiresPatientAddress: true,
     requiresDuplicateRx: true,
-    retentionYears: 5,
+    retentionYears: NARCOTIC_REGISTER_RETENTION_YEARS,
     label: "Narcotics / NDPS",
     badgeColor: "red",
     description: "NDPS Act regulated. Strict daily opening-closing balance register, doctor license verification, 5-year retention.",
