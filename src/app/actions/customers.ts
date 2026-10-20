@@ -4,6 +4,7 @@ import { db, schema } from "@/server/db";
 import { eq, ilike, and, desc, or } from "drizzle-orm";
 import { getCurrentSession, requireAuth } from "@/server/auth";
 import { revalidatePath } from "next/cache";
+import { extractStateCodeFromGstin } from "@/server/domain/gst";
 
 export async function getCustomers(searchQuery?: string, limit = 50) {
   const { session } = await requireAuth();
@@ -60,6 +61,8 @@ export async function createCustomer(formData: FormData) {
   const email = formData.get("email") as string;
   const address = formData.get("address") as string;
   const gstin = formData.get("gstin") as string;
+  const rawStateCode = formData.get("stateCode") as string;
+  const stateCode = (gstin ? extractStateCodeFromGstin(gstin) : null) || rawStateCode || null;
   const creditLimitStr = formData.get("creditLimit") as string;
   const notes = formData.get("notes") as string;
 
@@ -76,6 +79,7 @@ export async function createCustomer(formData: FormData) {
       email: email || null,
       address: address || null,
       gstin: gstin || null,
+      stateCode: stateCode || null,
       creditLimit,
       notes: notes || null,
       isActive: true,
@@ -96,6 +100,8 @@ export async function updateCustomer(id: string, formData: FormData) {
   const email = formData.get("email") as string;
   const address = formData.get("address") as string;
   const gstin = formData.get("gstin") as string;
+  const rawStateCode = formData.get("stateCode") as string;
+  const stateCode = (gstin ? extractStateCodeFromGstin(gstin) : null) || rawStateCode || null;
   const creditLimitStr = formData.get("creditLimit") as string;
   const notes = formData.get("notes") as string;
   const isActive = formData.get("isActive") === "on";
@@ -113,6 +119,7 @@ export async function updateCustomer(id: string, formData: FormData) {
         email: email || null,
         address: address || null,
         gstin: gstin || null,
+        stateCode: stateCode || null,
         creditLimit,
         notes: notes || null,
         isActive,

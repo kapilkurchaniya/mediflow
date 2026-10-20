@@ -1,6 +1,10 @@
 import { schema } from "@/server/db";
 import { eq, and, desc, gte, lte, sql, inArray } from "drizzle-orm";
 import type { DbOrTx } from "@/server/db";
+import {
+  B2CL_THRESHOLD_PAISE,
+  DEFAULT_GST_RATE_BP,
+} from "@/lib/regulatory";
 
 export const GST_STATE_CODES: Record<string, string> = {
   "01": "Jammu & Kashmir",
@@ -54,10 +58,85 @@ export function extractStateCodeFromGstin(gstin?: string | null): string | null 
   return /^\d{2}$/.test(prefix) ? prefix : null;
 }
 
+const GSTIN_ALPHABET = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+
+/**
+ * Computes official mod-36 Luhn check digit for a 14-char GSTIN prefix.
+ */
+export function computeGstinCheckDigit(gstin14: string): string {
+  let sum = 0;
+  for (let i = 0; i < 14; i++) {
+    const val = GSTIN_ALPHABET.indexOf(gstin14[i]!);
+    if (val === -1) return "";
+    const factor = i % 2 === 0 ? 1 : 2;
+    const prod = val * factor;
+    sum += Math.floor(prod / 36) + (prod % 36);
+  }
+  const checkCode = (36 - (sum % 36)) % 36;
+  return GSTIN_ALPHABET[checkCode]!;
+}
+
+/**
+ * Validates a GSTIN string against the 15-character standard format
+ * and verifies the official mod-36 checksum digit.
+ */
 export function isValidGstin(gstin?: string | null): boolean {
   if (!gstin) return false;
+  const clean = gstin.trim().toUpperCase();
   const regex = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/;
-  return regex.test(gstin.trim().toUpperCase());
+  if (!regex.test(clean)) return false;
+  return computeGstinCheckDigit(clean.slice(0, 14)) === clean[14];
+}
+
+export interface TaxContext {
+  supplyType: "B2B" | "B2C";
+  placeOfSupply: string;
+  isInterState: boolean;
+}
+
+/**
+ * Pure function: decides place of supply & inter-state status for a sale (B1.2).
+ *
+ * Rules:
+ * - If the customer has a valid GSTIN:
+ *     - supplyType: "B2B"
+ *     - placeOfSupply: GSTIN's first 2 digits
+ *     - isInterState: differs from the store's state code
+ * - Otherwise (no GSTIN or invalid GSTIN):
+ *     - supplyType: "B2C" (counter sale)
+ *     - placeOfSupply: store's state code
+ *     - isInterState: false (counter sale is always intra-state)
+ */
+export function determineTaxContext(input: {
+  storeStateCode: string;
+  storeGstin?: string | null;
+  customerGstin?: string | null;
+  customerStateCode?: string | null;
+}): TaxContext {
+  const storeState = (
+    input.storeStateCode ||
+    (input.storeGstin ? extractStateCodeFromGstin(input.storeGstin) : null) ||
+    "27"
+  ).padStart(2, "0");
+
+  const cleanGstin = input.customerGstin?.trim().toUpperCase();
+  if (cleanGstin && isValidGstin(cleanGstin)) {
+    const customerState =
+      extractStateCodeFromGstin(cleanGstin) ||
+      input.customerStateCode?.padStart(2, "0") ||
+      storeState;
+    return {
+      supplyType: "B2B",
+      placeOfSupply: customerState,
+      isInterState: customerState !== storeState,
+    };
+  }
+
+  return {
+    supplyType: "B2C",
+    placeOfSupply: storeState,
+    isInterState: false,
+  };
 }
 
 /**
@@ -87,7 +166,7 @@ export function determineSupplyType(params: {
   const total = params.totalAmountPaise ?? 0;
 
   // ₹2,50,000 = 25,000,000 paise
-  if (isInterState && total > 25000000) {
+  if (isInterState && total > B2CL_THRESHOLD_PAISE) {
     return "B2CL";
   }
 
@@ -531,7 +610,7 @@ export async function buildGstr1Data(
     const pos = doc.placeOfSupply || "27-Maharashtra";
     const existing = b2csMap.get(pos) || {
       placeOfSupply: pos,
-      taxRateBp: 1200, // typical 12% pharma
+      taxRateBp: DEFAULT_GST_RATE_BP,
       taxableAmount: 0,
       cgst: 0,
       sgst: 0,
