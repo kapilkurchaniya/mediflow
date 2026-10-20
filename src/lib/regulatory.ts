@@ -89,4 +89,5 @@ export const DEFAULT_LOYALTY_EARN_RATE = 10; // paise per point
  * the floor for most schedules, 5 years for narcotics/X).
  */
 export const MIN_REGISTER_RETENTION_YEARS = 2;
+export const H1_REGISTER_RETENTION_YEARS = 3;
 export const NARCOTIC_REGISTER_RETENTION_YEARS = 5;

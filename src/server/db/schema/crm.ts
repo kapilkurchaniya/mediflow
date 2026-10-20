@@ -39,6 +39,7 @@ export const customers = pgTable(
     email: text("email"),
     address: text("address"),
     gstin: text("gstin"),
+    stateCode: text("state_code"),
     groupId: uuid("group_id").references(() => customerGroups.id),
     creditLimit: money("credit_limit"),
     openingBalance: money("opening_balance"),
