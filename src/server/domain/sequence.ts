@@ -1,5 +1,7 @@
 import { schema } from "@/server/db";
 import { sql } from "drizzle-orm";
+import { DomainError } from "@/server/errors";
+import { MAX_INVOICE_NO_LENGTH } from "@/lib/regulatory";
 import type { Tx } from "@/server/db";
 
 export async function nextDocNumber(
@@ -7,9 +9,10 @@ export async function nextDocNumber(
   tenantId: string,
   storeId: string,
   docType: string,
-  prefix: string = "INV"
+  prefix: string = "INV",
+  now: Date = new Date()
 ): Promise<string> {
-  const date = new Date();
+  const date = now;
   const year = date.getFullYear();
   const month = date.getMonth() + 1;
   const fiscalYear = month >= 4 ? `${year}-${year + 1}` : `${year - 1}-${year}`;
@@ -39,5 +42,14 @@ export async function nextDocNumber(
   const numStr = currentVal.toString().padStart(6, "0");
   const fyShort = fiscalYear.slice(2, 4) + "-" + fiscalYear.slice(7, 9);
   
-  return `${prefix}/${fyShort}/${numStr}`;
+  const docNo = `${prefix}/${fyShort}/${numStr}`;
+  if (docType === "sale" && docNo.length > MAX_INVOICE_NO_LENGTH) {
+    // GST Rule 46(b): an invoice number may not exceed 16 characters. Fail the whole sale rather than
+    // issue an invalid invoice (the surrounding transaction rolls back, so no serial is burned).
+    throw new DomainError(
+      "INVOICE_NO_TOO_LONG",
+      `Invoice number "${docNo}" is longer than the ${MAX_INVOICE_NO_LENGTH} characters GST allows. Shorten the bill prefix in Settings.`,
+    );
+  }
+  return docNo;
 }

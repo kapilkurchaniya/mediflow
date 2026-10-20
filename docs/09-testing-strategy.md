@@ -12,45 +12,44 @@ There are no tests today. This document defines what to test first, because a ph
 
 Next.js's docs (`node_modules/next/dist/docs/01-app/02-guides/testing/vitest.md`) note that Vitest **doesn't support async Server Components**. Test those through E2E, and keep logic out of them anyway.
 
-## Setup (Roadmap A0.4)
-
-Files to add:
+## Setup (done in Roadmap A0.4)
 
 ```
-vitest.config.ts              # alias @ → src, environment node, setupFiles
+vitest.config.mts             # alias @ -> src, server-only -> empty module, globalSetup + setupFiles
 tests/
 ├── setup/
-│   ├── db.ts                 # creates a fresh schema per test file, runs migrations, exports `testDb`
-│   └── factories.ts          # makeTenant(), makeStore(), makeMedicine(), makeBatch(), makeUser({ role })
-├── unit/
-│   └── money.test.ts
-└── integration/
-    └── stock.test.ts
-docker-compose.yml            # db service for local integration tests
-.env.test                     # DATABASE_URL=postgres://mediflow:mediflow@localhost:5432/mediflow_test
+│   ├── global.ts             # once per run: build a migrated TEMPLATE database from ./drizzle
+│   ├── env.ts                # loads .env.test; refuses a database whose name lacks "test"/"ci"
+│   ├── urls.ts               # derives template / per-file database URLs from DATABASE_URL
+│   ├── db.ts                 # createTestDb(): copy the template into a private database for one test file
+│   ├── factories.ts          # makeTenant, makeStore, makeUser, makeMedicine, makeBatch, makeCustomer, makeSupplier, makeWorld
+│   └── empty.ts
+├── unit/money.test.ts
+└── integration/{stock,sequence}.test.ts
+docker-compose.yml            # local Postgres 16 with databases `mediflow` and `mediflow_test`
+.env.test.example             # copy to .env.test
 ```
 
-`vitest.config.ts` sketch:
+**How isolation works.** `global.ts` creates `<db>_tpl`, runs every migration into it, and closes all connections. Each test file calls `createTestDb()`, which runs `CREATE DATABASE <db>_<random> TEMPLATE <db>_tpl` (about 100 ms) and returns a Drizzle instance on a pool for that private database. `cleanup()` in `afterAll` drops it. Files therefore run in parallel and never need table truncation.
+
+*Why not a schema per file?* The generated migrations hard-code `"public"."tenants"` in foreign keys, so they cannot be replayed into another schema. A database per file avoids rewriting migration SQL.
+
+Writing an integration test:
 
 ```ts
-import { defineConfig } from "vitest/config";
-import path from "node:path";
+let t: Awaited<ReturnType<typeof createTestDb>>;
+beforeAll(async () => { t = await createTestDb(); });
+afterAll(async () => { await t.cleanup(); });
 
-export default defineConfig({
-  resolve: { alias: { "@": path.resolve(__dirname, "src") } },
-  test: {
-    environment: "node",
-    include: ["tests/**/*.test.ts", "src/**/*.test.ts"],
-    setupFiles: ["tests/setup/env.ts"],
-    pool: "forks",              // isolated processes; each integration file gets its own schema
-    testTimeout: 20_000,
-  },
+it("...", async () => {
+  const { tenant, store, user, medicine } = await makeWorld(t.db);
+  await t.db.transaction((tx) => someDomainFunction(tx, ...));
 });
 ```
 
-Isolation approach for DB tests: each test file runs `CREATE SCHEMA test_<random>`, sets `search_path`, runs migrations into it, and drops it afterwards. That's fast, parallel-safe and needs no truncation logic.
+Domain functions take a `tx`, so tests pass their own database. Anything that imports `@/server/db` directly (the app singleton) would hit `DATABASE_URL` instead; extract such logic into a function that takes `tx` before testing it.
 
-`server-only` imports throw outside Next.js. In `vitest.config.ts` alias `server-only` to an empty module: `alias: { "server-only": path.resolve(__dirname, "tests/setup/empty.ts") }`.
+Run: `npm test` (all), `npx vitest run tests/unit` (no database needed), `npx vitest tests/integration/stock.test.ts` (watch one file).
 
 ## Must-have tests (write them as the roadmap touches each area)
 

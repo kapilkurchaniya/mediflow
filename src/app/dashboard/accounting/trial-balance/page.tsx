@@ -6,6 +6,7 @@ import { ReportShell } from "@/app/components/ReportShell";
 import { StatCard, EmptyState } from "@/app/components/ui";
 import { formatINR } from "@/lib/format";
 import { Scale, CheckCircle2, AlertTriangle, ArrowRightLeft } from "lucide-react";
+import { requirePagePermission } from "@/server/rbac";
 
 export const metadata = {
   title: "Trial Balance | MediFlow Accounting",
@@ -17,6 +18,7 @@ export default async function TrialBalancePage({
 }: {
   searchParams: Promise<{ range?: string; from?: string; to?: string }>;
 }) {
+  await requirePagePermission("accounting.view");
   const params = await searchParams;
   const dateRange = resolveDateRange({
     range: params.range,

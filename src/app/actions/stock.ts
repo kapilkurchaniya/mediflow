@@ -2,8 +2,8 @@
 
 import { db, schema } from "@/server/db";
 import { eq, and, desc, sql, lte } from "drizzle-orm";
-import { getCurrentSession, requireAuth } from "@/server/auth";
 import { recordStockMovement } from "@/server/domain/stock";
+import { requirePermission, checkPermission } from "@/server/rbac";
 import { revalidatePath } from "next/cache";
 import { addDays, format } from "date-fns";
 
@@ -16,7 +16,7 @@ export async function getBatches(
       }
     | boolean
 ) {
-  const { session, user } = await requireAuth();
+  const ctx = await requirePermission("inventory.view");
 
   const isBool = typeof opts === "boolean";
   const nearExpiryOnly = isBool ? opts : Boolean(opts?.nearExpiryOnly);
@@ -26,8 +26,8 @@ export async function getBatches(
   const ninetyDaysFromNow = nearExpiryOnly ? format(addDays(new Date(), 90), "yyyy-MM-dd") : undefined;
 
   const conditions = [
-    eq(schema.batches.tenantId, session.tenantId),
-    eq(schema.batches.storeId, session.storeId),
+    eq(schema.batches.tenantId, ctx.tenantId),
+    eq(schema.batches.storeId, ctx.storeId),
   ];
 
   if (nearExpiryOnly && ninetyDaysFromNow) {
@@ -67,7 +67,9 @@ const openingStockSchema = z.object({
 });
 
 export async function addOpeningStock(formData: FormData) {
-  const { session, user } = await requireAuth();
+  const auth = await checkPermission("inventory.adjust");
+  if (!auth.ok) return { error: auth.error };
+  const ctx = auth.ctx;
 
   const parsed = openingStockSchema.safeParse(Object.fromEntries(formData.entries()));
   
@@ -88,7 +90,7 @@ export async function addOpeningStock(formData: FormData) {
         .from(schema.batches)
         .where(
           and(
-            eq(schema.batches.storeId, session.storeId),
+            eq(schema.batches.storeId, ctx.storeId),
             eq(schema.batches.medicineId, medicineId),
             eq(schema.batches.batchNo, batchNo)
           )
@@ -105,8 +107,8 @@ export async function addOpeningStock(formData: FormData) {
         const [newBatch] = await tx
           .insert(schema.batches)
           .values({
-            tenantId: session.tenantId,
-            storeId: session.storeId,
+            tenantId: ctx.tenantId,
+            storeId: ctx.storeId,
             medicineId,
             batchNo,
             expiryDate,
@@ -124,15 +126,15 @@ export async function addOpeningStock(formData: FormData) {
       // Record the immutable stock movement
       await recordStockMovement({
         tx,
-        tenantId: session.tenantId,
-        storeId: session.storeId,
+        tenantId: ctx.tenantId,
+        storeId: ctx.storeId,
         batchId,
         medicineId,
         type: "opening",
         qtyChange: qty,
         unitCost: purchaseRate,
         note: "Opening stock entry",
-        userId: user.id,
+        userId: ctx.userId,
       });
     });
 
@@ -151,7 +153,9 @@ const adjustBatchStockSchema = z.object({
 });
 
 export async function adjustBatchStock(formData: FormData) {
-  const { session, user } = await requireAuth();
+  const auth = await checkPermission("inventory.adjust");
+  if (!auth.ok) return { error: auth.error };
+  const ctx = auth.ctx;
 
   const parsed = adjustBatchStockSchema.safeParse(Object.fromEntries(formData.entries()));
   if (!parsed.success) {
@@ -168,25 +172,25 @@ export async function adjustBatchStock(formData: FormData) {
 
       await recordStockMovement({
         tx,
-        tenantId: session.tenantId,
-        storeId: session.storeId,
+        tenantId: ctx.tenantId,
+        storeId: ctx.storeId,
         batchId,
         medicineId: batch.medicineId,
         type: reason,
         qtyChange,
         note: note || `Manual ${reason}`,
-        userId: user.id,
+        userId: ctx.userId,
       });
 
       // Optionally record in stock_adjustments for easier querying of losses
       await tx.insert(schema.stockAdjustments).values({
-        tenantId: session.tenantId,
-        storeId: session.storeId,
+        tenantId: ctx.tenantId,
+        storeId: ctx.storeId,
         batchId,
         qtyChange,
         kind: reason,
         reason: note || `Manual ${reason}`,
-        userId: user.id,
+        userId: ctx.userId,
       });
     });
 

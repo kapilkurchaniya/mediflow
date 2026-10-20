@@ -14,6 +14,7 @@ import {
   Loader2,
 } from "lucide-react";
 import { createRack, updateRack, deleteRack } from "@/app/actions/racks";
+import { actionError } from "@/lib/action-result";
 
 export interface RackItem {
   id: string;
@@ -67,33 +68,35 @@ export function RacksListClient({ initialRacks }: { initialRacks: RackItem[] }) 
 
     try {
       if (editId) {
-        const res = await updateRack(editId, { code, name, description });
-        if (res.error) {
-          setError(res.error);
-        } else if (res.rack) {
+        const res = await updateRack({ id: editId, code, name, description });
+        const err = actionError(res);
+        if (err) {
+          setError(err);
+        } else if (res?.data) {
+          const rack = res.data.rack;
           setRacks((prev) =>
             prev.map((r) =>
-              r.id === editId
-                ? { ...r, code: res.rack.code, name: res.rack.name, description: res.rack.description }
-                : r
+              r.id === editId ? { ...r, code: rack.code, name: rack.name, description: rack.description } : r
             )
           );
           setModalOpen(false);
         }
       } else {
         const res = await createRack({ code, name, description });
-        if (res.error) {
-          setError(res.error);
-        } else if (res.rack) {
+        const err = actionError(res);
+        if (err) {
+          setError(err);
+        } else if (res?.data) {
+          const rack = res.data.rack;
           setRacks((prev) => [
             ...prev,
             {
-              id: res.rack.id,
-              code: res.rack.code,
-              name: res.rack.name,
-              description: res.rack.description,
-              isActive: res.rack.isActive,
-              createdAt: res.rack.createdAt,
+              id: rack.id,
+              code: rack.code,
+              name: rack.name,
+              description: rack.description,
+              isActive: rack.isActive,
+              createdAt: rack.createdAt,
               medicineCount: 0,
             },
           ]);
@@ -109,8 +112,13 @@ export function RacksListClient({ initialRacks }: { initialRacks: RackItem[] }) 
 
   async function handleDelete(id: string, code: string) {
     if (!confirm(`Are you sure you want to delete rack '${code}'? Any medicines assigned will be unlinked.`)) return;
+    const res = await deleteRack({ id });
+    const err = actionError(res);
+    if (err) {
+      alert(err);
+      return;
+    }
     setRacks((prev) => prev.filter((r) => r.id !== id));
-    await deleteRack(id);
   }
 
   return (
@@ -155,7 +163,7 @@ export function RacksListClient({ initialRacks }: { initialRacks: RackItem[] }) 
               {filtered.length === 0 ? (
                 <tr>
                   <td colSpan={5} className="text-center py-10 text-ink-400">
-                    No racks configured yet. Click "+ Add Rack / Shelf" to organize your pharmacy storage.
+                    No racks configured yet. Click &quot;+ Add Rack / Shelf&quot; to organize your pharmacy storage.
                   </td>
                 </tr>
               ) : (

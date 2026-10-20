@@ -2,9 +2,9 @@
 
 import { db, schema } from "@/server/db";
 import { eq, and, desc, gt, gte, lte, ilike, or, sql, inArray } from "drizzle-orm";
-import { getCurrentSession, requireAuth } from "@/server/auth";
 import { recordStockMovement } from "@/server/domain/stock";
 import { nextDocNumber } from "@/server/domain/sequence";
+import { can, checkPermission, requirePermission } from "@/server/rbac";
 import { revalidatePath } from "next/cache";
 import { sendWhatsAppReceipt } from "@/server/whatsapp";
 import { computeSaleTotals, type SaleLineInput } from "@/lib/money";
@@ -19,11 +19,11 @@ import { createGstDocumentFromSale } from "@/server/domain/gst";
 import { LoyaltyService } from "@/server/domain/loyalty";
 
 export async function getSales(dateFrom?: string | null, dateTo?: string | null) {
-  const { session, user } = await requireAuth();
+  const ctx = await requirePermission("sale.view");
 
   const conditions = [
-    eq(schema.sales.tenantId, session.tenantId),
-    eq(schema.sales.storeId, session.storeId),
+    eq(schema.sales.tenantId, ctx.tenantId),
+    eq(schema.sales.storeId, ctx.storeId),
   ];
 
   // Apply date filters if provided
@@ -47,7 +47,7 @@ export async function getSales(dateFrom?: string | null, dateTo?: string | null)
 
 // POS Search: Returns medicines with their nearest expiry batches that have stock
 export async function searchPosItems(query: string) {
-  const { session, user } = await requireAuth();
+  const ctx = await requirePermission("sale.create");
   
   if (!query || query.length < 2) return [];
 
@@ -65,7 +65,7 @@ export async function searchPosItems(query: string) {
     .leftJoin(schema.racks, eq(schema.medicines.rackId, schema.racks.id))
     .where(
       and(
-        eq(schema.medicines.tenantId, session.tenantId),
+        eq(schema.medicines.tenantId, ctx.tenantId),
         eq(schema.medicines.isActive, true),
         or(
           ilike(schema.medicines.name, `%${lowerQuery}%`),
@@ -87,7 +87,7 @@ export async function searchPosItems(query: string) {
     .from(schema.batches)
     .where(
       and(
-        eq(schema.batches.storeId, session.storeId),
+        eq(schema.batches.storeId, ctx.storeId),
         gt(schema.batches.qtyOnHand, 0),
         gt(schema.batches.expiryDate, todayStr),
         inArray(schema.batches.medicineId, medicineIds)
@@ -113,14 +113,14 @@ export async function searchPosItems(query: string) {
 
 // Find substitutes with identical generic composition in stock
 export async function findSubstitutes(genericName: string, excludeMedicineId?: string) {
-  const { session } = await requireAuth();
+  const ctx = await requirePermission("sale.create");
   if (!genericName || genericName.trim().length < 2) return [];
 
   const todayStr = format(new Date(), 'yyyy-MM-dd');
   const cleanGeneric = genericName.trim().toLowerCase();
 
   const conditions = [
-    eq(schema.medicines.tenantId, session.tenantId),
+    eq(schema.medicines.tenantId, ctx.tenantId),
     eq(schema.medicines.isActive, true),
     ilike(schema.medicines.genericName, `%${cleanGeneric}%`),
   ];
@@ -142,7 +142,7 @@ export async function findSubstitutes(genericName: string, excludeMedicineId?: s
     .from(schema.batches)
     .where(
       and(
-        eq(schema.batches.storeId, session.storeId),
+        eq(schema.batches.storeId, ctx.storeId),
         gt(schema.batches.qtyOnHand, 0),
         gt(schema.batches.expiryDate, todayStr),
         inArray(schema.batches.medicineId, medicineIds)
@@ -193,9 +193,28 @@ export async function createSaleInvoice(
   complianceDetails?: ComplianceDetailsInput,
   medicalRepId?: string
 ) {
-  const { session, user } = await requireAuth();
+  const auth = await checkPermission("sale.create");
+  if (!auth.ok) return { error: auth.error };
+  const ctx = auth.ctx;
 
   if (items.length === 0) return { error: "No items to bill" };
+
+  // Never trust numbers from the browser: a negative discount would add to the bill, one above 100% would make it negative.
+  for (const i of items) {
+    if (!Number.isInteger(i.qty) || i.qty <= 0) return { error: "Quantity must be a whole number above zero." };
+    if (!Number.isInteger(i.discountBp) || i.discountBp < 0 || i.discountBp > 10000) {
+      return { error: "Discount must be between 0% and 100%." };
+    }
+  }
+  if (!Number.isInteger(amountPaid) || amountPaid < 0) return { error: "Amount paid must be zero or more." };
+
+  // Optional per-pharmacy discount ceiling (tenants.settings.maxDiscountBp, in basis points; unset = no limit).
+  // Going above it needs the sale.discount_override permission (managers/owners). A settings screen arrives in A3.1.
+  const [tenantRow] = await db.select({ settings: schema.tenants.settings }).from(schema.tenants).where(eq(schema.tenants.id, ctx.tenantId));
+  const maxDiscountBp = Number(tenantRow?.settings?.maxDiscountBp);
+  if (Number.isFinite(maxDiscountBp) && !can(ctx, "sale.discount_override") && items.some((i) => i.discountBp > maxDiscountBp)) {
+    return { error: `Discounts above ${maxDiscountBp / 100}% need a manager's approval (permission "sale.discount_override").` };
+  }
 
   try {
     let customerPhone = "";
@@ -213,7 +232,7 @@ export async function createSaleInvoice(
         .where(
           and(
             eq(schema.customers.id, customerId.trim()),
-            eq(schema.customers.tenantId, session.tenantId) // Tenant isolation fix
+            eq(schema.customers.tenantId, ctx.tenantId) // Tenant isolation fix
           )
         );
       if (customer?.phone) customerPhone = customer.phone;
@@ -225,8 +244,8 @@ export async function createSaleInvoice(
       .from(schema.stores)
       .where(
         and(
-          eq(schema.stores.id, session.storeId),
-          eq(schema.stores.tenantId, session.tenantId)
+          eq(schema.stores.id, ctx.storeId),
+          eq(schema.stores.tenantId, ctx.tenantId)
         )
       );
       
@@ -249,7 +268,7 @@ export async function createSaleInvoice(
         .innerJoin(schema.medicines, eq(schema.batches.medicineId, schema.medicines.id))
         .where(
           and(
-            eq(schema.batches.storeId, session.storeId),
+            eq(schema.batches.storeId, ctx.storeId),
             sql`${schema.batches.id} = ANY(ARRAY[${sql.join(batchIds, sql`, `)}]::uuid[])`
           )
         );
@@ -320,14 +339,14 @@ export async function createSaleInvoice(
       const amountDue = totals.total - amountPaid;
 
       // 2. Generate Invoice Number (gap-free, row-locked)
-      const invoiceNo = await nextDocNumber(tx, session.tenantId, session.storeId, "sale", store.invoicePrefix);
+      const invoiceNo = await nextDocNumber(tx, ctx.tenantId, ctx.storeId, "sale", store.invoicePrefix);
       generatedInvoiceNo = invoiceNo;
       finalTotalAmount = totals.total;
 
       // 3. Create Sale Header
       const [sale] = await tx.insert(schema.sales).values({
-        tenantId: session.tenantId,
-        storeId: session.storeId,
+        tenantId: ctx.tenantId,
+        storeId: ctx.storeId,
         invoiceNo,
         customerId: customerId?.trim() ? customerId.trim() : null,
         medicalRepId: medicalRepId?.trim() || null,
@@ -339,7 +358,7 @@ export async function createSaleInvoice(
         patientAddress: complianceDetails?.patientAddress?.trim() || null,
         prescriptionId: complianceDetails?.prescriptionId || null,
         prescriptionRef: complianceDetails?.prescriptionRef?.trim() || null,
-        pharmacistId: user.id,
+        pharmacistId: ctx.userId,
         grossAmount: totals.gross,
         discountAmount: totals.discount,
         taxableAmount: totals.taxable,
@@ -352,7 +371,7 @@ export async function createSaleInvoice(
         creditAmount: amountDue > 0 ? amountDue : 0,
         status: "completed",
         completedAt: new Date(),
-        createdBy: user.id,
+        createdBy: ctx.userId,
       }).returning({ id: schema.sales.id });
 
       // 4. Process Items & Update Stock
@@ -364,8 +383,8 @@ export async function createSaleInvoice(
         // Decrement physical stock (this locks the batch row)
         await recordStockMovement({
           tx,
-          tenantId: session.tenantId,
-          storeId: session.storeId,
+          tenantId: ctx.tenantId,
+          storeId: ctx.storeId,
           batchId: item.batchId,
           medicineId: item.medicineId,
           type: "sale",
@@ -373,11 +392,11 @@ export async function createSaleInvoice(
           unitCost: item.batch.purchaseRate,
           refType: "sale",
           refId: sale.id,
-          userId: user.id,
+          userId: ctx.userId,
         });
 
         saleItemsToInsert.push({
-          tenantId: session.tenantId,
+          tenantId: ctx.tenantId,
           saleId: sale.id,
           medicineId: item.medicineId,
           batchId: item.batchId,
@@ -411,8 +430,8 @@ export async function createSaleInvoice(
         if (isScheduledDrug(item.medicine.schedule) && insertedSaleItem) {
           await recordDispensingLog({
             tx,
-            tenantId: session.tenantId,
-            storeId: session.storeId,
+            tenantId: ctx.tenantId,
+            storeId: ctx.storeId,
             saleId: sale.id,
             saleItemId: insertedSaleItem.id,
             medicineId: item.medicineId,
@@ -433,9 +452,9 @@ export async function createSaleInvoice(
             prescriptionRef: complianceDetails?.prescriptionRef || null,
             prescriptionDate: complianceDetails?.prescriptionDate || format(new Date(), "yyyy-MM-dd"),
             quantityDispensed: item.qty,
-            pharmacistId: user.id,
-            pharmacistName: user.name,
-            pharmacistRegNo: (user as unknown as { pharmacistRegNo?: string }).pharmacistRegNo || null,
+            pharmacistId: ctx.userId,
+            pharmacistName: ctx.user.name,
+            pharmacistRegNo: ctx.user.pharmacistRegNo || null,
           });
         }
       }
@@ -443,7 +462,7 @@ export async function createSaleInvoice(
       // 5. Record Payment
       if (amountPaid > 0) {
         await tx.insert(schema.salePayments).values({
-          tenantId: session.tenantId,
+          tenantId: ctx.tenantId,
           saleId: sale.id,
           method: paymentMethod,
           amount: amountPaid,
@@ -454,9 +473,9 @@ export async function createSaleInvoice(
       // 6. Post Double-Entry Journal Entry
       await postSaleJournalEntry({
         tx,
-        tenantId: session.tenantId,
-        storeId: session.storeId,
-        userId: user.id,
+        tenantId: ctx.tenantId,
+        storeId: ctx.storeId,
+        userId: ctx.userId,
         saleId: sale.id,
         invoiceNo,
         invoiceDate: new Date(),
@@ -474,27 +493,35 @@ export async function createSaleInvoice(
       });
 
       // 7. Record GST Document
+      // Optional steps run in a SAVEPOINT (nested tx.transaction). A failed SQL statement poisons a
+      // Postgres transaction: catching the JS error is not enough, COMMIT would silently become a
+      // ROLLBACK and the bill would be reported as saved when it is not. The savepoint rolls back
+      // only this step. TODO(B2.1): enqueue a retry in the outbox instead of just logging.
       try {
-        await createGstDocumentFromSale(tx, {
-          saleId: sale.id,
-          tenantId: session.tenantId,
-          storeId: session.storeId,
+        await tx.transaction(async (sp) => {
+          await createGstDocumentFromSale(sp, {
+            saleId: sale.id,
+            tenantId: ctx.tenantId,
+            storeId: ctx.storeId,
+          });
         });
       } catch (gstErr) {
-        console.error("Warning: GST Document auto-creation error:", gstErr);
+        console.error("Warning: GST Document auto-creation failed; sale kept:", gstErr);
       }
 
       // 8. Earn Loyalty Points
       if (customerId?.trim()) {
         try {
-          await LoyaltyService.earnPoints(tx, {
-            tenantId: session.tenantId,
-            customerId: customerId.trim(),
-            saleAmountPaise: finalTotalAmount,
-            saleId: sale.id,
+          await tx.transaction(async (sp) => {
+            await LoyaltyService.earnPoints(sp, {
+              tenantId: ctx.tenantId,
+              customerId: customerId.trim(),
+              saleAmountPaise: finalTotalAmount,
+              saleId: sale.id,
+            });
           });
         } catch (loyaltyErr) {
-          console.error("Warning: Loyalty points earning error:", loyaltyErr);
+          console.error("Warning: Loyalty points earning failed; sale kept:", loyaltyErr);
         }
       }
 
@@ -517,8 +544,8 @@ export async function createSaleInvoice(
 }
 
 export async function getSaleById(id: string) {
-  const { session } = await requireAuth();
-  const [sale] = await db.select().from(schema.sales).where(and(eq(schema.sales.id, id), eq(schema.sales.tenantId, session.tenantId)));
+  const ctx = await requirePermission("sale.view");
+  const [sale] = await db.select().from(schema.sales).where(and(eq(schema.sales.id, id), eq(schema.sales.tenantId, ctx.tenantId)));
   if (!sale) return null;
   const items = await db.select().from(schema.saleItems).where(eq(schema.saleItems.saleId, id));
   const [customer] = sale.customerId ? await db.select().from(schema.customers).where(eq(schema.customers.id, sale.customerId)) : [null];

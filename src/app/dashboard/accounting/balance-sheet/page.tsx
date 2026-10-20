@@ -5,6 +5,7 @@ import { StatCard } from "@/app/components/ui";
 import { formatINR } from "@/lib/format";
 import { Landmark, CheckCircle2, AlertTriangle, ShieldCheck, Wallet } from "lucide-react";
 import { format } from "date-fns";
+import { requirePagePermission } from "@/server/rbac";
 
 export const metadata = {
   title: "Balance Sheet | MediFlow Accounting",
@@ -16,6 +17,7 @@ export default async function BalanceSheetPage({
 }: {
   searchParams: Promise<{ to?: string }>;
 }) {
+  await requirePagePermission("accounting.view");
   const params = await searchParams;
   const asOf = params.to || format(new Date(), "yyyy-MM-dd");
 
@@ -180,7 +182,7 @@ export default async function BalanceSheetPage({
               {/* Equity & Retained Earnings */}
               <div className="space-y-2.5">
                 <h3 className="text-[12.5px] font-semibold text-ink-500 uppercase tracking-wider">
-                  Owners' Equity & Reserves
+                  Owners&apos; Equity & Reserves
                 </h3>
                 <table className="w-full text-[13px]">
                   <tbody>

@@ -5,6 +5,7 @@ import { ArrowLeft, Printer, Receipt } from "lucide-react";
 import Link from "next/link";
 import PrintButton from "./PrintButton";
 import { formatINR } from "@/lib/format";
+import { requirePagePermission } from "@/server/rbac";
 
 export default async function PrintInvoicePage({
   params,
@@ -13,6 +14,7 @@ export default async function PrintInvoicePage({
   params: Promise<{ id: string }>;
   searchParams: Promise<{ format?: string }>;
 }) {
+  await requirePagePermission("sale.view");
   const resolvedParams = await params;
   const { format: printFormat } = await searchParams;
   const isThermal = printFormat === "thermal";

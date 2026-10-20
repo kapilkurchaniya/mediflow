@@ -3,12 +3,14 @@ import { getMedicalReps } from "@/app/actions/medical-reps";
 import { MedicalRepsClient } from "./MedicalRepsClient";
 import Link from "next/link";
 import { BarChart3 } from "lucide-react";
+import { requirePagePermission } from "@/server/rbac";
 
 export const metadata = {
   title: "Medical Representatives — MediFlow",
 };
 
 export default async function MedicalRepsPage() {
+  await requirePagePermission("customer.view");
   const reps = await getMedicalReps();
 
   return (

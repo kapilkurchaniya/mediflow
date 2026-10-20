@@ -1,10 +1,12 @@
 import { PageHeader } from "@/app/components/ui";
 import { getRacks } from "@/app/actions/racks";
+import { requirePagePermission } from "@/server/rbac";
 import { RacksListClient } from "./RacksListClient";
 
 export const dynamic = "force-dynamic";
 
 export default async function RacksPage() {
+  await requirePagePermission("medicine.manage");
   const racks = await getRacks();
 
   return (

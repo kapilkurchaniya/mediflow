@@ -8,6 +8,7 @@ import { DateRangeFilter } from "@/app/components/DateRangeFilter";
 import { resolveDateRange } from "@/lib/date-range";
 
 import { ExportButton } from "@/app/components/ExportButton";
+import { requirePagePermission } from "@/server/rbac";
 
 export const metadata = { title: "Batches & stock" };
 
@@ -25,6 +26,7 @@ export default async function BatchesPage({
 }: {
   searchParams: Promise<{ nearExpiry?: string; range?: string; from?: string; to?: string }>;
 }) {
+  await requirePagePermission("inventory.view");
   const { nearExpiry, range, from, to } = await searchParams;
   const isNearExpiry = nearExpiry === "true";
   const dateRange = resolveDateRange({ range, from, to });

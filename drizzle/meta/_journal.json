@@ -15,6 +15,13 @@
       "when": 1792440592933,
       "tag": "0001_catch_up",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1792482167340,
+      "tag": "0002_gst_default_5pct",
+      "breakpoints": true
     }
   ]
 }

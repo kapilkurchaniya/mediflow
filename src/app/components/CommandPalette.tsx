@@ -4,19 +4,6 @@ import React, { useState, useEffect, useRef, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import {
   Search,
-  LayoutGrid,
-  ScanLine,
-  Receipt,
-  FileInput,
-  Pill,
-  Boxes,
-  Upload,
-  BookOpenText,
-  Truck,
-  Users,
-  Settings,
-  UserPlus,
-  AlertTriangle,
   Sparkles,
   Keyboard,
   Sidebar as SidebarIcon,
@@ -25,6 +12,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { useShell } from "./ShellContext";
+import { visiblePaletteItems } from "./nav";
 import clsx from "clsx";
 
 interface CommandItem {
@@ -43,6 +31,7 @@ export function CommandPalette() {
     setCommandOpen,
     toggleCollapsed,
     setShortcutsOpen,
+    permissions,
   } = useShell();
   const router = useRouter();
   const [query, setQuery] = useState("");
@@ -57,120 +46,18 @@ export function CommandPalette() {
 
   const items: CommandItem[] = useMemo(
     () => [
-      // Navigation
-      {
-        id: "nav-overview",
-        category: "Navigation",
-        label: "Overview",
-        description: "Dashboard KPIs & recent activity",
-        icon: LayoutGrid,
-        action: () => navigateTo("/dashboard"),
-      },
-      {
-        id: "nav-pos",
-        category: "Navigation",
-        label: "New bill (POS Terminal)",
-        description: "High-speed retail counter billing",
-        icon: ScanLine,
-        shortcut: "F2",
-        action: () => navigateTo("/dashboard/sales/pos"),
-      },
-      {
-        id: "nav-sales",
-        category: "Navigation",
-        label: "Sales & invoices",
-        description: "View invoice history & print receipts",
-        icon: Receipt,
-        action: () => navigateTo("/dashboard/sales"),
-      },
-      {
-        id: "nav-purchases",
-        category: "Navigation",
-        label: "Purchases (GRN)",
-        description: "Goods received notes & supplier invoices",
-        icon: FileInput,
-        action: () => navigateTo("/dashboard/purchases"),
-      },
-      {
-        id: "nav-purchase-new",
-        category: "Navigation",
-        label: "Record purchase",
-        description: "Post a new GRN entry",
-        icon: FileInput,
-        action: () => navigateTo("/dashboard/purchases/new"),
-      },
-      {
-        id: "nav-inventory",
-        category: "Navigation",
-        label: "Item master",
-        description: "Drug catalog, salts & HSN codes",
-        icon: Pill,
-        action: () => navigateTo("/dashboard/inventory"),
-      },
-      {
-        id: "nav-batches",
-        category: "Navigation",
-        label: "Batches & stock",
-        description: "Expiry dates, MRP, cost & quantities",
-        icon: Boxes,
-        action: () => navigateTo("/dashboard/inventory/batches"),
-      },
-      {
-        id: "nav-near-expiry",
-        category: "Navigation",
-        label: "Near-expiry batches",
-        description: "Batches expiring within 90 days",
-        icon: AlertTriangle,
-        action: () => navigateTo("/dashboard/inventory/batches?nearExpiry=true"),
-      },
-      {
-        id: "nav-import",
-        category: "Navigation",
-        label: "Bulk import",
-        description: "Upload medicine stock via CSV/Excel",
-        icon: Upload,
-        action: () => navigateTo("/dashboard/inventory/import"),
-      },
-      {
-        id: "nav-accounting",
-        category: "Navigation",
-        label: "Accounting & GST",
-        description: "Day book, ledgers & tax summaries",
-        icon: BookOpenText,
-        action: () => navigateTo("/dashboard/accounting"),
-      },
-      {
-        id: "nav-customers",
-        category: "Navigation",
-        label: "Customers",
-        description: "Directory & outstanding balances",
-        icon: Users,
-        action: () => navigateTo("/dashboard/customers"),
-      },
-      {
-        id: "nav-customer-new",
-        category: "Navigation",
-        label: "Add customer",
-        description: "Register patient or credit account",
-        icon: UserPlus,
-        action: () => navigateTo("/dashboard/customers/new"),
-      },
-      {
-        id: "nav-suppliers",
-        category: "Navigation",
-        label: "Suppliers",
-        description: "Wholesalers & distributors list",
-        icon: Truck,
-        action: () => navigateTo("/dashboard/suppliers"),
-      },
-      {
-        id: "nav-settings",
-        category: "Navigation",
-        label: "Settings",
-        description: "Store profile, GSTIN, printer & bills",
-        icon: Settings,
-        action: () => navigateTo("/dashboard/settings"),
-      },
+      // Navigation: generated from the same config as the sidebar (components/nav)
+      ...visiblePaletteItems(permissions).map(
+        (n): CommandItem => ({
+          id: `nav-${n.href}`,
+          category: "Navigation",
+          label: n.href === "/dashboard/sales/pos" ? "New bill (POS Terminal)" : n.label,
+          description: n.description,
+          icon: n.icon,
+          shortcut: n.shortcut,
+          action: () => navigateTo(n.href),
+        }),
+      ),
 
       // Quick Actions
       {
@@ -214,7 +101,7 @@ export function CommandPalette() {
         },
       },
     ],
-    [router, setCommandOpen, toggleCollapsed, setShortcutsOpen]
+    [router, setCommandOpen, toggleCollapsed, setShortcutsOpen, permissions]
   );
 
   const filteredItems = useMemo(() => {

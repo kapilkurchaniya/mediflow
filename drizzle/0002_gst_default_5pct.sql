@@ -1,0 +1,1 @@
+ALTER TABLE "medicines" ALTER COLUMN "gst_rate_bp" SET DEFAULT 500;

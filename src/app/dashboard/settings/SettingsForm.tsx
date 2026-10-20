@@ -2,6 +2,7 @@
 
 import React, { useState, useTransition } from "react";
 import { updateStoreSettings } from "@/app/actions/settings";
+import { MAX_INVOICE_PREFIX_LENGTH } from "@/lib/invoice-no";
 import { Building2, Save, CheckCircle2, AlertCircle, Loader2 } from "lucide-react";
 
 interface SettingsFormProps {
@@ -133,12 +134,12 @@ export function SettingsForm({ store }: SettingsFormProps) {
               id="invoicePrefix"
               name="invoicePrefix"
               type="text"
-              maxLength={6}
+              maxLength={MAX_INVOICE_PREFIX_LENGTH}
               defaultValue={store.invoicePrefix}
               className="input font-mono uppercase"
-              placeholder="e.g. INV, MED, BILL"
+              placeholder="e.g. INV, MED"
             />
-            <p className="hint">Prepended to counter bills (e.g. INV-00042)</p>
+            <p className="hint">Up to {MAX_INVOICE_PREFIX_LENGTH} letters/digits. Bills look like INV/26-27/000042 (GST allows 16 characters in total).</p>
           </div>
 
           <div className="sm:col-span-2">

@@ -45,3 +45,7 @@ next-env.d.ts
 
 # Local medicine dataset (downloaded by scripts/fetch-dataset.ts)
 scripts/Indian-Medicine-Dataset/
+
+# ...but keep the documented templates
+!.env.example
+!.env.test.example

@@ -2,38 +2,42 @@
 
 These are the patterns reviewers check for. If you have a reason to break one, say why in the PR.
 
-## 1. Server Action shape (after Roadmap A1)
+## 1. Server Action shape (implemented in Roadmap A1.1/A1.2)
 
-Today actions call `requireAuth()` and take loose positional arguments. The target is **one wrapper** that authenticates, authorizes and validates. It's built on `next-safe-action`, which is already a dependency (`src/server/action.ts`).
+Every action is built with `protectedAction(permission)` from `src/server/action.ts` (a thin layer over `next-safe-action`). The reference implementation is **`src/app/actions/racks.ts`**: copy its shape.
 
 ```ts
-// src/app/actions/suppliers.ts
+// src/app/actions/racks.ts (abridged)
 "use server";
 import { z } from "zod";
 import { protectedAction } from "@/server/action";
-import { createSupplier as createSupplierDomain } from "@/server/domain/purchasing/suppliers";
-import { revalidatePath } from "next/cache";
+import { DomainError } from "@/server/errors";
 
-const CreateSupplierInput = z.object({
-  name: z.string().trim().min(2),
-  gstin: z.string().trim().toUpperCase().regex(/^\d{2}[A-Z0-9]{13}$/).optional(),
-  creditDays: z.coerce.number().int().min(0).max(365).default(30),
-});
-
-export const createSupplier = protectedAction("supplier.manage")
-  .inputSchema(CreateSupplierInput)
-  .action(async ({ parsedInput, ctx }) => {
-    const supplier = await createSupplierDomain(ctx, parsedInput); // ctx = { tenantId, storeId, userId, permissions }
-    revalidatePath("/dashboard/suppliers");
-    return { id: supplier.id };
+export const deleteRack = protectedAction("medicine.manage")          // 1. permission checked BEFORE anything runs
+  .inputSchema(z.object({ id: z.string().uuid() }))                   // 2. validated input; bad input never reaches the body
+  .action(async ({ parsedInput: { id }, ctx }) => {                   // 3. ctx = { tenantId, storeId, userId, permissions }
+    await findOwnRack(ctx, id);                                       // 4. every lookup scoped by ctx.tenantId + ctx.storeId
+    ...
+    return { deleted: true };
   });
 ```
 
+Client side: `const res = await deleteRack({ id })`, then `const err = actionError(res)` (from `@/lib/action-result`, returns a message or null) and read `res.data`.
+
 Rules:
 - **Never** accept `tenantId`, `storeId`, `userId`, prices or totals from the client. They come from `ctx` or the DB.
-- Actions stay thin: validate → call domain → revalidate. Business rules live in `src/server/domain/`.
-- Return `{ id }` or small DTOs, never whole DB rows with internal columns, to the client. Do not return error strings that leak SQL.
-- Reads in Server Components use the same checks via `requirePermission()` directly. Pages don't need the action wrapper.
+- Throw `DomainError(code, message)` for expected failures (not found, duplicate, insufficient stock): the message is shown to the user. Any other exception is logged and shown as a generic message.
+- Actions stay thin: validate, call domain code, revalidate. Business rules live in `src/server/domain/`.
+- Return small objects (`{ rack }`, `{ id }`), never whole rows with internal columns you do not need.
+- **Reads** used by Server Components or client effects stay plain async functions that start with `await requirePermission("x.view")`.
+- **Pages** start with `await requirePagePermission("x.view")`: it renders the friendly 403 screen (`src/app/forbidden.tsx`) instead of crashing. It uses Next's experimental `forbidden()` (`experimental.authInterrupts` in `next.config.ts`), isolated in `src/server/rbac.ts` so it is easy to swap.
+- Unique-constraint errors: use `isUniqueViolation(err, "constraint_name")` from `@/server/db/errors`. Drizzle wraps driver errors, so matching on `err.message` does not work.
+- Test an action with `tests/integration/racks-actions.test.ts` as the template (real RBAC, only the session is faked).
+
+### Roles and permissions
+- Permissions are strings (`src/lib/permissions.ts`); code checks permissions, never role names.
+- System roles (owner, manager, pharmacist, cashier, purchase_manager, accountant, auditor) are rows in the database per tenant, generated from `SYSTEM_ROLES` by `seedSystemRoles` (`src/server/roles.ts`). It runs at registration, in `db:seed`, and after every `db:migrate` (so changing a template in code updates every tenant). System roles are authoritative: the database is made to match the template.
+- To add a permission: add the key to `PERMISSIONS`, add it to the right role templates, run `npm run db:migrate`.
 
 ## 2. Domain function shape
 

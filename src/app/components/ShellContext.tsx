@@ -48,6 +48,8 @@ interface ShellContextType {
   storeName: string;
   userName: string;
   userEmail: string;
+  /** Permissions of the signed-in user; the sidebar and command palette hide what they may not use. */
+  permissions: ReadonlySet<string>;
 }
 
 const ShellContext = createContext<ShellContextType | null>(null);
@@ -59,12 +61,15 @@ export function ShellProvider({
   storeName,
   userName,
   userEmail,
+  permissions,
 }: {
   children: React.ReactNode;
   storeName: string;
   userName: string;
   userEmail: string;
+  permissions: readonly string[];
 }) {
+  const permissionSet = React.useMemo(() => new Set(permissions), [permissions]);
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [collapsed, setCollapsedState] = useState(() => {
@@ -173,6 +178,7 @@ export function ShellProvider({
         storeName,
         userName,
         userEmail,
+        permissions: permissionSet,
       }}
     >
       {children}
