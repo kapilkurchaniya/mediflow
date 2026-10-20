@@ -43,7 +43,7 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
-      - name: Lint (strict: paths that are already clean must stay clean)
+      - name: "Lint (strict - paths that are already clean must stay clean)"
         run: npm run lint:strict
 
       - name: Lint (whole repo, informational)
