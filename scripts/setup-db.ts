@@ -1,6 +1,7 @@
 import "dotenv/config";
 import { db, schema } from "../src/server/db/index";
 import bcrypt from "bcryptjs";
+import { seedSystemRoles } from "../src/server/roles";
 
 async function setup() {
   console.log("Setting up default user and tenant...");
@@ -27,19 +28,14 @@ async function setup() {
     passwordHash: hashedPassword,
   }).returning();
 
-  const [role] = await db.insert(schema.roles).values({
-    tenantId: tenant.id,
-    name: "Owner",
-    key: "owner",
-    description: "System Owner"
-  }).returning();
+  const roleIds = await seedSystemRoles(db, tenant.id);
 
-  // 4. Link User to Tenant
+  // 4. Link User to Tenant as Owner
   await db.insert(schema.memberships).values({
     tenantId: tenant.id,
     userId: user.id,
-    roleId: role.id,
-    storeIds: [store.id]
+    roleId: roleIds.owner,
+    storeIds: [store.id],
   });
 
   console.log("Done! You can login with admin@apollo.com / admin123");

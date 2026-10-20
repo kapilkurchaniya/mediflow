@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import { db, schema } from "@/server/db";
 import { eq } from "drizzle-orm";
+import { seedSystemRoles } from "@/server/roles";
 import { hashPassword, verifyPassword, createSession, setSessionCookie, deleteSessionCookie, invalidateSession, getCurrentSession } from "@/server/auth";
 
 export async function loginAction(prevState: { error?: string; success?: boolean } | null, formData: FormData) {
@@ -101,19 +102,12 @@ export async function registerAction(prevState: { error?: string; success?: bool
       stateCode: "00", // Default or ask user later
     }).returning();
 
-    // Create Role and Membership for the Owner
-    const [role] = await tx.insert(schema.roles).values({
-      tenantId: tenant.id,
-      key: "owner",
-      name: "Owner",
-      isSystem: true,
-    }).returning();
-
-    // Give role all permissions (in a real app, populate role_permissions)
+    // Create the system roles (owner, manager, pharmacist, ...) with their permissions, and make this user the Owner
+    const roleIds = await seedSystemRoles(tx, tenant.id);
     await tx.insert(schema.memberships).values({
       tenantId: tenant.id,
       userId: user.id,
-      roleId: role.id,
+      roleId: roleIds.owner,
       allStores: true,
     });
 

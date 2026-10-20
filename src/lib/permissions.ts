@@ -36,6 +36,11 @@ export const PERMISSIONS = {
   "settings.manage": "Manage business settings & stores",
   "user.manage": "Manage users & roles",
   "audit.view": "View audit logs",
+  "store.manage": "Create/edit stores and branches",
+  "store.switch_any": "Switch to any store, ignoring the allowed-stores list",
+  "inventory.transfer_receive": "Receive stock transfers",
+  "report.all_stores": "View reports across all stores",
+  "api_key.manage": "Create and revoke API keys",
 } as const;
 
 export type Permission = keyof typeof PERMISSIONS;
@@ -56,7 +61,9 @@ export const SYSTEM_ROLES: RoleTemplate[] = [
     key: "manager",
     name: "Store Manager",
     description: "Inventory, staff and operational reports",
-    permissions: ALL_PERMISSIONS.filter((p) => !["user.manage", "settings.manage"].includes(p)),
+    permissions: ALL_PERMISSIONS.filter(
+      (p) => !["user.manage", "settings.manage", "store.manage", "store.switch_any", "report.all_stores", "api_key.manage"].includes(p),
+    ),
   },
   {
     key: "pharmacist",

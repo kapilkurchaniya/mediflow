@@ -1,14 +1,39 @@
 "use server";
 
+import { z } from "zod";
 import { db, schema } from "@/server/db";
-import { eq, and, desc, sql } from "drizzle-orm";
-import { requireAuth } from "@/server/auth";
+import { eq, and, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
+import { protectedAction } from "@/server/action";
+import { requirePermission } from "@/server/rbac";
+import { DomainError } from "@/server/errors";
+import { isUniqueViolation } from "@/server/db/errors";
 
+/**
+ * Reference implementation of the action pattern (docs/06-coding-standards.md):
+ *   permission check -> validated input -> ids from `ctx` (never from the client) -> tenant/store-scoped queries.
+ * Client code reads results with `actionError(res)` from "@/lib/action-result" and data from `res.data`.
+ */
+
+const idSchema = z.string().uuid();
+
+const RackFields = z.object({
+  code: z.string().trim().min(1, "Rack code is required (e.g. R1-S2)").max(20),
+  name: z.string().trim().min(1, "Rack name is required (e.g. Front Counter Shelf)").max(80),
+  description: z.string().trim().max(200).optional(),
+});
+
+function revalidateRackPages() {
+  revalidatePath("/dashboard/settings/racks");
+  revalidatePath("/dashboard/inventory");
+  revalidatePath("/dashboard/sales/pos");
+}
+
+/** Read: called from Server Components and from a client form, so it stays a plain function. */
 export async function getRacks() {
-  const { session } = await requireAuth();
+  const ctx = await requirePermission("medicine.view");
 
-  const racksWithCount = await db
+  return db
     .select({
       id: schema.racks.id,
       code: schema.racks.code,
@@ -20,124 +45,107 @@ export async function getRacks() {
     })
     .from(schema.racks)
     .leftJoin(schema.medicines, eq(schema.racks.id, schema.medicines.rackId))
-    .where(
-      and(
-        eq(schema.racks.tenantId, session.tenantId),
-        eq(schema.racks.storeId, session.storeId!)
-      )
-    )
+    .where(and(eq(schema.racks.tenantId, ctx.tenantId), eq(schema.racks.storeId, ctx.storeId)))
     .groupBy(schema.racks.id)
     .orderBy(schema.racks.code);
-
-  return racksWithCount;
 }
 
-export async function createRack(data: {
-  code: string;
-  name: string;
-  description?: string;
-}) {
-  const { session } = await requireAuth();
+/** The rack must belong to the caller's tenant AND store, otherwise it does not exist as far as they know. */
+async function findOwnRack(ctx: { tenantId: string; storeId: string }, id: string) {
+  const [rack] = await db
+    .select({ id: schema.racks.id })
+    .from(schema.racks)
+    .where(and(eq(schema.racks.id, id), eq(schema.racks.tenantId, ctx.tenantId), eq(schema.racks.storeId, ctx.storeId)))
+    .limit(1);
+  if (!rack) throw new DomainError("NOT_FOUND", "Rack not found.");
+  return rack;
+}
 
-  if (!data.code?.trim()) return { error: "Rack code is required (e.g. R1-S2)" };
-  if (!data.name?.trim()) return { error: "Rack name is required (e.g. Front Counter Shelf)" };
+function rethrowDuplicateCode(err: unknown, code: string): never {
+  if (isUniqueViolation(err, "racks_store_code_uq")) {
+    throw new DomainError("RACK_CODE_EXISTS", `Rack code '${code.toUpperCase()}' already exists in this store.`);
+  }
+  throw err;
+}
 
-  try {
-    const [rack] = await db
-      .insert(schema.racks)
-      .values({
-        tenantId: session.tenantId,
-        storeId: session.storeId!,
-        code: data.code.trim().toUpperCase(),
-        name: data.name.trim(),
-        description: data.description?.trim() || null,
-        isActive: true,
-      })
-      .returning();
-
-    revalidatePath("/dashboard/settings/racks");
-    revalidatePath("/dashboard/inventory");
-    revalidatePath("/dashboard/sales/pos");
-    return { success: true, rack };
-  } catch (err: unknown) {
-    if ((err instanceof Error ? err.message : String(err)).includes("racks_store_code_uq")) {
-      return { error: `Rack code '${data.code.toUpperCase()}' already exists in this store.` };
+export const createRack = protectedAction("medicine.manage")
+  .inputSchema(RackFields)
+  .action(async ({ parsedInput: data, ctx }) => {
+    try {
+      const [rack] = await db
+        .insert(schema.racks)
+        .values({
+          tenantId: ctx.tenantId,
+          storeId: ctx.storeId,
+          code: data.code.toUpperCase(),
+          name: data.name,
+          description: data.description || null,
+          isActive: true,
+        })
+        .returning();
+      revalidateRackPages();
+      return { rack };
+    } catch (err) {
+      rethrowDuplicateCode(err, data.code);
     }
-    return { error: err instanceof Error ? err.message : String(err) };
-  }
-}
+  });
 
-export async function updateRack(
-  id: string,
-  data: {
-    code: string;
-    name: string;
-    description?: string;
-    isActive?: boolean;
-  }
-) {
-  const { session } = await requireAuth();
+export const updateRack = protectedAction("medicine.manage")
+  .inputSchema(RackFields.extend({ id: idSchema, isActive: z.boolean().optional() }))
+  .action(async ({ parsedInput: data, ctx }) => {
+    await findOwnRack(ctx, data.id);
+    try {
+      const [rack] = await db
+        .update(schema.racks)
+        .set({
+          code: data.code.toUpperCase(),
+          name: data.name,
+          description: data.description || null,
+          isActive: data.isActive ?? true,
+        })
+        .where(and(eq(schema.racks.id, data.id), eq(schema.racks.tenantId, ctx.tenantId), eq(schema.racks.storeId, ctx.storeId)))
+        .returning();
+      revalidateRackPages();
+      return { rack };
+    } catch (err) {
+      rethrowDuplicateCode(err, data.code);
+    }
+  });
 
-  try {
-    const [updated] = await db
-      .update(schema.racks)
-      .set({
-        code: data.code.trim().toUpperCase(),
-        name: data.name.trim(),
-        description: data.description?.trim() || null,
-        isActive: data.isActive ?? true,
-      })
-      .where(
-        and(
-          eq(schema.racks.id, id),
-          eq(schema.racks.tenantId, session.tenantId),
-          eq(schema.racks.storeId, session.storeId!)
-        )
-      )
-      .returning();
+export const deleteRack = protectedAction("medicine.manage")
+  .inputSchema(z.object({ id: idSchema }))
+  .action(async ({ parsedInput: { id }, ctx }) => {
+    await findOwnRack(ctx, id);
+
+    await db.transaction(async (tx) => {
+      // Unlink the medicines in this rack first, then delete the rack
+      await tx
+        .update(schema.medicines)
+        .set({ rackId: null })
+        .where(and(eq(schema.medicines.rackId, id), eq(schema.medicines.tenantId, ctx.tenantId)));
+      await tx
+        .delete(schema.racks)
+        .where(and(eq(schema.racks.id, id), eq(schema.racks.tenantId, ctx.tenantId), eq(schema.racks.storeId, ctx.storeId)));
+    });
 
     revalidatePath("/dashboard/settings/racks");
     revalidatePath("/dashboard/inventory");
+    return { deleted: true };
+  });
+
+export const assignMedicineToRack = protectedAction("medicine.manage")
+  .inputSchema(z.object({ medicineId: idSchema, rackId: idSchema.nullable() }))
+  .action(async ({ parsedInput: { medicineId, rackId }, ctx }) => {
+    if (rackId) await findOwnRack(ctx, rackId); // previously any rack id, even another pharmacy's, was accepted
+
+    const updated = await db
+      .update(schema.medicines)
+      .set({ rackId })
+      .where(and(eq(schema.medicines.id, medicineId), eq(schema.medicines.tenantId, ctx.tenantId)))
+      .returning({ id: schema.medicines.id });
+    if (updated.length === 0) throw new DomainError("NOT_FOUND", "Medicine not found.");
+
+    revalidatePath("/dashboard/inventory");
     revalidatePath("/dashboard/sales/pos");
-    return { success: true, rack: updated };
-  } catch (err: unknown) {
-    return { error: err instanceof Error ? err.message : String(err) };
-  }
-}
-
-export async function deleteRack(id: string) {
-  const { session } = await requireAuth();
-
-  // Unlink any medicines in this rack first
-  await db
-    .update(schema.medicines)
-    .set({ rackId: null })
-    .where(and(eq(schema.medicines.rackId, id), eq(schema.medicines.tenantId, session.tenantId)));
-
-  await db
-    .delete(schema.racks)
-    .where(
-      and(
-        eq(schema.racks.id, id),
-        eq(schema.racks.tenantId, session.tenantId),
-        eq(schema.racks.storeId, session.storeId!)
-      )
-    );
-
-  revalidatePath("/dashboard/settings/racks");
-  revalidatePath("/dashboard/inventory");
-  return { success: true };
-}
-
-export async function assignMedicineToRack(medicineId: string, rackId: string | null) {
-  const { session } = await requireAuth();
-
-  await db
-    .update(schema.medicines)
-    .set({ rackId: rackId || null })
-    .where(and(eq(schema.medicines.id, medicineId), eq(schema.medicines.tenantId, session.tenantId)));
-
-  revalidatePath("/dashboard/inventory");
-  revalidatePath("/dashboard/sales/pos");
-  return { success: true };
-}
+    return { assigned: true };
+  });
