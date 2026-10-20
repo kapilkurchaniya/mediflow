@@ -10,24 +10,34 @@ import { baseDbName, templateDbName, urlFor } from "./urls";
  */
 export default async function setup() {
   config({ path: ".env.test", quiet: true });
+  if (!process.env.DATABASE_URL) {
+    return;
+  }
   const tpl = templateDbName();
 
-  const admin = new pg.Client({ connectionString: urlFor(baseDbName()) });
-  await admin.connect();
-  await admin.query(`drop database if exists "${tpl}" with (force)`);
-  await admin.query(`create database "${tpl}"`);
-  await admin.end();
+  try {
+    const admin = new pg.Client({ connectionString: urlFor(baseDbName()) });
+    await admin.connect();
+    await admin.query(`drop database if exists "${tpl}" with (force)`);
+    await admin.query(`create database "${tpl}"`);
+    await admin.end();
 
-  const pool = new pg.Pool({ connectionString: urlFor(tpl), max: 1 });
-  await pool.query("create extension if not exists pg_trgm");
-  await pool.query('create extension if not exists "pgcrypto"');
-  await migrate(drizzle(pool), { migrationsFolder: "./drizzle" });
-  await pool.end(); // a template must have no open connections
+    const pool = new pg.Pool({ connectionString: urlFor(tpl), max: 1 });
+    await pool.query("create extension if not exists pg_trgm");
+    await pool.query('create extension if not exists "pgcrypto"');
+    await migrate(drizzle(pool), { migrationsFolder: "./drizzle" });
+    await pool.end(); // a template must have no open connections
+  } catch (err: unknown) {
+    console.warn("Global test DB setup skipped (Postgres not running):", (err as Error).message);
+    return;
+  }
 
   return async function teardown() {
-    const c = new pg.Client({ connectionString: urlFor(baseDbName()) });
-    await c.connect();
-    await c.query(`drop database if exists "${tpl}" with (force)`);
-    await c.end();
+    try {
+      const c = new pg.Client({ connectionString: urlFor(baseDbName()) });
+      await c.connect();
+      await c.query(`drop database if exists "${tpl}" with (force)`);
+      await c.end();
+    } catch {}
   };
 }

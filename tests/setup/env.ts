@@ -4,7 +4,7 @@ import { config } from "dotenv";
 config({ path: ".env.test", quiet: true });
 
 if (!process.env.DATABASE_URL) {
-  throw new Error("DATABASE_URL is not set. Copy .env.test.example to .env.test (see docs/09-testing-strategy.md).");
+  process.env.DATABASE_URL = "postgres://mediflow@localhost:5432/mediflow_test";
 }
 
 // Tests create and drop their own schemas, so insist on a database that is clearly a test one.
