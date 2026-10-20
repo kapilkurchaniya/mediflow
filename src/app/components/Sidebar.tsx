@@ -17,7 +17,7 @@ import {
 import { Logo, LogoMark } from "./ui";
 import { logoutAction } from "@/app/actions/auth";
 import { useShell } from "./ShellContext";
-import { NAV, settingsItem, type NavItem } from "./nav";
+import { visibleNav, settingsItem, type NavItem } from "./nav";
 
 function isActive(pathname: string, item: NavItem) {
   if (item.exact) return pathname === item.href || pathname === `${item.href}/new`;
@@ -37,7 +37,9 @@ export function Sidebar({
   isMobile?: boolean;
 }) {
   const pathname = usePathname();
-  const { collapsed, toggleCollapsed, setMobileOpen } = useShell();
+  const { collapsed, toggleCollapsed, setMobileOpen, permissions } = useShell();
+  const nav = visibleNav(permissions);
+  const showSettings = !settingsItem.permission || permissions.has(settingsItem.permission);
   const [showStoreMenu, setShowStoreMenu] = useState(false);
 
   const letters = userName
@@ -152,7 +154,7 @@ export function Sidebar({
 
       {/* Navigation Links */}
       <nav className="flex-1 overflow-y-auto px-2.5 py-1 space-y-4" aria-label="Primary">
-        {NAV.map((group, gi) => (
+        {nav.map((group, gi) => (
           <div key={gi} className="space-y-1">
             {group.heading && !isCollapsed && (
               <p className="px-2 text-[10.5px] font-medium uppercase tracking-[0.06em] text-ink-400 mb-1">
@@ -204,18 +206,20 @@ export function Sidebar({
 
       {/* Footer Profile & Settings */}
       <div className="border-t border-ink-150/70 p-2.5 space-y-1">
-        <Link
-          href={settingsItem.href}
-          onClick={() => isMobile && setMobileOpen(false)}
-          title={isCollapsed ? "Settings" : undefined}
-          className={clsx(
-            "flex h-8 items-center rounded-md text-[13px] text-ink-600 transition-colors hover:bg-ink-100/70 hover:text-ink-900",
-            isCollapsed ? "justify-center px-0" : "gap-2.5 px-2.5"
-          )}
-        >
-          <Settings className="h-4 w-4 text-ink-400" strokeWidth={1.9} />
-          {!isCollapsed && <span>Settings</span>}
-        </Link>
+        {showSettings && (
+          <Link
+            href={settingsItem.href}
+            onClick={() => isMobile && setMobileOpen(false)}
+            title={isCollapsed ? "Settings" : undefined}
+            className={clsx(
+              "flex h-8 items-center rounded-md text-[13px] text-ink-600 transition-colors hover:bg-ink-100/70 hover:text-ink-900",
+              isCollapsed ? "justify-center px-0" : "gap-2.5 px-2.5"
+            )}
+          >
+            <Settings className="h-4 w-4 text-ink-400" strokeWidth={1.9} />
+            {!isCollapsed && <span>Settings</span>}
+          </Link>
+        )}
 
         <div
           className={clsx(

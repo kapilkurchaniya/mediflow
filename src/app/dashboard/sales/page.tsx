@@ -7,6 +7,7 @@ import { formatINR, formatNumber } from "@/lib/format";
 import { DateRangeFilter } from "@/app/components/DateRangeFilter";
 import { ExportButton } from "@/app/components/ExportButton";
 import { resolveDateRange } from "@/lib/date-range";
+import { requirePagePermission } from "@/server/rbac";
 
 export const metadata = { title: "Sales & invoices" };
 
@@ -15,6 +16,7 @@ export default async function SalesPage({
 }: {
   searchParams: Promise<{ q?: string; range?: string; from?: string; to?: string }>;
 }) {
+  await requirePagePermission("sale.view");
   const params = await searchParams;
   const dateRange = resolveDateRange({
     range: params.range,

@@ -5,6 +5,7 @@ import { ReportShell } from "@/app/components/ReportShell";
 import { StatCard, EmptyState, Avatar } from "@/app/components/ui";
 import { formatINR, formatNumber } from "@/lib/format";
 import { Users, Truck, Clock, AlertTriangle, ChevronRight, Phone } from "lucide-react";
+import { requirePagePermission } from "@/server/rbac";
 
 export const metadata = {
   title: "Outstanding Ageing Analysis | MediFlow Accounting",
@@ -16,6 +17,7 @@ export default async function OutstandingPage({
 }: {
   searchParams: Promise<{ type?: string }>;
 }) {
+  await requirePagePermission("accounting.view");
   const params = await searchParams;
   const type = (params.type === "payable" ? "payable" : "receivable") as "receivable" | "payable";
 

@@ -3,11 +3,13 @@
 import { db, schema } from "@/server/db";
 import { eq } from "drizzle-orm";
 import { requireAuth } from "@/server/auth";
+import { checkPermission, requirePermission } from "@/server/rbac";
 import { validateInvoicePrefix } from "@/lib/invoice-no";
 import { revalidatePath } from "next/cache";
 
 export async function getStoreSettings() {
-  const { session, user } = await requireAuth();
+  const session = await requirePermission("settings.manage");
+  const { user } = await requireAuth(); // for the profile card (phone is not part of AuthCtx)
 
   let store = null;
   if (session.storeId) {
@@ -52,7 +54,9 @@ export async function getStoreSettings() {
 }
 
 export async function updateStoreSettings(formData: FormData) {
-  const { session } = await requireAuth();
+  const auth = await checkPermission("settings.manage");
+  if (!auth.ok) return { error: auth.error };
+  const session = auth.ctx;
 
   if (!session.storeId) {
     return { error: "No store associated with this session." };

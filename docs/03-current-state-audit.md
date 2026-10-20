@@ -52,7 +52,7 @@ Legend: ✅ works · 🟡 partial / has gaps · 🔴 table exists but no code ·
 |---|---|---|---|
 | S1 | **Critical** | `POST /api/v1/stock/check` has no auth and **no tenant filter**. It returns every tenant's medicines, prices and stock. `proxy.ts` only checks that *a* cookie named `mediflow_session` exists, so any value passes. | `src/app/api/v1/stock/check/route.ts:32`, `src/proxy.ts:23` |
 | S2 | **Critical** | `POST /api/v1/orders` is unauthenticated. It takes `tenantId` from the request body and **defaults to the first tenant in the DB**. `GET` returns any order by id with no tenant check. | `src/app/api/v1/orders/route.ts:17,65` |
-| S3 | High | Permissions are never enforced (see RBAC above). | all `src/app/actions/*` |
+| S3 | High | ✅ **Lane A fixed (A1.1-A1.3); Lane B pending (B1.5).** Permissions were never enforced (see RBAC above). | all `src/app/actions/*` |
 | S4 | High | WhatsApp webhook `POST` does not verify Meta's `X-Hub-Signature-256`, so anyone can inject inbound messages. `GET` accepts a hard-coded verify token `"mediflow_wa_webhook"`. | `src/app/api/webhooks/whatsapp/route.ts:20,28` |
 | S5 | High | Simulated e-invoice IRNs and QR codes could be printed on real B2B invoices. | `src/server/domain/e-invoice.ts:119` |
 | S6 | Medium | WhatsApp access tokens and SMS API keys are stored in plaintext. | `schema.ts:1070,1118` |

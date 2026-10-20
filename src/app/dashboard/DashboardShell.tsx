@@ -14,6 +14,7 @@ interface DashboardShellProps {
   userName: string;
   userEmail: string;
   storeName: string;
+  permissions: readonly string[];
 }
 
 function DashboardShellContent({
@@ -125,6 +126,7 @@ export function DashboardShell(props: DashboardShellProps) {
       storeName={props.storeName}
       userName={props.userName}
       userEmail={props.userEmail}
+      permissions={props.permissions}
     >
       <DashboardShellContent {...props} />
     </ShellProvider>

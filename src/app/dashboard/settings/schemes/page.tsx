@@ -1,10 +1,12 @@
 import { PageHeader } from "@/app/components/ui";
 import { getSchemes } from "@/app/actions/schemes";
 import { SchemesListClient } from "./SchemesListClient";
+import { requirePagePermission } from "@/server/rbac";
 
 export const dynamic = "force-dynamic";
 
 export default async function SchemesPage() {
+  await requirePagePermission("purchase.view");
   const schemes = await getSchemes();
 
   return (
