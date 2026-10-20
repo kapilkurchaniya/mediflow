@@ -13,6 +13,19 @@ jobs:
   verify:
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: mediflow
+          POSTGRES_HOST_AUTH_METHOD: trust # throw-away database that lives only for this job
+          POSTGRES_DB: mediflow_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U mediflow"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     env:
       # The build never connects to the database; env.ts only needs a syntactically valid URL.
       DATABASE_URL: postgres://ci:ci@127.0.0.1:5432/ci
@@ -30,13 +43,19 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
-      - name: Lint
-        # TODO(Phase 0 · A0.6): remove continue-on-error once the existing 70 lint errors are fixed.
+      - name: "Lint (strict - paths that are already clean must stay clean)"
+        run: npm run lint:strict
+
+      - name: Lint (whole repo, informational)
+        # TODO(Phase 0 · A0.6): delete this step and the strict list once every path is clean.
         continue-on-error: true
         run: npm run lint
 
-      - name: Unit tests
+      - name: Tests (unit + integration)
         run: npm test
+        env:
+          # Real Postgres service above; the suite builds a migrated template DB and copies it per test file.
+          DATABASE_URL: postgres://mediflow@localhost:5432/mediflow_test
 
       - name: Build
         run: npm run build

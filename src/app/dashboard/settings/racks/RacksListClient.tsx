@@ -155,7 +155,7 @@ export function RacksListClient({ initialRacks }: { initialRacks: RackItem[] }) 
               {filtered.length === 0 ? (
                 <tr>
                   <td colSpan={5} className="text-center py-10 text-ink-400">
-                    No racks configured yet. Click "+ Add Rack / Shelf" to organize your pharmacy storage.
+                    No racks configured yet. Click &quot;+ Add Rack / Shelf&quot; to organize your pharmacy storage.
                   </td>
                 </tr>
               ) : (

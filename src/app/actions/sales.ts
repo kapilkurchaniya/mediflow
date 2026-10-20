@@ -474,27 +474,35 @@ export async function createSaleInvoice(
       });
 
       // 7. Record GST Document
+      // Optional steps run in a SAVEPOINT (nested tx.transaction). A failed SQL statement poisons a
+      // Postgres transaction: catching the JS error is not enough, COMMIT would silently become a
+      // ROLLBACK and the bill would be reported as saved when it is not. The savepoint rolls back
+      // only this step. TODO(B2.1): enqueue a retry in the outbox instead of just logging.
       try {
-        await createGstDocumentFromSale(tx, {
-          saleId: sale.id,
-          tenantId: session.tenantId,
-          storeId: session.storeId,
+        await tx.transaction(async (sp) => {
+          await createGstDocumentFromSale(sp, {
+            saleId: sale.id,
+            tenantId: session.tenantId,
+            storeId: session.storeId,
+          });
         });
       } catch (gstErr) {
-        console.error("Warning: GST Document auto-creation error:", gstErr);
+        console.error("Warning: GST Document auto-creation failed; sale kept:", gstErr);
       }
 
       // 8. Earn Loyalty Points
       if (customerId?.trim()) {
         try {
-          await LoyaltyService.earnPoints(tx, {
-            tenantId: session.tenantId,
-            customerId: customerId.trim(),
-            saleAmountPaise: finalTotalAmount,
-            saleId: sale.id,
+          await tx.transaction(async (sp) => {
+            await LoyaltyService.earnPoints(sp, {
+              tenantId: session.tenantId,
+              customerId: customerId.trim(),
+              saleAmountPaise: finalTotalAmount,
+              saleId: sale.id,
+            });
           });
         } catch (loyaltyErr) {
-          console.error("Warning: Loyalty points earning error:", loyaltyErr);
+          console.error("Warning: Loyalty points earning failed; sale kept:", loyaltyErr);
         }
       }
 

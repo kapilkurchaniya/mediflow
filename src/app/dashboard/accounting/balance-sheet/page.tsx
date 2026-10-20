@@ -180,7 +180,7 @@ export default async function BalanceSheetPage({
               {/* Equity & Retained Earnings */}
               <div className="space-y-2.5">
                 <h3 className="text-[12.5px] font-semibold text-ink-500 uppercase tracking-wider">
-                  Owners' Equity & Reserves
+                  Owners&apos; Equity & Reserves
                 </h3>
                 <table className="w-full text-[13px]">
                   <tbody>
