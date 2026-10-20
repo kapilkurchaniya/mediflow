@@ -1,10 +1,11 @@
 "use server";
 
 import { db, schema } from "@/server/db";
-import { eq, and, desc, sql, or } from "drizzle-orm";
+import { eq, and, desc, sql } from "drizzle-orm";
 import { requireAuth } from "@/server/auth";
 import { revalidatePath } from "next/cache";
 import { WhatsAppService } from "@/server/domain/whatsapp";
+import { encryptSecret, maskSecret, isMasked } from "@/server/crypto";
 
 export async function getWhatsAppConfig() {
   const { session } = await requireAuth();
@@ -15,7 +16,13 @@ export async function getWhatsAppConfig() {
     .where(eq(schema.whatsappConfigs.tenantId, session.tenantId))
     .limit(1);
 
-  return config || null;
+  if (!config) return null;
+
+  // Never send the real token to the client — return a masked version.
+  return {
+    ...config,
+    accessToken: maskSecret(config.accessToken),
+  };
 }
 
 export async function saveWhatsAppConfig(formData: FormData) {
@@ -23,30 +30,44 @@ export async function saveWhatsAppConfig(formData: FormData) {
 
   const phoneNumberId = formData.get("phoneNumberId") as string;
   const businessAccountId = formData.get("businessAccountId") as string;
-  const accessToken = formData.get("accessToken") as string;
+  const accessTokenInput = formData.get("accessToken") as string;
   const webhookVerifyToken = formData.get("webhookVerifyToken") as string;
   const isActive = formData.get("isActive") === "on";
 
-  try {
-    const existing = await getWhatsAppConfig();
+  // If the user submits the masked placeholder ("••••XXXX"), they did not
+  // change the token — keep whatever is in the DB.
+  const newAccessToken =
+    accessTokenInput && !isMasked(accessTokenInput)
+      ? encryptSecret(accessTokenInput.trim())
+      : undefined; // undefined means "don't overwrite"
 
-    if (existing) {
+  try {
+    // Re-read the raw (encrypted) record — not the masked version from
+    // getWhatsAppConfig — so we can keep the old encrypted value when needed.
+    const [rawExisting] = await db
+      .select()
+      .from(schema.whatsappConfigs)
+      .where(eq(schema.whatsappConfigs.tenantId, session.tenantId))
+      .limit(1);
+
+    if (rawExisting) {
       await db
         .update(schema.whatsappConfigs)
         .set({
           phoneNumberId: phoneNumberId?.trim() || null,
           businessAccountId: businessAccountId?.trim() || null,
-          accessToken: accessToken?.trim() || null,
+          // Only overwrite if a real (non-masked) token was submitted
+          ...(newAccessToken !== undefined ? { accessToken: newAccessToken } : {}),
           webhookVerifyToken: webhookVerifyToken?.trim() || null,
           isActive,
         })
-        .where(eq(schema.whatsappConfigs.id, existing.id));
+        .where(eq(schema.whatsappConfigs.id, rawExisting.id));
     } else {
       await db.insert(schema.whatsappConfigs).values({
         tenantId: session.tenantId,
         phoneNumberId: phoneNumberId?.trim() || null,
         businessAccountId: businessAccountId?.trim() || null,
-        accessToken: accessToken?.trim() || null,
+        accessToken: newAccessToken ?? null,
         webhookVerifyToken: webhookVerifyToken?.trim() || null,
         isActive,
       });
