@@ -23,15 +23,15 @@ git switch lane-a/overxpowered   # or lane-b/kapil
 Option A, Docker (recommended):
 
 ```bash
-docker compose up -d db          # Postgres 16 on localhost:5432, user/pass mediflow/mediflow
+docker compose up -d db          # Postgres 16 on localhost:5432, user `mediflow`, no password (bound to 127.0.0.1 only)
                                  # creates databases `mediflow` (app) and `mediflow_test` (tests)
 ```
 
 If Docker's bridge networking fails ("operation not supported" on veth), use host networking on another port:
 
 ```bash
-docker run -d --name mediflow-db --network host -e POSTGRES_USER=mediflow -e POSTGRES_PASSWORD=mediflow \
-  -e POSTGRES_DB=mediflow postgres:16 -c port=5433
+docker run -d --name mediflow-db --network host -e POSTGRES_USER=mediflow -e POSTGRES_HOST_AUTH_METHOD=trust \
+  -e POSTGRES_DB=mediflow postgres:16 -c port=5433 -c listen_addresses=127.0.0.1
 docker exec mediflow-db psql -p 5433 -U mediflow -d mediflow -c "create database mediflow_test"
 # then use port 5433 in DATABASE_URL (.env) and .env.test
 ```
@@ -50,7 +50,7 @@ Copy `.env.example` (added in Roadmap B0.6) to `.env` and fill it in. Today the 
 
 | Variable | Required | Used by | Notes |
 |---|---|---|---|
-| `DATABASE_URL` | ✅ | everything (`src/env.ts`) | `postgres://mediflow:mediflow@localhost:5432/mediflow` |
+| `DATABASE_URL` | ✅ | everything (`src/env.ts`) | `postgres://mediflow@localhost:5432/mediflow` |
 | `GEMINI_API_KEY` | for AI | `api/chat/route.ts`, `server/ai.ts` | README says `GOOGLE_GENERATIVE_AI_API_KEY`, which is **wrong**; the code reads `GEMINI_API_KEY` |
 | `GROQ_API_KEY` | for AI fallback | same | |
 | `TAVILY_API_KEY` | optional | `server/ai.ts` (web search for enrichment) | |

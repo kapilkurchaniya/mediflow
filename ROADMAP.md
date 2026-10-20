@@ -122,18 +122,18 @@ Full map in `.github/CODEOWNERS` and [ADR 0004](docs/adr/0004-two-lane-ownership
   - ➕ `tests/setup/factories.ts`: `makeTenant`, `makeStore`, `makeUser`, `makeMedicine`, `makeBatch`, `makeCustomer`, `makeSupplier`. Each inserts minimal valid rows and returns them.
   - ➕ `tests/setup/empty.ts` (`export {}`).
   - ➕ `docker-compose.yml`: a `db` service `postgres:16` with env `POSTGRES_USER/PASSWORD/DB=mediflow`, port `5432`, and a healthcheck.
-  - ➕ `.env.test.example`: `DATABASE_URL=postgres://mediflow:mediflow@localhost:5432/mediflow_test`.
+  - ➕ `.env.test.example`: `DATABASE_URL=postgres://mediflow@localhost:5432/mediflow_test` (passwordless, local only).
   - ✏️ `.github/workflows/ci.yml`: add a Postgres service container and `DATABASE_URL` for tests:
     ```yaml
     services:
       postgres:
         image: postgres:16
-        env: { POSTGRES_USER: mediflow, POSTGRES_PASSWORD: mediflow, POSTGRES_DB: mediflow_test }
+        env: { POSTGRES_USER: mediflow, POSTGRES_HOST_AUTH_METHOD: trust, POSTGRES_DB: mediflow_test }
         ports: ["5432:5432"]
         options: >-
           --health-cmd "pg_isready -U mediflow" --health-interval 5s --health-timeout 5s --health-retries 10
     ```
-    and set the test step's env `DATABASE_URL: postgres://mediflow:mediflow@localhost:5432/mediflow_test`. Keep the dummy URL for the build step.
+    and set the test step's env `DATABASE_URL: postgres://mediflow@localhost:5432/mediflow_test`. Keep the dummy URL for the build step.
   - ➕ `tests/unit/money.test.ts`, ➕ `tests/integration/stock.test.ts`, ➕ `tests/integration/sequence.test.ts`. The cases are listed in docs/09 §"Must-have tests".
 - **How (refactor needed for testability):** `nextDocNumber(tx, tenantId, storeId, docType, prefix)` reads `new Date()` internally. Add an optional last parameter `now: Date = new Date()` so tests can check the fiscal-year rollover on 31 Mar → 1 Apr.
 - **Done when:** CI runs and passes these tests on every PR. The concurrency test (two parallel sales of 6 out of 10 units → exactly one succeeds) passes.

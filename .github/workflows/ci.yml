@@ -18,7 +18,7 @@ jobs:
         image: postgres:16
         env:
           POSTGRES_USER: mediflow
-          POSTGRES_PASSWORD: mediflow
+          POSTGRES_HOST_AUTH_METHOD: trust # throw-away database that lives only for this job
           POSTGRES_DB: mediflow_test
         ports: ["5432:5432"]
         options: >-
@@ -55,7 +55,7 @@ jobs:
         run: npm test
         env:
           # Real Postgres service above; the suite builds a migrated template DB and copies it per test file.
-          DATABASE_URL: postgres://mediflow:mediflow@localhost:5432/mediflow_test
+          DATABASE_URL: postgres://mediflow@localhost:5432/mediflow_test
 
       - name: Build
         run: npm run build
