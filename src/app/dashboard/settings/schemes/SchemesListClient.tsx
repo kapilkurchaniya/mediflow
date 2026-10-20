@@ -178,7 +178,7 @@ export function SchemesListClient({ initialSchemes }: { initialSchemes: SchemeIt
               {filtered.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="text-center py-10 text-ink-400">
-                    No trade schemes created yet. Click "+ Create Scheme" to configure distributor or retail offers.
+                    No trade schemes created yet. Click &quot;+ Create Scheme&quot; to configure distributor or retail offers.
                   </td>
                 </tr>
               ) : (

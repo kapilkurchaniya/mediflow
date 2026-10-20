@@ -147,6 +147,7 @@ Full map in `.github/CODEOWNERS` and [ADR 0004](docs/adr/0004-two-lane-ownership
 #### A0.6 Lint debt → make lint blocking ⏱ 1 day (split with Lane B)
 - **Why:** 70 lint errors mean CI can't enforce lint (`continue-on-error: true` in `ci.yml`).
 - **How:** each lane fixes lint errors **in its own files** (CODEOWNERS), mostly replacing `any` with inferred Drizzle types or `unknown`. Lane B does its half in B0.5. When `npx eslint src` reports 0 errors, Lane A removes `continue-on-error` from `.github/workflows/ci.yml`. Warnings can stay for now.
+- **Status (Lane A half done):** all Lane A files are error-free. A **ratchet** is in place: `npm run lint:strict` (`scripts/lint-strict.mjs`) blocks CI on every already-clean path; the whole-repo `npm run lint` stays informational. **Lane B still owes** (B0.5 lint share): `src/app/api/chat` (30 errors, mostly `any` / `@ts-nocheck`, see B6.1), `src/app/components/AIAssistant.tsx` (22), `src/app/dashboard/{customers,orders,compliance}` (15) and `src/server/domain/{reports,loyalty,whatsapp}.ts` (5). Fix a path, then add it to `CLEAN_PATHS`. When the list covers everything, delete the script and the informational CI step.
 - **Done when:** the lint step is blocking and green.
 
 #### A0.7 🧪 Sale transaction safety fixes (audit C1, C4) ⏱ 0.5 day

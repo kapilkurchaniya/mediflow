@@ -43,8 +43,11 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
-      - name: Lint
-        # TODO(Phase 0 · A0.6): remove continue-on-error once the existing 70 lint errors are fixed.
+      - name: Lint (strict: paths that are already clean must stay clean)
+        run: npm run lint:strict
+
+      - name: Lint (whole repo, informational)
+        # TODO(Phase 0 · A0.6): delete this step and the strict list once every path is clean.
         continue-on-error: true
         run: npm run lint
 
