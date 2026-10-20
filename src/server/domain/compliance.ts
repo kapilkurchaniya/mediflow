@@ -423,3 +423,148 @@ export async function getComplianceStats(
     activePrescriptions: prescriptionsCount?.count ?? 0,
   };
 }
+
+export interface PrescriptionDispensingLine {
+  prescriptionItemId?: string;
+  medicineId?: string;
+  medicineName?: string;
+  quantity: number;
+}
+
+export interface ApplyPrescriptionDispensingParams {
+  prescriptionId: string;
+  tenantId: string;
+  lines: PrescriptionDispensingLine[];
+  today?: Date;
+}
+
+/**
+ * Applies dispensing against an active prescription (🤝 B1.4 / A2.1).
+ *
+ * Rules:
+ * 1. Verifies prescription exists, belongs to tenant, and is not cancelled or already fully dispensed.
+ * 2. Prescription validity: rejects when validUntil < today.
+ * 3. Increments prescription_items.quantity_dispensed.
+ * 4. Blocks dispensing more than prescribed for Schedule H1 / X / narcotic items.
+ * 5. Updates prescription status to "partially_dispensed" or "fully_dispensed".
+ */
+export async function applyPrescriptionDispensing(
+  tx: Tx,
+  params: ApplyPrescriptionDispensingParams
+): Promise<{
+  prescriptionId: string;
+  status: "active" | "partially_dispensed" | "fully_dispensed";
+  dispensedLines: Array<{ itemId: string; medicineName: string; quantityDispensed: number }>;
+}> {
+  const [rx] = await tx
+    .select()
+    .from(schema.prescriptions)
+    .where(
+      and(
+        eq(schema.prescriptions.id, params.prescriptionId),
+        eq(schema.prescriptions.tenantId, params.tenantId)
+      )
+    );
+
+  if (!rx) {
+    throw new Error(`Prescription ${params.prescriptionId} not found`);
+  }
+
+  if (rx.status === "cancelled") {
+    throw new Error("Cannot dispense against a cancelled prescription");
+  }
+
+  if (rx.status === "fully_dispensed") {
+    throw new Error("Prescription has already been fully dispensed");
+  }
+
+  const checkDate = (params.today || new Date()).toISOString().slice(0, 10);
+  if (rx.validUntil && rx.validUntil < checkDate) {
+    throw new Error(`Prescription expired on ${rx.validUntil} (current date: ${checkDate})`);
+  }
+
+  const items = await tx
+    .select({
+      id: schema.prescriptionItems.id,
+      medicineId: schema.prescriptionItems.medicineId,
+      medicineName: schema.prescriptionItems.medicineName,
+      quantityPrescribed: schema.prescriptionItems.quantityPrescribed,
+      quantityDispensed: schema.prescriptionItems.quantityDispensed,
+      schedule: schema.medicines.schedule,
+    })
+    .from(schema.prescriptionItems)
+    .leftJoin(schema.medicines, eq(schema.prescriptionItems.medicineId, schema.medicines.id))
+    .where(eq(schema.prescriptionItems.prescriptionId, params.prescriptionId));
+
+  const dispensedLines: Array<{ itemId: string; medicineName: string; quantityDispensed: number }> = [];
+
+  for (const line of params.lines) {
+    if (line.quantity <= 0) continue;
+
+    const matchedItem = items.find((item) => {
+      if (line.prescriptionItemId && item.id === line.prescriptionItemId) return true;
+      if (line.medicineId && item.medicineId === line.medicineId) return true;
+      if (
+        line.medicineName &&
+        item.medicineName.trim().toLowerCase() === line.medicineName.trim().toLowerCase()
+      ) {
+        return true;
+      }
+      return false;
+    });
+
+    if (!matchedItem) {
+      continue;
+    }
+
+    const currentSchedule = (matchedItem.schedule || "").toUpperCase();
+    const isStrictSchedule =
+      currentSchedule === "H1" || currentSchedule === "X" || currentSchedule === "NARCOTIC";
+
+    const proposedTotal = matchedItem.quantityDispensed + line.quantity;
+    if (isStrictSchedule && proposedTotal > matchedItem.quantityPrescribed) {
+      throw new Error(
+        `Cannot dispense ${line.quantity} units of ${matchedItem.medicineName}. Prescribed: ${matchedItem.quantityPrescribed}, already dispensed: ${matchedItem.quantityDispensed}. Excess dispensing prohibited for Schedule ${matchedItem.schedule}.`
+      );
+    }
+
+    await tx
+      .update(schema.prescriptionItems)
+      .set({
+        quantityDispensed: proposedTotal,
+      })
+      .where(eq(schema.prescriptionItems.id, matchedItem.id));
+
+    matchedItem.quantityDispensed = proposedTotal;
+    dispensedLines.push({
+      itemId: matchedItem.id,
+      medicineName: matchedItem.medicineName,
+      quantityDispensed: line.quantity,
+    });
+  }
+
+  // Calculate new status
+  const allFullyDispensed =
+    items.length > 0 && items.every((i) => i.quantityDispensed >= i.quantityPrescribed);
+  const anyDispensed = items.some((i) => i.quantityDispensed > 0);
+
+  const newStatus: "active" | "partially_dispensed" | "fully_dispensed" = allFullyDispensed
+    ? "fully_dispensed"
+    : anyDispensed
+    ? "partially_dispensed"
+    : (rx.status as any);
+
+  await tx
+    .update(schema.prescriptions)
+    .set({
+      status: newStatus,
+      updatedAt: new Date(),
+    })
+    .where(eq(schema.prescriptions.id, params.prescriptionId));
+
+  return {
+    prescriptionId: params.prescriptionId,
+    status: newStatus,
+    dispensedLines,
+  };
+}
