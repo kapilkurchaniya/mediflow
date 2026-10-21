@@ -324,6 +324,150 @@ export async function createGstDocumentFromPurchase(
   return gstDoc;
 }
 
+/**
+ * Cancels the outward GST document associated with a sale invoice (B2.6).
+ * Sets document status to 'cancelled'. Cancelled documents are excluded
+ * from GSTR-1 tables but tracked in doc_issue summary under 'canc'.
+ */
+export async function cancelGstDocumentForSale(
+  dbOrTx: DbOrTx,
+  saleId: string
+) {
+  const [doc] = await dbOrTx
+    .select()
+    .from(schema.gstDocuments)
+    .where(
+      and(
+        eq(schema.gstDocuments.refType, "sale"),
+        eq(schema.gstDocuments.refId, saleId)
+      )
+    )
+    .limit(1);
+
+  if (!doc) return null;
+
+  const [updated] = await dbOrTx
+    .update(schema.gstDocuments)
+    .set({ status: "cancelled" })
+    .where(eq(schema.gstDocuments.id, doc.id))
+    .returning();
+
+  return updated;
+}
+
+/**
+ * Auto-creates a Credit Note GST document when a customer sale return is recorded (B2.6).
+ * Sets doc_type = 'credit_note', ref_type = 'return', ref_id = returnId.
+ * Linked to the original invoice for GSTR-1 CDNR / CDNUR reporting.
+ */
+export async function createGstDocumentFromReturn(
+  dbOrTx: DbOrTx,
+  params: {
+    returnId: string;
+  }
+) {
+  // 1. Fetch sale return
+  const [saleReturn] = await dbOrTx
+    .select()
+    .from(schema.saleReturns)
+    .where(eq(schema.saleReturns.id, params.returnId))
+    .limit(1);
+
+  if (!saleReturn) {
+    throw new Error(`Sale return ${params.returnId} not found`);
+  }
+
+  // 2. Fetch original sale
+  const [sale] = await dbOrTx
+    .select()
+    .from(schema.sales)
+    .where(eq(schema.sales.id, saleReturn.saleId))
+    .limit(1);
+
+  if (!sale) {
+    throw new Error(`Original sale ${saleReturn.saleId} not found for return ${params.returnId}`);
+  }
+
+  // 3. Fetch original GST document to obtain buyer GSTIN and party details
+  const [origGstDoc] = await dbOrTx
+    .select()
+    .from(schema.gstDocuments)
+    .where(
+      and(
+        eq(schema.gstDocuments.refType, "sale"),
+        eq(schema.gstDocuments.refId, sale.id)
+      )
+    )
+    .limit(1);
+
+  let buyerGstin = origGstDoc?.partyGstin || null;
+  let buyerName = origGstDoc?.partyName || sale.customerName || "Walk-in Customer";
+  let buyerStateCode = origGstDoc?.partyStateCode || "27";
+  let placeOfSupply = origGstDoc?.placeOfSupply || `${buyerStateCode}-${getStateName(buyerStateCode)}`;
+  let supplyType = origGstDoc?.supplyType || (sale.customerId ? "B2B" : "B2C");
+
+  if (!origGstDoc && sale.customerId) {
+    const [cust] = await dbOrTx
+      .select({ gstin: schema.customers.gstin, stateCode: schema.customers.stateCode, name: schema.customers.name })
+      .from(schema.customers)
+      .where(eq(schema.customers.id, sale.customerId))
+      .limit(1);
+
+    if (cust) {
+      buyerName = cust.name;
+      if (cust.gstin && isValidGstin(cust.gstin)) {
+        buyerGstin = cust.gstin.trim().toUpperCase();
+        buyerStateCode = extractStateCodeFromGstin(buyerGstin) || "27";
+        supplyType = "B2B";
+      }
+      placeOfSupply = `${buyerStateCode}-${getStateName(buyerStateCode)}`;
+    }
+  }
+
+  const isInterState = sale.isInterState || (origGstDoc ? (origGstDoc.igst ?? 0) > 0 : false);
+  const taxAmount = saleReturn.taxAmount ?? 0;
+  let cgst = 0;
+  let sgst = 0;
+  let igst = 0;
+
+  if (isInterState) {
+    igst = taxAmount;
+  } else {
+    cgst = Math.floor(taxAmount / 2);
+    sgst = taxAmount - cgst;
+  }
+
+  const docDate = (saleReturn.createdAt || new Date()).toISOString().slice(0, 10);
+
+  const [creditNoteDoc] = await dbOrTx
+    .insert(schema.gstDocuments)
+    .values({
+      tenantId: saleReturn.tenantId,
+      storeId: saleReturn.storeId,
+      docType: "credit_note",
+      docNo: saleReturn.returnNo,
+      docDate,
+      partyGstin: buyerGstin,
+      partyName: buyerName,
+      partyStateCode: buyerStateCode,
+      placeOfSupply,
+      supplyType: supplyType === "EXPORT" ? "EXPORT" : (buyerGstin && isValidGstin(buyerGstin) ? "B2B" : "B2C"),
+      isReverseCharge: false,
+      taxableAmount: saleReturn.taxableAmount ?? 0,
+      cgst,
+      sgst,
+      igst,
+      cess: 0,
+      total: saleReturn.totalAmount ?? 0,
+      refType: "return",
+      refId: saleReturn.id,
+      status: "active",
+    })
+    .returning();
+
+  return creditNoteDoc;
+}
+
 export interface Gstr1Summary {
   period: { month: number; year: number; fromDate: string; toDate: string };
   b2b: Array<{
@@ -358,6 +502,23 @@ export interface Gstr1Summary {
     taxableAmount: number;
     igst: number;
     total: number;
+  }>;
+  cdnr: Array<{
+    id: string;
+    docNo: string;
+    docDate: string;
+    originalInvoiceNo: string;
+    originalInvoiceDate: string;
+    partyName: string;
+    partyGstin: string;
+    placeOfSupply: string;
+    noteType: "C" | "D";
+    taxableAmount: number;
+    cgst: number;
+    sgst: number;
+    igst: number;
+    total: number;
+    status: string;
   }>;
   hsnSummary: Array<{
     hsn: string;
@@ -408,7 +569,7 @@ export async function buildGstr1Data(
 
   const conditions = [
     eq(schema.gstDocuments.tenantId, params.tenantId),
-    eq(schema.gstDocuments.refType, "sale"),
+    inArray(schema.gstDocuments.refType, ["sale", "return"]),
     gte(schema.gstDocuments.docDate, fromDate),
     lte(schema.gstDocuments.docDate, toDate),
   ];
@@ -425,6 +586,7 @@ export async function buildGstr1Data(
 
   const b2b: Gstr1Summary["b2b"] = [];
   const b2cl: Gstr1Summary["b2cl"] = [];
+  const cdnr: Gstr1Summary["cdnr"] = [];
   let b2bCount = 0;
   let b2cCount = 0;
   let totalTaxable = 0;
@@ -436,10 +598,37 @@ export async function buildGstr1Data(
   let cancelledCount = 0;
 
   const saleIds: string[] = [];
+  const returnIds: string[] = [];
 
   for (const doc of docs) {
     if (doc.status === "cancelled") {
       cancelledCount++;
+      continue;
+    }
+
+    if (doc.docType === "credit_note") {
+      if (doc.refId) {
+        returnIds.push(doc.refId);
+      }
+      if (doc.supplyType === "B2B" && doc.partyGstin) {
+        cdnr.push({
+          id: doc.id,
+          docNo: doc.docNo,
+          docDate: doc.docDate,
+          originalInvoiceNo: "INV-ORIG",
+          originalInvoiceDate: doc.docDate,
+          partyName: doc.partyName || "B2B Client",
+          partyGstin: doc.partyGstin,
+          placeOfSupply: doc.placeOfSupply || "27-Maharashtra",
+          noteType: "C",
+          taxableAmount: doc.taxableAmount,
+          cgst: doc.cgst,
+          sgst: doc.sgst,
+          igst: doc.igst,
+          total: doc.total,
+          status: doc.status,
+        });
+      }
       continue;
     }
 
@@ -484,6 +673,38 @@ export async function buildGstr1Data(
       });
     } else {
       b2cCount++;
+    }
+  }
+
+  // Resolve original invoice details for credit notes
+  if (returnIds.length > 0) {
+    const returnRows = await db
+      .select({
+        returnId: schema.saleReturns.id,
+        invoiceNo: schema.sales.invoiceNo,
+        completedAt: schema.sales.completedAt,
+        createdAt: schema.sales.createdAt,
+      })
+      .from(schema.saleReturns)
+      .leftJoin(schema.sales, eq(schema.saleReturns.saleId, schema.sales.id))
+      .where(inArray(schema.saleReturns.id, returnIds));
+
+    const returnMap = new Map<string, { invoiceNo: string; docDate: string }>();
+    for (const r of returnRows) {
+      const dt = (r.completedAt || r.createdAt || new Date()).toISOString().slice(0, 10);
+      returnMap.set(r.returnId, {
+        invoiceNo: r.invoiceNo || "INV-ORIG",
+        docDate: dt,
+      });
+    }
+
+    for (const item of cdnr) {
+      const origDoc = docs.find((d) => d.id === item.id);
+      if (origDoc?.refId && returnMap.has(origDoc.refId)) {
+        const orig = returnMap.get(origDoc.refId)!;
+        item.originalInvoiceNo = orig.invoiceNo;
+        item.originalInvoiceDate = orig.docDate;
+      }
     }
   }
 
@@ -603,6 +824,7 @@ export async function buildGstr1Data(
     b2b,
     b2cs,
     b2cl,
+    cdnr,
     hsnSummary,
     docSummary,
     totals: {
@@ -953,6 +1175,44 @@ export function buildGstr1JsonPayload(
     ],
   };
 
+  const cdnrMap = new Map<string, Array<any>>();
+  if (gstr1.cdnr && gstr1.cdnr.length > 0) {
+    for (const cn of gstr1.cdnr) {
+      const ctin = cn.partyGstin;
+      const existing = cdnrMap.get(ctin) || [];
+      existing.push({
+        ntty: cn.noteType,
+        nt_num: cn.docNo,
+        nt_dt: cn.docDate.split("-").reverse().join("-"),
+        val: Number((cn.total / 100).toFixed(2)),
+        pos: cn.placeOfSupply.slice(0, 2),
+        rchrg: "N",
+        inv_typ: "R",
+        inum: cn.originalInvoiceNo,
+        idt: cn.originalInvoiceDate.split("-").reverse().join("-"),
+        itms: [
+          {
+            num: 1,
+            itm_det: {
+              txval: Number((cn.taxableAmount / 100).toFixed(2)),
+              rt: Number((DEFAULT_GST_RATE_BP / 100).toFixed(2)),
+              camt: Number((cn.cgst / 100).toFixed(2)),
+              samt: Number((cn.sgst / 100).toFixed(2)),
+              iamt: Number((cn.igst / 100).toFixed(2)),
+              csamt: 0.0,
+            },
+          },
+        ],
+      });
+      cdnrMap.set(ctin, existing);
+    }
+  }
+
+  const cdnrFormatted = Array.from(cdnrMap.entries()).map(([ctin, nt]) => ({
+    ctin,
+    nt,
+  }));
+
   return {
     gstin,
     fp,
@@ -971,7 +1231,7 @@ export function buildGstr1JsonPayload(
       iamt: Number((item.igst / 100).toFixed(2)),
       csamt: 0.0,
     })),
-    cdnr: [],
+    cdnr: cdnrFormatted,
     hsn: hsnFormatted,
     doc_issue: docIssueFormatted,
   };

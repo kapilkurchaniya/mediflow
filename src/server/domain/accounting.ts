@@ -275,6 +275,7 @@ export interface PostPurchaseJournalParams {
   cgst: number; // in paise
   sgst: number; // in paise
   igst: number; // in paise
+  roundOff?: number; // in paise
   totalAmount: number; // in paise
 }
 
@@ -298,6 +299,7 @@ export async function postPurchaseJournalEntry(params: PostPurchaseJournalParams
     cgst,
     sgst,
     igst,
+    roundOff,
     totalAmount,
   } = params;
 
@@ -369,7 +371,30 @@ export async function postPurchaseJournalEntry(params: PostPurchaseJournalParams
     });
   }
 
-  // --- 2. CREDIT (Supplier Creditors) ---
+  // --- 2. ROUND OFF ---
+  if (roundOff !== undefined && roundOff !== 0 && accounts.roundoff) {
+    if (roundOff < 0) {
+      // Total rounded down -> supplier gave roundoff discount (credit)
+      lines.push({
+        tenantId,
+        entryId: entry.id,
+        accountId: accounts.roundoff,
+        debit: 0,
+        credit: Math.abs(roundOff),
+      });
+    } else {
+      // Total rounded up -> expense (debit)
+      lines.push({
+        tenantId,
+        entryId: entry.id,
+        accountId: accounts.roundoff,
+        debit: roundOff,
+        credit: 0,
+      });
+    }
+  }
+
+  // --- 3. CREDIT (Supplier Creditors) ---
   if (totalAmount > 0 && accounts.creditors) {
     lines.push({
       tenantId,
