@@ -1,4 +1,4 @@
-import { requireAuth } from "@/server/auth";
+import { requirePagePermission } from "@/server/rbac";
 import { db, schema } from "@/server/db";
 import { eq, and } from "drizzle-orm";
 import { notFound } from "next/navigation";
@@ -73,7 +73,7 @@ export default async function PrintRegisterPage({
     return notFound();
   }
 
-  const { session } = await requireAuth();
+  const session = await requirePagePermission("report.view");
   if (!session.storeId) {
     return notFound();
   }
