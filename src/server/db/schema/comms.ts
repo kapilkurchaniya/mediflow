@@ -28,10 +28,11 @@ export const outboxEvents = pgTable(
     status: text("status").notNull().default("pending"), // pending | done | failed
     attempts: integer("attempts").notNull().default(0),
     lastError: text("last_error"),
+    nextAttemptAt: timestamp("next_attempt_at", { withTimezone: true }),
     createdAt: createdAt(),
     processedAt: timestamp("processed_at", { withTimezone: true }),
   },
-  (t) => [index("outbox_pending_idx").on(t.status, t.id)],
+  (t) => [index("outbox_pending_idx").on(t.status, t.nextAttemptAt, t.id)],
 );
 
 export const notifications = pgTable(
