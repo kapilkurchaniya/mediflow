@@ -1,12 +1,14 @@
 import { PageHeader } from "@/app/components/ui";
 import { getBankStatements, getStatementLines, getCandidatePayments } from "@/app/actions/bank-reconciliation";
 import { BankReconciliationClient } from "./BankReconciliationClient";
+import { requirePagePermission } from "@/server/rbac";
 
 export const metadata = {
   title: "Bank Reconciliation — MediFlow",
 };
 
 export default async function BankReconciliationPage() {
+  await requirePagePermission("accounting.view");
   const statements = await getBankStatements();
   const selectedStatementId = statements[0]?.id;
 

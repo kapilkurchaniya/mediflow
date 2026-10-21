@@ -348,7 +348,7 @@ Full map in `.github/CODEOWNERS` and [ADR 0004](docs/adr/0004-two-lane-ownership
 - **Done when:** one module (`racks.ts`) is migrated as the reference example, with its client call sites updated.
 
 #### A1.3 Apply RBAC to Lane A modules + seed roles ⏱ 3 days
-- **Progress:** done already as part of A1.1/A1.2: system roles are seeded at registration (`registerAction`), in `db:seed`, and by a backfill that runs after every `db:migrate` (`src/server/roles.ts`; it replaces the SQL data migration this task originally planned, because the templates live in TypeScript). `racks.ts` is the reference action. `forbidden.tsx` + `requirePagePermission` exist. **Remaining:** the other Lane A modules listed below, and hiding nav items the user cannot use (`permission` is already on every nav item).
+- **Progress:** done already as part of A1.1/A1.2: system roles are seeded at registration (`registerAction`), in `db:seed`, and by a backfill that runs after every `db:migrate` (`src/server/roles.ts`; it replaces the SQL data migration this task originally planned, because the templates live in TypeScript). `racks.ts` is the reference action. `forbidden.tsx` + `requirePagePermission` exist. **Also done (A1.3 complete):** all Lane A actions use `requirePermission`/`checkPermission` (stock, inventory, accounting, sales, settings), every Lane A page/layout calls `requirePagePermission`, the sidebar and command palette hide what the user cannot use, `createSaleInvoice` validates qty/discount/amount server-side and supports an optional discount ceiling (`tenants.settings.maxDiscountBp`, enforced with `sale.discount_override`; a settings screen arrives in A3.1), and `createMedicine` defaults to 5% GST and rejects invalid rates. Lane B's pages/actions are guarded in B1.5.
 - **Files:** ✏️ `src/app/actions/{auth,sales,stock,inventory,racks,accounting,settings}.ts`, plus their client call sites; ✏️ `src/app/actions/auth.ts` (`registerAction` calls `seedSystemRoles(tx, tenant.id)` and assigns the `owner` role, replacing the bare role insert at `auth.ts:104–116`); ➕ a migration with a **data backfill** (for every tenant, create the system roles and permissions, and point existing memberships whose role key is `owner` at the seeded owner role); ✏️ `src/app/components/Sidebar.tsx` (hide nav items whose `permission` the user lacks; pass the permission list from `dashboard/layout.tsx` as a prop; it's a small string array, which is fine); ✏️ Lane A pages: Server Components call `await requirePermission("x.view")` at the top; ➕ `src/app/dashboard/forbidden.tsx` or an inline "no access" component (or enable `experimental.authInterrupts` and use `forbidden()`; read `node_modules/next/dist/docs/01-app/03-api-reference/04-functions/forbidden.md` first; it's experimental).
 - **Permission mapping (Lane A actions):**
   | Action | Permission |
@@ -455,6 +455,12 @@ Full map in `.github/CODEOWNERS` and [ADR 0004](docs/adr/0004-two-lane-ownership
 - **Files:** ➕ `src/app/dashboard/gst/rates/page.tsx` + `RerateClient.tsx`, ➕ action `bulkUpdateGstRates` in `src/app/actions/gst.ts` (permission `medicine.manage`).
 - **How:** filter medicines by current rate and HSN prefix (3003/3004). Preview the count. Set a new rate from `GST_RATES_BP`. Write one audit row per batch of changes. **Only the master** is changed; historical `sale_items` and `purchase_items` keep their stored rate.
 - **Done when:** all 12% items with HSN 3004 move to 5% in one action, with an audit trail.
+
+#### B1.7 Purchase hardening (added after the 20 Oct 2026 test-guide review) ⏱ 2 days
+- **Why:** `createPurchaseInvoice` (`src/app/actions/purchases.ts`) stores the totals the browser sends (`taxableAmount`, `totalAmount`, `discountAmount`) and writes the plain rate as the batch cost, ignoring free quantity. Same class of bug that A1.3 fixed for sales. See B_TEST_GUIDE B-2.0 / B-2.0a.
+- **Files:** ✏️ `src/app/actions/purchases.ts` (convert to `protectedAction("purchase.create")` with a Zod schema; never read amounts from input), ✏️ `src/server/domain/` (extract `createPurchase(tx, ctx, input)` like `createSale`), ➕ `tests/integration/purchase-totals.test.ts`.
+- **How:** recompute with `computePurchaseTotals` / `computePurchaseLine` (already tested in `src/lib/money.ts`); set `batches.purchase_rate` and `stock_movements.unit_cost` to the **landed unit cost** (taxable ÷ (qty + free)) and fill `purchase_items.landed_unit_cost`; use `determineTaxContext`-style logic for inter-state purchases (`igst`, today hard-coded 0); reject negative qty/rate and GST rates not in `GST_RATES_BP`.
+- **Done when:** a tampered request cannot change totals or the journal; a 10+1 purchase gives a unit cost of taxable ÷ 11.
 
 **Phase 1 exit (both lanes):** a cashier login can't do manager things (verified manually and by tests) · invites work · audit log populated · GST and compliance test suites green · inter-state contract merged.
 
@@ -905,7 +911,7 @@ When you start a phase, list your 🤝 items in the Monday sync and merge them b
 Tick items in PRs. One line per task, in the same order as above.
 
 **Phase 0** — A: [x] A0.1 [x] A0.2 [x] A0.3 [x] A0.4 [x] A0.5 [ ] A0.6 [x] A0.7 · B: [ ] B0.1 [ ] B0.2 [ ] B0.3 [ ] B0.4 [ ] B0.5 [ ] B0.6 [ ] B0.7 [ ] B0.8
-**Phase 1** — A: [x] A1.1 [x] A1.2 [ ] A1.3 [ ] A1.4 [ ] A1.5 [ ] A1.6 [ ] A1.7 · B: [ ] B1.1 [ ] B1.2 [ ] B1.3 [ ] B1.4 [ ] B1.5 [ ] B1.6
+**Phase 1** — A: [x] A1.1 [x] A1.2 [x] A1.3 [ ] A1.4 [ ] A1.5 [ ] A1.6 [ ] A1.7 · B: [ ] B1.1 [ ] B1.2 [ ] B1.3 [ ] B1.4 [ ] B1.5 [ ] B1.6 [ ] B1.7
 **Phase 2** — A: [ ] A2.1 [ ] A2.2 [ ] A2.3 [ ] A2.4 [ ] A2.5 [ ] A2.6 [ ] A2.7 [ ] A2.8 [ ] A2.9 · B: [ ] B2.1 [ ] B2.2 [ ] B2.3 [ ] B2.4 [ ] B2.5 [ ] B2.6 [ ] B2.7
 **Phase 3** — A: [ ] A3.1 [ ] A3.2 [ ] A3.3 [ ] A3.4 [ ] A3.5 [ ] A3.6 · B: [ ] B3.1 [ ] B3.2 [ ] B3.3 [ ] B3.4 [ ] B3.5
 **Phase 4** — A: [ ] A4.1 [ ] A4.2 [ ] A4.3 [ ] A4.4 [ ] A4.5 [ ] A4.6 [ ] A4.7 [ ] A4.8 · B: [ ] B4.1 [ ] B4.2 [ ] B4.3 [ ] B4.4 [ ] B4.5

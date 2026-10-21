@@ -12,7 +12,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { useShell } from "./ShellContext";
-import { PALETTE_NAV_ITEMS } from "./nav";
+import { visiblePaletteItems } from "./nav";
 import clsx from "clsx";
 
 interface CommandItem {
@@ -31,6 +31,7 @@ export function CommandPalette() {
     setCommandOpen,
     toggleCollapsed,
     setShortcutsOpen,
+    permissions,
   } = useShell();
   const router = useRouter();
   const [query, setQuery] = useState("");
@@ -46,7 +47,7 @@ export function CommandPalette() {
   const items: CommandItem[] = useMemo(
     () => [
       // Navigation: generated from the same config as the sidebar (components/nav)
-      ...PALETTE_NAV_ITEMS.map(
+      ...visiblePaletteItems(permissions).map(
         (n): CommandItem => ({
           id: `nav-${n.href}`,
           category: "Navigation",
@@ -100,7 +101,7 @@ export function CommandPalette() {
         },
       },
     ],
-    [router, setCommandOpen, toggleCollapsed, setShortcutsOpen]
+    [router, setCommandOpen, toggleCollapsed, setShortcutsOpen, permissions]
   );
 
   const filteredItems = useMemo(() => {

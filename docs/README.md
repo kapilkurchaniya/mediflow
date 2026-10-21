@@ -20,7 +20,7 @@ Start here. Each file answers one question. The order is the suggested reading o
 | — | [Glossary](glossary.md) | Every pharmacy, GST and engineering term used in these docs |
 | — | [Decision records](adr/) | Why we chose what we chose (ADRs) |
 
-The plan of work lives in [`../ROADMAP.md`](../ROADMAP.md). The contribution rules live in [`../CONTRIBUTING.md`](../CONTRIBUTING.md).
+Manual test guides: [`../A_TEST_GUIDE.md`](../A_TEST_GUIDE.md) (Lane A) and [`../B_TEST_GUIDE.md`](../B_TEST_GUIDE.md) (Lane B). The plan of work lives in [`../ROADMAP.md`](../ROADMAP.md). The contribution rules live in [`../CONTRIBUTING.md`](../CONTRIBUTING.md).
 
 ## Keeping docs alive
 

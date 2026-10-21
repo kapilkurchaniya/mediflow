@@ -37,6 +37,9 @@ export async function createTestDb() {
   }
 
   const pool = new pg.Pool({ connectionString: urlFor(dbName), max: 10 });
+  // While the database is being dropped, a connection that is still closing can report "terminating connection
+  // due to administrator command" (57P01). An unhandled 'error' event would fail the whole run despite green tests.
+  pool.on("error", () => {});
   const db = drizzle(pool, { schema });
 
   async function cleanup() {

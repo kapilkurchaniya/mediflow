@@ -6,6 +6,7 @@ import { ReportShell } from "@/app/components/ReportShell";
 import { StatCard } from "@/app/components/ui";
 import { formatINR } from "@/lib/format";
 import { TrendingUp, IndianRupee, ShoppingCart, Percent } from "lucide-react";
+import { requirePagePermission } from "@/server/rbac";
 
 export const metadata = {
   title: "Profit & Loss Statement | MediFlow Accounting",
@@ -17,6 +18,7 @@ export default async function ProfitAndLossPage({
 }: {
   searchParams: Promise<{ range?: string; from?: string; to?: string }>;
 }) {
+  await requirePagePermission("accounting.view");
   const params = await searchParams;
   const dateRange = resolveDateRange({
     range: params.range,

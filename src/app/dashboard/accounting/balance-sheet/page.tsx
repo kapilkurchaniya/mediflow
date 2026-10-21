@@ -5,6 +5,7 @@ import { StatCard } from "@/app/components/ui";
 import { formatINR } from "@/lib/format";
 import { Landmark, CheckCircle2, AlertTriangle, ShieldCheck, Wallet } from "lucide-react";
 import { format } from "date-fns";
+import { requirePagePermission } from "@/server/rbac";
 
 export const metadata = {
   title: "Balance Sheet | MediFlow Accounting",
@@ -16,6 +17,7 @@ export default async function BalanceSheetPage({
 }: {
   searchParams: Promise<{ to?: string }>;
 }) {
+  await requirePagePermission("accounting.view");
   const params = await searchParams;
   const asOf = params.to || format(new Date(), "yyyy-MM-dd");
 

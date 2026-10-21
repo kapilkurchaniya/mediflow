@@ -3,6 +3,7 @@ import { Plus, Pill, Upload } from "lucide-react";
 import Link from "next/link";
 import { PageHeader, SearchForm, EmptyState } from "@/app/components/ui";
 import { formatINR, formatNumber } from "@/lib/format";
+import { requirePagePermission } from "@/server/rbac";
 
 export const metadata = { title: "Item master" };
 
@@ -11,6 +12,7 @@ export default async function InventoryPage({
 }: {
   searchParams: Promise<{ q?: string }>;
 }) {
+  await requirePagePermission("medicine.view");
   const { q } = await searchParams;
   const items = await getMedicines(q);
   const rxCount = items.filter((i) => i.medicine.rxRequired).length;

@@ -3,10 +3,12 @@ import { eq } from "drizzle-orm";
 import { requireAuth } from "@/server/auth";
 import { PageHeader } from "@/app/components/ui";
 import { NewSchemeForm } from "./NewSchemeForm";
+import { requirePagePermission } from "@/server/rbac";
 
 export const dynamic = "force-dynamic";
 
 export default async function NewSchemePage() {
+  await requirePagePermission("purchase.view");
   const { session } = await requireAuth();
 
   const [medicines, suppliers, categories] = await Promise.all([

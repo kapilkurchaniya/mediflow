@@ -28,6 +28,7 @@ async function main() {
 
   execSync("npx tsx src/server/db/migrate.ts", { stdio: "inherit" });
   execSync("npx tsx scripts/setup-db.ts", { stdio: "inherit" });
+  execSync("npx tsx scripts/seed-test-users.ts", { stdio: "inherit" }); // one login per role, for manual testing
 }
 
 main().catch((err) => {
