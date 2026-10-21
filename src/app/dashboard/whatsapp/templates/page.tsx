@@ -1,12 +1,14 @@
 import { PageHeader } from "@/app/components/ui";
 import { getWhatsAppTemplates } from "@/app/actions/whatsapp";
 import { TemplatesClient } from "./TemplatesClient";
+import { requirePagePermission } from "@/server/rbac";
 
 export const metadata = {
   title: "WhatsApp Templates — MediFlow",
 };
 
 export default async function WhatsAppTemplatesPage() {
+  await requirePagePermission("settings.manage");
   const templates = await getWhatsAppTemplates();
 
   // If none yet, provide standard default templates
