@@ -49,5 +49,5 @@ const CLEAN_PATHS = [
   "src/app/dashboard/whatsapp",
 ];
 
-const r = spawnSync("npx", ["eslint", "--quiet", ...CLEAN_PATHS], { stdio: "inherit" });
+const r = spawnSync("npx", ["eslint", "--quiet", ...CLEAN_PATHS], { stdio: "inherit", shell: true });
 process.exit(r.status ?? 1);

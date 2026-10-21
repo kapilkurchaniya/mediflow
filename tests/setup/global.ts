@@ -16,7 +16,30 @@ export default async function setup() {
   const tpl = templateDbName();
 
   try {
-    const admin = new pg.Client({ connectionString: urlFor(baseDbName()) });
+    const base = baseDbName();
+    let initClient: pg.Client | null = null;
+    for (const maintenanceDb of ["mediflow", "postgres"]) {
+      try {
+        const client = new pg.Client({ connectionString: urlFor(maintenanceDb) });
+        await client.connect();
+        initClient = client;
+        break;
+      } catch {
+        // try next maintenance db
+      }
+    }
+    if (initClient) {
+      const checkRes = await initClient.query(
+        "select 1 from pg_database where datname = $1",
+        [base]
+      );
+      if (checkRes.rowCount === 0) {
+        await initClient.query(`create database "${base}"`);
+      }
+      await initClient.end();
+    }
+
+    const admin = new pg.Client({ connectionString: urlFor(base) });
     await admin.connect();
     await admin.query(`drop database if exists "${tpl}" with (force)`);
     await admin.query(`create database "${tpl}"`);
