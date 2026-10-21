@@ -6,10 +6,17 @@ import { eq, and, desc, gte, lte } from "drizzle-orm";
 import { requirePermission } from "@/server/rbac";
 import { protectedAction } from "@/server/action";
 import { revalidatePath } from "next/cache";
-import { createPurchase, type CreatePurchaseInput } from "@/server/domain/purchases";
 import { isUniqueViolation } from "@/server/db/errors";
-import { isValidGstRateBp } from "@/lib/regulatory";
 import { DomainError } from "@/server/errors";
+import {
+  createPurchase,
+  CreatePurchaseSchema,
+  PurchaseItemInputSchema,
+  type CreatePurchaseInput,
+  type PurchaseItemInput,
+} from "@/server/domain/purchases";
+
+export type { PurchaseItemInput };
 
 export async function getPurchases(dateFrom?: string | null, dateTo?: string | null) {
   const ctx = await requirePermission("purchase.view");
@@ -76,31 +83,6 @@ export async function getPurchaseById(purchaseId: string) {
     items,
   };
 }
-
-export const PurchaseItemInputSchema = z.object({
-  medicineId: z.string().min(1, "Medicine is required"),
-  batchNo: z.string().min(1, "Batch number is required"),
-  expiryDate: z.string().min(1, "Expiry date is required"),
-  qty: z.number().int().positive("Quantity must be greater than zero"),
-  freeQty: z.number().int().min(0, "Free quantity cannot be negative").default(0),
-  rate: z.number().int().min(0, "Rate cannot be negative"), // paise
-  mrp: z.number().int().min(0, "MRP cannot be negative"), // paise
-  saleRate: z.number().int().min(0, "Sale rate cannot be negative"), // paise
-  discountBp: z.number().int().min(0).max(10000, "Discount cannot exceed 100%").default(0),
-  gstRateBp: z.number().int().refine((bp) => isValidGstRateBp(bp), {
-    message: "Invalid GST rate",
-  }),
-});
-
-export type PurchaseItemInput = z.infer<typeof PurchaseItemInputSchema>;
-
-export const CreatePurchaseSchema = z.object({
-  supplierId: z.string().min(1, "Supplier is required"),
-  supplierInvoiceNo: z.string().min(1, "Supplier invoice number is required"),
-  invoiceDate: z.string().min(1, "Invoice date is required"),
-  items: z.array(PurchaseItemInputSchema).min(1, "At least one item is required"),
-  notes: z.string().optional(),
-});
 
 function revalidatePurchasePaths() {
   revalidatePath("/dashboard/purchases");

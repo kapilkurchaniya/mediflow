@@ -20,22 +20,22 @@ import {
   generateEWayBillForDocument,
   type EWayBillInput,
 } from "@/server/domain/e-invoice";
+import { writeAudit } from "@/server/audit";
 
 export async function getGstDashboard(params?: { month?: number; year?: number }) {
-  const { session } = await requireAuth();
-  if (!session.storeId) throw new Error("Store required");
+  const ctx = await requirePermission("gst.view");
 
   const now = new Date();
   const month = params?.month || now.getMonth() + 1;
   const year = params?.year || now.getFullYear();
 
   // Auto-sync any existing completed sales/purchases that don't have gstDocuments yet
-  await syncPendingGstDocuments(session.tenantId, session.storeId);
+  await syncPendingGstDocuments(ctx.tenantId, ctx.storeId);
 
   const [gstr1, gstr2, recon] = await Promise.all([
-    buildGstr1Data(db, { tenantId: session.tenantId, storeId: session.storeId, month, year }),
-    buildGstr2Data(db, { tenantId: session.tenantId, storeId: session.storeId, month, year }),
-    reconcileGst(db, { tenantId: session.tenantId, storeId: session.storeId, month, year }),
+    buildGstr1Data(db, { tenantId: ctx.tenantId, storeId: ctx.storeId, month, year }),
+    buildGstr2Data(db, { tenantId: ctx.tenantId, storeId: ctx.storeId, month, year }),
+    reconcileGst(db, { tenantId: ctx.tenantId, storeId: ctx.storeId, month, year }),
   ]);
 
   // E-Invoice counts
@@ -44,7 +44,7 @@ export async function getGstDashboard(params?: { month?: number; year?: number }
     .from(schema.gstDocuments)
     .where(
       and(
-        eq(schema.gstDocuments.tenantId, session.tenantId),
+        eq(schema.gstDocuments.tenantId, ctx.tenantId),
         eq(schema.gstDocuments.supplyType, "B2B"),
         eq(schema.gstDocuments.refType, "sale"),
         sql`${schema.gstDocuments.irn} is null`,
@@ -57,7 +57,7 @@ export async function getGstDashboard(params?: { month?: number; year?: number }
     .from(schema.gstDocuments)
     .where(
       and(
-        eq(schema.gstDocuments.tenantId, session.tenantId),
+        eq(schema.gstDocuments.tenantId, ctx.tenantId),
         sql`${schema.gstDocuments.eWayBillNo} is not null`,
         eq(schema.gstDocuments.status, "active")
       )
@@ -67,7 +67,7 @@ export async function getGstDashboard(params?: { month?: number; year?: number }
   const recentDocs = await db
     .select()
     .from(schema.gstDocuments)
-    .where(eq(schema.gstDocuments.tenantId, session.tenantId))
+    .where(eq(schema.gstDocuments.tenantId, ctx.tenantId))
     .orderBy(desc(schema.gstDocuments.docDate), desc(schema.gstDocuments.createdAt))
     .limit(10);
 
@@ -88,14 +88,14 @@ export async function getOutwardSupplies(params?: {
   year?: number;
   supplyType?: string;
 }) {
-  const { session } = await requireAuth();
+  const ctx = await requirePermission("gst.view");
   const now = new Date();
   const month = params?.month || now.getMonth() + 1;
   const year = params?.year || now.getFullYear();
 
   const data = await buildGstr1Data(db, {
-    tenantId: session.tenantId,
-    storeId: session.storeId,
+    tenantId: ctx.tenantId,
+    storeId: ctx.storeId,
     month,
     year,
   });
@@ -107,14 +107,14 @@ export async function getInwardSupplies(params?: {
   month?: number;
   year?: number;
 }) {
-  const { session } = await requireAuth();
+  const ctx = await requirePermission("gst.view");
   const now = new Date();
   const month = params?.month || now.getMonth() + 1;
   const year = params?.year || now.getFullYear();
 
   const data = await buildGstr2Data(db, {
-    tenantId: session.tenantId,
-    storeId: session.storeId,
+    tenantId: ctx.tenantId,
+    storeId: ctx.storeId,
     month,
     year,
   });
@@ -126,24 +126,24 @@ export async function getGstReconciliation(params?: {
   month?: number;
   year?: number;
 }) {
-  const { session } = await requireAuth();
+  const ctx = await requirePermission("gst.view");
   const now = new Date();
   const month = params?.month || now.getMonth() + 1;
   const year = params?.year || now.getFullYear();
 
   return reconcileGst(db, {
-    tenantId: session.tenantId,
-    storeId: session.storeId,
+    tenantId: ctx.tenantId,
+    storeId: ctx.storeId,
     month,
     year,
   });
 }
 
 export async function getEInvoicesList(params?: { status?: string }) {
-  const { session } = await requireAuth();
+  const ctx = await requirePermission("gst.view");
 
   const conditions = [
-    eq(schema.gstDocuments.tenantId, session.tenantId),
+    eq(schema.gstDocuments.tenantId, ctx.tenantId),
     eq(schema.gstDocuments.refType, "sale"),
     eq(schema.gstDocuments.supplyType, "B2B"),
   ];
@@ -168,12 +168,19 @@ export async function getEInvoicesList(params?: { status?: string }) {
 }
 
 export async function generateEInvoiceAction(gstDocumentId: string) {
-  const { session } = await requireAuth();
+  const ctx = await requirePermission("accounting.post");
 
   try {
     const result = await generateEInvoiceForDocument(db, {
       gstDocumentId,
-      tenantId: session.tenantId,
+      tenantId: ctx.tenantId,
+    });
+
+    await writeAudit(db, ctx, {
+      action: "create",
+      entityType: "e_invoice",
+      entityId: gstDocumentId,
+      newValue: { irn: result.irn, ackNo: result.ackNo },
     });
 
     revalidatePath("/dashboard/gst");
@@ -189,14 +196,21 @@ export async function cancelEInvoiceAction(
   reasonCode: "1" | "2" | "3" | "4",
   remarks: string
 ) {
-  const { session } = await requireAuth();
+  const ctx = await requirePermission("accounting.post");
 
   try {
     const result = await cancelEInvoiceForDocument(db, {
       gstDocumentId,
-      tenantId: session.tenantId,
+      tenantId: ctx.tenantId,
       reasonCode,
       remarks,
+    });
+
+    await writeAudit(db, ctx, {
+      action: "cancel",
+      entityType: "e_invoice",
+      entityId: gstDocumentId,
+      reason: `Reason Code ${reasonCode}: ${remarks.trim()}`,
     });
 
     revalidatePath("/dashboard/gst");
@@ -211,13 +225,20 @@ export async function generateEWayBillAction(
   gstDocumentId: string,
   transportDetails: EWayBillInput
 ) {
-  const { session } = await requireAuth();
+  const ctx = await requirePermission("accounting.post");
 
   try {
     const result = await generateEWayBillForDocument(db, {
       gstDocumentId,
-      tenantId: session.tenantId,
+      tenantId: ctx.tenantId,
       transportDetails,
+    });
+
+    await writeAudit(db, ctx, {
+      action: "create",
+      entityType: "eway_bill",
+      entityId: gstDocumentId,
+      newValue: { ewayBillNo: result.ewayBillNo, validUpto: result.validUpto },
     });
 
     revalidatePath("/dashboard/gst");
@@ -233,23 +254,23 @@ export async function generateEWayBillAction(
 }
 
 export async function downloadGstr1JsonAction(month: number, year: number) {
-  const { session } = await requireAuth();
+  const ctx = await requirePermission("report.export");
 
   const [tenant] = await db
     .select({ gstin: schema.tenants.gstin })
     .from(schema.tenants)
-    .where(eq(schema.tenants.id, session.tenantId));
+    .where(eq(schema.tenants.id, ctx.tenantId));
 
   const [store] = await db
     .select({ gstin: schema.stores.gstin })
     .from(schema.stores)
-    .where(eq(schema.stores.id, session.storeId!));
+    .where(eq(schema.stores.id, ctx.storeId));
 
   const gstin = store?.gstin || tenant?.gstin || "27AAPCS1234F1Z5";
 
   const gstr1 = await buildGstr1Data(db, {
-    tenantId: session.tenantId,
-    storeId: session.storeId,
+    tenantId: ctx.tenantId,
+    storeId: ctx.storeId,
     month,
     year,
   });
