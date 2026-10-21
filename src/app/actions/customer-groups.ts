@@ -2,12 +2,12 @@
 
 import { db, schema } from "@/server/db";
 import { eq, and, desc, sql } from "drizzle-orm";
-import { requireAuth } from "@/server/auth";
+import { requirePermission } from "@/server/rbac";
 import { revalidatePath } from "next/cache";
 import { FamilyLedgerService } from "@/server/domain/family-ledger";
 
 export async function getCustomerGroups() {
-  const { session } = await requireAuth();
+  const ctx = await requirePermission("customer.view");
 
   const groups = await db
     .select({
@@ -20,7 +20,7 @@ export async function getCustomerGroups() {
     })
     .from(schema.customerGroups)
     .leftJoin(schema.customers, eq(schema.customerGroups.id, schema.customers.groupId))
-    .where(eq(schema.customerGroups.tenantId, session.tenantId))
+    .where(eq(schema.customerGroups.tenantId, ctx.tenantId))
     .groupBy(schema.customerGroups.id)
     .orderBy(schema.customerGroups.name);
 
@@ -28,7 +28,7 @@ export async function getCustomerGroups() {
 }
 
 export async function createCustomerGroup(formData: FormData) {
-  const { session } = await requireAuth();
+  const ctx = await requirePermission("customer.manage");
 
   const name = formData.get("name") as string;
   const creditLimitStr = formData.get("creditLimit") as string;
@@ -42,7 +42,7 @@ export async function createCustomerGroup(formData: FormData) {
     const [group] = await db
       .insert(schema.customerGroups)
       .values({
-        tenantId: session.tenantId,
+        tenantId: ctx.tenantId,
         name: name.trim(),
         creditLimit: creditLimit ?? undefined,
         notes: notes?.trim() || null,
@@ -57,13 +57,13 @@ export async function createCustomerGroup(formData: FormData) {
 }
 
 export async function addCustomerToGroup(groupId: string, customerId: string) {
-  const { session } = await requireAuth();
+  const ctx = await requirePermission("customer.manage");
 
   try {
     await db
       .update(schema.customers)
       .set({ groupId })
-      .where(and(eq(schema.customers.id, customerId), eq(schema.customers.tenantId, session.tenantId)));
+      .where(and(eq(schema.customers.id, customerId), eq(schema.customers.tenantId, ctx.tenantId)));
 
     revalidatePath("/dashboard/customers/groups");
     revalidatePath("/dashboard/customers");
@@ -74,13 +74,13 @@ export async function addCustomerToGroup(groupId: string, customerId: string) {
 }
 
 export async function removeCustomerFromGroup(customerId: string) {
-  const { session } = await requireAuth();
+  const ctx = await requirePermission("customer.manage");
 
   try {
     await db
       .update(schema.customers)
       .set({ groupId: null })
-      .where(and(eq(schema.customers.id, customerId), eq(schema.customers.tenantId, session.tenantId)));
+      .where(and(eq(schema.customers.id, customerId), eq(schema.customers.tenantId, ctx.tenantId)));
 
     revalidatePath("/dashboard/customers/groups");
     revalidatePath("/dashboard/customers");
@@ -91,11 +91,11 @@ export async function removeCustomerFromGroup(customerId: string) {
 }
 
 export async function getFamilyGroupDetails(groupId: string) {
-  const { session } = await requireAuth();
+  const ctx = await requirePermission("customer.view");
 
   const [summary, ledger] = await Promise.all([
-    FamilyLedgerService.getGroupSummary(session.tenantId, groupId),
-    FamilyLedgerService.getCombinedGroupLedger(session.tenantId, groupId),
+    FamilyLedgerService.getGroupSummary(ctx.tenantId, groupId),
+    FamilyLedgerService.getCombinedGroupLedger(ctx.tenantId, groupId),
   ]);
 
   return {

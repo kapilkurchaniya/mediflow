@@ -2,18 +2,18 @@
 
 import { db, schema } from "@/server/db";
 import { eq, and } from "drizzle-orm";
-import { requireAuth } from "@/server/auth";
+import { requirePermission } from "@/server/rbac";
 import { revalidatePath } from "next/cache";
 import { getSmsProvider } from "@/server/domain/sms";
 import { encryptSecret, maskSecret, isMasked } from "@/server/crypto";
 
 export async function getSmsConfig() {
-  const { session } = await requireAuth();
+  const ctx = await requirePermission("settings.manage");
 
   const [config] = await db
     .select()
     .from(schema.smsConfigs)
-    .where(eq(schema.smsConfigs.tenantId, session.tenantId))
+    .where(eq(schema.smsConfigs.tenantId, ctx.tenantId))
     .limit(1);
 
   if (!config) return null;
@@ -26,7 +26,7 @@ export async function getSmsConfig() {
 }
 
 export async function saveSmsConfig(formData: FormData) {
-  const { session } = await requireAuth();
+  const ctx = await requirePermission("settings.manage");
 
   const provider = (formData.get("provider") as string) || "msg91";
   const apiKeyInput = formData.get("apiKey") as string;
@@ -40,11 +40,10 @@ export async function saveSmsConfig(formData: FormData) {
       : undefined;
 
   try {
-    // Re-read raw (encrypted) record to preserve the existing key when not changing.
     const [rawExisting] = await db
       .select()
       .from(schema.smsConfigs)
-      .where(eq(schema.smsConfigs.tenantId, session.tenantId))
+      .where(eq(schema.smsConfigs.tenantId, ctx.tenantId))
       .limit(1);
 
     if (rawExisting) {
@@ -59,7 +58,7 @@ export async function saveSmsConfig(formData: FormData) {
         .where(eq(schema.smsConfigs.id, rawExisting.id));
     } else {
       await db.insert(schema.smsConfigs).values({
-        tenantId: session.tenantId,
+        tenantId: ctx.tenantId,
         provider,
         apiKey: newApiKey ?? null,
         senderId: senderId?.trim() || null,
@@ -75,13 +74,13 @@ export async function saveSmsConfig(formData: FormData) {
 }
 
 export async function sendTestSms(phone: string, message: string) {
-  const { session } = await requireAuth();
+  const ctx = await requirePermission("customer.manage");
 
   if (!phone?.trim()) return { error: "Phone number required" };
   if (!message?.trim()) return { error: "Message content required" };
 
   try {
-    const provider = await getSmsProvider(session.tenantId);
+    const provider = await getSmsProvider(ctx.tenantId);
     const res = await provider.sendSms(phone, message);
     return res;
   } catch (err: unknown) {

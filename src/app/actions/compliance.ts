@@ -2,8 +2,9 @@
 
 import { db, schema } from "@/server/db";
 import { eq, and, desc, gte, lte, ilike, or, sql } from "drizzle-orm";
-import { requireAuth } from "@/server/auth";
+import { requirePermission } from "@/server/rbac";
 import { revalidatePath } from "next/cache";
+import { writeAudit } from "@/server/audit";
 import {
   queryComplianceRegister,
   getComplianceStats,
@@ -12,8 +13,8 @@ import {
 } from "@/server/domain/compliance";
 
 export async function getComplianceOverview() {
-  const { session } = await requireAuth();
-  const stats = await getComplianceStats(db, session.tenantId, session.storeId);
+  const ctx = await requirePermission("report.view");
+  const stats = await getComplianceStats(db, ctx.tenantId, ctx.storeId);
   return stats;
 }
 
@@ -25,14 +26,14 @@ export async function getDispensingLogs(params: {
   page?: number;
   limit?: number;
 }) {
-  const { session } = await requireAuth();
+  const ctx = await requirePermission("report.view");
   const limit = params.limit ?? 50;
   const page = params.page ?? 1;
   const offset = (page - 1) * limit;
 
   const logs = await queryComplianceRegister(db, {
-    tenantId: session.tenantId,
-    storeId: session.storeId,
+    tenantId: ctx.tenantId,
+    storeId: ctx.storeId,
     registerType: params.registerType,
     dateFrom: params.dateFrom,
     dateTo: params.dateTo,
@@ -45,9 +46,9 @@ export async function getDispensingLogs(params: {
 }
 
 export async function getDoctors(searchQuery?: string) {
-  const { session } = await requireAuth();
+  const ctx = await requirePermission("report.view");
   const conditions = [
-    eq(schema.doctors.tenantId, session.tenantId),
+    eq(schema.doctors.tenantId, ctx.tenantId),
     eq(schema.doctors.isActive, true),
   ];
 
@@ -84,7 +85,7 @@ export async function upsertDoctor(data: {
   email?: string | null;
   address?: string | null;
 }) {
-  const { session } = await requireAuth();
+  const ctx = await requirePermission("prescription.approve");
 
   if (!data.name.trim()) return { error: "Doctor name is required" };
   if (!data.regNo.trim()) return { error: "Medical Council Registration Number is required" };
@@ -106,7 +107,7 @@ export async function upsertDoctor(data: {
         .where(
           and(
             eq(schema.doctors.id, data.id),
-            eq(schema.doctors.tenantId, session.tenantId)
+            eq(schema.doctors.tenantId, ctx.tenantId)
           )
         );
       revalidatePath("/dashboard/compliance");
@@ -116,7 +117,7 @@ export async function upsertDoctor(data: {
     const [inserted] = await db
       .insert(schema.doctors)
       .values({
-        tenantId: session.tenantId,
+        tenantId: ctx.tenantId,
         name: data.name.trim(),
         regNo: data.regNo.trim(),
         qualification: data.qualification?.trim() || null,
@@ -145,14 +146,14 @@ export async function getPrescriptions(params: {
   page?: number;
   limit?: number;
 }) {
-  const { session } = await requireAuth();
+  const ctx = await requirePermission("prescription.approve");
   const limit = params.limit ?? 30;
   const page = params.page ?? 1;
   const offset = (page - 1) * limit;
 
   const conditions = [
-    eq(schema.prescriptions.tenantId, session.tenantId),
-    eq(schema.prescriptions.storeId, session.storeId),
+    eq(schema.prescriptions.tenantId, ctx.tenantId),
+    eq(schema.prescriptions.storeId, ctx.storeId),
   ];
 
   if (params.status && params.status !== "all") {
@@ -189,7 +190,7 @@ export async function getPrescriptions(params: {
 }
 
 export async function getPrescriptionDetails(prescriptionId: string) {
-  const { session } = await requireAuth();
+  const ctx = await requirePermission("prescription.approve");
 
   const [rx] = await db
     .select({
@@ -203,7 +204,7 @@ export async function getPrescriptionDetails(prescriptionId: string) {
     .where(
       and(
         eq(schema.prescriptions.id, prescriptionId),
-        eq(schema.prescriptions.tenantId, session.tenantId)
+        eq(schema.prescriptions.tenantId, ctx.tenantId)
       )
     );
 
@@ -244,7 +245,7 @@ export async function createPrescription(data: {
     instructions?: string | null;
   }>;
 }) {
-  const { session } = await requireAuth();
+  const ctx = await requirePermission("prescription.approve");
 
   if (!data.patientName.trim()) return { error: "Patient name is required" };
   if (!data.doctorName.trim()) return { error: "Doctor name is required" };
@@ -263,8 +264,8 @@ export async function createPrescription(data: {
       const [insertedRx] = await tx
         .insert(schema.prescriptions)
         .values({
-          tenantId: session.tenantId,
-          storeId: session.storeId,
+          tenantId: ctx.tenantId,
+          storeId: ctx.storeId,
           customerId: data.customerId || null,
           patientName: data.patientName.trim(),
           patientAge: data.patientAge ?? null,
@@ -286,7 +287,7 @@ export async function createPrescription(data: {
         .returning({ id: schema.prescriptions.id });
 
       const itemsToInsert = data.items.map((item) => ({
-        tenantId: session.tenantId,
+        tenantId: ctx.tenantId,
         prescriptionId: insertedRx.id,
         medicineId: item.medicineId || null,
         medicineName: item.medicineName.trim(),
@@ -298,6 +299,13 @@ export async function createPrescription(data: {
       }));
 
       await tx.insert(schema.prescriptionItems).values(itemsToInsert);
+
+      await writeAudit(tx, ctx, {
+        action: "create",
+        entityType: "prescription",
+        entityId: insertedRx.id,
+        newValue: { patientName: data.patientName, doctorName: data.doctorName, itemsCount: data.items.length },
+      });
 
       return insertedRx.id;
     });
@@ -314,11 +322,11 @@ export async function exportRegisterCsvData(params: {
   dateFrom?: string;
   dateTo?: string;
 }) {
-  const { session } = await requireAuth();
+  const ctx = await requirePermission("report.export");
 
   const logs = await queryComplianceRegister(db, {
-    tenantId: session.tenantId,
-    storeId: session.storeId,
+    tenantId: ctx.tenantId,
+    storeId: ctx.storeId,
     registerType: params.registerType,
     dateFrom: params.dateFrom,
     dateTo: params.dateTo,
@@ -382,7 +390,7 @@ export async function exportRegisterCsvData(params: {
  * Cancels a prescription without deletion (B1.4 statutory audit trail preservation).
  */
 export async function cancelPrescription(prescriptionId: string, reason?: string) {
-  const { session } = await requireAuth();
+  const ctx = await requirePermission("prescription.approve");
 
   const [rx] = await db
     .select()
@@ -390,23 +398,34 @@ export async function cancelPrescription(prescriptionId: string, reason?: string
     .where(
       and(
         eq(schema.prescriptions.id, prescriptionId),
-        eq(schema.prescriptions.tenantId, session.tenantId)
+        eq(schema.prescriptions.tenantId, ctx.tenantId)
       )
     );
 
   if (!rx) return { error: "Prescription not found" };
   if (rx.status === "cancelled") return { error: "Prescription is already cancelled" };
 
-  await db
-    .update(schema.prescriptions)
-    .set({
-      status: "cancelled",
-      notes: reason
-        ? `${rx.notes ? rx.notes + " | " : ""}Cancelled: ${reason.trim()}`
-        : rx.notes,
-      updatedAt: new Date(),
-    })
-    .where(eq(schema.prescriptions.id, prescriptionId));
+  await db.transaction(async (tx) => {
+    await tx
+      .update(schema.prescriptions)
+      .set({
+        status: "cancelled",
+        notes: reason
+          ? `${rx.notes ? rx.notes + " | " : ""}Cancelled: ${reason.trim()}`
+          : rx.notes,
+        updatedAt: new Date(),
+      })
+      .where(eq(schema.prescriptions.id, prescriptionId));
+
+    await writeAudit(tx, ctx, {
+      action: "cancel",
+      entityType: "prescription",
+      entityId: prescriptionId,
+      oldValue: { status: rx.status },
+      newValue: { status: "cancelled" },
+      reason: reason?.trim() || "Prescription cancelled",
+    });
+  });
 
   revalidatePath("/dashboard/compliance/prescriptions");
   return { success: true };

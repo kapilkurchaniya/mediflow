@@ -2,10 +2,10 @@
 
 import { db, schema } from "@/server/db";
 import { eq, and, desc, sql, gte, lt } from "drizzle-orm";
-import { getCurrentSession, requireAuth } from "@/server/auth";
+import { requirePermission } from "@/server/rbac";
 
 export async function getDashboardStats(dateRange?: { from?: string | null; to?: string | null }) {
-  const { session } = await requireAuth();
+  const ctx = await requirePermission("dashboard.view");
 
   const todayStr = new Date().toISOString().split("T")[0];
   const ninetyDaysFromNow = new Date();
@@ -14,8 +14,8 @@ export async function getDashboardStats(dateRange?: { from?: string | null; to?:
 
   // 1. Sales - Filtered by date range if provided, or defaults to today
   const salesConditions = [
-    eq(schema.sales.tenantId, session.tenantId),
-    eq(schema.sales.storeId, session.storeId),
+    eq(schema.sales.tenantId, ctx.tenantId),
+    eq(schema.sales.storeId, ctx.storeId),
     eq(schema.sales.status, "completed"),
   ];
 
@@ -43,8 +43,8 @@ export async function getDashboardStats(dateRange?: { from?: string | null; to?:
     .from(schema.batches)
     .where(
       and(
-        eq(schema.batches.tenantId, session.tenantId),
-        eq(schema.batches.storeId, session.storeId),
+        eq(schema.batches.tenantId, ctx.tenantId),
+        eq(schema.batches.storeId, ctx.storeId),
         gte(schema.batches.qtyOnHand, 1),
         lt(schema.batches.expiryDate, expiryThresholdStr)
       )
@@ -55,8 +55,8 @@ export async function getDashboardStats(dateRange?: { from?: string | null; to?:
     SELECT COUNT(*) as count FROM (
       SELECT m.id, m.name, COALESCE(SUM(b.qty_on_hand), 0) as total_qty, m.reorder_level
       FROM ${schema.medicines} m
-      LEFT JOIN ${schema.batches} b ON m.id = b.medicine_id AND b.store_id = ${session.storeId} AND b.tenant_id = ${session.tenantId}
-      WHERE m.tenant_id = ${session.tenantId} AND m.is_active = true
+      LEFT JOIN ${schema.batches} b ON m.id = b.medicine_id AND b.store_id = ${ctx.storeId} AND b.tenant_id = ${ctx.tenantId}
+      WHERE m.tenant_id = ${ctx.tenantId} AND m.is_active = true
       GROUP BY m.id, m.name, m.reorder_level
       HAVING COALESCE(SUM(b.qty_on_hand), 0) <= COALESCE(m.reorder_level, 10)
     ) as subquery
@@ -64,8 +64,8 @@ export async function getDashboardStats(dateRange?: { from?: string | null; to?:
 
   // 4. Recent Sales (scoped to tenant and store)
   const recentSalesConditions = [
-    eq(schema.sales.tenantId, session.tenantId),
-    eq(schema.sales.storeId, session.storeId),
+    eq(schema.sales.tenantId, ctx.tenantId),
+    eq(schema.sales.storeId, ctx.storeId),
   ];
   if (dateRange?.from) {
     recentSalesConditions.push(sql`${schema.sales.createdAt} >= ${dateRange.from}::date`);
