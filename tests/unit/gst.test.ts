@@ -7,6 +7,7 @@ import {
   determineSupplyType,
   getStateName,
   buildGstr1JsonPayload,
+  type Gstr1Summary,
 } from "@/server/domain/gst";
 import { B2CL_THRESHOLD_PAISE } from "@/lib/regulatory";
 
@@ -216,7 +217,7 @@ describe("getStateName", () => {
 
 describe("buildGstr1JsonPayload (GSTR-1 Portal Schema Compliance)", () => {
   it("formats summary into standard GSTR-1 JSON schema structure with all required tables", () => {
-    const mockSummary = {
+    const mockSummary: Gstr1Summary = {
       period: { month: 10, year: 2026, fromDate: "2026-10-01", toDate: "2026-10-31" },
       b2b: [
         {
@@ -257,6 +258,7 @@ describe("buildGstr1JsonPayload (GSTR-1 Portal Schema Compliance)", () => {
           total: 52500,
         },
       ],
+      cdnr: [],
       hsnSummary: [
         {
           hsn: "30049099",
@@ -290,7 +292,7 @@ describe("buildGstr1JsonPayload (GSTR-1 Portal Schema Compliance)", () => {
       },
     };
 
-    const payload = buildGstr1JsonPayload(mockSummary as any, "27AAPCS1234F1ZD");
+    const payload = buildGstr1JsonPayload(mockSummary, "27AAPCS1234F1ZD");
 
     expect(payload.gstin).toBe("27AAPCS1234F1ZD");
     expect(payload.fp).toBe("102026");

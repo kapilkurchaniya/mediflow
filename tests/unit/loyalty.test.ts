@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { LoyaltyService } from "@/server/domain/loyalty";
+import type { Tx } from "@/server/db";
 
 describe("Loyalty Service (B2.5 Contract)", () => {
   const tenantId = "ten-001";
@@ -16,7 +17,7 @@ describe("Loyalty Service (B2.5 Contract)", () => {
   };
 
   it("getRedeemable returns 0 points when loyalty config is inactive or null", async () => {
-    const mockTx: any = {
+    const mockTx = {
       select: vi.fn().mockReturnValue({
         from: vi.fn().mockReturnValue({
           where: vi.fn().mockReturnValue({
@@ -24,7 +25,7 @@ describe("Loyalty Service (B2.5 Contract)", () => {
           }),
         }),
       }),
-    };
+    } as unknown as Tx;
 
     const res = await LoyaltyService.getRedeemable(mockTx, tenantId, customerId);
     expect(res).toEqual({ points: 0, valuePaise: 0 });
@@ -32,7 +33,7 @@ describe("Loyalty Service (B2.5 Contract)", () => {
 
   it("getRedeemable returns 0 if customer points are below minRedemptionPoints", async () => {
     let callCount = 0;
-    const mockTx: any = {
+    const mockTx = {
       select: vi.fn().mockImplementation(() => ({
         from: vi.fn().mockReturnValue({
           where: vi.fn().mockReturnValue({
@@ -44,7 +45,7 @@ describe("Loyalty Service (B2.5 Contract)", () => {
           }),
         }),
       })),
-    };
+    } as unknown as Tx;
 
     const res = await LoyaltyService.getRedeemable(mockTx, tenantId, customerId);
     expect(res).toEqual({ points: 0, valuePaise: 0 });
@@ -52,7 +53,7 @@ describe("Loyalty Service (B2.5 Contract)", () => {
 
   it("getRedeemable returns points and correct value in paise when above threshold", async () => {
     let callCount = 0;
-    const mockTx: any = {
+    const mockTx = {
       select: vi.fn().mockImplementation(() => ({
         from: vi.fn().mockReturnValue({
           where: vi.fn().mockReturnValue({
@@ -64,7 +65,7 @@ describe("Loyalty Service (B2.5 Contract)", () => {
           }),
         }),
       })),
-    };
+    } as unknown as Tx;
 
     const res = await LoyaltyService.getRedeemable(mockTx, tenantId, customerId);
     // 50 points * 100 paise = 5000 paise (₹50)
@@ -72,7 +73,7 @@ describe("Loyalty Service (B2.5 Contract)", () => {
   });
 
   it("redeemPoints throws when points <= 0 or under minRedemptionPoints", async () => {
-    const mockTx: any = {
+    const mockTx = {
       select: vi.fn().mockReturnValue({
         from: vi.fn().mockReturnValue({
           where: vi.fn().mockReturnValue({
@@ -80,7 +81,7 @@ describe("Loyalty Service (B2.5 Contract)", () => {
           }),
         }),
       }),
-    };
+    } as unknown as Tx;
 
     await expect(
       LoyaltyService.redeemPoints(mockTx, { tenantId, customerId, points: 0 })
@@ -93,7 +94,7 @@ describe("Loyalty Service (B2.5 Contract)", () => {
 
   it("redeemPoints throws if customer has insufficient points", async () => {
     let callCount = 0;
-    const mockTx: any = {
+    const mockTx = {
       select: vi.fn().mockImplementation(() => ({
         from: vi.fn().mockReturnValue({
           where: vi.fn().mockReturnValue({
@@ -108,7 +109,7 @@ describe("Loyalty Service (B2.5 Contract)", () => {
           }),
         }),
       })),
-    };
+    } as unknown as Tx;
 
     await expect(
       LoyaltyService.redeemPoints(mockTx, { tenantId, customerId, points: 20 })
@@ -117,10 +118,10 @@ describe("Loyalty Service (B2.5 Contract)", () => {
 
   it("redeemPoints successfully updates customer balance and logs transaction", async () => {
     let callCount = 0;
-    const updatedValues: any[] = [];
-    const insertedValues: any[] = [];
+    const updatedValues: Record<string, unknown>[] = [];
+    const insertedValues: Record<string, unknown>[] = [];
 
-    const mockTx: any = {
+    const mockTx = {
       select: vi.fn().mockImplementation(() => ({
         from: vi.fn().mockReturnValue({
           where: vi.fn().mockReturnValue({
@@ -136,18 +137,18 @@ describe("Loyalty Service (B2.5 Contract)", () => {
         }),
       })),
       update: vi.fn().mockReturnValue({
-        set: vi.fn().mockImplementation((val) => {
+        set: vi.fn().mockImplementation((val: Record<string, unknown>) => {
           updatedValues.push(val);
           return { where: vi.fn().mockResolvedValue([]) };
         }),
       }),
       insert: vi.fn().mockReturnValue({
-        values: vi.fn().mockImplementation((val) => {
+        values: vi.fn().mockImplementation((val: Record<string, unknown>) => {
           insertedValues.push(val);
           return Promise.resolve([]);
         }),
       }),
-    };
+    } as unknown as Tx;
 
     const res = await LoyaltyService.redeemPoints(mockTx, {
       tenantId,
@@ -176,10 +177,10 @@ describe("Loyalty Service (B2.5 Contract)", () => {
 
   it("earnPoints computes points earned and increments customer balance", async () => {
     let callCount = 0;
-    const updatedValues: any[] = [];
-    const insertedValues: any[] = [];
+    const updatedValues: Record<string, unknown>[] = [];
+    const insertedValues: Record<string, unknown>[] = [];
 
-    const mockTx: any = {
+    const mockTx = {
       select: vi.fn().mockImplementation(() => ({
         from: vi.fn().mockReturnValue({
           where: vi.fn().mockReturnValue({
@@ -195,18 +196,18 @@ describe("Loyalty Service (B2.5 Contract)", () => {
         }),
       })),
       update: vi.fn().mockReturnValue({
-        set: vi.fn().mockImplementation((val) => {
+        set: vi.fn().mockImplementation((val: Record<string, unknown>) => {
           updatedValues.push(val);
           return { where: vi.fn().mockResolvedValue([]) };
         }),
       }),
       insert: vi.fn().mockReturnValue({
-        values: vi.fn().mockImplementation((val) => {
+        values: vi.fn().mockImplementation((val: Record<string, unknown>) => {
           insertedValues.push(val);
           return Promise.resolve([]);
         }),
       }),
-    };
+    } as unknown as Tx;
 
     // ₹650 spent = 65,000 paise -> 6 points earned (at 1 pt per ₹100)
     const earned = await LoyaltyService.earnPoints(mockTx, {
@@ -229,10 +230,10 @@ describe("Loyalty Service (B2.5 Contract)", () => {
   });
 
   it("reverseForSale reverses 100% of earned points on cancellation", async () => {
-    const updatedValues: any[] = [];
-    const insertedValues: any[] = [];
+    const updatedValues: Record<string, unknown>[] = [];
+    const insertedValues: Record<string, unknown>[] = [];
 
-    const mockTx: any = {
+    const mockTx = {
       select: vi.fn().mockImplementation(() => ({
         from: vi.fn().mockReturnValue({
           where: vi.fn().mockImplementation(() => {
@@ -241,7 +242,7 @@ describe("Loyalty Service (B2.5 Contract)", () => {
                 limit: vi.fn().mockResolvedValue([{ points: 40 }]), // current balance 40
               }),
               // when called directly without .for
-              then: (resolve: any) =>
+              then: (resolve: (val: Record<string, unknown>[]) => void) =>
                 resolve([
                   {
                     id: "tx-1",
@@ -257,18 +258,18 @@ describe("Loyalty Service (B2.5 Contract)", () => {
         }),
       })),
       update: vi.fn().mockReturnValue({
-        set: vi.fn().mockImplementation((val) => {
+        set: vi.fn().mockImplementation((val: Record<string, unknown>) => {
           updatedValues.push(val);
           return { where: vi.fn().mockResolvedValue([]) };
         }),
       }),
       insert: vi.fn().mockReturnValue({
-        values: vi.fn().mockImplementation((val) => {
+        values: vi.fn().mockImplementation((val: Record<string, unknown>) => {
           insertedValues.push(val);
           return Promise.resolve([]);
         }),
       }),
-    };
+    } as unknown as Tx;
 
     await LoyaltyService.reverseForSale(mockTx, {
       tenantId,
@@ -288,10 +289,10 @@ describe("Loyalty Service (B2.5 Contract)", () => {
   });
 
   it("reverseForSale handles partial returns (e.g. 50% fraction) and refunds redeemed points", async () => {
-    const updatedValues: any[] = [];
-    const insertedValues: any[] = [];
+    const updatedValues: Record<string, unknown>[] = [];
+    const insertedValues: Record<string, unknown>[] = [];
 
-    const mockTx: any = {
+    const mockTx = {
       select: vi.fn().mockImplementation(() => ({
         from: vi.fn().mockReturnValue({
           where: vi.fn().mockImplementation(() => {
@@ -299,7 +300,7 @@ describe("Loyalty Service (B2.5 Contract)", () => {
               for: vi.fn().mockReturnValue({
                 limit: vi.fn().mockResolvedValue([{ points: 50 }]),
               }),
-              then: (resolve: any) =>
+              then: (resolve: (val: Record<string, unknown>[]) => void) =>
                 resolve([
                   {
                     id: "tx-1",
@@ -315,18 +316,18 @@ describe("Loyalty Service (B2.5 Contract)", () => {
         }),
       })),
       update: vi.fn().mockReturnValue({
-        set: vi.fn().mockImplementation((val) => {
+        set: vi.fn().mockImplementation((val: Record<string, unknown>) => {
           updatedValues.push(val);
           return { where: vi.fn().mockResolvedValue([]) };
         }),
       }),
       insert: vi.fn().mockReturnValue({
-        values: vi.fn().mockImplementation((val) => {
+        values: vi.fn().mockImplementation((val: Record<string, unknown>) => {
           insertedValues.push(val);
           return Promise.resolve([]);
         }),
       }),
-    };
+    } as unknown as Tx;
 
     await LoyaltyService.reverseForSale(mockTx, {
       tenantId,

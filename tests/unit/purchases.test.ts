@@ -269,8 +269,9 @@ describe("Purchase Input Schema & Validation (B1.7)", () => {
 
     const parsed = PurchaseItemInputSchema.parse(rawInput);
     // Schema strips or ignores extra fields
-    expect((parsed as any).taxableAmount).toBeUndefined();
-    expect((parsed as any).totalAmount).toBeUndefined();
+    const parsedRecord = parsed as Record<string, unknown>;
+    expect(parsedRecord.taxableAmount).toBeUndefined();
+    expect(parsedRecord.totalAmount).toBeUndefined();
 
     // Recomputed totals are based ONLY on verified fields
     const computed = computePurchaseLine(parsed);
