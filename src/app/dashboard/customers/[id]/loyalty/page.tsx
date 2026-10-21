@@ -4,6 +4,7 @@ import { CustomerLoyaltyClient } from "./CustomerLoyaltyClient";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { Settings } from "lucide-react";
+import { requirePagePermission } from "@/server/rbac";
 
 export const metadata = {
   title: "Customer Loyalty Points — MediFlow",
@@ -14,6 +15,7 @@ export default async function CustomerLoyaltyPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
+  await requirePagePermission("customer.view");
   const { id } = await params;
   const data = await getCustomerLoyalty(id);
 
