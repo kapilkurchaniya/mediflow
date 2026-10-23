@@ -2,6 +2,7 @@ import crypto from "crypto";
 import { schema } from "@/server/db";
 import { eq, and, desc } from "drizzle-orm";
 import type { DbOrTx } from "@/server/db";
+import { DEFAULT_GST_RATE_BP } from "@/lib/regulatory";
 
 export interface EInvoiceSellerDetails {
   gstin: string;
@@ -290,7 +291,7 @@ export async function buildEInvoicePayload(
         grossAmount: Number((unitPriceRs * item.qty).toFixed(2)),
         discount: discountRs,
         taxableAmount: taxableRs,
-        gstRate: Number(((item.gstRateBp ?? 1200) / 100).toFixed(2)),
+        gstRate: Number(((item.gstRateBp ?? DEFAULT_GST_RATE_BP) / 100).toFixed(2)),
         cgstAmount: cgstRs,
         sgstAmount: sgstRs,
         igstAmount: igstRs,
@@ -312,7 +313,7 @@ export async function buildEInvoicePayload(
         grossAmount: Number((doc.taxableAmount / 100).toFixed(2)),
         discount: 0,
         taxableAmount: Number((doc.taxableAmount / 100).toFixed(2)),
-        gstRate: 12.0,
+        gstRate: Number((DEFAULT_GST_RATE_BP / 100).toFixed(2)),
         cgstAmount: Number((doc.cgst / 100).toFixed(2)),
         sgstAmount: Number((doc.sgst / 100).toFixed(2)),
         igstAmount: Number((doc.igst / 100).toFixed(2)),
