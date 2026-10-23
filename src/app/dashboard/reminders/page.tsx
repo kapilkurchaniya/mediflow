@@ -2,7 +2,7 @@ import { PageHeader } from "@/app/components/ui";
 import { getReminders } from "@/app/actions/reminders";
 import { db, schema } from "@/server/db";
 import { eq } from "drizzle-orm";
-import { requireAuth } from "@/server/auth";
+import { requirePagePermission } from "@/server/rbac";
 import { RemindersClient } from "./RemindersClient";
 import Link from "next/link";
 import { Settings } from "lucide-react";
@@ -12,14 +12,14 @@ export const metadata = {
 };
 
 export default async function RemindersPage() {
-  const { session } = await requireAuth();
+  const ctx = await requirePagePermission("customer.manage");
 
   const [reminders, medicines] = await Promise.all([
     getReminders(),
     db
       .select({ id: schema.medicines.id, name: schema.medicines.name })
       .from(schema.medicines)
-      .where(eq(schema.medicines.tenantId, session.tenantId))
+      .where(eq(schema.medicines.tenantId, ctx.tenantId))
       .limit(200),
   ]);
 

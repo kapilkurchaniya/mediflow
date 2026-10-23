@@ -3,12 +3,14 @@ import { getWhatsAppMessages } from "@/app/actions/whatsapp";
 import { WhatsAppInboxClient } from "./WhatsAppInboxClient";
 import Link from "next/link";
 import { LayoutTemplate, Settings } from "lucide-react";
+import { requirePagePermission } from "@/server/rbac";
 
 export const metadata = {
   title: "WhatsApp Inbox — MediFlow",
 };
 
 export default async function WhatsAppInboxPage() {
+  await requirePagePermission("customer.manage");
   const { messages, conversations } = await getWhatsAppMessages();
 
   return (

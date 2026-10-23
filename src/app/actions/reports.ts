@@ -1,6 +1,6 @@
 "use server";
 
-import { requireAuth } from "@/server/auth";
+import { requirePermission } from "@/server/rbac";
 import {
   generateTrialBalance,
   generateProfitAndLoss,
@@ -22,49 +22,49 @@ export async function getTrialBalanceReport(
   from?: string | null,
   to?: string | null
 ): Promise<TrialBalanceReport> {
-  const { session } = await requireAuth();
-  return generateTrialBalance(session.tenantId, session.storeId, { from, to });
+  const ctx = await requirePermission("report.view");
+  return generateTrialBalance(ctx.tenantId, ctx.storeId, { from, to });
 }
 
 export async function getProfitAndLossReport(
   from?: string | null,
   to?: string | null
 ): Promise<ProfitAndLossReport> {
-  const { session } = await requireAuth();
-  return generateProfitAndLoss(session.tenantId, session.storeId, { from, to });
+  const ctx = await requirePermission("report.view");
+  return generateProfitAndLoss(ctx.tenantId, ctx.storeId, { from, to });
 }
 
 export async function getBalanceSheetReport(
   asOf?: string | null
 ): Promise<BalanceSheetReport> {
-  const { session } = await requireAuth();
-  return generateBalanceSheet(session.tenantId, session.storeId, asOf || undefined);
+  const ctx = await requirePermission("report.view");
+  return generateBalanceSheet(ctx.tenantId, ctx.storeId, asOf || undefined);
 }
 
 export async function getCashFlowReport(
   from?: string | null,
   to?: string | null
 ): Promise<CashFlowReport> {
-  const { session } = await requireAuth();
-  return generateCashFlow(session.tenantId, session.storeId, { from, to });
+  const ctx = await requirePermission("report.view");
+  return generateCashFlow(ctx.tenantId, ctx.storeId, { from, to });
 }
 
 export async function getOutstandingReport(
   type: "receivable" | "payable"
 ): Promise<OutstandingReport> {
-  const { session } = await requireAuth();
-  return generateOutstanding(session.tenantId, session.storeId, type);
+  const ctx = await requirePermission("report.view");
+  return generateOutstanding(ctx.tenantId, ctx.storeId, type);
 }
 
 export async function getInventoryMovementReport(
   from?: string | null,
   to?: string | null
 ): Promise<InventoryMovementReport> {
-  const { session } = await requireAuth();
-  return generateInventoryAnalytics(session.tenantId, session.storeId, { from, to });
+  const ctx = await requirePermission("report.view");
+  return generateInventoryAnalytics(ctx.tenantId, ctx.storeId, { from, to });
 }
 
 export async function getExpiryAnalysisReport(): Promise<ExpiryExposureReport> {
-  const { session } = await requireAuth();
-  return generateExpiryReport(session.tenantId, session.storeId);
+  const ctx = await requirePermission("report.view");
+  return generateExpiryReport(ctx.tenantId, ctx.storeId);
 }

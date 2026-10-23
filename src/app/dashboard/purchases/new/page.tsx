@@ -9,6 +9,8 @@ import { redirect } from "next/navigation";
 import { PageHeader } from "@/app/components/ui";
 import { formatINR } from "@/lib/format";
 
+import { DEFAULT_GST_RATE_BP, isValidGstRateBp } from "@/lib/regulatory";
+
 export default function NewPurchasePage() {
   const [suppliers, setSuppliers] = useState<{ id: string; name: string }[]>([]);
   const [medicines, setMedicines] = useState<{ id: string; name: string; gstRateBp: number }[]>([]);
@@ -58,7 +60,7 @@ export default function NewPurchasePage() {
         mrp: 0,
         saleRate: 0,
         discountBp: 0,
-        gstRateBp: 1200,
+        gstRateBp: DEFAULT_GST_RATE_BP,
       },
     ]);
   };
@@ -69,7 +71,7 @@ export default function NewPurchasePage() {
 
     if (field === "medicineId") {
       const med = medicines.find((m) => m.id === value);
-      if (med) newItems[index].gstRateBp = med.gstRateBp;
+      if (med && isValidGstRateBp(med.gstRateBp)) newItems[index].gstRateBp = med.gstRateBp;
     }
 
     // Default saleRate to mrp if not set

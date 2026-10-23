@@ -1,0 +1,1 @@
+ALTER TABLE "customers" ADD COLUMN "state_code" text;

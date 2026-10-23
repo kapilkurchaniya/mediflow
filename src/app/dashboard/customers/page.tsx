@@ -3,6 +3,7 @@ import { Plus, Users, Phone } from "lucide-react";
 import Link from "next/link";
 import { PageHeader, SearchForm, EmptyState, Avatar } from "@/app/components/ui";
 import { formatINR, formatNumber } from "@/lib/format";
+import { requirePagePermission } from "@/server/rbac";
 
 export const metadata = { title: "Customers" };
 
@@ -11,6 +12,7 @@ export default async function CustomersPage({
 }: {
   searchParams: Promise<{ q?: string }>;
 }) {
+  await requirePagePermission("customer.view");
   const { q } = await searchParams;
   const customers = await getCustomers(q);
 

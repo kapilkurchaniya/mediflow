@@ -1,20 +1,29 @@
 "use server";
 
+import { z } from "zod";
 import { db, schema } from "@/server/db";
 import { eq, and, desc, gte, lte } from "drizzle-orm";
-import { getCurrentSession, requireAuth } from "@/server/auth";
-import { recordStockMovement } from "@/server/domain/stock";
-import { nextDocNumber } from "@/server/domain/sequence";
+import { requirePermission } from "@/server/rbac";
+import { protectedAction } from "@/server/action";
 import { revalidatePath } from "next/cache";
-import { postPurchaseJournalEntry } from "@/server/domain/accounting";
-import { createGstDocumentFromPurchase } from "@/server/domain/gst";
+import { isUniqueViolation } from "@/server/db/errors";
+import { DomainError } from "@/server/errors";
+import {
+  createPurchase,
+  CreatePurchaseSchema,
+  PurchaseItemInputSchema,
+  type CreatePurchaseInput,
+  type PurchaseItemInput,
+} from "@/server/domain/purchases";
+
+export type { PurchaseItemInput };
 
 export async function getPurchases(dateFrom?: string | null, dateTo?: string | null) {
-  const { session, user } = await requireAuth();
+  const ctx = await requirePermission("purchase.view");
 
   const conditions = [
-    eq(schema.purchases.tenantId, session.tenantId),
-    eq(schema.purchases.storeId, session.storeId),
+    eq(schema.purchases.tenantId, ctx.tenantId),
+    eq(schema.purchases.storeId, ctx.storeId),
   ];
 
   if (dateFrom) {
@@ -36,7 +45,7 @@ export async function getPurchases(dateFrom?: string | null, dateTo?: string | n
 }
 
 export async function getPurchaseById(purchaseId: string) {
-  const { session } = await requireAuth();
+  const ctx = await requirePermission("purchase.view");
 
   const [res] = await db
     .select({
@@ -50,8 +59,8 @@ export async function getPurchaseById(purchaseId: string) {
     .where(
       and(
         eq(schema.purchases.id, purchaseId),
-        eq(schema.purchases.tenantId, session.tenantId),
-        eq(schema.purchases.storeId, session.storeId)
+        eq(schema.purchases.tenantId, ctx.tenantId),
+        eq(schema.purchases.storeId, ctx.storeId)
       )
     )
     .limit(1);
@@ -75,189 +84,78 @@ export async function getPurchaseById(purchaseId: string) {
   };
 }
 
-export type PurchaseItemInput = {
-  medicineId: string;
-  batchNo: string;
-  expiryDate: string;
-  qty: number;
-  freeQty: number;
-  rate: number; // paise
-  mrp: number; // paise
-  saleRate: number; // paise
-  discountBp: number; // basis points
-  gstRateBp: number; // basis points
-};
+function revalidatePurchasePaths() {
+  revalidatePath("/dashboard/purchases");
+  revalidatePath("/dashboard/accounting");
+  revalidatePath("/dashboard/gst");
+  revalidatePath("/dashboard/inventory/batches");
+}
 
+/**
+ * Safe action for purchase creation using next-safe-action.
+ */
+export const createPurchaseAction = protectedAction("purchase.create")
+  .inputSchema(CreatePurchaseSchema)
+  .action(async ({ parsedInput: input, ctx }) => {
+    try {
+      const res = await db.transaction(async (tx) => {
+        return await createPurchase(tx, ctx, input);
+      });
+      revalidatePurchasePaths();
+      return { success: true, purchase: res.purchase, totals: res.totals };
+    } catch (err: unknown) {
+      if (isUniqueViolation(err, "purchases_supplier_invoice_uq")) {
+        throw new DomainError("DUPLICATE_INVOICE", "This invoice number has already been entered for this supplier.");
+      }
+      throw err;
+    }
+  });
+
+/**
+ * Server action callable both with object payload or positional arguments for backwards compatibility.
+ */
 export async function createPurchaseInvoice(
-  supplierId: string,
-  supplierInvoiceNo: string,
-  invoiceDate: string,
-  items: PurchaseItemInput[]
-) {
-  const { session, user } = await requireAuth();
+  supplierIdOrInput: string | z.infer<typeof CreatePurchaseSchema>,
+  supplierInvoiceNo?: string,
+  invoiceDate?: string,
+  items?: PurchaseItemInput[],
+  notes?: string
+): Promise<{ success?: boolean; purchaseId?: string; error?: string }> {
+  const ctx = await requirePermission("purchase.create");
 
-  if (items.length === 0) return { error: "No items added" };
+  let parsed: CreatePurchaseInput;
+  try {
+    if (typeof supplierIdOrInput === "object" && supplierIdOrInput !== null) {
+      parsed = CreatePurchaseSchema.parse(supplierIdOrInput);
+    } else {
+      parsed = CreatePurchaseSchema.parse({
+        supplierId: supplierIdOrInput,
+        supplierInvoiceNo,
+        invoiceDate,
+        items,
+        notes,
+      });
+    }
+  } catch (validationErr) {
+    if (validationErr instanceof z.ZodError) {
+      return { error: validationErr.issues[0]?.message || "Validation failed" };
+    }
+    return { error: "Invalid purchase input" };
+  }
 
   try {
-    await db.transaction(async (tx) => {
-      // 1. Calculate Totals
-      let grossAmount = 0;
-      let totalTaxAmount = 0;
-      let totalDiscountAmount = 0;
-
-      const processedItems = items.map(item => {
-        const itemGross = item.qty * item.rate;
-        const discountAmount = Math.round((itemGross * item.discountBp) / 10000);
-        const taxableAmount = itemGross - discountAmount;
-        const taxAmount = Math.round((taxableAmount * item.gstRateBp) / 10000);
-        const totalAmount = taxableAmount + taxAmount;
-
-        grossAmount += itemGross;
-        totalDiscountAmount += discountAmount;
-        totalTaxAmount += taxAmount;
-
-        return { ...item, discountAmount, taxableAmount, taxAmount, totalAmount };
-      });
-
-      const totalInvoiceAmount = grossAmount - totalDiscountAmount + totalTaxAmount;
-      const cgst = Math.floor(totalTaxAmount / 2);
-      const sgst = totalTaxAmount - cgst;
-
-      // 2. Generate Internal Purchase Number (gap-free, row-locked)
-      const purchaseNo = await nextDocNumber(tx, session.tenantId, session.storeId, "purchase", "PUR");
-
-      // 3. Create Purchase Header
-      const [purchase] = await tx.insert(schema.purchases).values({
-        tenantId: session.tenantId,
-        storeId: session.storeId,
-        purchaseNo,
-        supplierId,
-        supplierInvoiceNo,
-        invoiceDate,
-        grossAmount,
-        discountAmount: totalDiscountAmount,
-        taxableAmount: grossAmount - totalDiscountAmount,
-        cgst,
-        sgst,
-        igst: 0,
-        totalAmount: totalInvoiceAmount,
-        status: "posted",
-        createdBy: user.id,
-      }).returning({ id: schema.purchases.id });
-
-      // 4. Process Items & Batches
-      for (const item of processedItems) {
-        // Find or create batch
-        let batchId = "";
-        const [existingBatch] = await tx
-          .select()
-          .from(schema.batches)
-          .where(
-            and(
-              eq(schema.batches.storeId, session.storeId),
-              eq(schema.batches.medicineId, item.medicineId),
-              eq(schema.batches.batchNo, item.batchNo)
-            )
-          )
-          .limit(1);
-
-        if (existingBatch) {
-          batchId = existingBatch.id;
-        } else {
-          const [newBatch] = await tx.insert(schema.batches).values({
-            tenantId: session.tenantId,
-            storeId: session.storeId,
-            medicineId: item.medicineId,
-            batchNo: item.batchNo,
-            expiryDate: item.expiryDate,
-            purchaseRate: item.rate,
-            mrp: item.mrp,
-            saleRate: item.saleRate,
-            supplierId: supplierId,
-            qtyOnHand: 0,
-            status: "active",
-          }).returning({ id: schema.batches.id });
-          batchId = newBatch.id;
-        }
-
-        // Add to inventory ledger (including free qty)
-        const totalQtyReceived = item.qty + item.freeQty;
-        await recordStockMovement({
-          tx,
-          tenantId: session.tenantId,
-          storeId: session.storeId,
-          batchId,
-          medicineId: item.medicineId,
-          type: "purchase",
-          qtyChange: totalQtyReceived,
-          unitCost: item.rate,
-          refType: "purchase",
-          refId: purchase.id,
-          userId: user.id,
-        });
-
-        // Record Purchase Item
-        await tx.insert(schema.purchaseItems).values({
-          tenantId: session.tenantId,
-          purchaseId: purchase.id,
-          medicineId: item.medicineId,
-          batchId,
-          batchNo: item.batchNo,
-          expiryDate: item.expiryDate,
-          qty: item.qty,
-          freeQty: item.freeQty,
-          rate: item.rate,
-          mrp: item.mrp,
-          saleRate: item.saleRate,
-          discountBp: item.discountBp,
-          discountAmount: item.discountAmount,
-          taxableAmount: item.taxableAmount,
-          gstRateBp: item.gstRateBp,
-          cgst: Math.floor(item.taxAmount / 2),
-          sgst: item.taxAmount - Math.floor(item.taxAmount / 2),
-          igst: 0,
-          totalAmount: item.totalAmount,
-        });
-      }
-
-      // 5. Post Double-Entry Journal Entry
-      await postPurchaseJournalEntry({
-        tx,
-        tenantId: session.tenantId,
-        storeId: session.storeId,
-        userId: user.id,
-        purchaseId: purchase.id,
-        purchaseNo,
-        supplierId,
-        supplierInvoiceNo,
-        invoiceDate,
-        taxableAmount: grossAmount - totalDiscountAmount,
-        cgst,
-        sgst,
-        igst: 0,
-        totalAmount: totalInvoiceAmount,
-      });
-
-      // 6. Record Inward GST Document (ITC claim)
-      try {
-        await createGstDocumentFromPurchase(tx, {
-          purchaseId: purchase.id,
-          tenantId: session.tenantId,
-          storeId: session.storeId,
-        });
-      } catch (gstErr) {
-        console.error("Warning: Purchase GST Document auto-creation error:", gstErr);
-      }
+    const res = await db.transaction(async (tx) => {
+      return await createPurchase(tx, ctx, parsed);
     });
 
-    revalidatePath("/dashboard/purchases");
-    revalidatePath("/dashboard/accounting");
-    revalidatePath("/dashboard/gst");
-    revalidatePath("/dashboard/inventory/batches");
-    return { success: true };
+    revalidatePurchasePaths();
+    return { success: true, purchaseId: res.purchase.id };
   } catch (err: unknown) {
-    if ((err instanceof Error ? err.message : String(err))?.includes("purchases_supplier_invoice_uq")) {
+    if (isUniqueViolation(err, "purchases_supplier_invoice_uq")) {
       return { error: "This invoice number has already been entered for this supplier." };
+    }
+    if (err instanceof DomainError) {
+      return { error: err.message };
     }
     return { error: (err instanceof Error ? err.message : String(err)) || "Failed to create purchase invoice" };
   }

@@ -22,6 +22,27 @@
       "when": 1792482167340,
       "tag": "0002_gst_default_5pct",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1792524455452,
+      "tag": "0003_certain_sentinel",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1792525741251,
+      "tag": "0004_redundant_mordo",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1792530557149,
+      "tag": "0005_quiet_ronan",
+      "breakpoints": true
     }
   ]
 }

@@ -1,6 +1,7 @@
 import React from "react";
 import { getComplianceOverview, getDispensingLogs } from "@/app/actions/compliance";
 import { ComplianceRegisterView } from "./ComplianceRegisterView";
+import { requirePagePermission } from "@/server/rbac";
 
 export const metadata = {
   title: "Drug Compliance Registers | MediFlow",
@@ -8,6 +9,7 @@ export const metadata = {
 };
 
 export default async function CompliancePage() {
+  await requirePagePermission("report.view");
   const stats = await getComplianceOverview();
   const logs = await getDispensingLogs({ limit: 100 });
 

@@ -1,25 +1,26 @@
 "use server";
 
 import { db, schema } from "@/server/db";
-import { eq, and, desc } from "drizzle-orm";
-import { requireAuth } from "@/server/auth";
+import { eq, and } from "drizzle-orm";
+import { requirePermission } from "@/server/rbac";
 import { revalidatePath } from "next/cache";
 import { LoyaltyService } from "@/server/domain/loyalty";
+import { writeAudit } from "@/server/audit";
 
 export async function getLoyaltyConfig() {
-  const { session } = await requireAuth();
+  const ctx = await requirePermission("customer.view");
 
   const [config] = await db
     .select()
     .from(schema.loyaltyConfigs)
-    .where(eq(schema.loyaltyConfigs.tenantId, session.tenantId))
+    .where(eq(schema.loyaltyConfigs.tenantId, ctx.tenantId))
     .limit(1);
 
   return config || null;
 }
 
 export async function saveLoyaltyConfig(formData: FormData) {
-  const { session } = await requireAuth();
+  const ctx = await requirePermission("settings.manage");
 
   const pointsPerRupee = parseInt(formData.get("pointsPerRupee") as string) || 1;
   const redemptionValueRupees = parseFloat(formData.get("redemptionValueRupees") as string) || 1.0;
@@ -29,7 +30,11 @@ export async function saveLoyaltyConfig(formData: FormData) {
   const redemptionValuePaise = Math.round(redemptionValueRupees * 100);
 
   try {
-    const existing = await getLoyaltyConfig();
+    const [existing] = await db
+      .select()
+      .from(schema.loyaltyConfigs)
+      .where(eq(schema.loyaltyConfigs.tenantId, ctx.tenantId))
+      .limit(1);
 
     if (existing) {
       await db
@@ -43,7 +48,7 @@ export async function saveLoyaltyConfig(formData: FormData) {
         .where(eq(schema.loyaltyConfigs.id, existing.id));
     } else {
       await db.insert(schema.loyaltyConfigs).values({
-        tenantId: session.tenantId,
+        tenantId: ctx.tenantId,
         pointsPerRupee,
         redemptionValuePaise,
         minRedemptionPoints,
@@ -59,7 +64,7 @@ export async function saveLoyaltyConfig(formData: FormData) {
 }
 
 export async function getCustomerLoyalty(customerId: string) {
-  const { session } = await requireAuth();
+  const ctx = await requirePermission("customer.view");
 
   const [customer] = await db
     .select({
@@ -69,12 +74,12 @@ export async function getCustomerLoyalty(customerId: string) {
       loyaltyPoints: schema.customers.loyaltyPoints,
     })
     .from(schema.customers)
-    .where(and(eq(schema.customers.id, customerId), eq(schema.customers.tenantId, session.tenantId)))
+    .where(and(eq(schema.customers.id, customerId), eq(schema.customers.tenantId, ctx.tenantId)))
     .limit(1);
 
   if (!customer) return null;
 
-  const history = await LoyaltyService.getCustomerHistory(session.tenantId, customerId);
+  const history = await LoyaltyService.getCustomerHistory(ctx.tenantId, customerId);
 
   return {
     customer,
@@ -83,14 +88,14 @@ export async function getCustomerLoyalty(customerId: string) {
 }
 
 export async function adjustCustomerLoyalty(customerId: string, pointsChange: number, note?: string) {
-  const { session } = await requireAuth();
+  const ctx = await requirePermission("customer.manage");
 
   try {
     await db.transaction(async (tx) => {
       const [cust] = await tx
         .select({ points: schema.customers.loyaltyPoints })
         .from(schema.customers)
-        .where(and(eq(schema.customers.id, customerId), eq(schema.customers.tenantId, session.tenantId)))
+        .where(and(eq(schema.customers.id, customerId), eq(schema.customers.tenantId, ctx.tenantId)))
         .limit(1);
 
       if (!cust) throw new Error("Customer not found");
@@ -103,12 +108,21 @@ export async function adjustCustomerLoyalty(customerId: string, pointsChange: nu
         .where(eq(schema.customers.id, customerId));
 
       await tx.insert(schema.loyaltyTransactions).values({
-        tenantId: session.tenantId,
+        tenantId: ctx.tenantId,
         customerId,
         type: "adjust",
         points: pointsChange,
         balanceAfter: newBalance,
         note: note?.trim() || "Manual adjustment by pharmacy manager",
+      });
+
+      await writeAudit(tx, ctx, {
+        action: "update",
+        entityType: "loyalty_points",
+        entityId: customerId,
+        oldValue: { points: cust.points },
+        newValue: { points: newBalance, change: pointsChange },
+        reason: note?.trim() || "Manual loyalty points adjustment",
       });
     });
 

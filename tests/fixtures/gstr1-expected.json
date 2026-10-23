@@ -1,0 +1,106 @@
+{
+  "gstin": "27AAPCS1234F1ZD",
+  "fp": "102026",
+  "gt": 316575,
+  "cur_gt": 316575,
+  "b2b": [
+    {
+      "ctin": "27GSPTE0985F1Z5",
+      "inv": [
+        {
+          "inum": "INV-2026-0001",
+          "idt": "15-10-2026",
+          "val": 1050,
+          "pos": "27",
+          "rchrg": "N",
+          "inv_typ": "R",
+          "itms": [
+            {
+              "num": 1,
+              "itm_det": {
+                "txval": 1000,
+                "rt": 12,
+                "camt": 25,
+                "samt": 25,
+                "iamt": 0,
+                "csamt": 0
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "b2cl": [
+    {
+      "pos": "24",
+      "inv": [
+        {
+          "inum": "INV-2026-0002",
+          "idt": "16-10-2026",
+          "val": 315000,
+          "itms": [
+            {
+              "num": 1,
+              "itm_det": {
+                "txval": 300000,
+                "rt": 5,
+                "iamt": 15000,
+                "csamt": 0
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "b2cs": [
+    {
+      "sply_ty": "INTRA",
+      "pos": "27",
+      "typ": "OE",
+      "rt": 5,
+      "txval": 500,
+      "camt": 12.5,
+      "samt": 12.5,
+      "iamt": 0,
+      "csamt": 0
+    }
+  ],
+  "cdnr": [],
+  "hsn": {
+    "data": [
+      {
+        "num": 1,
+        "hsn_sc": "30049099",
+        "desc": "Pharmaceutical formulations",
+        "uqc": "NOS",
+        "qty": 10,
+        "val": 1050,
+        "txval": 1000,
+        "iamt": 0,
+        "camt": 25,
+        "samt": 25,
+        "csamt": 0
+      }
+    ]
+  },
+  "doc_issue": {
+    "doc_det": [
+      {
+        "doc_num": 1,
+        "doc_typ": "Invoices for outward supply",
+        "docs": [
+          {
+            "num": 1,
+            "from": "INV-2026-0001",
+            "to": "INV-2026-0003",
+            "totnum": 3,
+            "canc": 0,
+            "net_issue": 3
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -18,6 +18,7 @@ import { PageHeader, StatCard, EmptyState, Avatar } from "@/app/components/ui";
 import { formatINR, formatNumber } from "@/lib/format";
 import { DateRangeFilter } from "@/app/components/DateRangeFilter";
 import { resolveDateRange } from "@/lib/date-range";
+import { requirePagePermission } from "@/server/rbac";
 
 export const metadata = { title: "Overview" };
 
@@ -40,6 +41,7 @@ export default async function DashboardPage({
 }: {
   searchParams: Promise<{ range?: string; from?: string; to?: string }>;
 }) {
+  await requirePagePermission("dashboard.view");
   const { range, from, to } = await searchParams;
   const dateRange = resolveDateRange({ range, from, to });
   const [stats, { user }] = await Promise.all([getDashboardStats(dateRange), getCurrentSession()]);

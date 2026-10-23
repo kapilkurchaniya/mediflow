@@ -6,6 +6,7 @@ import { db, schema } from "@/server/db";
 import { sql } from "drizzle-orm";
 import { z } from "zod";
 import { getCurrentSession } from "@/server/auth";
+import { getAuthCtx, can } from "@/server/rbac";
 import { resolveAIPeriod } from "@/lib/date-range";
 
 export const maxDuration = 60;
@@ -58,13 +59,20 @@ Data Protection & Security Rules:
 
 
 export async function POST(req: Request) {
-  const { session } = await getCurrentSession();
-  if (!session || !session.tenantId || !session.storeId) {
+  const ctx = await getAuthCtx().catch(() => null);
+  if (!ctx || !ctx.tenantId || !ctx.storeId) {
     return new Response(JSON.stringify({ error: "Unauthorized: Active store session required." }), {
       status: 401,
       headers: { "Content-Type": "application/json" },
     });
   }
+  if (!can(ctx, "ai.use")) {
+    return new Response(JSON.stringify({ error: "Forbidden: AI assistant access requires 'ai.use' permission." }), {
+      status: 403,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+  const session = { tenantId: ctx.tenantId, storeId: ctx.storeId };
   const body = await req.json();
   let messages = body.messages;
 

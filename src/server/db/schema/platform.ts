@@ -171,3 +171,36 @@ export const idempotencyKeys = pgTable(
   },
   (t) => [primaryKey({ columns: [t.tenantId, t.scope, t.key] })],
 );
+
+/**
+ * API keys for machine-to-machine access to /api/v1/*.
+ *
+ * The raw key (format: mf_live_<32 random bytes hex>) is shown to the user
+ * ONCE at creation and never stored. Only the sha256 hex digest is persisted.
+ *
+ * scopes: ["stock.read", "orders.write", "orders.read"]
+ */
+export const apiKeys = pgTable(
+  "api_keys",
+  {
+    id: id(),
+    tenantId: tenantId(),
+    /** Optional — if set the key can only access this store's data. */
+    storeId: uuid("store_id").references(() => stores.id, { onDelete: "set null" }),
+    name: text("name").notNull(),
+    /** sha256(rawKey) — hex encoded. Never store the raw key. */
+    keyHash: text("key_hash").notNull(),
+    /** e.g. ["stock.read", "orders.write"] */
+    scopes: text("scopes").array().notNull().default(sql`'{}'::text[]`),
+    lastUsedAt: timestamp("last_used_at", { withTimezone: true }),
+    revokedAt: timestamp("revoked_at", { withTimezone: true }),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    uniqueIndex("api_keys_hash_uq").on(t.keyHash),
+    index("api_keys_tenant_idx").on(t.tenantId),
+  ],
+);
+
+export type ApiKey = typeof apiKeys.$inferSelect;
+export type NewApiKey = typeof apiKeys.$inferInsert;

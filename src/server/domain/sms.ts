@@ -1,5 +1,6 @@
 import { db, schema } from "@/server/db";
 import { eq, and } from "drizzle-orm";
+import { decryptSecret } from "@/server/crypto";
 
 export interface SmsSendResult {
   success: boolean;
@@ -90,10 +91,13 @@ export async function getSmsProvider(tenantId: string): Promise<SmsProvider> {
     return new MockSmsProvider();
   }
 
+  // Decrypt the stored key — may be legacy plaintext or "v1:" ciphertext.
+  const plainApiKey = decryptSecret(config.apiKey) ?? "";
+
   if (config.provider === "msg91") {
-    return new Msg91Provider(config.apiKey, config.senderId || undefined);
+    return new Msg91Provider(plainApiKey, config.senderId || undefined);
   } else if (config.provider === "textlocal") {
-    return new TextLocalProvider(config.apiKey, config.senderId || undefined);
+    return new TextLocalProvider(plainApiKey, config.senderId || undefined);
   }
 
   return new MockSmsProvider();
