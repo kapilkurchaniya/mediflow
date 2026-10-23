@@ -3,6 +3,7 @@ import { Plus, Truck, Phone } from "lucide-react";
 import Link from "next/link";
 import { PageHeader, SearchForm, EmptyState, Avatar } from "@/app/components/ui";
 import { formatNumber } from "@/lib/format";
+import { requirePagePermission } from "@/server/rbac";
 
 export const metadata = { title: "Suppliers" };
 
@@ -11,6 +12,7 @@ export default async function SuppliersPage({
 }: {
   searchParams: Promise<{ q?: string }>;
 }) {
+  await requirePagePermission("supplier.view");
   const { q } = await searchParams;
   const suppliers = await getSuppliers(q);
 

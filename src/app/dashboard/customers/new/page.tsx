@@ -1,13 +1,28 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import { createCustomer } from "@/app/actions/customers";
 import { AlertCircle, Check } from "lucide-react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { PageHeader, FormSection, Field } from "@/app/components/ui";
+import { GST_STATE_CODES } from "@/lib/regulatory";
 
 export default function NewCustomerPage() {
+  const [gstin, setGstin] = useState("");
+  const [stateCode, setStateCode] = useState("");
+
+  const handleGstinChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value.toUpperCase();
+    setGstin(val);
+    if (val.length >= 2) {
+      const code = val.slice(0, 2);
+      if (GST_STATE_CODES[code]) {
+        setStateCode(code);
+      }
+    }
+  };
+
   const [state, formAction, isPending] = useActionState(async (prevState: { error?: string; success?: boolean } | null, formData: FormData) => {
     const res = await createCustomer(formData);
     if (res.success) {
@@ -42,8 +57,32 @@ export default function NewCustomerPage() {
           </FormSection>
 
           <FormSection title="Billing & credit" description="Optional. Required only for B2B or credit customers.">
-            <Field label="GSTIN" htmlFor="gstin">
-              <input id="gstin" name="gstin" className="input font-mono uppercase" placeholder="22AAAAA0000A1Z5" />
+            <Field label="GSTIN" htmlFor="gstin" hint="15-character GSTIN for B2B supplies.">
+              <input
+                id="gstin"
+                name="gstin"
+                value={gstin}
+                onChange={handleGstinChange}
+                maxLength={15}
+                className="input font-mono uppercase"
+                placeholder="27AAAAA0000A1Z5"
+              />
+            </Field>
+            <Field label="State / Place of supply" htmlFor="stateCode" hint="Auto-filled from GSTIN, or select manually.">
+              <select
+                id="stateCode"
+                name="stateCode"
+                value={stateCode}
+                onChange={(e) => setStateCode(e.target.value)}
+                className="input"
+              >
+                <option value="">Select state / UT</option>
+                {Object.entries(GST_STATE_CODES).map(([code, name]) => (
+                  <option key={code} value={code}>
+                    {code} - {name}
+                  </option>
+                ))}
+              </select>
             </Field>
             <Field label="Credit limit" htmlFor="creditLimit" hint="Leave blank for cash-only customers.">
               <div className="relative">

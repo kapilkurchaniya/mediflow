@@ -2,14 +2,14 @@
 
 import { db, schema } from "@/server/db";
 import { eq, and, desc } from "drizzle-orm";
-import { requireAuth } from "@/server/auth";
+import { requirePermission } from "@/server/rbac";
 import { revalidatePath } from "next/cache";
 import { RemindersService } from "@/server/domain/reminders";
 
 export async function getReminders(statusFilter?: string) {
-  const { session } = await requireAuth();
+  const ctx = await requirePermission("customer.view");
 
-  const conditions = [eq(schema.reminders.tenantId, session.tenantId)];
+  const conditions = [eq(schema.reminders.tenantId, ctx.tenantId)];
 
   if (statusFilter && statusFilter !== "all") {
     conditions.push(eq(schema.reminders.status, statusFilter));
@@ -39,10 +39,10 @@ export async function getReminders(statusFilter?: string) {
 }
 
 export async function triggerDueRemindersBatch() {
-  const { session } = await requireAuth();
+  const ctx = await requirePermission("customer.manage");
 
   try {
-    const results = await RemindersService.processDueReminders(session.tenantId, session.storeId);
+    const results = await RemindersService.processDueReminders(ctx.tenantId, ctx.storeId);
     revalidatePath("/dashboard/reminders");
     return { success: true, ...results };
   } catch (err: unknown) {
@@ -51,7 +51,7 @@ export async function triggerDueRemindersBatch() {
 }
 
 export async function createManualReminder(formData: FormData) {
-  const { session } = await requireAuth();
+  const ctx = await requirePermission("customer.manage");
 
   const customerName = formData.get("customerName") as string;
   const customerPhone = formData.get("customerPhone") as string;
@@ -69,8 +69,8 @@ export async function createManualReminder(formData: FormData) {
     const [reminder] = await db
       .insert(schema.reminders)
       .values({
-        tenantId: session.tenantId,
-        storeId: session.storeId || null,
+        tenantId: ctx.tenantId,
+        storeId: ctx.storeId || null,
         customerName: customerName?.trim() || "Customer",
         customerPhone: customerPhone.trim(),
         type,
@@ -90,13 +90,13 @@ export async function createManualReminder(formData: FormData) {
 }
 
 export async function cancelReminder(id: string) {
-  const { session } = await requireAuth();
+  const ctx = await requirePermission("customer.manage");
 
   try {
     await db
       .update(schema.reminders)
       .set({ status: "cancelled" })
-      .where(and(eq(schema.reminders.id, id), eq(schema.reminders.tenantId, session.tenantId)));
+      .where(and(eq(schema.reminders.id, id), eq(schema.reminders.tenantId, ctx.tenantId)));
 
     revalidatePath("/dashboard/reminders");
     return { success: true };

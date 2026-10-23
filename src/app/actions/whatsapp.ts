@@ -1,52 +1,70 @@
 "use server";
 
 import { db, schema } from "@/server/db";
-import { eq, and, desc, sql, or } from "drizzle-orm";
-import { requireAuth } from "@/server/auth";
+import { eq, and, desc, sql } from "drizzle-orm";
+import { requirePermission } from "@/server/rbac";
 import { revalidatePath } from "next/cache";
 import { WhatsAppService } from "@/server/domain/whatsapp";
+import { encryptSecret, maskSecret, isMasked } from "@/server/crypto";
 
 export async function getWhatsAppConfig() {
-  const { session } = await requireAuth();
+  const ctx = await requirePermission("settings.manage");
 
   const [config] = await db
     .select()
     .from(schema.whatsappConfigs)
-    .where(eq(schema.whatsappConfigs.tenantId, session.tenantId))
+    .where(eq(schema.whatsappConfigs.tenantId, ctx.tenantId))
     .limit(1);
 
-  return config || null;
+  if (!config) return null;
+
+  // Never send the real token to the client — return a masked version.
+  return {
+    ...config,
+    accessToken: maskSecret(config.accessToken),
+  };
 }
 
 export async function saveWhatsAppConfig(formData: FormData) {
-  const { session } = await requireAuth();
+  const ctx = await requirePermission("settings.manage");
 
   const phoneNumberId = formData.get("phoneNumberId") as string;
   const businessAccountId = formData.get("businessAccountId") as string;
-  const accessToken = formData.get("accessToken") as string;
+  const accessTokenInput = formData.get("accessToken") as string;
   const webhookVerifyToken = formData.get("webhookVerifyToken") as string;
   const isActive = formData.get("isActive") === "on";
 
-  try {
-    const existing = await getWhatsAppConfig();
+  // If the user submits the masked placeholder ("••••XXXX"), they did not
+  // change the token — keep whatever is in the DB.
+  const newAccessToken =
+    accessTokenInput && !isMasked(accessTokenInput)
+      ? encryptSecret(accessTokenInput.trim())
+      : undefined; // undefined means "don't overwrite"
 
-    if (existing) {
+  try {
+    const [rawExisting] = await db
+      .select()
+      .from(schema.whatsappConfigs)
+      .where(eq(schema.whatsappConfigs.tenantId, ctx.tenantId))
+      .limit(1);
+
+    if (rawExisting) {
       await db
         .update(schema.whatsappConfigs)
         .set({
           phoneNumberId: phoneNumberId?.trim() || null,
           businessAccountId: businessAccountId?.trim() || null,
-          accessToken: accessToken?.trim() || null,
+          ...(newAccessToken !== undefined ? { accessToken: newAccessToken } : {}),
           webhookVerifyToken: webhookVerifyToken?.trim() || null,
           isActive,
         })
-        .where(eq(schema.whatsappConfigs.id, existing.id));
+        .where(eq(schema.whatsappConfigs.id, rawExisting.id));
     } else {
       await db.insert(schema.whatsappConfigs).values({
-        tenantId: session.tenantId,
+        tenantId: ctx.tenantId,
         phoneNumberId: phoneNumberId?.trim() || null,
         businessAccountId: businessAccountId?.trim() || null,
-        accessToken: accessToken?.trim() || null,
+        accessToken: newAccessToken ?? null,
         webhookVerifyToken: webhookVerifyToken?.trim() || null,
         isActive,
       });
@@ -61,9 +79,9 @@ export async function saveWhatsAppConfig(formData: FormData) {
 }
 
 export async function getWhatsAppMessages(selectedPhone?: string) {
-  const { session } = await requireAuth();
+  const ctx = await requirePermission("customer.view");
 
-  const conditions = [eq(schema.whatsappMessages.tenantId, session.tenantId)];
+  const conditions = [eq(schema.whatsappMessages.tenantId, ctx.tenantId)];
 
   if (selectedPhone?.trim()) {
     const clean = selectedPhone.replace(/\D/g, "").slice(-10);
@@ -111,15 +129,15 @@ export async function getWhatsAppMessages(selectedPhone?: string) {
 }
 
 export async function sendManualWhatsAppMessage(phone: string, text: string) {
-  const { session } = await requireAuth();
+  const ctx = await requirePermission("customer.manage");
 
   if (!phone?.trim()) return { error: "Customer phone number is required" };
   if (!text?.trim()) return { error: "Message body cannot be empty" };
 
   try {
     const result = await WhatsAppService.sendMessage({
-      tenantId: session.tenantId,
-      storeId: session.storeId,
+      tenantId: ctx.tenantId,
+      storeId: ctx.storeId,
       customerPhone: phone.trim(),
       messageBody: text.trim(),
       messageType: "text",
@@ -133,17 +151,17 @@ export async function sendManualWhatsAppMessage(phone: string, text: string) {
 }
 
 export async function getWhatsAppTemplates() {
-  const { session } = await requireAuth();
+  const ctx = await requirePermission("settings.manage");
 
   return db
     .select()
     .from(schema.whatsappTemplates)
-    .where(eq(schema.whatsappTemplates.tenantId, session.tenantId))
+    .where(eq(schema.whatsappTemplates.tenantId, ctx.tenantId))
     .orderBy(desc(schema.whatsappTemplates.createdAt));
 }
 
 export async function createWhatsAppTemplate(formData: FormData) {
-  const { session } = await requireAuth();
+  const ctx = await requirePermission("settings.manage");
 
   const name = formData.get("name") as string;
   const category = (formData.get("category") as string) || "UTILITY";
@@ -158,7 +176,7 @@ export async function createWhatsAppTemplate(formData: FormData) {
     const [tmpl] = await db
       .insert(schema.whatsappTemplates)
       .values({
-        tenantId: session.tenantId,
+        tenantId: ctx.tenantId,
         name: name.trim().toLowerCase().replace(/\s+/g, "_"),
         category,
         languageCode: "en",

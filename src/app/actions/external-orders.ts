@@ -58,20 +58,31 @@ export async function createExternalOrder(data: {
   items: Array<{ medicineId: string; name: string; qty: number; rate: number }>;
   totalAmountPaise: number;
   notes?: string;
-  tenantId?: string;
-  storeId?: string;
 }) {
+  // Session-based action — tenantId comes from the authenticated session only.
+  const { session } = await requireAuth();
+  return createExternalOrderForTenant(session.tenantId, session.storeId, data);
+}
+
+/**
+ * Server-only domain function — called by /api/v1/orders after API key auth.
+ * tenantId comes from the verified API key, NOT from the request body.
+ * Never call this from a Server Action that accepts untrusted input.
+ */
+export async function createExternalOrderForTenant(
+  tenantId: string,
+  storeId: string | null,
+  data: {
+    source: string;
+    customerName: string;
+    customerPhone: string;
+    items: Array<{ medicineId: string; name: string; qty: number; rate: number }>;
+    totalAmountPaise: number;
+    notes?: string;
+  },
+) {
   const cleanPhone = data.customerPhone.replace(/\D/g, "").slice(-10);
   const orderNo = `ORD-${Date.now().toString().slice(-6)}`;
-
-  let tenantId = data.tenantId;
-  let storeId = data.storeId;
-
-  if (!tenantId) {
-    const auth = await requireAuth();
-    tenantId = auth.session.tenantId;
-    storeId = auth.session.storeId;
-  }
 
   // Lookup existing customer
   const [cust] = await db

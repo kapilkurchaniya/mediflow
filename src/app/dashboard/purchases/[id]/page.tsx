@@ -6,6 +6,7 @@ import { Truck, FileInput, Printer, Building2, CheckCircle2 } from "lucide-react
 import Link from "next/link";
 import { PageHeader } from "@/app/components/ui";
 import { formatINR, formatNumber } from "@/lib/format";
+import { requirePagePermission } from "@/server/rbac";
 
 export const metadata = { title: "Goods Receipt Note (GRN) Details | MediFlow" };
 
@@ -14,6 +15,7 @@ export default async function PurchaseDetailPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
+  await requirePagePermission("purchase.view");
   const { id } = await params;
   const data = await getPurchaseById(id);
 

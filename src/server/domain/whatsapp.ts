@@ -1,5 +1,6 @@
 import { db, schema } from "@/server/db";
 import { eq, and, desc } from "drizzle-orm";
+import { decryptSecret } from "@/server/crypto";
 
 export interface WhatsAppSendParams {
   tenantId: string;
@@ -81,7 +82,7 @@ export class WhatsAppService {
         const res = await fetch(`https://graph.facebook.com/v19.0/${config.phoneNumberId}/messages`, {
           method: "POST",
           headers: {
-            Authorization: `Bearer ${config.accessToken}`,
+            Authorization: `Bearer ${decryptSecret(config.accessToken)}`,
             "Content-Type": "application/json",
           },
           body: JSON.stringify(payload),

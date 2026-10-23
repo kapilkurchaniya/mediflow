@@ -4,12 +4,14 @@ import { getCustomers } from "@/app/actions/customers";
 import { CustomerGroupsClient } from "./CustomerGroupsClient";
 import Link from "next/link";
 import { Users } from "lucide-react";
+import { requirePagePermission } from "@/server/rbac";
 
 export const metadata = {
   title: "Family Groups & Ledgers — MediFlow",
 };
 
 export default async function CustomerGroupsPage() {
+  await requirePagePermission("customer.view");
   const [groups, customers] = await Promise.all([
     getCustomerGroups(),
     getCustomers(),

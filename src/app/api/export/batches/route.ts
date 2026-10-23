@@ -1,19 +1,31 @@
 import { db, schema } from "@/server/db";
 import { eq, and, desc, sql, lte } from "drizzle-orm";
-import { requireAuth } from "@/server/auth";
+import { getAuthCtx, can } from "@/server/rbac";
 import { format, addDays } from "date-fns";
 
 export async function GET(request: Request) {
   try {
-    const { session } = await requireAuth();
+    const ctx = await getAuthCtx().catch(() => null);
+    if (!ctx || !ctx.tenantId || !ctx.storeId) {
+      return new Response(JSON.stringify({ error: "Unauthorized: Active store session required." }), {
+        status: 401,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+    if (!can(ctx, "report.export")) {
+      return new Response(JSON.stringify({ error: "Forbidden: Export requires 'report.export' permission." }), {
+        status: 403,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
     const { searchParams } = new URL(request.url);
     const nearExpiry = searchParams.get("nearExpiry") === "true";
     const from = searchParams.get("from");
     const to = searchParams.get("to");
 
     const conditions = [
-      eq(schema.batches.tenantId, session.tenantId),
-      eq(schema.batches.storeId, session.storeId),
+      eq(schema.batches.tenantId, ctx.tenantId),
+      eq(schema.batches.storeId, ctx.storeId),
     ];
 
     if (nearExpiry) {
