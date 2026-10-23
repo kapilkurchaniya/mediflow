@@ -1,6 +1,7 @@
 import React from "react";
 import { getComplianceOverview, getDispensingLogs } from "@/app/actions/compliance";
 import { ComplianceRegisterView } from "../ComplianceRegisterView";
+import { requirePagePermission } from "@/server/rbac";
 
 export const metadata = {
   title: "Schedule H Statutory Register | MediFlow",
@@ -8,6 +9,7 @@ export const metadata = {
 };
 
 export default async function ScheduleHPage() {
+  await requirePagePermission("report.view");
   const stats = await getComplianceOverview();
   const logs = await getDispensingLogs({
     registerType: "schedule_h",

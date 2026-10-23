@@ -1,6 +1,7 @@
 import React from "react";
 import { getPrescriptions, getDoctors } from "@/app/actions/compliance";
 import { PrescriptionsView } from "./PrescriptionsView";
+import { requirePagePermission } from "@/server/rbac";
 
 export const metadata = {
   title: "Prescription Repository (Rx Master) | MediFlow",
@@ -8,6 +9,7 @@ export const metadata = {
 };
 
 export default async function PrescriptionsPage() {
+  await requirePagePermission("prescription.approve");
   const prescriptions = await getPrescriptions({});
   const doctors = await getDoctors();
 
