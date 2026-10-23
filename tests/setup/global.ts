@@ -10,24 +10,57 @@ import { baseDbName, templateDbName, urlFor } from "./urls";
  */
 export default async function setup() {
   config({ path: ".env.test", quiet: true });
+  if (!process.env.DATABASE_URL) {
+    return;
+  }
   const tpl = templateDbName();
 
-  const admin = new pg.Client({ connectionString: urlFor(baseDbName()) });
-  await admin.connect();
-  await admin.query(`drop database if exists "${tpl}" with (force)`);
-  await admin.query(`create database "${tpl}"`);
-  await admin.end();
+  try {
+    const base = baseDbName();
+    let initClient: pg.Client | null = null;
+    for (const maintenanceDb of ["mediflow", "postgres"]) {
+      try {
+        const client = new pg.Client({ connectionString: urlFor(maintenanceDb) });
+        await client.connect();
+        initClient = client;
+        break;
+      } catch {
+        // try next maintenance db
+      }
+    }
+    if (initClient) {
+      const checkRes = await initClient.query(
+        "select 1 from pg_database where datname = $1",
+        [base]
+      );
+      if (checkRes.rowCount === 0) {
+        await initClient.query(`create database "${base}"`);
+      }
+      await initClient.end();
+    }
 
-  const pool = new pg.Pool({ connectionString: urlFor(tpl), max: 1 });
-  await pool.query("create extension if not exists pg_trgm");
-  await pool.query('create extension if not exists "pgcrypto"');
-  await migrate(drizzle(pool), { migrationsFolder: "./drizzle" });
-  await pool.end(); // a template must have no open connections
+    const admin = new pg.Client({ connectionString: urlFor(base) });
+    await admin.connect();
+    await admin.query(`drop database if exists "${tpl}" with (force)`);
+    await admin.query(`create database "${tpl}"`);
+    await admin.end();
+
+    const pool = new pg.Pool({ connectionString: urlFor(tpl), max: 1 });
+    await pool.query("create extension if not exists pg_trgm");
+    await pool.query('create extension if not exists "pgcrypto"');
+    await migrate(drizzle(pool), { migrationsFolder: "./drizzle" });
+    await pool.end(); // a template must have no open connections
+  } catch (err: unknown) {
+    console.warn("Global test DB setup skipped (Postgres not running):", (err as Error).message);
+    return;
+  }
 
   return async function teardown() {
-    const c = new pg.Client({ connectionString: urlFor(baseDbName()) });
-    await c.connect();
-    await c.query(`drop database if exists "${tpl}" with (force)`);
-    await c.end();
+    try {
+      const c = new pg.Client({ connectionString: urlFor(baseDbName()) });
+      await c.connect();
+      await c.query(`drop database if exists "${tpl}" with (force)`);
+      await c.end();
+    } catch {}
   };
 }
