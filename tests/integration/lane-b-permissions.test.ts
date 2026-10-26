@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import * as schema from "@/server/db/schema";
 import type { Permission } from "@/lib/permissions";
 import { createTestDb } from "../setup/db";
