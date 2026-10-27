@@ -1,4 +1,4 @@
-/** Communications and jobs: WhatsApp, SMS, reminders, outbox, notifications. (Lane B) */
+ /** Communications and jobs: WhatsApp, SMS, reminders, outbox, notifications. (Lane B) */
 import { sql } from "drizzle-orm";
 import {
   bigserial,

@@ -1,4 +1,4 @@
-import { getSmsProvider } from "@/server/domain/sms";
+ import { getSmsProvider } from "@/server/domain/sms";
 
 export async function handleSmsSend(event: {
   tenantId: string;
