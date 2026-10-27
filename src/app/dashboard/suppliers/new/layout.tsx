@@ -1,4 +1,4 @@
- import { requirePagePermission } from "@/server/rbac";
+import { requirePagePermission } from "@/server/rbac";
 
 export default async function NewSupplierLayout({
   children,
