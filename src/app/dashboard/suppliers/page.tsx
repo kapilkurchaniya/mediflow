@@ -1,4 +1,4 @@
-import { getSuppliers } from "@/app/actions/suppliers";
+ import { getSuppliers } from "@/app/actions/suppliers";
 import { Plus, Truck, Phone } from "lucide-react";
 import Link from "next/link";
 import { PageHeader, SearchForm, EmptyState, Avatar } from "@/app/components/ui";
