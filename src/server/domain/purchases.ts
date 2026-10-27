@@ -1,4 +1,4 @@
-/**
+ /**
  * src/server/domain/purchases.ts
  *
  * Core domain service for managing purchases (Goods Receipt Notes / GRNs).
