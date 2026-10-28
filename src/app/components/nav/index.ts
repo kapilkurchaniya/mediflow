@@ -11,6 +11,7 @@ import { crmNav } from "./crm";
 import { gstNav } from "./gst";
 import { inventoryNav } from "./inventory";
 import { mainNav } from "./main";
+import { platformNav } from "./platform";
 import { purchasingNav } from "./purchasing";
 import { reportsNav } from "./reports";
 import { salesNav } from "./sales";
@@ -42,6 +43,7 @@ const MODULE_NAV: NavItem[][] = [
   accountingNav,
   reportsNav,
   commsNav,
+  platformNav,
 ];
 
 const groupIndex = (id: NavGroupId) => GROUPS.findIndex((g) => g.id === id);

@@ -16,6 +16,7 @@ import {
 import { createGstDocumentFromSale, determineTaxContext, extractStateCodeFromGstin } from "@/server/domain/gst";
 import { LoyaltyService } from "@/server/domain/loyalty";
 import { enqueue } from "@/server/jobs/outbox";
+import { writeAudit } from "@/server/audit";
 import type { CreateSaleOptions, CreateSaleResult, SaleInput } from "./types";
 
 /** Payment methods the journal can book today. Split tender and credit arrive with A2.2. */
@@ -106,11 +107,8 @@ export async function createSale(
     .from(schema.tenants)
     .where(eq(schema.tenants.id, ctx.tenantId));
   const maxDiscountBp = Number(tenantRow?.settings?.maxDiscountBp);
-  if (
-    Number.isFinite(maxDiscountBp) &&
-    !can(ctx, "sale.discount_override") &&
-    input.lines.some((l) => l.discountBp > maxDiscountBp)
-  ) {
+  const aboveLimit = Number.isFinite(maxDiscountBp) && input.lines.some((l) => l.discountBp > maxDiscountBp);
+  if (aboveLimit && !can(ctx, "sale.discount_override")) {
     throw new DomainError(
       "DISCOUNT_OVER_LIMIT",
       `Discounts above ${maxDiscountBp / 100}% need a manager's approval (permission "sale.discount_override").`,
@@ -251,6 +249,17 @@ export async function createSale(
       createdBy: ctx.userId,
     })
     .returning({ id: schema.sales.id });
+
+  // A discount above the shop's limit was allowed because the user holds sale.discount_override: leave a trail.
+  if (aboveLimit) {
+    await writeAudit(tx, ctx, {
+      action: "discount_override",
+      entityType: "sale",
+      entityId: sale.id,
+      newValue: { invoiceNo, maxDiscountBp, highestLineDiscountBp: Math.max(...input.lines.map((l) => l.discountBp)) },
+      reason: "Discount above the shop limit, approved by permission sale.discount_override",
+    });
+  }
 
   // ── 7. Lines: stock movement (locks the batch) + sale items ─────────────────────────────────────
   const saleItems = [];

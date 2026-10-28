@@ -158,13 +158,13 @@ Every staff login has a **role**. A role decides which pages you see and which a
 
 | Role | Typical person | What they can do |
 |---|---|---|
-| **Owner** | Pharmacy owner | **Everything**, including Settings. Only the owner opens *Settings* (profile, WhatsApp, SMS, API keys). |
+| **Owner** | Pharmacy owner | **Everything**, including Settings and the Audit log. Only the owner opens *Settings* (profile, WhatsApp, SMS, API keys). |
 | **Store Manager** | Branch manager | Everything except Settings, user/store management, API keys and all-store reports. Can approve large discounts and export data. |
 | **Pharmacist** | Registered pharmacist | Billing, medicines, racks, customers, prescriptions and doctors, WhatsApp and reminders, AI assistant, view sales and stock. |
 | **Cashier** | Counter staff | Billing, view stock, customers (add and view), WhatsApp and reminders. Cannot see accounts, GST, purchases or reports. |
 | **Purchase Manager** | Buyer | Suppliers, purchases, medicines, racks, trade schemes, reports, AI assistant, view stock and legal registers. No billing. |
 | **Accountant** | Accounts / CA | Accounting, GST, reports, view sales and purchases, export data. No billing. |
-| **Auditor** | Inspector / external CA | **View only**: reports, accounting, GST, sales, purchases, registers. Cannot change or export anything. |
+| **Auditor** | Inspector / external CA | **View only**: reports, accounting, GST, sales, purchases, registers, **audit log**. Cannot change or export anything. |
 
 Examples of what a role does **not** see:
 - A cashier won't see *Accounting*, *GST & Tax*, *Purchases* or *Reports* in the menu.
@@ -626,6 +626,20 @@ Treat a key like a password; never share it by chat or email. The connected app 
 
 ---
 
+### 15.5 Audit log: who changed what
+**Finance → Audit log** is a permanent record of important changes, so you can always answer "who did that, and when?". It is open to the **owner, manager and auditor**.
+
+It records, with the person's name, the time and the **old and new values**:
+- **Stock changes** (opening stock and adjustments), showing the quantity before and after and the reason.
+- **New medicines**, with price, GST rate and schedule.
+- **Changes to your pharmacy profile** (only the fields that changed).
+- **Discount overrides**: when a manager gives a discount above the shop's limit.
+- Changes made in GST rates, suppliers, prescriptions and loyalty points.
+
+Use the filters at the top (**User, Record type, Action, From, To**) and press **Apply**; **Reset** clears them. Entries can never be edited or deleted. Staff sign-ins, role changes and returns will be added as those features arrive.
+
+---
+
 ## 16. The AI assistant
 
 Press **Ctrl + J** (or choose *Ask MediFlow AI* in the palette) to open a chat panel. Ask in plain English, for example:
@@ -692,7 +706,7 @@ These are planned but **cannot be used today**. If you can't find a button for t
 | Billing | Cancel a bill; sales returns and credit notes; split payment (cash + UPI); credit sales; hold and resume a bill; cash register open/close; using loyalty points as a discount; billing without internet |
 | Stock | Stock adjustments and write-offs; transfers between branches; warehouse; physical stock count; reorder suggestions |
 | Buying | Purchase orders; returning goods to suppliers (debit notes); paying suppliers; supplier ledger |
-| People & security | Creating staff logins and roles from the screen; locking out repeated wrong passwords; changing your own password; activity (audit) log screen |
+| People & security | Creating staff logins and roles from the screen; locking out repeated wrong passwords; changing your own password; sign-in and role-change entries in the audit log (the audit log itself is available) |
 | Multi-branch | Adding branches; switching between branches; chain-wide reports |
 | Accounts | Expenses; day-book drill-down and ledgers by party; receivables ageing with reminders; period locking; year-end closing |
 | GST & messaging | Live e-invoice and e-way bill with the government portal; GSTR-2B / IMS matching; production WhatsApp and SMS rules; customer consent and privacy tools |
