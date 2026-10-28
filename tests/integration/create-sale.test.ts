@@ -1,0 +1,362 @@
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { and, eq, sql } from "drizzle-orm";
+import * as schema from "@/server/db/schema";
+import { ALL_PERMISSIONS } from "@/lib/permissions";
+import { createTestDb } from "../setup/db";
+import { makeBatch, makeCustomer, makeMedicine, makeStore, makeTenant, makeUser, makeWorld } from "../setup/factories";
+
+vi.mock("@/server/auth", () => ({
+  requireAuth: async () => {
+    throw new Error("not used");
+  },
+  getCurrentSession: async () => null,
+}));
+vi.mock("next/cache", () => ({ revalidatePath: () => {} }));
+
+import { createSale } from "@/server/domain/sales/create-sale";
+import type { SaleInputData } from "@/server/domain/sales/types";
+import { SaleInput } from "@/server/domain/sales/types";
+import type { AuthCtx } from "@/server/rbac";
+
+let t: Awaited<ReturnType<typeof createTestDb>>;
+beforeAll(async () => {
+  t = await createTestDb();
+});
+afterAll(async () => {
+  await t.cleanup();
+});
+
+type World = Awaited<ReturnType<typeof makeWorld>>;
+
+function ctxFor(w: Pick<World, "tenant" | "store" | "user">, permissions: readonly string[] = ALL_PERMISSIONS): AuthCtx {
+  return {
+    tenantId: w.tenant.id,
+    storeId: w.store.id,
+    userId: w.user.id,
+    user: { id: w.user.id, name: w.user.name, email: w.user.email, pharmacistRegNo: "PH-123" },
+    permissions: new Set(permissions) as AuthCtx["permissions"],
+    allowedStoreIds: "all",
+  };
+}
+
+/** A tenant with one store and one medicine batch of 10 units at ₹100 (5% GST included). */
+async function scene(opts: { storeState?: string; storeGstin?: string | null; schedule?: string } = {}) {
+  const tenant = await makeTenant(t.db);
+  const store = await makeStore(t.db, tenant.id, { stateCode: opts.storeState ?? "27", gstin: opts.storeGstin ?? null });
+  const user = await makeUser(t.db);
+  const maker = (await t.db.insert(schema.manufacturers).values({ tenantId: tenant.id, name: "Acme Pharma" }).returning())[0];
+  const medicine = await makeMedicine(t.db, tenant.id, { schedule: opts.schedule ?? "none", manufacturerId: maker.id });
+  const batch = await makeBatch(t.db, { tenantId: tenant.id, storeId: store.id, medicineId: medicine.id, qtyOnHand: 10 });
+  const w = { tenant, store, user, medicine };
+  const sell = (input: Partial<SaleInputData> = {}, over: { now?: Date; ctx?: AuthCtx; invoiceNo?: string } = {}) =>
+    t.db.transaction((tx) =>
+      createSale(
+        tx,
+        over.ctx ?? ctxFor(w),
+        SaleInput.parse({ lines: [{ batchId: batch.id, qty: 2, discountBp: 0 }], payments: [{ method: "cash", amount: 20000 }], ...input }),
+        { source: "pos", now: over.now, invoiceNo: over.invoiceNo },
+      ),
+    );
+  const stock = async () => (await t.db.select().from(schema.batches).where(eq(schema.batches.id, batch.id)))[0].qtyOnHand;
+  const sales = () => t.db.select().from(schema.sales).where(eq(schema.sales.tenantId, tenant.id));
+  return { w, batch, sell, stock, sales };
+}
+
+describe("createSale: a full sale", () => {
+  it("writes the sale, stock movement, journal, GST document and register, and queues the receipt", async () => {
+    const s = await scene({ schedule: "H1" });
+    const customer = await makeCustomer(t.db, s.w.tenant.id, { phone: "9876543210" });
+    const res = await s.sell({
+      customerId: customer.id,
+      compliance: {
+        doctorName: "Dr Verma",
+        doctorRegNo: "MCI-1",
+        patientName: "Ravi",
+        patientAge: 40,
+        patientGender: "male",
+        patientAddress: "1 Main Road",
+        prescriptionRef: "RX-1",
+      },
+    });
+
+    expect(res).toMatchObject({ duplicate: false, total: 20000 });
+    expect(res.invoiceNo).toMatch(/^INV\/\d{2}-\d{2}\/000001$/);
+    expect(await s.stock()).toBe(8);
+
+    const [sale] = await s.sales();
+    expect(sale).toMatchObject({ status: "completed", totalAmount: 20000, paidAmount: 20000, creditAmount: 0, isInterState: false, customerPhone: "9876543210" });
+    // ₹200 inclusive at 5% -> taxable ₹190.48, tax split evenly
+    expect(sale.cgst).toBe(sale.sgst);
+    expect(sale.igst).toBe(0);
+
+    const moves = await t.db.select().from(schema.stockMovements).where(eq(schema.stockMovements.refId, sale.id));
+    expect(moves).toHaveLength(1);
+    expect(moves[0]).toMatchObject({ type: "sale", qtyChange: -2, balanceAfter: 8 });
+
+    const lines = await t.db
+      .select({ debit: schema.journalLines.debit, credit: schema.journalLines.credit })
+      .from(schema.journalLines)
+      .innerJoin(schema.journalEntries, eq(schema.journalLines.entryId, schema.journalEntries.id))
+      .where(eq(schema.journalEntries.refId, sale.id));
+    expect(lines.length).toBeGreaterThan(1);
+    expect(lines.reduce((a, l) => a + Number(l.debit), 0)).toBe(lines.reduce((a, l) => a + Number(l.credit), 0));
+
+    const docs = await t.db.select().from(schema.gstDocuments).where(eq(schema.gstDocuments.refId, sale.id));
+    expect(docs).toHaveLength(1);
+    expect(docs[0]).toMatchObject({ total: 20000, docNo: res.invoiceNo });
+
+    const [log] = await t.db.select().from(schema.dispensingLogs).where(eq(schema.dispensingLogs.saleId, sale.id));
+    expect(log).toMatchObject({ patientName: "Ravi", doctorName: "Dr Verma", manufacturerName: "Acme Pharma", pharmacistRegNo: "PH-123", quantityDispensed: 2 });
+
+    // the receipt is queued, not sent inside the request
+    const events = await t.db.select().from(schema.outboxEvents).where(eq(schema.outboxEvents.tenantId, s.w.tenant.id));
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({ type: "whatsapp.receipt", status: "pending", payload: { saleId: sale.id } });
+  });
+
+  it("does not queue a receipt for a walk-in customer", async () => {
+    const s = await scene();
+    await s.sell();
+    expect(await t.db.select().from(schema.outboxEvents).where(eq(schema.outboxEvents.tenantId, s.w.tenant.id))).toHaveLength(0);
+  });
+
+  it("ignores any price from the caller: the server rate is used", async () => {
+    const s = await scene();
+    const res = await s.sell({ payments: [] });
+    expect(res.total).toBe(20000); // 2 x ₹100 (batch sale rate)
+    const [sale] = await s.sales();
+    expect(sale.creditAmount).toBe(20000); // nothing paid, all outstanding
+  });
+
+  it("numbers by financial year and honours a pre-assigned invoice number", async () => {
+    const s = await scene();
+    const a = await s.sell({}, { now: new Date(2027, 2, 31, 12) }); // 31 Mar 2027 -> FY 26-27
+    const b = await s.sell({}, { now: new Date(2027, 3, 1, 12) }); // 1 Apr 2027 -> FY 27-28, restarts
+    expect(a.invoiceNo).toBe("INV/26-27/000001");
+    expect(b.invoiceNo).toBe("INV/27-28/000001");
+    const c = await s.sell({}, { invoiceNo: "D01/27-28/000007" });
+    expect(c.invoiceNo).toBe("D01/27-28/000007");
+  });
+});
+
+describe("createSale: idempotency", () => {
+  it("a repeated clientSaleId returns the first sale and bills only once", async () => {
+    const s = await scene();
+    const clientSaleId = "22222222-2222-4222-8222-222222222222";
+    const first = await s.sell({ clientSaleId });
+    const second = await s.sell({ clientSaleId });
+    expect(first.duplicate).toBe(false);
+    expect(second).toMatchObject({ duplicate: true, saleId: first.saleId, invoiceNo: first.invoiceNo });
+    expect(await s.stock()).toBe(8);
+    expect(await s.sales()).toHaveLength(1);
+  });
+
+  it("two parallel requests with the same clientSaleId create exactly one sale", async () => {
+    const s = await scene();
+    const clientSaleId = "33333333-3333-4333-8333-333333333333";
+    const results = await Promise.allSettled([s.sell({ clientSaleId }), s.sell({ clientSaleId })]);
+    expect(results.every((r) => r.status === "fulfilled")).toBe(true);
+    expect(await s.sales()).toHaveLength(1);
+    expect(await s.stock()).toBe(8);
+  });
+});
+
+describe("createSale: tax context (CGST+SGST vs IGST)", () => {
+  const MH_GSTIN = "27GSPTE0985F1Z5";
+  const TN_GSTIN = "33AABCT1332L1ZL";
+
+  it("B2B customer in another state -> IGST only, flagged inter-state", async () => {
+    const s = await scene({ storeState: "27" });
+    const c = await makeCustomer(t.db, s.w.tenant.id, { gstin: TN_GSTIN });
+    await s.sell({ customerId: c.id });
+    const [sale] = await s.sales();
+    expect(sale).toMatchObject({ isInterState: true, cgst: 0, sgst: 0 });
+    expect(sale.igst).toBeGreaterThan(0);
+  });
+
+  it("B2B customer in the same state -> CGST + SGST", async () => {
+    const s = await scene({ storeState: "27" });
+    const c = await makeCustomer(t.db, s.w.tenant.id, { gstin: MH_GSTIN });
+    await s.sell({ customerId: c.id });
+    const [sale] = await s.sales();
+    expect(sale).toMatchObject({ isInterState: false, igst: 0 });
+    expect(sale.cgst).toBeGreaterThan(0);
+  });
+
+  it("a customer without a GSTIN is always intra-state", async () => {
+    const s = await scene({ storeState: "27" });
+    const c = await makeCustomer(t.db, s.w.tenant.id, { stateCode: "33" });
+    await s.sell({ customerId: c.id });
+    expect((await s.sales())[0].isInterState).toBe(false);
+  });
+
+  it("a store whose state is not a 2-digit code (seed data 'MH') and has no GSTIN bills intra-state instead of guessing", async () => {
+    const s = await scene({ storeState: "MH" });
+    const c = await makeCustomer(t.db, s.w.tenant.id, { gstin: TN_GSTIN });
+    await s.sell({ customerId: c.id });
+    expect((await s.sales())[0]).toMatchObject({ isInterState: false, igst: 0 });
+  });
+
+  it("a non-numeric store state falls back to the store's GSTIN", async () => {
+    const s = await scene({ storeState: "MH", storeGstin: MH_GSTIN });
+    const c = await makeCustomer(t.db, s.w.tenant.id, { gstin: TN_GSTIN });
+    await s.sell({ customerId: c.id });
+    expect((await s.sales())[0].isInterState).toBe(true);
+  });
+});
+
+describe("createSale: prescriptions (🤝 B1.4)", () => {
+  async function withRx(qtyPrescribed: number, validUntil?: string) {
+    const s = await scene({ schedule: "H1" });
+    const [rx] = await t.db
+      .insert(schema.prescriptions)
+      .values({
+        tenantId: s.w.tenant.id,
+        storeId: s.w.store.id,
+        patientName: "Ravi",
+        doctorName: "Dr Verma",
+        prescriptionDate: "2026-10-01",
+        validUntil: validUntil ?? null,
+      })
+      .returning();
+    await t.db.insert(schema.prescriptionItems).values({
+      tenantId: s.w.tenant.id,
+      prescriptionId: rx.id,
+      medicineId: s.w.medicine.id,
+      medicineName: s.w.medicine.name,
+      quantityPrescribed: qtyPrescribed,
+    });
+    const compliance = {
+      doctorName: "Dr Verma",
+      doctorRegNo: "MCI-1",
+      patientName: "Ravi",
+      patientAge: 40,
+      patientAddress: "1 Main Road",
+      prescriptionRef: "RX-1",
+      prescriptionId: rx.id,
+    };
+    const rxState = async () => ({
+      rx: (await t.db.select().from(schema.prescriptions).where(eq(schema.prescriptions.id, rx.id)))[0],
+      item: (await t.db.select().from(schema.prescriptionItems).where(eq(schema.prescriptionItems.prescriptionId, rx.id)))[0],
+    });
+    return { ...s, compliance, rxState };
+  }
+
+  it("selling against a prescription advances its dispensed quantity and status", async () => {
+    const s = await withRx(3);
+    await s.sell({ compliance: s.compliance });
+    let st = await s.rxState();
+    expect(st.item.quantityDispensed).toBe(2);
+    expect(st.rx.status).toBe("partially_dispensed");
+    await s.sell({ compliance: s.compliance, lines: [{ batchId: s.batch.id, qty: 1, discountBp: 0 }], payments: [] });
+    st = await s.rxState();
+    expect(st.item.quantityDispensed).toBe(3);
+    expect(st.rx.status).toBe("fully_dispensed");
+  });
+
+  it("over-dispensing an H1 drug is refused and nothing is written", async () => {
+    const s = await withRx(3);
+    await s.sell({ compliance: s.compliance }); // 2 of 3
+    await expect(s.sell({ compliance: s.compliance })).rejects.toThrow(/Excess dispensing prohibited/); // +2 > 3
+    expect(await s.stock()).toBe(8);
+    expect(await s.sales()).toHaveLength(1);
+    expect((await s.rxState()).item.quantityDispensed).toBe(2);
+  });
+
+  it("an expired prescription is refused", async () => {
+    const s = await withRx(3, "2020-01-01");
+    await expect(s.sell({ compliance: s.compliance })).rejects.toThrow(/expired/i);
+    expect(await s.sales()).toHaveLength(0);
+  });
+});
+
+describe("createSale: refusals change nothing", () => {
+  it("insufficient stock", async () => {
+    const s = await scene();
+    await expect(s.sell({ lines: [{ batchId: s.batch.id, qty: 50, discountBp: 0 }] })).rejects.toThrow(/Insufficient stock/);
+    expect(await s.stock()).toBe(10);
+    expect(await s.sales()).toHaveLength(0);
+  });
+
+  it("an expired batch", async () => {
+    const s = await scene();
+    await t.db.update(schema.batches).set({ expiryDate: "2020-01-01" }).where(eq(schema.batches.id, s.batch.id));
+    await expect(s.sell()).rejects.toThrow(/expired/);
+    expect(await s.stock()).toBe(10);
+  });
+
+  it("a batch of another pharmacy", async () => {
+    const mine = await scene();
+    const other = await scene();
+    await expect(
+      mine.sell({ lines: [{ batchId: other.batch.id, qty: 1, discountBp: 0 }] }),
+    ).rejects.toThrow(/not found/);
+    expect(await other.stock()).toBe(10);
+  });
+
+  it("a customer of another pharmacy", async () => {
+    const mine = await scene();
+    const other = await scene();
+    const foreign = await makeCustomer(t.db, other.w.tenant.id);
+    await expect(mine.sell({ customerId: foreign.id })).rejects.toThrow(/Customer not found/);
+    expect(await mine.sales()).toHaveLength(0);
+  });
+
+  it("a Schedule H1 drug without doctor details", async () => {
+    const s = await scene({ schedule: "H1" });
+    await expect(s.sell()).rejects.toThrow(/required|mandatory/i);
+    expect(await s.stock()).toBe(10);
+  });
+
+  it("split payments, credit and point redemption are not available yet", async () => {
+    const s = await scene();
+    await expect(
+      s.sell({ payments: [{ method: "cash", amount: 10000 }, { method: "upi", amount: 10000 }] }),
+    ).rejects.toThrow(/Split payments are not available yet/);
+    await expect(s.sell({ payments: [{ method: "credit", amount: 10000 }] })).rejects.toThrow(/not available yet/);
+    await expect(s.sell({ redeemPoints: 5 })).rejects.toThrow(/not available yet/);
+    expect(await s.sales()).toHaveLength(0);
+  });
+
+  it("the discount ceiling needs sale.discount_override", async () => {
+    const s = await scene();
+    await t.db.update(schema.tenants).set({ settings: { maxDiscountBp: 1000 } }).where(eq(schema.tenants.id, s.w.tenant.id));
+    const cashier = ctxFor(s.w, ["sale.create"]);
+    await expect(
+      s.sell({ lines: [{ batchId: s.batch.id, qty: 1, discountBp: 1500 }] }, { ctx: cashier }),
+    ).rejects.toThrow(/need a manager's approval/);
+    await s.sell({ lines: [{ batchId: s.batch.id, qty: 1, discountBp: 1000 }] }, { ctx: cashier }); // at the limit is fine
+    await s.sell({ lines: [{ batchId: s.batch.id, qty: 1, discountBp: 1500 }] }); // owner may override
+    expect(await s.sales()).toHaveLength(2);
+  });
+
+  it("negative or fractional numbers", async () => {
+    const s = await scene();
+    const bad = (line: object) => s.sell({ lines: [{ batchId: s.batch.id, qty: 1, discountBp: 0, ...line }] });
+    // Zod rejects these before the service; the service also guards by itself when called directly.
+    await expect(bad({ qty: 0 })).rejects.toThrow();
+    await expect(
+      t.db.transaction((tx) =>
+        createSale(tx, ctxFor(s.w), { lines: [{ batchId: s.batch.id, qty: -1, discountBp: 0 }], billDiscountPaise: 0, payments: [], redeemPoints: 0 }, { source: "pos" }),
+      ),
+    ).rejects.toThrow(/Quantity must be a whole number/);
+    expect(await s.stock()).toBe(10);
+  });
+});
+
+describe("createSale: optional steps never lose the sale", () => {
+  it("a failing outbox insert is swallowed (savepoint) and the sale is kept", async () => {
+    const s = await scene();
+    const customer = await makeCustomer(t.db, s.w.tenant.id, { phone: "9876543210" });
+    // Make the outbox insert fail for real: a CHECK that rejects whatsapp.receipt rows.
+    await t.db.execute(sql`alter table outbox_events add constraint tmp_no_receipt check (type <> 'whatsapp.receipt') not valid`);
+    try {
+      const res = await s.sell({ customerId: customer.id });
+      expect(res.total).toBe(20000);
+      expect(await s.stock()).toBe(8);
+      expect(await s.sales()).toHaveLength(1);
+    } finally {
+      await t.db.execute(sql`alter table outbox_events drop constraint tmp_no_receipt`);
+    }
+  });
+});

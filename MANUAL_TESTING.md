@@ -3,7 +3,7 @@
 The one guide for testing everything in MediFlow by hand: every screen, every flow, every business rule, every permission. It replaces the separate Lane A and Lane B guides.
 
 - **Last verified against code:** 29 Oct 2026, branch `lane-a/overxpowered` after merging `origin/main` (Lane B PRs #12 and #13).
-- **Automated checks at that point:** `typecheck` ✅ · `lint:strict` ✅ · `npm test` ✅ **21 files / 307 tests**.
+- **Automated checks at that point:** `typecheck` ✅ · `lint:strict` ✅ · `npm test` ✅ **23 files / 335 tests** (after A2.1).
 - **Using the app rather than testing it?** Read [USER_MANUAL.md](USER_MANUAL.md).
 
 ---
@@ -99,7 +99,7 @@ If the login page shows *Failed query … AggregateError*, the database isn't re
 ```bash
 npm run typecheck && npm run lint:strict && npm test
 ```
-**Expect:** all exit 0; `Test Files 21 passed`, `Tests 307 passed` (numbers grow; "no failures" is what matters).
+**Expect:** all exit 0; `Test Files 23 passed`, `Tests 335 passed` (numbers grow; "no failures" is what matters).
 
 ### 2.4 Real medicines (optional)
 ```bash
@@ -155,13 +155,13 @@ Create this once; the tests refer to these names. **Do step 0 first.**
 | Roles & permissions (all pages/actions) | 🟡 | Lane A and most Lane B guarded. Gaps: API-keys page/actions, Omnichannel orders pages, a few actions (§18) |
 | Item master, racks, batches, opening stock, bulk import, schemes | ✅ | No stock-adjust screen (⏳) |
 | POS: search, cart, discount, one payment method, H/H1/X compliance, print | ✅ | No split tender, hold, cancel, returns, cash shift (⏳) |
-| Sale side-effects: stock ledger, numbering, journal, GST doc, register, loyalty | ✅ | Inter-state tax on sales not wired 🟡 |
+| Sale side-effects: stock ledger, numbering, journal, GST doc, register, loyalty, inter-state IGST, receipt queued in the outbox | ✅ | Built as one reusable service (`createSale`, A2.1) |
 | Suppliers, purchase (GRN) with landed cost, IGST, server totals | ✅ | No purchase orders/returns/payments (⏳) |
 | Customers, family groups, loyalty earn + adjust, medical reps, omnichannel & promise orders | ✅ | Redeem points at POS ⏳ |
-| Compliance registers, doctors, prescriptions, printable register | ✅ | Prescription dispensing not called by POS 🟡 |
+| Compliance registers, doctors, prescriptions, printable register | ✅ | Sales call prescription dispensing when a prescription id is sent, but the POS screen has no prescription picker yet 🟡 |
 | GST pages, GSTR-1 JSON, re-rate tool | ✅ | E-invoice is a **simulator** only; no "SIMULATED" badge ❗ |
 | Accounting statements, bank reconciliation | ✅ | No expenses, payment vouchers, period lock (⏳) |
-| WhatsApp/SMS settings, templates, inbox, reminders (simulated) | ✅ | Outbox + cron built; only reminders use the outbox 🟡 |
+| WhatsApp/SMS settings, templates, inbox, reminders (simulated) | ✅ | Outbox + cron built; reminders and sale receipts use the outbox. Nothing runs the cron on a schedule yet 🟡 |
 | API keys + `/api/v1/*` | 🟡 | Works; the key-management page lacks a permission check ❗ |
 | AI assistant | ✅ | Needs an AI key; permission enforced |
 | Multi-store, offline POS, import wizard, expenses, real e-invoice, … | ⏳ | §17 |
@@ -455,9 +455,15 @@ Expect: search by invoice no. or customer; columns **Invoice, Customer, Prescrib
 `npx vitest run tests/integration/stock.test.ts`
 Expect: pass: two cashiers each selling 6 of 10 units → exactly one succeeds; 20 parallel single-unit sales of a 12-unit batch sell exactly 12; the ledger always adds up. To see the tests have teeth: temporarily remove `.for("update")` in `src/server/domain/stock.ts`, re-run (two tests must fail), then `git checkout src/server/domain/stock.ts`.
 
-### POS-15 · Inter-state tax on a sale ❗🟡
-Bill the **Clinic** customer (GSTIN of another state) for ₹1,050.
-Expect (correct behaviour): IGST ₹50 only; `sales.is_inter_state = true`. **Today:** CGST + SGST because the sale code hard-codes intra-state. The logic function exists: `npx vitest run tests/unit/gst.test.ts -t "tax context"`. A pass here means it was wired in.
+### POS-15 · Inter-state tax on a sale ✅
+Role: cashier. Bill ₹1,050 of PARA to the **Clinic** customer (GSTIN `33AABCT1332L1ZL`, another state), then to a customer with GSTIN `27GSPTE0985F1Z5` (same state), then to **Ravi** (no GSTIN).
+Expect: Clinic → **IGST ₹50 only**, no CGST/SGST; same-state GSTIN → CGST ₹25 + SGST ₹25; Ravi → CGST + SGST even if his state is another state (a customer without a GSTIN is always intra-state).
+🛠 `select is_inter_state, cgst, sgst, igst from sales order by created_at desc limit 3;` and the GSTR-1 B2B table lists the Clinic sale.
+Edge: if the store's state is not a 2-digit code (the seed uses `MH`) and the store has no GSTIN, the sale is billed intra-state rather than guessed (do §3 step 0 to get correct IGST). `npx vitest run tests/integration/create-sale.test.ts -t "tax context"` covers all cases.
+
+### POS-16 · Double-click safety 🛠
+`npx vitest run tests/integration/create-sale.test.ts -t idempotency`
+Expect: pass: the same `clientSaleId` sent twice (even in parallel) creates exactly one sale and one stock deduction. (The POS screen does not send an id yet; held bills and offline sync will.)
 
 ---
 
@@ -558,10 +564,10 @@ Expect: print-friendly page with the pharmacy's licence number, pharmacist, the 
 ### CMP-5 · No deletion ✅
 Look for any delete control on registers or prescriptions. Expect: none.
 
-### CMP-6 · Prescription dispensing logic 🛠 / 🟡
-`npx vitest run tests/integration/dispensing.test.ts tests/unit/compliance.test.ts`
-Expect: pass: dispensed quantity accumulates; status goes `active → partially_dispensed → fully_dispensed`; dispensing more than prescribed is blocked for H1/X; an expired prescription is rejected; cancelled prescriptions stay in the table.
-🟡 **POS doesn't call this yet.** In the app, selling against a prescription does **not** change the prescription's status or quantities. That is the expected result today.
+### CMP-6 · Prescription dispensing logic ✅ (service) / 🟡 (screen)
+`npx vitest run tests/integration/dispensing.test.ts tests/unit/compliance.test.ts tests/integration/create-sale.test.ts -t "prescription|dispens"`
+Expect: pass: when a sale carries a prescription id, dispensed quantity accumulates; status goes `active → partially_dispensed → fully_dispensed`; selling more than prescribed is blocked for H1/X and **nothing is written** (no sale, stock unchanged); an expired prescription is refused; cancelled prescriptions stay in the table.
+🟡 **The POS screen has no prescription picker yet** (A2.7): it only has the free-text *Rx Slip / Ref No*. In the browser a sale does **not** change the prescription's status. To exercise the wiring end to end today, use the automated test above.
 
 ---
 
@@ -679,7 +685,8 @@ Expect: columns **Patient, Medicine / Reason, Scheduled Date, Channel, Status, M
 
 Expect: (1) **401**. (2) **200** with counts. (3) due reminders become `reminder.send` events; failures increase `attempts` with back-off (2^attempts × 5 s, capped at 1 hour); good ones become `done`. `npx vitest run tests/unit/outbox.test.ts`.
 ⚠️ If `CRON_SECRET` is **not set**, the endpoints do not check a secret (open). Production boot requires it.
-🟡 **Sale receipts are not queued** (a `TODO(B2.1)` remains in `sales.ts`). Nothing schedules the cron URLs automatically.
+✅ **Sale receipts are queued (A2.1):** bill a customer who has a phone number, then `select type, status, payload from outbox_events order by created_at desc limit 1;` → `whatsapp.receipt`, `pending`, payload `{saleId}`. The bill completes instantly; the message is sent by the next `/api/cron/outbox` run (simulated unless live WhatsApp is configured). A walk-in customer (no phone) queues nothing. A failed GST document is queued as `gst.doc_retry` instead of being lost.
+🟡 Nothing schedules the cron URLs automatically yet.
 
 ### COM-6 · Webhook ✅ (🟡 unsigned allowed without secret)
 ```bash
@@ -799,7 +806,6 @@ For each item, confirm there is **no** menu entry, page or button (so it isn't h
 | A1.5 | Login lockout, change password, store pick | 11 wrong passwords still allowed; no Profile page |
 | A1.6 | Audit-log screen | No Settings → Audit log (rows exist in `audit_logs`) |
 | A1.7 | Tenant-isolation suite | `tests/integration/isolation.test.ts` doesn't exist |
-| A2.1 | Extracted sale service / idempotency | `src/server/domain/sales/` doesn't exist |
 | A2.2 | Split tender | Only one payment method per bill; no `F8` |
 | A2.3 | Hold / resume bills | `F6`/`F7` do nothing |
 | A2.4–A2.5 | Cancel bill, returns, credit notes | No cancel/return buttons on an invoice |
@@ -827,15 +833,14 @@ Record these as **known**, not new. Fix and tick when resolved.
 | 1 | API Keys page and actions check login only (no permission) | API-4 | Any role can mint keys: **security** |
 | 2 | Omnichannel orders pages and several actions (`external-orders`, `medical-reps`, `schemes`, `bank-reconciliation`, `inventory-import`, `ai-enrichment`) lack permission checks | RBAC-2, RBAC-10 | Wrong roles can use them |
 | 3 | No visible "SIMULATED – NOT VALID" marker on e-invoice screen or print | GST-5 | Simulator could be mistaken for real |
-| 4 | Sales hard-code intra-state GST | POS-15 | Inter-state B2B sales show CGST+SGST instead of IGST |
-| 5 | POS doesn't call prescription-dispensing tracking | CMP-6 | Prescription status/quantities don't update |
-| 6 | Sale receipts not queued; nothing schedules cron | COM-5 | No automatic WhatsApp receipt/reminder runs |
-| 7 | Webhook accepts unsigned POSTs and cron skips its secret when the env var is unset | COM-5, COM-6 | Set both secrets in any shared environment |
-| 8 | Seeded store state is `MH` (text) but tax logic uses 2-digit codes | §3 step 0 | Intra-state purchases may come out as IGST until Settings has `27` |
-| 9 | GST dropdown still offers 12% and 28%; docs list 0/5/18/40 | GST-7 | Decide and align code and docs |
-| 10 | Whole-repo `npm run lint` still has Lane B errors | `npm run lint` | `lint:strict` is clean |
-| 11 | Webhook settings placeholder shows the old `mediflow_wa_webhook` | COM-6 | Cosmetic |
-| 12 | The 25 Oct automated run couldn't use: Racks **Save**, Purchase supplier select, new Scheme listing, Customer name input | INV-3, PUR-2, INV-8, CRM-1 | Probably test-script selectors; confirm by hand |
+| 4 | POS screen has no prescription picker (the service is wired) | CMP-6 | Prescription status/quantities don't update from the browser |
+| 5 | Nothing schedules the cron URLs | COM-5 | Receipts and reminders are only sent when someone calls the cron endpoints |
+| 6 | Webhook accepts unsigned POSTs and cron skips its secret when the env var is unset | COM-5, COM-6 | Set both secrets in any shared environment |
+| 7 | Seeded store state is `MH` (text) but tax logic uses 2-digit codes | §3 step 0 | Intra-state purchases may come out as IGST until Settings has `27` |
+| 8 | GST dropdown still offers 12% and 28%; docs list 0/5/18/40 | GST-7 | Decide and align code and docs |
+| 9 | Whole-repo `npm run lint` still has Lane B errors | `npm run lint` | `lint:strict` is clean |
+| 10 | Webhook settings placeholder shows the old `mediflow_wa_webhook` | COM-6 | Cosmetic |
+| 11 | The 25 Oct automated run couldn't use: Racks **Save**, Purchase supplier select, new Scheme listing, Customer name input | INV-3, PUR-2, INV-8, CRM-1 | Probably test-script selectors; confirm by hand |
 
 ---
 
@@ -869,7 +874,7 @@ npm run typecheck && npm run lint:strict
 | DEV-11 | `npx vitest run tests/unit/permissions.test.ts` | role templates match the counts in RBAC-4 |
 | DEV-12 | `NEXT_TELEMETRY_DISABLED=1 npx next build` | succeeds (needs `DATABASE_URL`; `next start` also needs `APP_ENCRYPTION_KEY` and `CRON_SECRET`) |
 
-### 19.3 What the automated suite covers (21 files)
+### 19.3 What the automated suite covers (23 files)
 | File | Covers |
 |---|---|
 | `unit/money.test.ts`, `invoice-no.test.ts` | paise/bp math, GST split, invoice number format |
@@ -883,6 +888,8 @@ npm run typecheck && npm run lint:strict
 | `integration/stock.test.ts` | stock ledger, concurrency, replay |
 | `integration/sequence.test.ts` | gap-free numbering, FY rollover, 16-char limit |
 | `integration/sale-resilience.test.ts` | savepoints, rejected inputs |
+| `integration/create-sale.test.ts` | the sale service: stock, journal, GST doc, register, outbox receipt, idempotency, IGST, prescriptions, refusals |
+| `unit/contracts.test.ts` | `SaleInput` and `PostPaymentInput` schemas |
 | `integration/rbac.test.ts` | membership/store/tenant checks |
 | `integration/register.test.ts` | registration seeds an owner |
 | `integration/racks-actions.test.ts` | racks permissions and isolation |
