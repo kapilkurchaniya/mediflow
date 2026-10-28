@@ -69,7 +69,15 @@ When you bill a customer, MediFlow automatically:
 
 If the email or password is wrong you'll see *Invalid email or password*. If you aren't signed in and open any page, MediFlow sends you to the sign-in screen first and brings you back afterwards.
 
+**Too many wrong passwords:** after 10 wrong attempts for the same email, sign-in is paused for **15 minutes** (even with the right password) and you'll see *Too many attempts, try again in 15 minutes*. This protects your account from guessing. A successful sign-in starts the count again. If you still can't sign in, ask your owner.
+
+**Which branch you start in:** MediFlow opens the branch you used last time, if you're still allowed to use it; otherwise the first branch you have access to. If your access has been suspended or you have no branch, you'll be told to ask your administrator.
+
 To leave, press the **Sign out** icon at the bottom of the left menu, next to your name.
+
+### 2.1a Changing your password
+
+Click **your name** at the bottom of the left menu to open **My profile**. Enter your **Current password**, then the **New password** twice (at least 8 characters, different from the current one) and press **Change password**. You stay signed in here; **every other device you were signed in on is signed out**. Your name, email and phone are shown above the form.
 
 ### 2.2 Registering a new pharmacy
 
@@ -688,6 +696,9 @@ It answers from your live data. If it hasn't been set up with an AI key, it will
 | You see… | What it means / what to do |
 |---|---|
 | *Invalid email or password* | Check both. Passwords are case-sensitive. |
+| *Too many attempts, try again in 15 minutes* | There were 10 wrong passwords for this email. Wait 15 minutes, then try again. |
+| *Your access has been suspended* / *no branch access* | Ask your owner to restore your access. |
+| *Your current password is not correct* | You typed the wrong current password on the My profile page. |
 | *You don't have access to this page* | Your role can't use this page. Ask the owner. |
 | *Insufficient stock for … Available: N* | You asked for more than the batch has. Lower the quantity or choose another batch. |
 | An item doesn't appear in billing search | It has no stock, only expired batches, or is misspelled. Check **Inventory → Batches & stock**. |
@@ -720,7 +731,7 @@ These are planned but **cannot be used today**. If you can't find a button for t
 | Billing | Cancel a bill; sales returns and credit notes; split payment (cash + UPI); credit sales; hold and resume a bill; cash register open/close; using loyalty points as a discount; billing without internet |
 | Stock | Stock adjustments and write-offs; transfers between branches; warehouse; physical stock count; reorder suggestions |
 | Buying | Purchase orders; returning goods to suppliers (debit notes); paying suppliers from the screen; supplier ledger |
-| People & security | Creating staff logins and roles from the screen; locking out repeated wrong passwords; changing your own password; sign-in and role-change entries in the audit log (the audit log itself is available) |
+| People & security | Creating staff logins and roles from the screen; password reset by email; sign-in and role-change entries in the audit log (the audit log itself is available) |
 | Multi-branch | Adding branches; switching between branches; chain-wide reports |
 | Accounts | Expenses; day-book drill-down and ledgers by party; receivables ageing with reminders; period locking; year-end closing (customer receipts are available) |
 | GST & messaging | Live e-invoice and e-way bill with the government portal; GSTR-2B / IMS matching; production WhatsApp and SMS rules; customer consent and privacy tools |

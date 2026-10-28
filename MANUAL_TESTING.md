@@ -3,7 +3,7 @@
 The one guide for testing everything in MediFlow by hand: every screen, every flow, every business rule, every permission. It replaces the separate Lane A and Lane B guides.
 
 - **Last verified against code:** 29 Oct 2026, branch `lane-a/overxpowered` after merging `origin/main` (Lane B PRs #12 and #13).
-- **Automated checks at that point:** `typecheck` ✅ · `lint:strict` ✅ · `npm test` ✅ **28 files / 441 tests** (after A1.7).
+- **Automated checks at that point:** `typecheck` ✅ · `lint:strict` ✅ · `npm test` ✅ **29 files / 466 tests** (after A1.5).
 - **Using the app rather than testing it?** Read [USER_MANUAL.md](USER_MANUAL.md).
 
 ---
@@ -99,7 +99,7 @@ If the login page shows *Failed query … AggregateError*, the database isn't re
 ```bash
 npm run typecheck && npm run lint:strict && npm test
 ```
-**Expect:** all exit 0; `Test Files 28 passed`, `Tests 441 passed` (numbers grow; "no failures" is what matters).
+**Expect:** all exit 0; `Test Files 29 passed`, `Tests 466 passed` (numbers grow; "no failures" is what matters).
 
 ### 2.4 Real medicines (optional)
 ```bash
@@ -151,7 +151,7 @@ Create this once; the tests refer to these names. **Do step 0 first.**
 
 | Area | Status | Notes |
 |---|---|---|
-| Login, register, sessions | ✅ | No lockout, no change-password, no invites (⏳) |
+| Login, register, sessions, **lockout after 10 wrong passwords, last-branch memory, change password** | ✅ | No staff invites yet (A1.4) |
 | Roles & permissions (all pages/actions) | 🟡 | Lane A and most Lane B guarded. Gaps: API-keys page/actions, Omnichannel orders pages, a few actions (§18) |
 | Item master, racks, batches, opening stock, bulk import, schemes | ✅ | No stock-adjust screen (⏳) |
 | POS: search, cart, discount, one payment method, H/H1/X compliance, print | ✅ | No split tender, hold, cancel, returns, cash shift (⏳) |
@@ -198,6 +198,28 @@ Expect: (1) redirect to `/login`, no crash. (2) `HttpOnly`. (3) a 64-hex id that
 
 ### AUTH-4 · Logout ✅
 Press the **Sign out** icon (bottom of sidebar). Expect: redirected to login; `/dashboard` now requires sign-in again.
+
+### AUTH-5 · Lockout after 10 wrong passwords ✅
+Role: any (use the cashier). On the sign-in page enter `cashier@apollo.com` with a **wrong** password 10 times, then the **right** one.
+Expect: each wrong try says *Invalid email or password* (the same text for an email that does not exist). After the 10th, even the right password says **Too many attempts, try again in 15 minutes**. Another email (e.g. `manager@apollo.com`) is unaffected. After 15 minutes the right password works. A successful sign-in clears the count (9 wrong + 1 right + 9 wrong does not lock). Attempts made while locked are refused and **not** counted, so an attacker cannot keep a real user locked out for ever.
+🛠 `select email_lower, success, ip, created_at from login_attempts order by created_at desc limit 12;` shows one row per real attempt (10 failures, none for the refused ones). To unlock a test account at once: `delete from login_attempts where email_lower='cashier@apollo.com';`. `npx vitest run tests/integration/login.test.ts -t "lockout"`.
+
+### AUTH-6 · Which branch the session starts in ✅🛠
+There is no screen to add branches yet (A3.1), so create a second store by SQL: `insert into stores (tenant_id, name, code, state_code) select tenant_id, 'Store B', 'STB', '27' from stores limit 1;`.
+1. Sign in as the **owner**, note the branch shown in the sidebar; `select last_store_id from memberships m join users u on u.id=m.user_id where u.email='admin@apollo.com';` is set.
+2. Limit the cashier to Store B only: `update memberships set all_stores=false, store_ids=array[(select id from stores where code='STB')] where user_id=(select id from users where email='cashier@apollo.com');` then sign in as the cashier.
+3. Make Store B inactive (`update stores set is_active=false where code='STB';`) and sign in as the cashier again.
+4. Suspend the cashier (`update memberships set status='suspended' where …`) and sign in.
+Expect: (1) the first branch; next sign-in starts in the last-used branch. (2) the cashier's session starts in **Store B**, never in the other store. (3) *Your account has no branch access. Ask your administrator.* (4) *Your access has been suspended. Ask your administrator.* Restore the data afterwards (`npm run db:reset`). A user in several pharmacies starts in the most recently joined one. `npx vitest run tests/integration/login.test.ts -t "branch"`.
+
+### AUTH-7 · Change password (My profile) ✅
+Open **My profile** by clicking your **name** at the bottom of the left menu (`/dashboard/settings/profile`; every role can open it).
+1. Check the page shows your name, email, phone.
+2. In a second private window sign in as the same user (this is the "other device").
+3. In the first window change the password: wrong *Current password*; *New password* and *Confirm* that differ; a new password under 8 characters; the same password again; then a valid one.
+4. Reload the second window.
+5. Sign out and sign in with the old, then the new password.
+Expect: (3) errors *Your current password is not correct.* / *The new passwords do not match.* / *The new password must be at least 8 characters.* / *Choose a password you have not used just now.*; success: *Password changed. 1 other signed-in device was signed out.* (4) the second window is sent to sign-in. (5) old fails, new works. Nothing about the password appears in the audit log (only *Password changed*). `npx vitest run tests/integration/login.test.ts -t "changing the password"`.
 
 ### RBAC-1 · "No access" page ✅
 Role: cashier. Open `/dashboard/accounting` and `/dashboard/settings`.
@@ -854,7 +876,6 @@ For each item, confirm there is **no** menu entry, page or button (so it isn't h
 | Roadmap | Feature | Quick check it is absent |
 |---|---|---|
 | A1.4 | Users, invites, roles screens | No Settings → Users/Roles; no `/invite/<token>` page |
-| A1.5 | Login lockout, change password, store pick | 11 wrong passwords still allowed; no Profile page |
 | A2.2 | Split tender | Only one payment method per bill; no `F8` |
 | A2.3 | Hold / resume bills | `F6`/`F7` do nothing |
 | A2.4–A2.5 | Cancel bill, returns, credit notes | No cancel/return buttons on an invoice |
@@ -889,7 +910,8 @@ Record these as **known**, not new. Fix and tick when resolved.
 | 8 | GST dropdown still offers 12% and 28%; docs list 0/5/18/40 | GST-7 | Decide and align code and docs |
 | 9 | Whole-repo `npm run lint` still has Lane B errors | `npm run lint` | `lint:strict` is clean |
 | 10 | Webhook settings placeholder shows the old `mediflow_wa_webhook` | COM-6 | Cosmetic |
-| 11 | The 25 Oct automated run couldn't use: Racks **Save**, Purchase supplier select, new Scheme listing, Customer name input | INV-3, PUR-2, INV-8, CRM-1 | Probably test-script selectors; confirm by hand |
+| 11 | The sign-in page's **Forgot password?** link does nothing (`#`), and registration does not enforce a minimum password length (changing a password requires 8+) | AUTH-1, AUTH-7 | No self-service reset; weak passwords possible at registration |
+| 12 | The 25 Oct automated run couldn't use: Racks **Save**, Purchase supplier select, new Scheme listing, Customer name input | INV-3, PUR-2, INV-8, CRM-1 | Probably test-script selectors; confirm by hand |
 
 ---
 
@@ -910,7 +932,7 @@ npm run typecheck && npm run lint:strict
 ### 19.2 Foundation checks
 | ID | Check | Expected |
 |---|---|---|
-| DEV-1 | `npm run db:reset`, then count tables: `select count(*) from information_schema.tables where table_schema='public' and table_type='BASE TABLE';` | prints `✓ database wiped / ✓ migrations applied / ✓ system roles synced`; **59** tables; `drizzle/` has `0000_init … 0005_quiet_ronan` |
+| DEV-1 | `npm run db:reset`, then count tables: `select count(*) from information_schema.tables where table_schema='public' and table_type='BASE TABLE';` | prints `✓ database wiped / ✓ migrations applied / ✓ system roles synced`; **60** tables; `drizzle/` has `0000_init … 0006_login_hardening` |
 | DEV-2 | `npx drizzle-kit generate --name should_not_exist` | `No schema changes, nothing to migrate`. If it creates a file, delete it (`git clean -f drizzle`) and tell the schema author to commit a migration |
 | DEV-3 | `DATABASE_URL=postgres://u:p@db.example.com:5432/x npm run db:reset` (and `db:seed-users`) | `Refusing to … non-local database`; nothing changes. `npm run db:migrate` twice is safe (no duplicates) |
 | DEV-4 | `ls src/server/db/schema` | 12 module files (`platform catalog inventory sales accounting purchasing compliance gst crm comms banking ai`) + `_helpers.ts` + `index.ts`; no old `schema.ts` |
@@ -923,7 +945,7 @@ npm run typecheck && npm run lint:strict
 | DEV-11 | `npx vitest run tests/unit/permissions.test.ts` | role templates match the counts in RBAC-4 |
 | DEV-12 | `NEXT_TELEMETRY_DISABLED=1 npx next build` | succeeds (needs `DATABASE_URL`; `next start` also needs `APP_ENCRYPTION_KEY` and `CRON_SECRET`) |
 
-### 19.3 What the automated suite covers (28 files)
+### 19.3 What the automated suite covers (29 files)
 | File | Covers |
 |---|---|
 | `unit/money.test.ts`, `invoice-no.test.ts` | paise/bp math, GST split, invoice number format |
@@ -943,6 +965,7 @@ npm run typecheck && npm run lint:strict
 | `unit/action-guards.test.ts` | every exported server action has a permission check (a new unguarded action fails; known gaps are listed in the test) |
 | `integration/isolation.test.ts` | pharmacy B signed in as OWNER cannot read or change pharmacy A's data through any list or by id (≈60 attacks across both lanes), nor point its records at A's |
 | `integration/payments.test.ts` | receipts and supplier/expense payments: journal, bill settlement, refusals, who may post |
+| `integration/login.test.ts` | lockout rules (10 failures / 15 min, reset on success, per email, unknown emails), store selection (last used, limited stores, inactive, suspended), change password and sign-out of other sessions |
 | `integration/audit-log.test.ts` | audit rows written by stock, store settings, medicines and discount overrides; filters, paging, tenant isolation, who may read |
 | `integration/rbac.test.ts` | membership/store/tenant checks |
 | `integration/register.test.ts` | registration seeds an owner |
@@ -963,7 +986,7 @@ Copy this table into your notes and fill the last two columns.
 
 | ID | Test | Result | Notes |
 |---|---|---|---|
-| AUTH-1…4 | Sign in, register, session, logout | | |
+| AUTH-1…7 | Sign in, register, session, logout, lockout, branch, password | | |
 | RBAC-1…10 | Access, menus, roles, exports, AI, isolation | | |
 | INV-1…9 | Medicines, racks, stock, import, schemes | | |
 | POS-1…15 | Billing counter and sales | | |
