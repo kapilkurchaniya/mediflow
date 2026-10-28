@@ -85,6 +85,13 @@ export async function addOpeningStock(formData: FormData) {
 
   try {
     await db.transaction(async (tx) => {
+      // The medicine must belong to this pharmacy (never trust an id from the browser)
+      const [medicine] = await tx
+        .select({ id: schema.medicines.id })
+        .from(schema.medicines)
+        .where(and(eq(schema.medicines.id, medicineId), eq(schema.medicines.tenantId, ctx.tenantId)));
+      if (!medicine) throw new Error("Medicine not found");
+
       // Check if batch already exists
       const existingBatch = await tx
         .select()
@@ -177,7 +184,11 @@ export async function adjustBatchStock(formData: FormData) {
   try {
     await db.transaction(async (tx) => {
       // Get batch to know which medicine it is
-      const [batch] = await tx.select().from(schema.batches).where(eq(schema.batches.id, batchId)).limit(1);
+      const [batch] = await tx
+        .select()
+        .from(schema.batches)
+        .where(and(eq(schema.batches.id, batchId), eq(schema.batches.tenantId, ctx.tenantId), eq(schema.batches.storeId, ctx.storeId)))
+        .limit(1);
       if (!batch) throw new Error("Batch not found");
 
       const balanceAfter = await recordStockMovement({

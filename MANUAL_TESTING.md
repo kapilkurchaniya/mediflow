@@ -3,7 +3,7 @@
 The one guide for testing everything in MediFlow by hand: every screen, every flow, every business rule, every permission. It replaces the separate Lane A and Lane B guides.
 
 - **Last verified against code:** 29 Oct 2026, branch `lane-a/overxpowered` after merging `origin/main` (Lane B PRs #12 and #13).
-- **Automated checks at that point:** `typecheck` ✅ · `lint:strict` ✅ · `npm test` ✅ **26 files / 377 tests** (after A2.9).
+- **Automated checks at that point:** `typecheck` ✅ · `lint:strict` ✅ · `npm test` ✅ **28 files / 441 tests** (after A1.7).
 - **Using the app rather than testing it?** Read [USER_MANUAL.md](USER_MANUAL.md).
 
 ---
@@ -99,7 +99,7 @@ If the login page shows *Failed query … AggregateError*, the database isn't re
 ```bash
 npm run typecheck && npm run lint:strict && npm test
 ```
-**Expect:** all exit 0; `Test Files 26 passed`, `Tests 377 passed` (numbers grow; "no failures" is what matters).
+**Expect:** all exit 0; `Test Files 28 passed`, `Tests 441 passed` (numbers grow; "no failures" is what matters).
 
 ### 2.4 Real medicines (optional)
 ```bash
@@ -273,14 +273,18 @@ Read `src/server/action.ts`. Expect: expected failures (`DomainError`) show thei
 
 Expect: (1) JSON `Forbidden: Export requires 'report.export' permission.` (2) CSV downloads (only roles with `report.export`: owner, manager, accountant). (3) *Forbidden: AI assistant access requires 'ai.use' permission.* (4) **401** JSON, not a redirect.
 
-### RBAC-9 · Tenant isolation 🛠 / 👤
-1. Register a second pharmacy (AUTH-2). Log in there and open Item master, Customers, Sales.
-2. Try opening an invoice URL of pharmacy 1 (`/dashboard/sales/<id>`).
+### RBAC-9 · Tenant isolation ✅ 🛠 / 👤
+1. Register a second pharmacy (AUTH-2). Log in there and open Item master, Customers, Suppliers, Sales, Purchases, Reports, Audit log.
+2. Try opening an invoice URL of pharmacy 1 (`/dashboard/sales/<id>`), a supplier and a purchase by id.
 
-Expect: (1) only that pharmacy's own (empty) data. (2) not found / no data. 🛠 `npx vitest run tests/integration/racks-actions.test.ts` covers cross-pharmacy and cross-store access for racks.
+Expect: (1) only that pharmacy's own (empty) data. (2) not found / no data.
+🛠 `npx vitest run tests/integration/isolation.test.ts`: pharmacy B is signed in as an **owner** (so a refusal can only be isolation, not missing rights) and attacks pharmacy A in three ways: it reads about 30 lists (medicines, customers, suppliers, purchases, sales, registers, orders, reminders, WhatsApp, SMS, bank statements, GST, dashboard, API keys…), it reads and changes about 28 records by A's ids (sales, purchases, suppliers, customers, loyalty, orders, schemes, reps, prescriptions, reminders, bank lines, API keys, e-invoices, racks, stock adjustments, opening stock…), and it tries to create its own records pointing at A's category, manufacturer or rack. Expect: no response contains A's data (a marker string), and a snapshot of A's data is identical afterwards.
+✅ Fixed while writing this suite (Lane A): `adjustBatchStock` could change **another pharmacy's** batch, `addOpeningStock` accepted another pharmacy's medicine, and `createMedicine` accepted another pharmacy's category/manufacturer/rack. All three are now refused, and `recordStockMovement` also scopes its row lock by pharmacy and store.
+🛠 `npx vitest run tests/integration/racks-actions.test.ts` covers cross-store access for racks.
 
-### RBAC-10 · Login-only actions 🟡
-Not visible in the UI. These server actions only check that someone is logged in (no permission): `external-orders`, `medical-reps`, `schemes`, `bank-reconciliation`, `inventory-import`, `ai-enrichment`, `api-keys`. Note them as a hardening to-do (§18).
+### RBAC-10 · Every action must check a permission 🟡 🛠
+`npx vitest run tests/unit/action-guards.test.ts`
+Expect: pass. The test reads every exported server action and fails if one has no permission check, unless it is listed as public by design (sign-in, register, logout, a server-only order helper) or as a **known gap**. Known gaps today (all Lane B, listed in the test with a reason): `enrichMedicineDetails` (**no authentication at all**, anyone could call the AI provider through it), and login-only: `api-keys` (3), `bank-reconciliation` (7), `external-orders` (4), `medical-reps` (4), `promise-orders` (3), `schemes` (5), `inventory-import`, and two GST reads (`getGstRateDistribution`, `previewGstRerate`). When Lane B fixes one, it must delete its line from the test: the last check fails while a listed action is already guarded. Not visible in the UI (see §18).
 
 ---
 
@@ -851,7 +855,6 @@ For each item, confirm there is **no** menu entry, page or button (so it isn't h
 |---|---|---|
 | A1.4 | Users, invites, roles screens | No Settings → Users/Roles; no `/invite/<token>` page |
 | A1.5 | Login lockout, change password, store pick | 11 wrong passwords still allowed; no Profile page |
-| A1.7 | Tenant-isolation suite | `tests/integration/isolation.test.ts` doesn't exist |
 | A2.2 | Split tender | Only one payment method per bill; no `F8` |
 | A2.3 | Hold / resume bills | `F6`/`F7` do nothing |
 | A2.4–A2.5 | Cancel bill, returns, credit notes | No cancel/return buttons on an invoice |
@@ -877,7 +880,7 @@ Record these as **known**, not new. Fix and tick when resolved.
 | # | Issue | Where to see it | Impact |
 |---|---|---|---|
 | 1 | API Keys page and actions check login only (no permission) | API-4 | Any role can mint keys: **security** |
-| 2 | Omnichannel orders pages and several actions (`external-orders`, `medical-reps`, `schemes`, `bank-reconciliation`, `inventory-import`, `ai-enrichment`) lack permission checks | RBAC-2, RBAC-10 | Wrong roles can use them |
+| 2 | Omnichannel orders pages and ~30 actions (`external-orders`, `medical-reps`, `promise-orders`, `schemes`, `bank-reconciliation`, `inventory-import`, 2 GST reads) lack permission checks; **`enrichMedicineDetails` has no authentication at all** | RBAC-2, RBAC-10 | Wrong roles can use them; the AI-enrichment endpoint is callable by anyone (cost abuse) |
 | 3 | No visible "SIMULATED – NOT VALID" marker on e-invoice screen or print | GST-5 | Simulator could be mistaken for real |
 | 4 | POS screen has no prescription picker (the service is wired) | CMP-6 | Prescription status/quantities don't update from the browser |
 | 5 | Nothing schedules the cron URLs | COM-5 | Receipts and reminders are only sent when someone calls the cron endpoints |
@@ -920,7 +923,7 @@ npm run typecheck && npm run lint:strict
 | DEV-11 | `npx vitest run tests/unit/permissions.test.ts` | role templates match the counts in RBAC-4 |
 | DEV-12 | `NEXT_TELEMETRY_DISABLED=1 npx next build` | succeeds (needs `DATABASE_URL`; `next start` also needs `APP_ENCRYPTION_KEY` and `CRON_SECRET`) |
 
-### 19.3 What the automated suite covers (26 files)
+### 19.3 What the automated suite covers (28 files)
 | File | Covers |
 |---|---|
 | `unit/money.test.ts`, `invoice-no.test.ts` | paise/bp math, GST split, invoice number format |
@@ -937,6 +940,8 @@ npm run typecheck && npm run lint:strict
 | `integration/create-sale.test.ts` | the sale service: stock, journal, GST doc, register, outbox receipt, idempotency, IGST, prescriptions, refusals |
 | `unit/contracts.test.ts` | `SaleInput` and `PostPaymentInput` schemas |
 | `unit/audit-diff.test.ts` | how the audit page describes old → new values |
+| `unit/action-guards.test.ts` | every exported server action has a permission check (a new unguarded action fails; known gaps are listed in the test) |
+| `integration/isolation.test.ts` | pharmacy B signed in as OWNER cannot read or change pharmacy A's data through any list or by id (≈60 attacks across both lanes), nor point its records at A's |
 | `integration/payments.test.ts` | receipts and supplier/expense payments: journal, bill settlement, refusals, who may post |
 | `integration/audit-log.test.ts` | audit rows written by stock, store settings, medicines and discount overrides; filters, paging, tenant isolation, who may read |
 | `integration/rbac.test.ts` | membership/store/tenant checks |

@@ -1,5 +1,5 @@
 import { schema } from "@/server/db";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import type { Tx } from "@/server/db";
 
 export type StockMovementType =
@@ -58,7 +58,7 @@ export async function recordStockMovement(params: RecordStockParams) {
   const [lockedBatch] = await tx
     .select({ id: schema.batches.id, qtyOnHand: schema.batches.qtyOnHand })
     .from(schema.batches)
-    .where(eq(schema.batches.id, batchId))
+    .where(and(eq(schema.batches.id, batchId), eq(schema.batches.tenantId, tenantId), eq(schema.batches.storeId, storeId)))
     .for("update");
 
   if (!lockedBatch) {
