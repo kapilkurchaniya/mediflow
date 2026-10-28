@@ -163,7 +163,7 @@ Every staff login has a **role**. A role decides which pages you see and which a
 | **Pharmacist** | Registered pharmacist | Billing, medicines, racks, customers, prescriptions and doctors, WhatsApp and reminders, AI assistant, view sales and stock. |
 | **Cashier** | Counter staff | Billing, view stock, customers (add and view), WhatsApp and reminders. Cannot see accounts, GST, purchases or reports. |
 | **Purchase Manager** | Buyer | Suppliers, purchases, medicines, racks, trade schemes, reports, AI assistant, view stock and legal registers. No billing. |
-| **Accountant** | Accounts / CA | Accounting, GST, reports, view sales and purchases, export data. No billing. |
+| **Accountant** | Accounts / CA | Accounting, **receipts**, GST, reports, view sales and purchases, export data. No billing. |
 | **Auditor** | Inspector / external CA | **View only**: reports, accounting, GST, sales, purchases, registers, **audit log**. Cannot change or export anything. |
 
 Examples of what a role does **not** see:
@@ -550,15 +550,29 @@ MediFlow keeps proper double-entry books automatically; you don't post entries b
 | **Balance Sheet** | What you own and owe on a date. |
 | **Cash Flow** | Money in and out. |
 | **Outstanding** | Who owes you and whom you owe, in age buckets (*Current 0–30 days, Overdue 31–60, Critical over 60*). |
+| **Receipts** | Record money received from a customer against their unpaid bills (see 13.1). |
 
-### 13.1 Bank reconciliation
+### 13.1 Receiving money from a customer (receipts)
+
+When a customer pays an outstanding balance, record it in **Finance → Receipts** (owner, manager and accountant). This keeps the customer's balance, the bill and your books in step.
+
+1. **Choose the customer.** The left list shows only customers who owe you money, biggest balance first. Use the search box for a name or phone.
+2. **Settle their bills.** Their unpaid bills appear, oldest first. In **Receive now (₹)** type how much they paid against each bill, or click **Full** for one bill, or **Settle all bills in full**.
+3. Choose the **Payment method** (Cash, UPI, Card or Bank transfer), the **Date** (not in the future), an optional **Reference** (UPI id, cheque number) and a **Note**.
+4. Press **Record receipt of ₹…**. You get a receipt number such as **RCT/26-27/000001**.
+
+You can't receive more than a bill's outstanding balance. A receipt posts the accounting entry for you (cash goes to *Cash on Hand*, UPI/card/bank to *Bank / Digital Payments*) and shows under **Recent receipts** at the bottom of the page. The balance also drops in **Outstanding**.
+
+> **Note:** the billing counter cannot yet create credit bills (part-paid or unpaid), so this screen is mostly empty until that arrives. Paying a **supplier** from the screen is also not available yet.
+
+### 13.2 Bank reconciliation
 
 **Finance → Bank reconciliation** matches your bank statement to the payments recorded in MediFlow.
 
 1. **Upload Bank Statement CSV:** choose the **Bank Name** (HDFC, ICICI, State Bank of India, Axis, or *Other / Standard CSV*), **Account Number** and **Statement Date**, then paste the statement's CSV text (date, description, debit, credit, balance).
 2. Let it **auto-match**, or link a line yourself with **Link System Payment**. You can unmatch a mistake.
 
-> Recording payments you receive from customers and pay to suppliers (receipt and payment vouchers) is **not available yet**, so most lines will stay unmatched for now.
+> Customer receipts can now be recorded (see 13.1), but paying suppliers from the screen is **not available yet**, so many lines may stay unmatched for now.
 
 > **Not available yet:** recording expenses (rent, salaries), closing a period so old entries can't change, and aged receivables with reminders.
 
@@ -705,10 +719,10 @@ These are planned but **cannot be used today**. If you can't find a button for t
 |---|---|
 | Billing | Cancel a bill; sales returns and credit notes; split payment (cash + UPI); credit sales; hold and resume a bill; cash register open/close; using loyalty points as a discount; billing without internet |
 | Stock | Stock adjustments and write-offs; transfers between branches; warehouse; physical stock count; reorder suggestions |
-| Buying | Purchase orders; returning goods to suppliers (debit notes); paying suppliers; supplier ledger |
+| Buying | Purchase orders; returning goods to suppliers (debit notes); paying suppliers from the screen; supplier ledger |
 | People & security | Creating staff logins and roles from the screen; locking out repeated wrong passwords; changing your own password; sign-in and role-change entries in the audit log (the audit log itself is available) |
 | Multi-branch | Adding branches; switching between branches; chain-wide reports |
-| Accounts | Expenses; day-book drill-down and ledgers by party; receivables ageing with reminders; period locking; year-end closing |
+| Accounts | Expenses; day-book drill-down and ledgers by party; receivables ageing with reminders; period locking; year-end closing (customer receipts are available) |
 | GST & messaging | Live e-invoice and e-way bill with the government portal; GSTR-2B / IMS matching; production WhatsApp and SMS rules; customer consent and privacy tools |
 | Setup | Import wizard for data from Marg or other software; guided onboarding; one-click inspector and CA export packs; built-in help guides |
 
