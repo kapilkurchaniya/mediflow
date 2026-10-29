@@ -47,6 +47,7 @@ const CLEAN_PATHS = [
   "src/app/dashboard/reports",
   "src/app/dashboard/reminders",
   "src/app/dashboard/whatsapp",
+  "src/server/jobs",
 ];
 
 const r = spawnSync("npx", ["eslint", "--quiet", ...CLEAN_PATHS], { stdio: "inherit", shell: true });
