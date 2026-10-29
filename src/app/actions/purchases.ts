@@ -119,7 +119,8 @@ export async function createPurchaseInvoice(
   supplierInvoiceNo?: string,
   invoiceDate?: string,
   items?: PurchaseItemInput[],
-  notes?: string
+  notes?: string,
+  purchaseOrderId?: string
 ): Promise<{ success?: boolean; purchaseId?: string; error?: string }> {
   const ctx = await requirePermission("purchase.create");
 
@@ -134,6 +135,7 @@ export async function createPurchaseInvoice(
         invoiceDate,
         items,
         notes,
+        purchaseOrderId,
       });
     }
   } catch (validationErr) {
