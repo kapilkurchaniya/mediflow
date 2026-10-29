@@ -1,4 +1,4 @@
- # MediFlow — AI-Native Pharmacy Operating System
+# MediFlow — AI-Native Pharmacy Operating System
 
 <div align="center">
 
