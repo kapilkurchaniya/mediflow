@@ -5,6 +5,13 @@ import { eq, and, desc } from "drizzle-orm";
 import { requirePermission } from "@/server/rbac";
 import { revalidatePath } from "next/cache";
 import { writeAudit } from "@/server/audit";
+import { protectedAction } from "@/server/action";
+import {
+  getSupplierLedger,
+  recordSupplierPayment,
+  getOpenSupplierInvoices,
+  RecordSupplierPaymentSchema,
+} from "@/server/domain/suppliers";
 
 export async function getSuppliers(searchQuery?: string) {
   const ctx = await requirePermission("supplier.view");
@@ -157,3 +164,35 @@ export async function updateSupplier(supplierId: string, formData: FormData) {
     return { error: (err instanceof Error ? err.message : String(err)) || "Failed to update supplier" };
   }
 }
+
+
+export async function getSupplierLedgerAction(
+  supplierId: string,
+  options?: { startDate?: string; endDate?: string }
+) {
+  const ctx = await requirePermission("supplier.view");
+  return getSupplierLedger(db, ctx.tenantId, supplierId, options);
+}
+
+export async function getOpenSupplierInvoicesAction(supplierId: string) {
+  const ctx = await requirePermission("supplier.view");
+  return getOpenSupplierInvoices(db, ctx.tenantId, supplierId);
+}
+
+export const recordSupplierPaymentAction = protectedAction("accounting.post")
+  .schema(RecordSupplierPaymentSchema)
+  .action(async ({ parsedInput, ctx }) => {
+    const payment = await db.transaction(async (tx) => {
+      return recordSupplierPayment(tx, ctx, parsedInput);
+    });
+
+    revalidatePath(`/dashboard/suppliers/${parsedInput.supplierId}`);
+    revalidatePath(`/dashboard/suppliers`);
+    revalidatePath(`/dashboard/accounting`);
+
+    return {
+      success: true,
+      paymentId: payment.id,
+      paymentNo: payment.paymentNo,
+    };
+  });

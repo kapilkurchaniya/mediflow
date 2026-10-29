@@ -17,6 +17,7 @@ import {
 } from "@/server/domain/compliance";
 import { createGstDocumentFromSale } from "@/server/domain/gst";
 import { LoyaltyService } from "@/server/domain/loyalty";
+import { enqueue } from "@/server/jobs/outbox";
 
 export async function getSales(dateFrom?: string | null, dateTo?: string | null) {
   const ctx = await requirePermission("sale.view");
@@ -506,7 +507,12 @@ export async function createSaleInvoice(
           });
         });
       } catch (gstErr) {
-        console.error("Warning: GST Document auto-creation failed; sale kept:", gstErr);
+        console.error("Warning: GST Document auto-creation failed; enqueueing outbox retry:", gstErr);
+        await enqueue(tx, ctx.tenantId, "gst.doc_retry", {
+          refType: "sale",
+          refId: sale.id,
+          storeId: ctx.storeId,
+        });
       }
 
       // 8. Earn Loyalty Points
@@ -525,6 +531,12 @@ export async function createSaleInvoice(
         }
       }
 
+      if (customerPhone) {
+        await enqueue(tx, ctx.tenantId, "whatsapp.receipt", {
+          saleId: sale.id,
+        });
+      }
+
       return sale.id;
     });
 
@@ -534,7 +546,7 @@ export async function createSaleInvoice(
 
     if (customerPhone) {
       // In a real app we'd queue this out of band, but keeping it simple
-      await sendWhatsAppReceipt(customerPhone, generatedInvoiceNo, finalTotalAmount, "https://mediflow.demo/receipts/" + saleId);
+      // Dispatched reliably via outbox enqueue inside tx
     }
 
     return { success: true, saleId };
@@ -551,5 +563,10 @@ export async function getSaleById(id: string) {
   const [customer] = sale.customerId ? await db.select().from(schema.customers).where(eq(schema.customers.id, sale.customerId)) : [null];
   const [store] = await db.select().from(schema.stores).where(eq(schema.stores.id, sale.storeId));
   const [tenant] = await db.select().from(schema.tenants).where(eq(schema.tenants.id, sale.tenantId));
-  return { sale, items, customer, store, tenant };
+  const [gstDoc] = await db
+    .select()
+    .from(schema.gstDocuments)
+    .where(and(eq(schema.gstDocuments.refType, "sale"), eq(schema.gstDocuments.refId, id), eq(schema.gstDocuments.tenantId, ctx.tenantId)))
+    .limit(1);
+  return { sale, items, customer, store, tenant, gstDoc: gstDoc || null };
 }

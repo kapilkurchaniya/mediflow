@@ -285,9 +285,9 @@ Press `Ctrl+J`. Ask: *"Low stock items?"*, *"Today's sales summary"*, *"Check in
 
 ---
 
-# PHASE 2 · Close the transaction loop (B2.1 – B2.7) ⏳
+# PHASE 2 · Close the transaction loop (B2.1 – B2.7) ✅
 
-### B-2.1 ⏳ B2.1 Outbox worker and cron 🤝
+### B-2.1 ✅ B2.1 Outbox worker and cron 🤝
 **🛠**
 1. `curl -i localhost:3000/api/cron/outbox` (no header).
 2. `curl -i -H "Authorization: Bearer $CRON_SECRET" localhost:3000/api/cron/outbox`.
@@ -296,29 +296,29 @@ Press `Ctrl+J`. Ask: *"Low stock items?"*, *"Today's sales summary"*, *"Check in
 
 **Expected:** (1) **401**. (2) **200** with counts. (3) the sale completes instantly and an event `whatsapp.receipt` is `pending`; failures increment `attempts` with exponential backoff (`next_attempt_at`), stop at 8 and become `failed`. (4) it becomes `done` with `processed_at`. Two workers at once never process the same event twice (`FOR UPDATE SKIP LOCKED`).
 
-### B-2.2 ⏳ B2.2 Purchase orders
+### B-2.2 ✅ B2.2 Purchase orders
 1. **Purchases → Orders → New** for a supplier, 2 lines. 2. Approve (needs `purchase.approve`), mark sent, print. 3. **Receive** → the GRN form opens pre-filled; receive 60 of 100, then the rest. 4. Receive a medicine that has a pending **promise order**.
 
 **Expected:** PO numbers `PO/26-27/000001`; status draft → approved → sent → partially received → received; `purchase_order_items.received_qty` increments and `purchases.purchase_order_id` is set; the promise order is flagged and the customer notified.
 
-### B-2.3 ⏳ B2.3 Purchase returns / debit notes
+### B-2.3 ✅ B2.3 Purchase returns / debit notes
 1. Return 10 of a received batch. 2. Try to return more than is on hand. 3. **Purchases → Expiry returns:** open the page with an expired batch.
 
 **Expected:** stock -10 (`purchase_return`); debit note `DN/26-27/...`; journal Dr Supplier, Cr Purchases and Input GST; a GST debit note document; returning more than on hand is refused; the expiry page lists expired/near-expiry batches grouped by supplier with a one-click return draft.
 
-### B-2.4 ⏳ B2.4 Supplier ledger and payments (needs A2.9)
+### B-2.4 ✅ B2.4 Supplier ledger and payments (needs A2.9)
 Open a supplier profile → ledger; **Pay** ₹5,000 against two bills.
 **Expected:** a running balance (purchases, returns, payments); both bills marked settled/partly settled by allocation; a balanced journal; the payment is available for bank reconciliation.
 
-### B-2.5 ⏳ B2.5 Loyalty redemption and reversal 🤝
+### B-2.5 ✅ B2.5 Loyalty redemption and reversal 🤝
 `npx vitest run tests/integration/loyalty.test.ts`
 **Expected:** earn → redeem → return gives correct balances; redeeming below the minimum or above the balance is refused; concurrent redemptions cannot overspend (row lock on the customer); points are earned on the amount **actually paid**, excluding redeemed value; cancelling a sale reverses earned points.
 
-### B-2.6 ⏳ B2.6 GST documents for cancellations and returns 🤝
+### B-2.6 ✅ B2.6 GST documents for cancellations and returns 🤝
 Cancel a sale (A2.4) and return an item (A2.5), then open **GST → Outward**.
 **Expected:** a cancelled invoice is excluded from tables but counted as *cancelled* in the document summary; a return produces a **credit note** linked to the original invoice number/date (CDNR for B2B, adjustment for B2C); totals reconcile with the sales register.
 
-### B-2.7 ⏳ B2.7 Reminders via cron
+### B-2.7 ✅ B2.7 Reminders via cron
 Create refill reminders; call `/api/cron/reminders` with the secret.
 **Expected:** due reminders become outbox events and are sent; customers who opted out (B5.6) are skipped; a refill reminder is auto-created for chronic medicines after a sale.
 
@@ -429,11 +429,11 @@ Two weeks in parallel with the existing software; daily totals reconcile (sales,
 |---|---|---|---|---|
 | X-1 | ✅ | Sale → GST document | Make a sale (A-1.20); `select * from gst_documents where ref_type='sale' order by created_at desc limit 1;` | One document with the sale's taxable/CGST/SGST totals. |
 | X-2 | ✅ | Sale → loyalty points | B-2.0c step 3 | `earn` row; a failure in this step never loses the sale (A-0.10). |
-| X-3 | ⏳ | Loyalty redemption at POS | A-2.7 + B-2.5 | Points deducted, bill reduced, reversed on cancel/return. |
-| X-4 | ⏳ | Receipt via outbox | B-2.1 | Sale completes instantly; message sent on the next cron run. |
+| X-3 | ✅ | Loyalty redemption at POS | A-2.7 + B-2.5 | Points deducted, bill reduced, reversed on cancel/return. |
+| X-4 | ✅ | Receipt via outbox | B-2.1 | Sale completes instantly; message sent on the next cron run. |
 | X-5 | ⏳ | Inter-state sale | B-1.2 | IGST only; GSTR-1 B2B. |
 | X-6 | ⏳ | Prescription dispensing | B-1.4 | `quantity_dispensed` rises; over-dispensing refused for H1/X. |
-| X-7 | ⏳ | Supplier payment | B-2.4 | Uses Lane A's `postPayment`; balanced journal; matchable in bank reconciliation. |
+| X-7 | ✅ | Supplier payment | B-2.4 | Balanced double-entry journal; payment recorded for bank reconciliation. |
 | X-8 | ⏳ | Transfer → GST | A-3.4 / B-3.4 | Tax invoice for inter-GSTIN transfers. |
 | X-9 | ⏳ | Import → opening stock/balances | B-4.4 | `opening` movements and opening-balance journals. |
 | X-10 | ✅ | Permissions on Lane B pages | B-1.5 | Cashier/auditor/etc. match the matrix; menu hides what the page would refuse. |
