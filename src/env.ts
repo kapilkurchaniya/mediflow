@@ -3,7 +3,20 @@ import { z } from "zod";
 const envSchema = z
   .object({
     // ─── Core ────────────────────────────────────────────────────────────────
-    DATABASE_URL: z.string().url("DATABASE_URL must be a valid postgres:// URL"),
+    DATABASE_URL: z
+      .string()
+      .refine(
+        (val) => {
+          if (val === "[SENSITIVE]") return true;
+          try {
+            const u = new URL(val);
+            return u.protocol === "postgres:" || u.protocol === "postgresql:";
+          } catch {
+            return false;
+          }
+        },
+        "DATABASE_URL must be a valid postgres:// URL"
+      ),
     NODE_ENV: z
       .enum(["development", "test", "production"])
       .default("development"),
