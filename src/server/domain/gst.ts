@@ -1236,3 +1236,92 @@ export function buildGstr1JsonPayload(
     doc_issue: docIssueFormatted,
   };
 }
+
+
+/**
+ * Creates debit note GST document from a purchase return (B2.3).
+ */
+export async function createGstDocumentFromPurchaseReturn(
+  dbOrTx: DbOrTx,
+  params: {
+    returnId: string;
+    tenantId: string;
+    storeId: string;
+    cgst?: number;
+    sgst?: number;
+    igst?: number;
+  }
+) {
+  const [returnRec] = await dbOrTx
+    .select({
+      id: schema.purchaseReturns.id,
+      returnNo: schema.purchaseReturns.returnNo,
+      purchaseId: schema.purchaseReturns.purchaseId,
+      supplierId: schema.purchaseReturns.supplierId,
+      taxableAmount: schema.purchaseReturns.taxableAmount,
+      taxAmount: schema.purchaseReturns.taxAmount,
+      totalAmount: schema.purchaseReturns.totalAmount,
+      createdAt: schema.purchaseReturns.createdAt,
+    })
+    .from(schema.purchaseReturns)
+    .where(and(eq(schema.purchaseReturns.id, params.returnId), eq(schema.purchaseReturns.tenantId, params.tenantId)));
+
+  if (!returnRec) {
+    throw new Error(`Purchase return ${params.returnId} not found`);
+  }
+
+  const [supplier] = await dbOrTx
+    .select({
+      name: schema.suppliers.name,
+      gstin: schema.suppliers.gstin,
+      stateCode: schema.suppliers.stateCode,
+    })
+    .from(schema.suppliers)
+    .where(eq(schema.suppliers.id, returnRec.supplierId));
+
+  const [store] = await dbOrTx
+    .select({
+      stateCode: schema.stores.stateCode,
+    })
+    .from(schema.stores)
+    .where(eq(schema.stores.id, params.storeId));
+
+  const storeStateCode = (store?.stateCode || "27").padStart(2, "0");
+  const supplierStateCode = (supplier?.stateCode || extractStateCodeFromGstin(supplier?.gstin) || storeStateCode).padStart(2, "0");
+  const isInterState = supplierStateCode !== storeStateCode;
+
+  const totalTax = returnRec.taxAmount ?? 0;
+  const igst = params.igst ?? (isInterState ? totalTax : 0);
+  const cgst = params.cgst ?? (isInterState ? 0 : Math.floor(totalTax / 2));
+  const sgst = params.sgst ?? (isInterState ? 0 : totalTax - cgst);
+
+  const docDate = returnRec.createdAt ? new Date(returnRec.createdAt).toISOString().split("T")[0]! : new Date().toISOString().split("T")[0]!;
+
+  const [gstDoc] = await dbOrTx
+    .insert(schema.gstDocuments)
+    .values({
+      tenantId: params.tenantId,
+      storeId: params.storeId,
+      docType: "debit_note",
+      docNo: returnRec.returnNo,
+      docDate,
+      partyGstin: supplier?.gstin || null,
+      partyName: supplier?.name || "Supplier",
+      partyStateCode: supplierStateCode,
+      placeOfSupply: `${storeStateCode}-${getStateName(storeStateCode)}`,
+      supplyType: "B2B",
+      isReverseCharge: false,
+      taxableAmount: returnRec.taxableAmount ?? 0,
+      cgst,
+      sgst,
+      igst,
+      cess: 0,
+      total: returnRec.totalAmount ?? 0,
+      refType: "return",
+      refId: returnRec.id,
+      status: "active",
+    })
+    .returning();
+
+  return gstDoc;
+}
