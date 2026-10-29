@@ -221,9 +221,14 @@ export function EInvoiceClient({ invoices }: { invoices: GstDocItem[] }) {
                           <Ban className="h-3 w-3" /> Cancelled
                         </span>
                       ) : inv.irn ? (
-                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-emerald-100 text-emerald-800">
-                          <CheckCircle2 className="h-3 w-3" /> Generated
-                        </span>
+                        <div className="flex flex-col items-center gap-0.5">
+                          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-emerald-100 text-emerald-800">
+                            <CheckCircle2 className="h-3 w-3" /> Generated
+                          </span>
+                          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold bg-rose-100 text-rose-700 border border-rose-200" title="Simulated IRP: Not legally valid for tax compliance">
+                            <AlertCircle className="h-2.5 w-2.5" /> SIMULATED – NOT VALID
+                          </span>
+                        </div>
                       ) : (
                         <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-100 text-amber-800">
                           <AlertCircle className="h-3 w-3" /> Pending
@@ -327,6 +332,10 @@ export function EInvoiceClient({ invoices }: { invoices: GstDocItem[] }) {
             </div>
 
             <div className="space-y-3 text-xs">
+              <div className="bg-rose-50 border border-rose-200 rounded-lg p-2.5 text-rose-800 text-xs font-semibold flex items-center gap-2">
+                <AlertCircle className="h-4 w-4 shrink-0 text-rose-600" />
+                <span>SIMULATED IRN — NOT A VALID E-INVOICE FOR STATUTORY COMPLIANCE</span>
+              </div>
               <div>
                 <label className="text-ink-500 font-semibold block mb-1">
                   64-Character IRN (Invoice Reference Number)
@@ -420,6 +429,10 @@ export function EInvoiceClient({ invoices }: { invoices: GstDocItem[] }) {
             </div>
 
             <div className="space-y-3 text-xs">
+              <div className="bg-rose-50 border border-rose-200 rounded-lg p-2.5 text-rose-800 text-xs font-semibold flex items-center gap-2">
+                <AlertCircle className="h-4 w-4 shrink-0 text-rose-600" />
+                <span>SIMULATED IRN — NOT A VALID E-INVOICE FOR STATUTORY COMPLIANCE</span>
+              </div>
               <div className="p-3 bg-amber-50 rounded-lg border border-amber-200 text-amber-900">
                 <span className="font-semibold block mb-0.5">Statutory 24-Hour Cancellation:</span>
                 An IRN can only be cancelled within 24 hours of generation on the NIC portal. After 24 hours, you must issue a GST credit note.
@@ -492,6 +505,10 @@ export function EInvoiceClient({ invoices }: { invoices: GstDocItem[] }) {
             </div>
 
             <div className="space-y-3 text-xs">
+              <div className="bg-rose-50 border border-rose-200 rounded-lg p-2.5 text-rose-800 text-xs font-semibold flex items-center gap-2">
+                <AlertCircle className="h-4 w-4 shrink-0 text-rose-600" />
+                <span>SIMULATED IRN — NOT A VALID E-INVOICE FOR STATUTORY COMPLIANCE</span>
+              </div>
               <p className="text-ink-500">
                 Generate Part-A and Part-B consignment movement credentials for invoice value of{" "}
                 <span className="font-semibold text-ink-900">{formatINR(ewayDoc.total)}</span>.

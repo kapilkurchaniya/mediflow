@@ -7,7 +7,7 @@ import { handleEInvoiceGenerate } from "./einvoice-generate";
 
 export const handlers: Record<
   OutboxType,
-  (event: { tenantId: string; payload: any }) => Promise<void>
+  (event: { tenantId: string; payload: Record<string, unknown> }) => Promise<void>
 > = {
   "whatsapp.receipt": handleWhatsAppReceipt,
   "sms.send": handleSmsSend,

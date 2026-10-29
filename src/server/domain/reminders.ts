@@ -1,7 +1,6 @@
 import { db, schema } from "@/server/db";
 import { eq, and, lte, desc } from "drizzle-orm";
-import { getSmsProvider } from "./sms";
-import { WhatsAppService } from "./whatsapp";
+import { enqueue } from "@/server/jobs/outbox";
 
 export class RemindersService {
   /**
@@ -72,55 +71,19 @@ export class RemindersService {
   }
 
   /**
-   * Execute batch dispatch of due reminders via WhatsApp / SMS
+   * Batch dispatch due reminders through Outbox worker (B2.7)
    */
   static async processDueReminders(tenantId: string, storeId?: string | null) {
     const dueList = await this.getDueReminders(tenantId, storeId);
-    const smsProvider = await getSmsProvider(tenantId);
+    let enqueued = 0;
 
-    const results = {
-      total: dueList.length,
-      sent: 0,
-      failed: 0,
-    };
-
-    for (const { reminder, medicineName } of dueList) {
-      let waOk = false;
-      let smsOk = false;
-
-      // 1. Try WhatsApp if channel is 'whatsapp' or 'both'
-      if (reminder.channel === "whatsapp" || reminder.channel === "both") {
-        const waRes = await WhatsAppService.sendRefillReminder({
-          tenantId,
-          storeId: reminder.storeId,
-          customerPhone: reminder.customerPhone,
-          customerId: reminder.customerId,
-          customerName: reminder.customerName,
-          medicineName: medicineName || "Prescription Medicine",
-        });
-        waOk = waRes.success;
+    await db.transaction(async (tx) => {
+      for (const { reminder } of dueList) {
+        await enqueue(tx, tenantId, "reminder.send", { reminderId: reminder.id });
+        enqueued++;
       }
+    });
 
-      // 2. Try SMS if channel is 'sms' or (channel is 'both' and whatsapp wasn't delivered)
-      if (reminder.channel === "sms" || (reminder.channel === "both" && !waOk)) {
-        const smsRes = await smsProvider.sendSms(reminder.customerPhone, reminder.message);
-        smsOk = smsRes.success;
-      }
-
-      const isSuccess = waOk || smsOk;
-
-      await db
-        .update(schema.reminders)
-        .set({
-          status: isSuccess ? "sent" : "failed",
-          sentAt: isSuccess ? new Date() : null,
-        })
-        .where(eq(schema.reminders.id, reminder.id));
-
-      if (isSuccess) results.sent++;
-      else results.failed++;
-    }
-
-    return results;
+    return { total: dueList.length, sent: enqueued, failed: 0 };
   }
 }

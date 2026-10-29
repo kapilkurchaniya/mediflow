@@ -4,9 +4,9 @@ import { WhatsAppService } from "@/server/domain/whatsapp";
 
 export async function handleWhatsAppReceipt(event: {
   tenantId: string;
-  payload: any;
+  payload: Record<string, unknown>;
 }) {
-  const { saleId } = event.payload;
+  const saleId = typeof event.payload.saleId === "string" ? event.payload.saleId : undefined;
   if (!saleId) throw new Error("Missing saleId in whatsapp.receipt payload");
 
   const [sale] = await db

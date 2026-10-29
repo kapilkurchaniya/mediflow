@@ -1,19 +1,24 @@
 "use client";
 
-import { useActionState, useEffect, useState } from "react";
+import { useActionState, useEffect, useState, Suspense } from "react";
+import { useSearchParams, redirect } from "next/navigation";
+import Link from "next/link";
 import { createPurchaseInvoice, PurchaseItemInput } from "@/app/actions/purchases";
 import { getSuppliers } from "@/app/actions/suppliers";
 import { getMedicines } from "@/app/actions/inventory";
-import { Save, Plus, Trash2, FileText, Truck, AlertCircle } from "lucide-react";
-import { redirect } from "next/navigation";
+import { getPurchaseOrder } from "@/app/actions/purchase-orders";
+import { Save, Plus, Trash2, FileText, Truck, AlertCircle, ClipboardList } from "lucide-react";
 import { PageHeader } from "@/app/components/ui";
 import { formatINR } from "@/lib/format";
+import { DEFAULT_GST_RATE_BP, isValidGstRateBp, type GstRateBp } from "@/lib/regulatory";
 
-import { DEFAULT_GST_RATE_BP, isValidGstRateBp } from "@/lib/regulatory";
+function NewPurchaseForm() {
+  const searchParams = useSearchParams();
+  const poId = searchParams.get("poId");
 
-export default function NewPurchasePage() {
   const [suppliers, setSuppliers] = useState<{ id: string; name: string }[]>([]);
   const [medicines, setMedicines] = useState<{ id: string; name: string; gstRateBp: number }[]>([]);
+  const [linkedPo, setLinkedPo] = useState<{ id: string; poNo: string } | null>(null);
 
   const [supplierId, setSupplierId] = useState("");
   const [supplierInvoiceNo, setSupplierInvoiceNo] = useState("");
@@ -32,7 +37,32 @@ export default function NewPurchasePage() {
         }))
       );
     });
-  }, []);
+
+    if (poId) {
+      getPurchaseOrder(poId).then((po) => {
+        if (po) {
+          setLinkedPo({ id: po.id, poNo: po.poNo });
+          setSupplierId(po.supplierId);
+          if (po.items && po.items.length > 0) {
+            setItems(
+              po.items.map((i) => ({
+                medicineId: i.medicineId,
+                batchNo: "",
+                expiryDate: "",
+                qty: Math.max(1, i.qty - i.receivedQty),
+                freeQty: i.freeQty,
+                rate: i.rate,
+                mrp: Math.round(i.rate * 1.3),
+                saleRate: Math.round(i.rate * 1.2),
+                discountBp: 0,
+                gstRateBp: DEFAULT_GST_RATE_BP,
+              }))
+            );
+          }
+        }
+      });
+    }
+  }, [poId]);
 
   const [state, formAction, isPending] = useActionState(
     async (_prevState: { error?: string; success?: boolean } | null, _formData: FormData) => {
@@ -40,7 +70,14 @@ export default function NewPurchasePage() {
       if (!supplierInvoiceNo.trim()) return { error: "Supplier invoice number is required." };
       if (items.length === 0) return { error: "Please add at least one line item." };
 
-      const res = await createPurchaseInvoice(supplierId, supplierInvoiceNo.trim(), invoiceDate, items);
+      const res = await createPurchaseInvoice(
+        supplierId,
+        supplierInvoiceNo.trim(),
+        invoiceDate,
+        items,
+        undefined,
+        linkedPo?.id
+      );
       if (res.success) redirect("/dashboard/purchases");
       return res;
     },
@@ -68,17 +105,6 @@ export default function NewPurchasePage() {
   const updateItem = <K extends keyof PurchaseItemInput>(index: number, field: K, value: PurchaseItemInput[K]) => {
     const newItems = [...items];
     newItems[index][field] = value;
-
-    if (field === "medicineId") {
-      const med = medicines.find((m) => m.id === value);
-      if (med && isValidGstRateBp(med.gstRateBp)) newItems[index].gstRateBp = med.gstRateBp;
-    }
-
-    // Default saleRate to mrp if not set
-    if (field === "mrp" && !newItems[index].saleRate) {
-      newItems[index].saleRate = value as number;
-    }
-
     setItems(newItems);
   };
 
@@ -86,150 +112,179 @@ export default function NewPurchasePage() {
     setItems(items.filter((_, i) => i !== index));
   };
 
-  const calculateTotals = () => {
-    let gross = 0;
-    let disc = 0;
-    let tax = 0;
+  const totals = items.reduce(
+    (acc, item) => {
+      const gross = item.qty * item.rate;
+      const discount = Math.round((gross * (item.discountBp || 0)) / 10000);
+      const taxable = gross - discount;
+      const gst = Math.round((taxable * item.gstRateBp) / 10000);
+      const total = taxable + gst;
 
-    items.forEach((item) => {
-      const g = item.qty * item.rate;
-      const d = Math.round((g * item.discountBp) / 10000);
-      const t = Math.round(((g - d) * item.gstRateBp) / 10000);
-      gross += g;
-      disc += d;
-      tax += t;
-    });
-
-    return { gross, disc, tax, net: gross - disc + tax };
-  };
-
-  const totals = calculateTotals();
+      return {
+        gross: acc.gross + gross,
+        disc: acc.disc + discount,
+        tax: acc.tax + gst,
+        net: acc.net + total,
+      };
+    },
+    { gross: 0, disc: 0, tax: 0, net: 0 }
+  );
 
   return (
-    <div className="page mx-auto max-w-6xl space-y-6 pb-20">
+    <div className="page space-y-6">
       <PageHeader
-        title="Record Purchase Invoice (GRN)"
-        description="Receive stock from distributors, increment batch inventory, and post to General Ledger."
         backHref="/dashboard/purchases"
+        eyebrow="Inventory Inward"
+        title="Record Purchase Invoice (GRN)"
+        description="Receive stock from suppliers, update batch inventories, and book payable journals."
       />
 
-      <form action={formAction} className="space-y-6">
-        {state?.error && (
-          <div className="p-3 text-[13px] text-red-700 bg-red-50 border border-red-200 rounded-lg flex items-center gap-2">
-            <AlertCircle className="h-4 w-4 shrink-0 text-red-600" />
-            <span>{state.error}</span>
+      {linkedPo && (
+        <div className="card p-3.5 bg-brand-50 border border-brand-200 text-brand-900 text-xs flex flex-wrap items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <ClipboardList className="w-4 h-4 text-brand-600 shrink-0" />
+            <span>
+              Receiving goods against <strong>Purchase Order {linkedPo.poNo}</strong>. Items and rates pre-filled.
+            </span>
           </div>
-        )}
+          <Link
+            href={`/dashboard/purchases/orders/${linkedPo.id}`}
+            className="text-brand-700 underline font-semibold text-xs hover:text-brand-900"
+          >
+            View PO Details
+          </Link>
+        </div>
+      )}
 
-        {/* Invoice Metadata Header Card */}
-        <div className="card p-5 shadow-xs">
-          <h3 className="card-title text-[14px] flex items-center gap-2 border-b border-ink-150 pb-2 mb-4">
-            <Truck className="h-4 w-4 text-brand-600" />
-            Supplier & Invoice Details
-          </h3>
+      {state?.error && (
+        <div className="alert alert-error">
+          <AlertCircle className="h-4 w-4 shrink-0" />
+          <span>{state.error}</span>
+        </div>
+      )}
 
+      <form action={formAction} className="space-y-6">
+        {/* Invoice Info Card */}
+        <div className="card p-5 space-y-4">
+          <h3 className="card-title text-[14px] border-b border-ink-150 pb-2">Supplier & Bill Info</h3>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
-              <label className="label text-[12.5px]">Supplier / Distributor *</label>
-              <select
-                required
-                value={supplierId}
-                onChange={(e) => setSupplierId(e.target.value)}
-                className="select"
-              >
-                <option value="">Select supplier...</option>
-                {suppliers.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.name}
-                  </option>
-                ))}
-              </select>
+              <label htmlFor="grn-supplier-select" className="label required">Supplier</label>
+              <div className="relative">
+                <Truck className="absolute left-3 top-2.5 h-4 w-4 text-ink-400" />
+                <select
+                  id="grn-supplier-select"
+                  value={supplierId}
+                  onChange={(e) => setSupplierId(e.target.value)}
+                  className="input pl-9"
+                  required
+                >
+                  <option value="">Select Supplier</option>
+                  {suppliers.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
 
             <div>
-              <label className="label text-[12.5px]">Supplier Bill / Invoice No *</label>
-              <input
-                type="text"
-                required
-                value={supplierInvoiceNo}
-                onChange={(e) => setSupplierInvoiceNo(e.target.value)}
-                className="input font-mono uppercase"
-                placeholder="e.g. INV-2024-9841"
-              />
+              <label htmlFor="grn-invoice-no-input" className="label required">Supplier Invoice No.</label>
+              <div className="relative">
+                <FileText className="absolute left-3 top-2.5 h-4 w-4 text-ink-400" />
+                <input
+                  id="grn-invoice-no-input"
+                  type="text"
+                  value={supplierInvoiceNo}
+                  onChange={(e) => setSupplierInvoiceNo(e.target.value)}
+                  placeholder="e.g. INV-9842"
+                  className="input pl-9 uppercase"
+                  required
+                />
+              </div>
             </div>
 
             <div>
-              <label className="label text-[12.5px]">Invoice Date *</label>
+              <label htmlFor="grn-invoice-date-input" className="label required">Invoice Date</label>
               <input
+                id="grn-invoice-date-input"
                 type="date"
-                required
                 value={invoiceDate}
                 onChange={(e) => setInvoiceDate(e.target.value)}
                 className="input"
+                required
               />
             </div>
           </div>
         </div>
 
-        {/* Line Items Table Card */}
-        <div className="card overflow-hidden shadow-xs">
-          <div className="p-4 border-b border-ink-150 bg-ink-50/60 flex justify-between items-center">
-            <h3 className="card-title text-[14px] flex items-center gap-2">
-              <FileText className="h-4 w-4 text-brand-600" />
-              Goods Received Items ({items.length})
-            </h3>
+        {/* Batch Line Items Card */}
+        <div className="card overflow-hidden">
+          <div className="p-4 border-b border-ink-150 flex items-center justify-between">
+            <div>
+              <h3 className="card-title text-[14px]">Invoice Items & Batches</h3>
+              <p className="card-description">Enter batch details, quantities, cost rates, and GST.</p>
+            </div>
             <button
               type="button"
               onClick={handleAddItem}
-              className="btn btn-primary btn-sm"
+              className="btn btn-secondary text-xs"
             >
-              <Plus className="h-4 w-4 mr-1" /> Add Line Item
+              <Plus className="h-3.5 w-3.5 mr-1" />
+              Add Row
             </button>
           </div>
 
           <div className="overflow-x-auto">
-            <table className="data-table">
+            <table className="data-table text-[12px] w-full">
               <thead>
                 <tr>
-                  <th className="min-w-[200px]">Medicine</th>
+                  <th className="w-48">Medicine</th>
                   <th className="w-28">Batch No</th>
-                  <th className="w-36">Expiry</th>
-                  <th className="w-20 text-center">Qty</th>
-                  <th className="w-20 text-center">Free</th>
-                  <th className="w-28 text-right">Purchase Rate (₹)</th>
-                  <th className="w-28 text-right">MRP (₹)</th>
-                  <th className="w-20 text-center">Disc %</th>
-                  <th className="w-28 text-right">Net Line (₹)</th>
+                  <th className="w-28">Expiry</th>
+                  <th className="w-16 text-center">Qty</th>
+                  <th className="w-16 text-center">Free</th>
+                  <th className="w-24 text-right">Cost Rate (₹)</th>
+                  <th className="w-20 text-center">GST %</th>
+                  <th className="w-24 text-right">MRP (₹)</th>
+                  <th className="w-24 text-right">Sale Rate (₹)</th>
+                  <th className="w-16 text-center">Disc %</th>
+                  <th className="w-24 text-right">Total</th>
                   <th className="w-10"></th>
                 </tr>
               </thead>
               <tbody>
                 {items.length === 0 ? (
                   <tr>
-                    <td colSpan={10} className="px-4 py-12 text-center text-ink-400">
-                      <p className="text-[13.5px] font-medium text-ink-600">No line items added yet</p>
-                      <p className="text-[12px] text-ink-400 mt-1">
-                        Click &ldquo;Add Line Item&rdquo; above to record medicines received on this supplier invoice.
-                      </p>
+                    <td colSpan={12} className="text-center py-8 text-ink-400">
+                      No line items yet. Click &ldquo;Add Row&rdquo; to start recording received batches.
                     </td>
                   </tr>
                 ) : (
                   items.map((item, index) => {
-                    const lineGross = item.qty * item.rate;
-                    const lineDisc = Math.round((lineGross * item.discountBp) / 10000);
-                    const lineTax = Math.round(((lineGross - lineDisc) * item.gstRateBp) / 10000);
-                    const lineTotal = lineGross - lineDisc + lineTax;
+                    const gross = item.qty * item.rate;
+                    const discount = Math.round((gross * (item.discountBp || 0)) / 10000);
+                    const taxable = gross - discount;
+                    const gst = Math.round((taxable * item.gstRateBp) / 10000);
+                    const lineTotal = taxable + gst;
 
                     return (
                       <tr key={index} className="hover:bg-ink-50/50">
                         <td>
                           <select
-                            required
                             value={item.medicineId}
-                            onChange={(e) => updateItem(index, "medicineId", e.target.value)}
-                            className="select !h-8.5 text-[12.5px]"
+                            onChange={(e) => {
+                              const med = medicines.find((m) => m.id === e.target.value);
+                              updateItem(index, "medicineId", e.target.value);
+                              if (med) {
+                                updateItem(index, "gstRateBp", isValidGstRateBp(med.gstRateBp) ? med.gstRateBp : DEFAULT_GST_RATE_BP);
+                              }
+                            }}
+                            className="input !h-8.5 text-[12px]"
+                            required
                           >
-                            <option value="">Select medicine...</option>
+                            <option value="">Select Item</option>
                             {medicines.map((m) => (
                               <option key={m.id} value={m.id}>
                                 {m.name}
@@ -240,30 +295,30 @@ export default function NewPurchasePage() {
                         <td>
                           <input
                             type="text"
-                            required
                             value={item.batchNo}
                             onChange={(e) => updateItem(index, "batchNo", e.target.value.toUpperCase())}
                             className="input !h-8.5 font-mono uppercase text-[12px]"
-                            placeholder="LOT101"
+                            placeholder="BATCH-12"
+                            required
                           />
                         </td>
                         <td>
                           <input
                             type="date"
-                            required
                             value={item.expiryDate}
                             onChange={(e) => updateItem(index, "expiryDate", e.target.value)}
-                            className="input !h-8.5 text-[12px]"
+                            className="input !h-8.5 text-[11px]"
+                            required
                           />
                         </td>
                         <td>
                           <input
                             type="number"
-                            required
                             min="1"
                             value={item.qty || ""}
-                            onChange={(e) => updateItem(index, "qty", parseInt(e.target.value) || 0)}
-                            className="input !h-8.5 text-center font-bold num text-[12.5px]"
+                            onChange={(e) => updateItem(index, "qty", parseInt(e.target.value, 10) || 0)}
+                            className="input !h-8.5 text-center num text-[12.5px]"
+                            required
                           />
                         </td>
                         <td>
@@ -271,32 +326,60 @@ export default function NewPurchasePage() {
                             type="number"
                             min="0"
                             value={item.freeQty || ""}
-                            placeholder="0"
-                            onChange={(e) => updateItem(index, "freeQty", parseInt(e.target.value) || 0)}
+                            onChange={(e) => updateItem(index, "freeQty", parseInt(e.target.value, 10) || 0)}
                             className="input !h-8.5 text-center num text-[12.5px]"
+                            placeholder="0"
                           />
                         </td>
                         <td>
                           <input
                             type="number"
                             step="0.01"
-                            required
-                            value={item.rate ? item.rate / 100 : ""}
+                            min="0"
+                            value={item.rate ? (item.rate / 100).toFixed(2) : ""}
                             onChange={(e) =>
                               updateItem(index, "rate", Math.round(parseFloat(e.target.value) * 100) || 0)
                             }
-                            className="input !h-8.5 text-right font-medium num text-[12.5px]"
+                            className="input !h-8.5 text-right num text-[12.5px]"
                             placeholder="0.00"
+                            required
+                          />
+                        </td>
+                        <td>
+                          <select
+                            value={item.gstRateBp}
+                            onChange={(e) => updateItem(index, "gstRateBp", parseInt(e.target.value, 10) as GstRateBp)}
+                            className="input !h-8.5 text-center num text-[12px]"
+                          >
+                            <option value={0}>0%</option>
+                            <option value={500}>5%</option>
+                            <option value={1200}>12%</option>
+                            <option value={1800}>18%</option>
+                            <option value={2800}>28%</option>
+                          </select>
+                        </td>
+                        <td>
+                          <input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            value={item.mrp ? (item.mrp / 100).toFixed(2) : ""}
+                            onChange={(e) =>
+                              updateItem(index, "mrp", Math.round(parseFloat(e.target.value) * 100) || 0)
+                            }
+                            className="input !h-8.5 text-right num text-[12.5px]"
+                            placeholder="0.00"
+                            required
                           />
                         </td>
                         <td>
                           <input
                             type="number"
                             step="0.01"
-                            required
-                            value={item.mrp ? item.mrp / 100 : ""}
+                            min="0"
+                            value={item.saleRate ? (item.saleRate / 100).toFixed(2) : ""}
                             onChange={(e) =>
-                              updateItem(index, "mrp", Math.round(parseFloat(e.target.value) * 100) || 0)
+                              updateItem(index, "saleRate", Math.round(parseFloat(e.target.value) * 100) || 0)
                             }
                             className="input !h-8.5 text-right num text-[12.5px]"
                             placeholder="0.00"
@@ -373,5 +456,13 @@ export default function NewPurchasePage() {
         </div>
       </form>
     </div>
+  );
+}
+
+export default function NewPurchasePage() {
+  return (
+    <Suspense fallback={<div className="page p-8 text-center text-xs text-ink-500">Loading purchase form...</div>}>
+      <NewPurchaseForm />
+    </Suspense>
   );
 }

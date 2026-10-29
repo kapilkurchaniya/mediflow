@@ -1,7 +1,7 @@
 import { getSaleById } from "@/app/actions/sales";
 import { notFound } from "next/navigation";
 import { format } from "date-fns";
-import { ArrowLeft, Printer, Receipt } from "lucide-react";
+import { ArrowLeft, Printer, Receipt, AlertCircle } from "lucide-react";
 import Link from "next/link";
 import PrintButton from "./PrintButton";
 import { formatINR } from "@/lib/format";
@@ -22,7 +22,7 @@ export default async function PrintInvoicePage({
   const data = await getSaleById(resolvedParams.id);
   if (!data) return notFound();
 
-  const { sale, items, customer, store, tenant } = data;
+  const { sale, items, customer, store, tenant, gstDoc } = data;
 
   return (
     <div className="min-h-screen bg-ink-100 py-6 px-4 font-sans text-ink-900 print:bg-white print:p-0 print:m-0 print:min-h-0">
@@ -100,6 +100,13 @@ export default async function PrintInvoicePage({
             {customer?.phone && <div>Phone: {customer.phone}</div>}
             {sale.doctorName && <div>Doctor: {sale.doctorName}</div>}
           </div>
+          {gstDoc?.irn && (
+            <div className="py-1 border-b border-dashed border-black text-[9px] text-center">
+              <p className="font-bold">*** SIMULATED IRN – NOT A VALID E-INVOICE ***</p>
+              <p className="font-mono break-all text-[8px]">IRN: {gstDoc.irn}</p>
+              {gstDoc.ackNo && <p>Ack: {gstDoc.ackNo}</p>}
+            </div>
+          )}
 
           {/* Items Header */}
           <table className="w-full my-2 text-[10px] text-left border-collapse">
@@ -202,6 +209,29 @@ export default async function PrintInvoicePage({
               <p className="text-ink-600 capitalize mt-0.5">Payment: {sale.status === "completed" ? "Paid (Retail POS)" : sale.status}</p>
             </div>
           </div>
+
+          {/* Simulated E-Invoice Banner for A4 Format */}
+          {gstDoc?.irn && (
+            <div className="mb-6 p-3 rounded-lg border border-dashed border-rose-300 bg-rose-50 text-xs flex flex-col md:flex-row items-start md:items-center justify-between gap-3">
+              <div>
+                <div className="flex items-center gap-1.5 font-bold text-rose-800 text-xs uppercase tracking-wide">
+                  <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+                  <span>SIMULATED IRN – NOT A VALID E-INVOICE</span>
+                </div>
+                <p className="font-mono text-[11px] text-ink-800 break-all mt-1">
+                  <span className="font-semibold text-ink-900">IRN:</span> {gstDoc.irn}
+                </p>
+                {gstDoc.ackNo && (
+                  <p className="text-[11px] text-ink-600 mt-0.5">
+                    Ack No: <span className="font-mono">{gstDoc.ackNo}</span> | Date: {gstDoc.ackDate ? format(new Date(gstDoc.ackDate), "dd/MM/yyyy HH:mm") : "N/A"}
+                  </p>
+                )}
+              </div>
+              <div className="shrink-0 bg-white px-2 py-1 rounded border border-rose-200 text-center">
+                <span className="text-[10px] font-mono text-rose-700 font-bold block uppercase">[Simulated IRN / QR]</span>
+              </div>
+            </div>
+          )}
 
           {/* Items Table */}
           <div className="mb-6 overflow-x-auto">
