@@ -119,9 +119,27 @@ export const memberships = pgTable(
     status: text("status").notNull().default("active"), // active | suspended
     allStores: boolean("all_stores").notNull().default(true),
     storeIds: uuid("store_ids").array().notNull().default(sql`'{}'::uuid[]`),
+    /** The store this member last signed in to; the next login starts there if it is still allowed. */
+    lastStoreId: uuid("last_store_id"),
     createdAt: createdAt(),
   },
   (t) => [uniqueIndex("memberships_tenant_user_uq").on(t.tenantId, t.userId)],
+);
+
+/**
+ * Every sign-in attempt (successful or not), used to lock an email out for 15 minutes after 10 failures.
+ * Holds no password and no tenant: it is looked up by email before we know who the user is.
+ */
+export const loginAttempts = pgTable(
+  "login_attempts",
+  {
+    id: bigserial("id", { mode: "number" }).primaryKey(),
+    emailLower: text("email_lower").notNull(),
+    ip: text("ip"),
+    success: boolean("success").notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [index("login_attempts_email_created_idx").on(t.emailLower, t.createdAt)],
 );
 
 export const auditLogs = pgTable(

@@ -1,60 +1,54 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { headers } from "next/headers";
 import { db, schema } from "@/server/db";
 import { eq } from "drizzle-orm";
 import { seedSystemRoles } from "@/server/roles";
-import { hashPassword, verifyPassword, createSession, setSessionCookie, deleteSessionCookie, invalidateSession, getCurrentSession } from "@/server/auth";
+import { hashPassword, verifyPassword, createSession, setSessionCookie, deleteSessionCookie, invalidateSession, getCurrentSession, requireAuth } from "@/server/auth";
+import { attemptLogin, changePassword } from "@/server/domain/login";
 
 export async function loginAction(prevState: { error?: string; success?: boolean } | null, formData: FormData) {
-  const email = formData.get("email") as string;
-  const password = formData.get("password") as string;
+  const email = (formData.get("email") as string) ?? "";
+  const password = (formData.get("password") as string) ?? "";
 
-  if (!email || !password) {
-    return { error: "Email and password are required" };
-  }
+  const h = await headers();
+  const ip = h.get("x-forwarded-for")?.split(",")[0]?.trim() || h.get("x-real-ip") || null;
 
-  const users = await db
-    .select()
-    .from(schema.users)
-    .where(eq(schema.users.email, email.toLowerCase()));
-
-  const user = users[0];
-
-  if (!user || !(await verifyPassword(password, user.passwordHash))) {
-    return { error: "Invalid email or password" };
-  }
-
-  // Fetch user's membership to get tenantId and storeId
-  const memberships = await db
-    .select()
-    .from(schema.memberships)
-    .where(eq(schema.memberships.userId, user.id))
-    .limit(1);
-
-  let tenantId = null;
-  let storeId = null;
-
-  if (memberships.length > 0) {
-    tenantId = memberships[0].tenantId;
-    // Get first store of this tenant
-    const stores = await db
-      .select()
-      .from(schema.stores)
-      .where(eq(schema.stores.tenantId, tenantId))
-      .limit(1);
-    
-    if (stores.length > 0) {
-      storeId = stores[0].id;
-    }
-  }
+  const result = await attemptLogin(db, { email, password, ip }, verifyPassword);
+  if (!result.ok) return { error: result.error };
 
   const token = (await import("@/server/auth")).generateSessionToken();
-  await createSession(token, user.id, tenantId, storeId);
+  await createSession(token, result.userId, result.tenantId, result.storeId);
   await setSessionCookie(token);
 
   // Redirect to dashboard
   redirect("/dashboard");
+}
+
+/** Change the signed-in user's own password and sign out every other device. */
+export async function changePasswordAction(prevState: { error?: string; success?: string } | null, formData: FormData) {
+  const { session, user } = await requireAuth();
+  const result = await changePassword(
+    db,
+    {
+      userId: user.id,
+      keepSessionId: session.id,
+      current: (formData.get("current") as string) ?? "",
+      next: (formData.get("next") as string) ?? "",
+      confirm: (formData.get("confirm") as string) ?? "",
+    },
+    verifyPassword,
+    hashPassword,
+    { tenantId: session.tenantId, storeId: session.storeId },
+  );
+  if (!result.ok) return { error: result.error };
+  return {
+    success:
+      result.signedOutElsewhere > 0
+        ? `Password changed. ${result.signedOutElsewhere} other signed-in device${result.signedOutElsewhere === 1 ? " was" : "s were"} signed out.`
+        : "Password changed.",
+  };
 }
 
 export async function registerAction(prevState: { error?: string; success?: boolean } | null, formData: FormData) {

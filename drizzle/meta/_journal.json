@@ -43,6 +43,13 @@
       "when": 1792530557149,
       "tag": "0005_quiet_ronan",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1793216233581,
+      "tag": "0006_login_hardening",
+      "breakpoints": true
     }
   ]
 }

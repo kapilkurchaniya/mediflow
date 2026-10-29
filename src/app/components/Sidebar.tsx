@@ -235,12 +235,12 @@ export function Sidebar({
           </span>
           {!isCollapsed && (
             <>
-              <div className="min-w-0 flex-1">
+              <Link href="/dashboard/settings/profile" className="min-w-0 flex-1 rounded hover:bg-ink-50" title="My profile and password">
                 <p className="truncate text-[12.5px] font-medium text-ink-900 leading-tight">
                   {userName}
                 </p>
                 <p className="truncate text-[11px] text-ink-500">{userEmail}</p>
-              </div>
+              </Link>
               <form action={logoutAction}>
                 <button
                   type="submit"
