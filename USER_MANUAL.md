@@ -209,6 +209,8 @@ When it succeeds, the invoice opens and can be printed. To start the next bill p
 - Numbers the invoice like **INV/26-27/000001**: your prefix, the financial year (1 April–31 March), and a running number with no gaps. The number is at most 16 characters, as GST law requires.
 - Records the accounts entries, the GST record, and (for scheduled drugs) the register entry.
 - Gives loyalty points if the customer is in your rewards programme.
+- Charges **IGST instead of CGST + SGST** when you bill a business customer (one with a GSTIN) from another state. Ordinary customers are always billed CGST + SGST.
+- If the customer has a phone number, queues a **WhatsApp receipt** that goes out shortly after, so the bill itself never waits.
 
 If something goes wrong in the optional steps (such as the GST record or loyalty points), **your bill is still saved**.
 

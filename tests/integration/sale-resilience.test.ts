@@ -28,7 +28,8 @@ vi.mock("next/cache", () => ({ revalidatePath: () => {} }));
 vi.mock("@/server/whatsapp", () => ({ sendWhatsAppReceipt: async () => {} }));
 
 // A failing optional step must be a failing SQL statement: that is what aborts a Postgres transaction.
-vi.mock("@/server/domain/gst", () => ({
+vi.mock("@/server/domain/gst", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/server/domain/gst")>()),
   createGstDocumentFromSale: async (tx: { execute: (q: unknown) => Promise<unknown> }) => {
     if (h.failGst) await tx.execute(sql`select 1/0`);
   },
