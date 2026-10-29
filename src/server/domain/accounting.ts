@@ -428,3 +428,168 @@ export async function postPurchaseJournalEntry(params: PostPurchaseJournalParams
 
   return entry.id;
 }
+
+
+export interface PostPurchaseReturnJournalParams {
+  tx: Tx;
+  tenantId: string;
+  storeId: string;
+  userId: string;
+  returnId: string;
+  returnNo: string;
+  supplierId: string;
+  returnDate: string;
+  taxableAmount: number; // in paise
+  cgst: number; // in paise
+  sgst: number; // in paise
+  igst: number; // in paise
+  roundOff?: number; // in paise
+  totalAmount: number; // in paise
+}
+
+/**
+ * Creates balanced double-entry journal lines for a purchase return / debit note (B2.3).
+ * Debit: Supplier Payable (Creditors)
+ * Credit: Purchases (reversal) + Input GST (reversal)
+ */
+export async function postPurchaseReturnJournalEntry(params: PostPurchaseReturnJournalParams) {
+  const {
+    tx,
+    tenantId,
+    storeId,
+    userId,
+    returnId,
+    returnNo,
+    supplierId,
+    returnDate,
+    taxableAmount,
+    cgst,
+    sgst,
+    igst,
+    roundOff,
+    totalAmount,
+  } = params;
+
+  const accounts = await getOrSeedAccounts(tx, tenantId);
+  const entryNo = await nextDocNumber(tx, tenantId, storeId, "journal", "JV");
+
+  const [entry] = await tx
+    .insert(schema.journalEntries)
+    .values({
+      tenantId,
+      storeId,
+      entryNo,
+      entryDate: returnDate,
+      narration: `Purchase Return Debit Note ${returnNo}`,
+      refType: "purchase_return",
+      refId: returnId,
+      createdBy: userId,
+    })
+    .returning({ id: schema.journalEntries.id });
+
+  const lines: {
+    tenantId: string;
+    entryId: string;
+    accountId: string;
+    debit: number;
+    credit: number;
+    partyType?: string;
+    partyId?: string;
+  }[] = [];
+
+  // --- 1. DEBIT (Supplier Creditors) ---
+  if (totalAmount > 0 && accounts.creditors) {
+    lines.push({
+      tenantId,
+      entryId: entry.id,
+      accountId: accounts.creditors,
+      debit: totalAmount,
+      credit: 0,
+      partyType: "supplier",
+      partyId: supplierId,
+    });
+  }
+
+  // --- 2. CREDITS (Purchases & Input GST reversals) ---
+  if (taxableAmount > 0 && accounts.purchases) {
+    lines.push({
+      tenantId,
+      entryId: entry.id,
+      accountId: accounts.purchases,
+      debit: 0,
+      credit: taxableAmount,
+    });
+  }
+
+  if (cgst > 0 && accounts.cgst_input) {
+    lines.push({
+      tenantId,
+      entryId: entry.id,
+      accountId: accounts.cgst_input,
+      debit: 0,
+      credit: cgst,
+    });
+  }
+
+  if (sgst > 0 && accounts.sgst_input) {
+    lines.push({
+      tenantId,
+      entryId: entry.id,
+      accountId: accounts.sgst_input,
+      debit: 0,
+      credit: sgst,
+    });
+  }
+
+  if (igst > 0 && accounts.igst_input) {
+    lines.push({
+      tenantId,
+      entryId: entry.id,
+      accountId: accounts.igst_input,
+      debit: 0,
+      credit: igst,
+    });
+  }
+
+  // --- 3. ROUND OFF ---
+  if (roundOff !== undefined && roundOff !== 0 && accounts.roundoff) {
+    if (roundOff < 0) {
+      lines.push({
+        tenantId,
+        entryId: entry.id,
+        accountId: accounts.roundoff,
+        debit: Math.abs(roundOff),
+        credit: 0,
+      });
+    } else {
+      lines.push({
+        tenantId,
+        entryId: entry.id,
+        accountId: accounts.roundoff,
+        debit: 0,
+        credit: roundOff,
+      });
+    }
+  }
+
+  // Check balance and adjust 1-paise variance if any
+  const totalDebit = lines.reduce((s, l) => s + l.debit, 0);
+  const totalCredit = lines.reduce((s, l) => s + l.credit, 0);
+
+  if (totalDebit !== totalCredit && accounts.roundoff) {
+    const diff = totalDebit - totalCredit;
+    if (Math.abs(diff) <= 2) {
+      if (diff > 0) {
+        lines.push({ tenantId, entryId: entry.id, accountId: accounts.roundoff, debit: 0, credit: diff });
+      } else {
+        lines.push({ tenantId, entryId: entry.id, accountId: accounts.roundoff, debit: Math.abs(diff), credit: 0 });
+      }
+    }
+  }
+
+  if (lines.length > 0) {
+    await tx.insert(schema.journalLines).values(lines);
+  }
+
+  return entry.id;
+}

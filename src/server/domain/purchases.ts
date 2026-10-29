@@ -8,7 +8,7 @@
 
 import { z } from "zod";
 import { schema, type Tx } from "@/server/db";
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { computePurchaseTotals } from "@/lib/money";
 import { isValidGstRateBp, GST_RATES_BP } from "@/lib/regulatory";
 import { extractStateCodeFromGstin } from "@/server/domain/gst";
@@ -16,6 +16,7 @@ import { nextDocNumber } from "@/server/domain/sequence";
 import { recordStockMovement } from "@/server/domain/stock";
 import { postPurchaseJournalEntry } from "@/server/domain/accounting";
 import { createGstDocumentFromPurchase } from "@/server/domain/gst";
+import { enqueue } from "@/server/jobs/outbox";
 import { DomainError } from "@/server/errors";
 
 export const PurchaseItemInputSchema = z.object({
@@ -53,6 +54,7 @@ export const CreatePurchaseSchema = z.object({
   supplierInvoiceNo: z.string().min(1, "Supplier invoice number is required"),
   invoiceDate: z.string().min(1, "Invoice date is required"),
   items: z.array(PurchaseItemInputSchema).min(1, "At least one item is required"),
+  purchaseOrderId: z.string().uuid().optional(),
   notes: z.string().optional(),
 });
 
@@ -61,6 +63,7 @@ export interface CreatePurchaseInput {
   supplierInvoiceNo: string;
   invoiceDate: string; // YYYY-MM-DD
   items: CreatePurchaseItemInput[];
+  purchaseOrderId?: string;
   notes?: string;
 }
 
@@ -193,6 +196,8 @@ export async function createPurchase(
       storeId: ctx.storeId,
       purchaseNo,
       supplierId: supplier.id,
+
+      purchaseOrderId: input.purchaseOrderId ?? null,
       supplierInvoiceNo: cleanInvoiceNo,
       invoiceDate: input.invoiceDate,
       isInterState,
@@ -258,6 +263,7 @@ export async function createPurchase(
           mrp: item.mrp,
           saleRate: item.saleRate,
           supplierId: supplier.id,
+
           qtyOnHand: 0,
           status: "active",
         })
@@ -268,7 +274,7 @@ export async function createPurchase(
     // Record stock movement (qty + freeQty)
     const totalQtyReceived = item.qty + (item.freeQty ?? 0);
     await recordStockMovement({
-      tx: tx as any,
+      tx: tx as unknown as Tx,
       tenantId: ctx.tenantId,
       storeId: ctx.storeId,
       batchId,
@@ -311,9 +317,80 @@ export async function createPurchase(
     insertedItems.push(insertedItem);
   }
 
+  // 6b. If received against a Purchase Order, update PO received quantities & status
+  if (input.purchaseOrderId) {
+    const poItems = await tx
+      .select()
+      .from(schema.purchaseOrderItems)
+      .where(eq(schema.purchaseOrderItems.purchaseOrderId, input.purchaseOrderId));
+
+    for (const item of input.items) {
+      const match = poItems.find((p) => p.medicineId === item.medicineId);
+      if (match) {
+        const totalReceived = (item.qty ?? 0) + (item.freeQty ?? 0);
+        await tx
+          .update(schema.purchaseOrderItems)
+          .set({
+            receivedQty: match.receivedQty + totalReceived,
+          })
+          .where(eq(schema.purchaseOrderItems.id, match.id));
+      }
+    }
+
+    const updatedPoItems = await tx
+      .select({ qty: schema.purchaseOrderItems.qty, receivedQty: schema.purchaseOrderItems.receivedQty })
+      .from(schema.purchaseOrderItems)
+      .where(eq(schema.purchaseOrderItems.purchaseOrderId, input.purchaseOrderId));
+
+    const isFullyReceived = updatedPoItems.length > 0 && updatedPoItems.every((i) => i.receivedQty >= i.qty);
+    await tx
+      .update(schema.purchaseOrders)
+      .set({
+        status: isFullyReceived ? "received" : "partially_received",
+      })
+      .where(eq(schema.purchaseOrders.id, input.purchaseOrderId));
+  }
+
+  // 6c. Auto-fulfill Promise Orders for received medicines
+  const receivedMedIds = input.items.map((i) => i.medicineId);
+  if (receivedMedIds.length > 0) {
+    const pendingPromiseOrders = await tx
+      .select()
+      .from(schema.promiseOrders)
+      .where(
+        and(
+          eq(schema.promiseOrders.tenantId, ctx.tenantId),
+          eq(schema.promiseOrders.storeId, ctx.storeId),
+          inArray(schema.promiseOrders.medicineId, receivedMedIds),
+          inArray(schema.promiseOrders.status, ["pending", "ordered"])
+        )
+      );
+
+    if (pendingPromiseOrders.length > 0) {
+      await tx
+        .update(schema.promiseOrders)
+        .set({ status: "fulfilled" })
+        .where(
+          inArray(
+            schema.promiseOrders.id,
+            pendingPromiseOrders.map((p) => p.id)
+          )
+        );
+
+      for (const pOrder of pendingPromiseOrders) {
+        if (pOrder.customerPhone) {
+          await enqueue(tx, ctx.tenantId, "sms.send", {
+            phone: pOrder.customerPhone,
+            message: `Hello ${pOrder.customerName}, your requested medicine (${pOrder.medicineName}) is now in stock at MediFlow. Please visit the store to collect it.`,
+          });
+        }
+      }
+    }
+  }
+
   // 7. Post Double-Entry Journal Entry
   await postPurchaseJournalEntry({
-    tx: tx as any,
+    tx: tx as unknown as Tx,
     tenantId: ctx.tenantId,
     storeId: ctx.storeId,
     userId: ctx.userId,
