@@ -3,7 +3,7 @@
 The one guide for testing everything in MediFlow by hand: every screen, every flow, every business rule, every permission. It replaces the separate Lane A and Lane B guides.
 
 - **Last verified against code:** 29 Oct 2026, branch `lane-a/overxpowered` after merging `origin/main` (Lane B PRs #12 and #13).
-- **Automated checks at that point:** `typecheck` ✅ · `lint:strict` ✅ · `npm test` ✅ **25 files / 356 tests** (after A1.6).
+- **Automated checks at that point:** `typecheck` ✅ · `lint:strict` ✅ · `npm test` ✅ **26 files / 377 tests** (after A2.9).
 - **Using the app rather than testing it?** Read [USER_MANUAL.md](USER_MANUAL.md).
 
 ---
@@ -99,7 +99,7 @@ If the login page shows *Failed query … AggregateError*, the database isn't re
 ```bash
 npm run typecheck && npm run lint:strict && npm test
 ```
-**Expect:** all exit 0; `Test Files 25 passed`, `Tests 356 passed` (numbers grow; "no failures" is what matters).
+**Expect:** all exit 0; `Test Files 26 passed`, `Tests 377 passed` (numbers grow; "no failures" is what matters).
 
 ### 2.4 Real medicines (optional)
 ```bash
@@ -161,6 +161,7 @@ Create this once; the tests refer to these names. **Do step 0 first.**
 | Compliance registers, doctors, prescriptions, printable register | ✅ | Sales call prescription dispensing when a prescription id is sent, but the POS screen has no prescription picker yet 🟡 |
 | GST pages, GSTR-1 JSON, re-rate tool | ✅ | E-invoice is a **simulator** only; no "SIMULATED" badge ❗ |
 | Audit log screen (who changed what: stock, store settings, medicines, discount overrides) | ✅ | Role/membership and login rows arrive with A1.4 / A1.5 |
+| Receipts: record money from a customer against unpaid bills; `postPayment` for supplier/expense payments | ✅ | Customer receipts have a screen; supplier payments have no screen yet (Lane B, B2.4). Credit sales are not possible at the POS yet (A2.2) |
 | Accounting statements, bank reconciliation | ✅ | No expenses, payment vouchers, period lock (⏳) |
 | WhatsApp/SMS settings, templates, inbox, reminders (simulated) | ✅ | Outbox + cron built; reminders and sale receipts use the outbox. Nothing runs the cron on a schedule yet 🟡 |
 | API keys + `/api/v1/*` | 🟡 | Works; the key-management page lacks a permission check ❗ |
@@ -226,6 +227,7 @@ Log in as each role and open each URL. **✓** opens, **403** shows the no-acces
 | `/reports` and sub-pages (report.view) | ✓ | ✓ | 403 | 403 | ✓ | ✓ | ✓ |
 | `/settings`, `/settings/sms`, `/settings/whatsapp`, `/whatsapp/templates` (settings.manage) | ✓ | 403 | 403 | 403 | 403 | 403 | 403 |
 | `/settings/audit` (audit.view) | ✓ | ✓ | 403 | 403 | 403 | 403 | ✓ |
+| `/accounting/receipts` (accounting.post) | ✓ | ✓ | 403 | 403 | 403 | ✓ | 403 |
 | ❗ `/orders`, `/orders/<id>`, `/settings/api-keys` (no check) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 
 Expect: every cell matches, except the last row, which is a known gap (the correct result would be 403 for roles without `sale.view` / `api_key.manage`). Record what you see.
@@ -235,12 +237,12 @@ Log in as each role, count the sidebar links (not the logo), and press **Ctrl+K*
 
 | Role | Links | Settings link |
 |---|---|---|
-| owner | **32** | yes |
-| manager | 32 | no |
+| owner | **33** | yes |
+| manager | 33 | no |
 | pharmacist | 17 | no |
 | cashier | **13** | no |
 | purchase_manager | 14 | no |
-| accountant | 23 | no |
+| accountant | 24 | no |
 | auditor | 24 | no |
 
 Expect: counts match. The cashier's palette has **no** *Record purchase*; the owner's does. Accountant and auditor see *GST & Tax* and *Finance* but no *New bill*.
@@ -661,6 +663,24 @@ Expect: cards **Already Expired Loss**, **Near-Expiry Exposure (≤ 90d)**, **Ur
 **Reports & Analytics** hub links: Trial Balance, P&L, Balance Sheet, Cash Flow, Fast & Slow Movers, Expiry Exposure, Batches & Valuation Ledger, Customer Credit & Debtor Ageing, Supplier Payables, Compliance.
 Expect: every link opens (for roles allowed); **MR commissions** filters by rep; **Export** buttons give the same rows as the screen; date presets (*Today … All time*) change results; auditor can view but not export.
 
+### ACC-9 · Receipts: receive money against a credit bill ✅
+Role: accountant (or owner/manager). The POS cannot create credit bills yet (A2.2), so make one by SQL:
+```sql
+-- turn the last bill of Ravi into an unpaid credit bill (pick any completed sale and set a customer)
+update sales set customer_id=(select id from customers where name='Ravi' limit 1), paid_amount=0, credit_amount=total_amount
+ where id=(select id from sales where status='completed' order by created_at desc limit 1);
+```
+1. Open **Finance → Receipts** (`/dashboard/accounting/receipts`).
+2. Under **1. Choose the customer**, find Ravi (search by name/phone). It shows `N unpaid bills · owes ₹…`.
+3. Under **2. Settle their bills** type a partial amount (e.g. half) in **Receive now (₹)**, or click **Full** / **Settle all bills in full**.
+4. Choose a method (**UPI**), keep today's date, reference `UTR-1`, **Record receipt of ₹…**.
+5. Open **Finance → Outstanding** (receivables), the **Day Book**, and the Audit log.
+
+Expect: (2) only customers who owe money are listed, biggest balance first. (3) the button shows the total you typed; an amount above a bill's outstanding shows *An amount is more than the bill's outstanding balance.* (4) a green *Receipt RCT/26-27/000001 recorded…* message; the customer disappears if fully settled; **Recent receipts** lists it with method and reference. (5) Outstanding shows the reduced balance; the day book has a balanced entry `Receipt RCT/… from Ravi` (Dr **Bank / Digital Payments** for UPI/card/bank, **Cash on Hand** for cash; Cr **Customer Receivables**); the audit log has a *Created* `payment` row.
+🛠 `select paid_amount, credit_amount from sales where id=…;` (paid up, credit down by the amount) and `select payment_no, direction, method, amount, journal_entry_id from payments order by created_at desc limit 1;`.
+Also check: the menu shows **Receipts** only for owner, manager and accountant (cashier/pharmacist/purchase manager/auditor → no link, and 403 by URL); the date can't be in the future; numbers run `RCT/26-27/000001, …02`.
+🛠 `npx vitest run tests/integration/payments.test.ts` covers: part/full settlement, several bills at once, advance with no bill, UPI/card/bank vs cash accounts, over-allocation, another customer's or pharmacy's bill, cancelled bills, supplier payments (`PAY/…`, debit creditors, credit bank/cash), expense payments, permissions. **Supplier payments have no screen yet:** Lane B builds it on `postPayment` (B2.4).
+
 ---
 
 ## 13. WhatsApp, SMS, reminders, background jobs
@@ -733,7 +753,7 @@ Check each opens for the right role (see RBAC-2): Racks, Loyalty, Medical reps, 
 
 ### AUD-1 · Audit log page and who may open it ✅
 Roles: owner, manager, auditor open **Finance → Audit log** (`/dashboard/settings/audit`). Cashier, pharmacist, purchase manager, accountant → **403**.
-Expect: heading *Audit log*; filters **User**, **Record type**, **Action**, **From**, **To**, **Apply** / **Reset**; a table **When, User, Action, Record, Changes, Reason** (newest first); a footer like `12 entries · page 1 of 1` with **Previous / Next** when there are more than 50; the menu link appears only for roles with `audit.view` (owner 32 links, auditor 24).
+Expect: heading *Audit log*; filters **User**, **Record type**, **Action**, **From**, **To**, **Apply** / **Reset**; a table **When, User, Action, Record, Changes, Reason** (newest first); a footer like `12 entries · page 1 of 1` with **Previous / Next** when there are more than 50; the menu link appears only for roles with `audit.view` (owner 33 links, auditor 24).
 
 ### AUD-2 · What gets recorded ✅
 Do each action, then open the audit log.
@@ -838,7 +858,7 @@ For each item, confirm there is **no** menu entry, page or button (so it isn't h
 | A2.6 | Cash register shifts | No open/close shift screen |
 | A2.7 | POS refactor, redeem loyalty points | No points field at POS |
 | A2.8 | Playwright e2e | No `tests/e2e` folder |
-| A2.9 | Receipts/payments vouchers | No Accounting → Receipts/Payments |
+| A2.9 (supplier payments screen) | Pay a supplier from the UI | No *Pay* button on a supplier or purchase (the service `postPayment` exists; Lane B builds the screen in B2.4) |
 | B2.2–B2.4 | Purchase orders, returns, supplier ledger/payments | No such pages under Purchases |
 | B2.7 | Automatic reminders | Cron route exists but nothing calls it; no refill auto-reminder after a sale |
 | A3.x / B3.x | Stores, switcher, per-store settings, transfers, warehouse, stock count, chain reports, reorder, central purchasing, per-GSTIN returns, expiry redistribution | No Settings → Stores, no `Ctrl+Shift+S`, no transfers, no Purchases → Reorder |
@@ -900,7 +920,7 @@ npm run typecheck && npm run lint:strict
 | DEV-11 | `npx vitest run tests/unit/permissions.test.ts` | role templates match the counts in RBAC-4 |
 | DEV-12 | `NEXT_TELEMETRY_DISABLED=1 npx next build` | succeeds (needs `DATABASE_URL`; `next start` also needs `APP_ENCRYPTION_KEY` and `CRON_SECRET`) |
 
-### 19.3 What the automated suite covers (25 files)
+### 19.3 What the automated suite covers (26 files)
 | File | Covers |
 |---|---|
 | `unit/money.test.ts`, `invoice-no.test.ts` | paise/bp math, GST split, invoice number format |
@@ -917,6 +937,7 @@ npm run typecheck && npm run lint:strict
 | `integration/create-sale.test.ts` | the sale service: stock, journal, GST doc, register, outbox receipt, idempotency, IGST, prescriptions, refusals |
 | `unit/contracts.test.ts` | `SaleInput` and `PostPaymentInput` schemas |
 | `unit/audit-diff.test.ts` | how the audit page describes old → new values |
+| `integration/payments.test.ts` | receipts and supplier/expense payments: journal, bill settlement, refusals, who may post |
 | `integration/audit-log.test.ts` | audit rows written by stock, store settings, medicines and discount overrides; filters, paging, tenant isolation, who may read |
 | `integration/rbac.test.ts` | membership/store/tenant checks |
 | `integration/register.test.ts` | registration seeds an owner |
@@ -945,7 +966,7 @@ Copy this table into your notes and fill the last two columns.
 | CRM-1…8 | Customers, loyalty, reps, orders | | |
 | CMP-1…6 | Prescriptions and registers | | |
 | GST-1…8 | GST pages, export, e-invoice, re-rate | | |
-| ACC-1…8 | Accounting and reports | | |
+| ACC-1…9 | Accounting, reports, receipts | | |
 | COM-1…6 | WhatsApp, SMS, reminders, jobs, webhook | | |
 | AI-1…2 | AI assistant | | |
 | AUD-1…4 | Audit log | | |
