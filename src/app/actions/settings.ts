@@ -6,6 +6,7 @@ import { requireAuth } from "@/server/auth";
 import { checkPermission, requirePermission } from "@/server/rbac";
 import { validateInvoicePrefix } from "@/lib/invoice-no";
 import { revalidatePath } from "next/cache";
+import { writeAudit } from "@/server/audit";
 
 export async function getStoreSettings() {
   const session = await requirePermission("settings.manage");
@@ -82,20 +83,25 @@ export async function updateStoreSettings(formData: FormData) {
   }
 
   try {
-    await db
-      .update(schema.stores)
-      .set({
-        name,
-        address,
-        city,
-        stateCode,
-        pincode,
-        phone,
-        gstin,
-        drugLicenseNo,
-        invoicePrefix,
-      })
-      .where(eq(schema.stores.id, session.storeId));
+    const next = { name, address, city, stateCode, pincode, phone, gstin, drugLicenseNo, invoicePrefix };
+    await db.transaction(async (tx) => {
+      const [before] = await tx.select().from(schema.stores).where(eq(schema.stores.id, session.storeId));
+      await tx.update(schema.stores).set(next).where(eq(schema.stores.id, session.storeId));
+
+      // Audit only the fields that actually changed (old -> new).
+      const oldValue: Record<string, unknown> = {};
+      const newValue: Record<string, unknown> = {};
+      for (const [k, v] of Object.entries(next)) {
+        const prev = (before as Record<string, unknown> | undefined)?.[k] ?? null;
+        if ((prev ?? "") !== (v ?? "")) {
+          oldValue[k] = prev;
+          newValue[k] = v ?? null;
+        }
+      }
+      if (Object.keys(newValue).length > 0) {
+        await writeAudit(tx, session, { action: "update", entityType: "store", entityId: session.storeId, oldValue, newValue });
+      }
+    });
 
     revalidatePath("/dashboard/settings");
     revalidatePath("/dashboard");

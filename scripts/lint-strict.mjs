@@ -27,6 +27,7 @@ const CLEAN_PATHS = [
   "src/server/action.ts",
   "src/server/domain/sales",
   "src/server/domain/payments.ts",
+  "src/server/domain/audit-log.ts",
   "src/app/layout.tsx",
   "src/app/page.tsx",
   "src/app/login",

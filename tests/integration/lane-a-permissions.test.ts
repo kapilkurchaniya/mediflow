@@ -23,6 +23,7 @@ import { getRacks } from "@/app/actions/racks";
 import { createSaleInvoice, findSubstitutes, getSaleById, getSales, searchPosItems } from "@/app/actions/sales";
 import { getStoreSettings, updateStoreSettings } from "@/app/actions/settings";
 import { addOpeningStock, adjustBatchStock, getBatches } from "@/app/actions/stock";
+import { getAuditFilterOptions, getAuditLogs } from "@/app/actions/audit";
 
 let t: Awaited<ReturnType<typeof createTestDb>>;
 beforeAll(async () => {
@@ -65,6 +66,9 @@ const CASES: Case[] = [
   { name: "getAccounts", permission: "accounting.view", kind: "read", call: () => getAccounts() },
   { name: "getJournalLines", permission: "accounting.view", kind: "read", call: () => getJournalLines() },
   { name: "getTrialBalance", permission: "accounting.view", kind: "read", call: () => getTrialBalance() },
+  // Audit log
+  { name: "getAuditLogs", permission: "audit.view", kind: "read", call: () => getAuditLogs() },
+  { name: "getAuditFilterOptions", permission: "audit.view", kind: "read", call: () => getAuditFilterOptions() },
   // Settings
   { name: "getStoreSettings", permission: "settings.manage", kind: "read", call: () => getStoreSettings() },
   { name: "updateStoreSettings", permission: "settings.manage", kind: "form", call: () => updateStoreSettings(form({ name: "Test Pharmacy", invoicePrefix: "INV" })) },

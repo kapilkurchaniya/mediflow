@@ -3,6 +3,7 @@
 import { db, schema } from "@/server/db";
 import { eq, and, desc, ilike, or } from "drizzle-orm";
 import { requirePermission, checkPermission } from "@/server/rbac";
+import { writeAudit } from "@/server/audit";
 import { DEFAULT_GST_RATE_BP, isValidGstRateBp } from "@/lib/regulatory";
 import { revalidatePath } from "next/cache";
 
@@ -134,7 +135,8 @@ export async function createMedicine(formData: FormData) {
   const salePrice = salePriceStr ? Math.round(parseFloat(salePriceStr) * 100) : mrp; // fallback to mrp
 
   try {
-    await db.insert(schema.medicines).values({
+    await db.transaction(async (tx) => {
+    const [created] = await tx.insert(schema.medicines).values({
       tenantId: ctx.tenantId,
       name,
       genericName: genericName || null,
@@ -151,6 +153,14 @@ export async function createMedicine(formData: FormData) {
       rxRequired,
       schedule: schedule || "none",
       isActive: true,
+    }).returning({ id: schema.medicines.id });
+
+    await writeAudit(tx, ctx, {
+      action: "create",
+      entityType: "medicine",
+      entityId: created.id,
+      newValue: { name, mrp, salePrice, gstRateBp, hsn: hsn || null, schedule: schedule || "none", rxRequired },
+    });
     });
 
     revalidatePath("/dashboard/inventory");

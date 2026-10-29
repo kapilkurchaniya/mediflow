@@ -3,6 +3,7 @@
 import { db, schema } from "@/server/db";
 import { eq, and, desc, sql, lte } from "drizzle-orm";
 import { recordStockMovement } from "@/server/domain/stock";
+import { writeAudit } from "@/server/audit";
 import { requirePermission, checkPermission } from "@/server/rbac";
 import { revalidatePath } from "next/cache";
 import { addDays, format } from "date-fns";
@@ -124,7 +125,7 @@ export async function addOpeningStock(formData: FormData) {
       }
 
       // Record the immutable stock movement
-      await recordStockMovement({
+      const balanceAfter = await recordStockMovement({
         tx,
         tenantId: ctx.tenantId,
         storeId: ctx.storeId,
@@ -135,6 +136,15 @@ export async function addOpeningStock(formData: FormData) {
         unitCost: purchaseRate,
         note: "Opening stock entry",
         userId: ctx.userId,
+      });
+
+      await writeAudit(tx, ctx, {
+        action: "stock_adjust",
+        entityType: "batch",
+        entityId: batchId,
+        oldValue: { qtyOnHand: balanceAfter - qty },
+        newValue: { qtyOnHand: balanceAfter, batchNo, medicineId },
+        reason: "Opening stock entry",
       });
     });
 
@@ -170,7 +180,7 @@ export async function adjustBatchStock(formData: FormData) {
       const [batch] = await tx.select().from(schema.batches).where(eq(schema.batches.id, batchId)).limit(1);
       if (!batch) throw new Error("Batch not found");
 
-      await recordStockMovement({
+      const balanceAfter = await recordStockMovement({
         tx,
         tenantId: ctx.tenantId,
         storeId: ctx.storeId,
@@ -180,6 +190,15 @@ export async function adjustBatchStock(formData: FormData) {
         qtyChange,
         note: note || `Manual ${reason}`,
         userId: ctx.userId,
+      });
+
+      await writeAudit(tx, ctx, {
+        action: "stock_adjust",
+        entityType: "batch",
+        entityId: batchId,
+        oldValue: { qtyOnHand: balanceAfter - qtyChange },
+        newValue: { qtyOnHand: balanceAfter },
+        reason: note ? `${reason}: ${note}` : reason,
       });
 
       // Optionally record in stock_adjustments for easier querying of losses

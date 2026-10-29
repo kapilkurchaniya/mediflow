@@ -3,7 +3,7 @@
 The one guide for testing everything in MediFlow by hand: every screen, every flow, every business rule, every permission. It replaces the separate Lane A and Lane B guides.
 
 - **Last verified against code:** 29 Oct 2026, branch `lane-a/overxpowered` after merging `origin/main` (Lane B PRs #12 and #13).
-- **Automated checks at that point:** `typecheck` ✅ · `lint:strict` ✅ · `npm test` ✅ **23 files / 335 tests** (after A2.1).
+- **Automated checks at that point:** `typecheck` ✅ · `lint:strict` ✅ · `npm test` ✅ **25 files / 356 tests** (after A1.6).
 - **Using the app rather than testing it?** Read [USER_MANUAL.md](USER_MANUAL.md).
 
 ---
@@ -99,7 +99,7 @@ If the login page shows *Failed query … AggregateError*, the database isn't re
 ```bash
 npm run typecheck && npm run lint:strict && npm test
 ```
-**Expect:** all exit 0; `Test Files 23 passed`, `Tests 335 passed` (numbers grow; "no failures" is what matters).
+**Expect:** all exit 0; `Test Files 25 passed`, `Tests 356 passed` (numbers grow; "no failures" is what matters).
 
 ### 2.4 Real medicines (optional)
 ```bash
@@ -160,6 +160,7 @@ Create this once; the tests refer to these names. **Do step 0 first.**
 | Customers, family groups, loyalty earn + adjust, medical reps, omnichannel & promise orders | ✅ | Redeem points at POS ⏳ |
 | Compliance registers, doctors, prescriptions, printable register | ✅ | Sales call prescription dispensing when a prescription id is sent, but the POS screen has no prescription picker yet 🟡 |
 | GST pages, GSTR-1 JSON, re-rate tool | ✅ | E-invoice is a **simulator** only; no "SIMULATED" badge ❗ |
+| Audit log screen (who changed what: stock, store settings, medicines, discount overrides) | ✅ | Role/membership and login rows arrive with A1.4 / A1.5 |
 | Accounting statements, bank reconciliation | ✅ | No expenses, payment vouchers, period lock (⏳) |
 | WhatsApp/SMS settings, templates, inbox, reminders (simulated) | ✅ | Outbox + cron built; reminders and sale receipts use the outbox. Nothing runs the cron on a schedule yet 🟡 |
 | API keys + `/api/v1/*` | 🟡 | Works; the key-management page lacks a permission check ❗ |
@@ -224,6 +225,7 @@ Log in as each role and open each URL. **✓** opens, **403** shows the no-acces
 | `/gst` and every sub-page incl. `/gst/rates` (gst.view) | ✓ | ✓ | 403 | 403 | 403 | ✓ | ✓ |
 | `/reports` and sub-pages (report.view) | ✓ | ✓ | 403 | 403 | ✓ | ✓ | ✓ |
 | `/settings`, `/settings/sms`, `/settings/whatsapp`, `/whatsapp/templates` (settings.manage) | ✓ | 403 | 403 | 403 | 403 | 403 | 403 |
+| `/settings/audit` (audit.view) | ✓ | ✓ | 403 | 403 | 403 | 403 | ✓ |
 | ❗ `/orders`, `/orders/<id>`, `/settings/api-keys` (no check) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 
 Expect: every cell matches, except the last row, which is a known gap (the correct result would be 403 for roles without `sale.view` / `api_key.manage`). Record what you see.
@@ -233,13 +235,13 @@ Log in as each role, count the sidebar links (not the logo), and press **Ctrl+K*
 
 | Role | Links | Settings link |
 |---|---|---|
-| owner | **31** | yes |
-| manager | 31 | no |
+| owner | **32** | yes |
+| manager | 32 | no |
 | pharmacist | 17 | no |
 | cashier | **13** | no |
 | purchase_manager | 14 | no |
 | accountant | 23 | no |
-| auditor | 23 | no |
+| auditor | 24 | no |
 
 Expect: counts match. The cashier's palette has **no** *Record purchase*; the owner's does. Accountant and auditor see *GST & Tax* and *Finance* but no *New bill*.
 
@@ -401,7 +403,7 @@ Expect: (1) Discount, Taxable and Net Payable update live (2 × ₹105 = ₹210 
 3. As **owner**, discount 15%.
 4. Reset: `update tenants set settings = '{}'::jsonb;`
 
-Expect: (2) 15% blocked with *Discounts above 10% need a manager's approval (permission "sale.discount_override")* and no sale; 10% passes. (3) passes. With no ceiling set, any 0–100% works. (There is no settings screen for this limit yet.)
+Expect: (2) 15% blocked with *Discounts above 10% need a manager's approval (permission "sale.discount_override")* and no sale; 10% passes. (3) passes **and leaves an audit row** (`discount_override`, see AUD-2); a discount within the limit leaves none. With no ceiling set, any 0–100% works. (There is no settings screen for this limit yet.)
 
 ### POS-6 · Stock protection ✅
 1. Add more PARA `P1` than available (e.g. qty 500).
@@ -729,6 +731,31 @@ Expect: (1) error *Bill prefix can be at most 3 characters (GST allows 16 charac
 ### SET-2 · Sub-pages and their roles ✅
 Check each opens for the right role (see RBAC-2): Racks, Loyalty, Medical reps, Schemes, SMS, WhatsApp.
 
+### AUD-1 · Audit log page and who may open it ✅
+Roles: owner, manager, auditor open **Finance → Audit log** (`/dashboard/settings/audit`). Cashier, pharmacist, purchase manager, accountant → **403**.
+Expect: heading *Audit log*; filters **User**, **Record type**, **Action**, **From**, **To**, **Apply** / **Reset**; a table **When, User, Action, Record, Changes, Reason** (newest first); a footer like `12 entries · page 1 of 1` with **Previous / Next** when there are more than 50; the menu link appears only for roles with `audit.view` (owner 32 links, auditor 24).
+
+### AUD-2 · What gets recorded ✅
+Do each action, then open the audit log.
+| Do this (role) | Expect a new row |
+|---|---|
+| Add **opening stock** `NEW1`, qty 25 (manager) | *Stock change* on `batch`; `qtyOnHand: 0 → 25`; reason *Opening stock entry* |
+| Adjust stock −3 with note (action only, no screen yet: see below) | *Stock change*; `qtyOnHand: 10 → 7`; reason `damage: <note>` |
+| Create a medicine (pharmacist/owner) | *Created* on `medicine`; shows name, MRP, sale price, GST rate, schedule |
+| Change the store name/prefix in Settings (owner) | *Changed* on `store`; **only the fields that changed**, old → new |
+| Save Settings without changing anything | **no** row |
+| Bill with a discount above the shop limit as owner (POS-5) | *Discount override* on `sale`; shows the limit and the highest line discount |
+| Bill within the limit | **no** row |
+| A stock adjustment that fails (more than on hand) | **no** row and no stock change |
+There is **no screen for stock adjustments yet**; test that row with `npx vitest run tests/integration/audit-log.test.ts` or a direct call. Existing rows from other modules (GST re-rate, suppliers, loyalty adjust, compliance) also appear.
+
+### AUD-3 · Filters and paging ✅
+Generate a few rows (AUD-2), then filter by **User**, **Record type**, **Action** and a **From/To** range; use **Reset**.
+Expect: only matching rows; the date range includes both end days; the count in the footer matches; filter drop-downs list only users and record types that occur in **your** pharmacy. 🛠 `npx vitest run tests/integration/audit-log.test.ts -t "reading"`.
+
+### AUD-4 · Append-only and isolated ✅
+Expect: no edit or delete button anywhere on the page. A second pharmacy never sees the first's entries (register a second pharmacy and open its audit log: empty, and its filter lists contain only its own users).
+
 ### API-1 · `/api/v1/*` needs a key ✅
 ```bash
 curl -i -X POST localhost:3000/api/v1/stock/check -H 'Content-Type: application/json' -d '{"query":"para"}'
@@ -804,7 +831,6 @@ For each item, confirm there is **no** menu entry, page or button (so it isn't h
 |---|---|---|
 | A1.4 | Users, invites, roles screens | No Settings → Users/Roles; no `/invite/<token>` page |
 | A1.5 | Login lockout, change password, store pick | 11 wrong passwords still allowed; no Profile page |
-| A1.6 | Audit-log screen | No Settings → Audit log (rows exist in `audit_logs`) |
 | A1.7 | Tenant-isolation suite | `tests/integration/isolation.test.ts` doesn't exist |
 | A2.2 | Split tender | Only one payment method per bill; no `F8` |
 | A2.3 | Hold / resume bills | `F6`/`F7` do nothing |
@@ -874,7 +900,7 @@ npm run typecheck && npm run lint:strict
 | DEV-11 | `npx vitest run tests/unit/permissions.test.ts` | role templates match the counts in RBAC-4 |
 | DEV-12 | `NEXT_TELEMETRY_DISABLED=1 npx next build` | succeeds (needs `DATABASE_URL`; `next start` also needs `APP_ENCRYPTION_KEY` and `CRON_SECRET`) |
 
-### 19.3 What the automated suite covers (23 files)
+### 19.3 What the automated suite covers (25 files)
 | File | Covers |
 |---|---|
 | `unit/money.test.ts`, `invoice-no.test.ts` | paise/bp math, GST split, invoice number format |
@@ -890,6 +916,8 @@ npm run typecheck && npm run lint:strict
 | `integration/sale-resilience.test.ts` | savepoints, rejected inputs |
 | `integration/create-sale.test.ts` | the sale service: stock, journal, GST doc, register, outbox receipt, idempotency, IGST, prescriptions, refusals |
 | `unit/contracts.test.ts` | `SaleInput` and `PostPaymentInput` schemas |
+| `unit/audit-diff.test.ts` | how the audit page describes old → new values |
+| `integration/audit-log.test.ts` | audit rows written by stock, store settings, medicines and discount overrides; filters, paging, tenant isolation, who may read |
 | `integration/rbac.test.ts` | membership/store/tenant checks |
 | `integration/register.test.ts` | registration seeds an owner |
 | `integration/racks-actions.test.ts` | racks permissions and isolation |
@@ -920,6 +948,7 @@ Copy this table into your notes and fill the last two columns.
 | ACC-1…8 | Accounting and reports | | |
 | COM-1…6 | WhatsApp, SMS, reminders, jobs, webhook | | |
 | AI-1…2 | AI assistant | | |
+| AUD-1…4 | Audit log | | |
 | SET-1…2, API-1…4, ENV-1 | Settings, API keys, environment | | |
 | E2E-1…5 | End-to-end scenarios | | |
 | §17 | Absent features confirmed | | |

@@ -10,7 +10,8 @@ export type AuditAction =
   | "price_change"
   | "stock_adjust"
   | "permission_change"
-  | "bulk_update";
+  | "bulk_update"
+  | "discount_override";
 
 export interface WriteAuditParams {
   action: AuditAction;
