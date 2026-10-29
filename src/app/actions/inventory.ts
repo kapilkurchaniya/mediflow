@@ -134,6 +134,15 @@ export async function createMedicine(formData: FormData) {
   const mrp = mrpStr ? Math.round(parseFloat(mrpStr) * 100) : 0;
   const salePrice = salePriceStr ? Math.round(parseFloat(salePriceStr) * 100) : mrp; // fallback to mrp
 
+  // Category, manufacturer and rack must belong to this pharmacy (never trust an id from the browser)
+  const owns = async (table: typeof schema.categories | typeof schema.manufacturers | typeof schema.racks, id: string) => {
+    const [row] = await db.select({ id: table.id }).from(table).where(and(eq(table.id, id), eq(table.tenantId, ctx.tenantId)));
+    return !!row;
+  };
+  if (categoryId?.trim() && !(await owns(schema.categories, categoryId.trim()))) return { error: "Category not found." };
+  if (manufacturerId?.trim() && !(await owns(schema.manufacturers, manufacturerId.trim()))) return { error: "Manufacturer not found." };
+  if (rackId?.trim() && !(await owns(schema.racks, rackId.trim()))) return { error: "Rack not found." };
+
   try {
     await db.transaction(async (tx) => {
     const [created] = await tx.insert(schema.medicines).values({
