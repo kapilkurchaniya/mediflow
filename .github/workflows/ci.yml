@@ -90,25 +90,20 @@ jobs:
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
 
+      - name: Check Vercel Token Secret
+        run: |
+          if [ -z "${{ secrets.VERCEL_TOKEN }}" ]; then
+            echo "::error::VERCEL_TOKEN secret is missing in GitHub Repository Secrets! Please add VERCEL_TOKEN under Settings -> Secrets and variables -> Actions."
+            exit 1
+          fi
+
       - name: Install Vercel CLI
         run: npm install --global vercel@latest
-
-      - name: Pull Vercel Environment Information
-        run: vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
-        env:
-          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID || 'team_0vjeaamZrsAW1ORAKUnCKYX2' }}
-          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID || 'prj_od3DI3D0plUMQ78Wgzot5mteLaJn' }}
-
-      - name: Build Project Artifacts
-        run: vercel build --prod --token=${{ secrets.VERCEL_TOKEN }}
-        env:
-          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID || 'team_0vjeaamZrsAW1ORAKUnCKYX2' }}
-          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID || 'prj_od3DI3D0plUMQ78Wgzot5mteLaJn' }}
 
       - name: Deploy to Vercel (Production)
         id: deploy-vercel
         run: |
-          DEPLOY_URL=$(vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }})
+          DEPLOY_URL=$(vercel deploy --prod --yes --token=${{ secrets.VERCEL_TOKEN }})
           echo "url=$DEPLOY_URL" >> $GITHUB_OUTPUT
           echo "### 🚀 Production Deployment Successful!" >> $GITHUB_STEP_SUMMARY
           echo "- **URL:** $DEPLOY_URL" >> $GITHUB_STEP_SUMMARY
