@@ -127,7 +127,7 @@ export async function processOutbox(limit = 25): Promise<ProcessResult> {
     }
 
     try {
-      await handler(ev);
+      await handler({ ...ev, payload: (ev.payload ?? {}) as Record<string, unknown> });
 
       await db
         .update(schema.outboxEvents)

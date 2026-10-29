@@ -3,9 +3,9 @@ import { generateEInvoiceForDocument } from "@/server/domain/e-invoice";
 
 export async function handleEInvoiceGenerate(event: {
   tenantId: string;
-  payload: any;
+  payload: Record<string, unknown>;
 }) {
-  const { gstDocumentId } = event.payload;
+  const gstDocumentId = typeof event.payload.gstDocumentId === "string" ? event.payload.gstDocumentId : "";
   if (!gstDocumentId) throw new Error("Missing gstDocumentId in einvoice.generate payload");
 
   await generateEInvoiceForDocument(db, {

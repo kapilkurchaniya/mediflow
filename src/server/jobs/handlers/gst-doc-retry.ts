@@ -3,10 +3,13 @@ import { createGstDocumentFromSale, createGstDocumentFromPurchase } from "@/serv
 
 export async function handleGstDocRetry(event: {
   tenantId: string;
-  payload: any;
+  payload: Record<string, unknown>;
 }) {
-  const { refType, refId, storeId } = event.payload;
+  const refType = typeof event.payload.refType === "string" ? event.payload.refType : "";
+  const refId = typeof event.payload.refId === "string" ? event.payload.refId : "";
+  const storeId = typeof event.payload.storeId === "string" ? event.payload.storeId : undefined;
   if (!refId || !refType) throw new Error("Missing refType or refId in gst.doc_retry payload");
+  if (!storeId) throw new Error("Missing storeId in gst.doc_retry payload");
 
   if (refType === "sale") {
     await createGstDocumentFromSale(db, {
