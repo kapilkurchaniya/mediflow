@@ -1,4 +1,4 @@
-import { chromium, type Page, type BrowserContext, type Browser } from "playwright";
+import { chromium, type Page, type BrowserContext, type Browser, type ConsoleMessage } from "playwright";
 import { execSync } from "node:child_process";
 import * as fs from "node:fs";
 import * as path from "node:path";
@@ -39,13 +39,13 @@ export class TestSession {
   }
 
   public hookPageLogs(page: Page) {
-    page.on("console", (msg) => {
+    page.on("console", (msg: ConsoleMessage) => {
       if (msg.type() === "error") {
         const text = msg.text();
         this.consoleErrors.push(text);
       }
     });
-    page.on("pageerror", (err) => {
+    page.on("pageerror", (err: Error) => {
       this.consoleErrors.push(err.message || String(err));
     });
   }
