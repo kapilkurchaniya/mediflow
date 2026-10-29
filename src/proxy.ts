@@ -28,6 +28,11 @@ export async function proxy(request: NextRequest) {
     return NextResponse.next();
   }
 
+  // Invitation links are opened by people who have no account (and no session) yet; the token is the credential.
+  if (pathname.startsWith("/invite/")) {
+    return NextResponse.next();
+  }
+
   const hasSession = request.cookies.has("mediflow_session");
 
   // Auth pages: redirect logged-in users to the dashboard.
