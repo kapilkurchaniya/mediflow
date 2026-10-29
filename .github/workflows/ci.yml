@@ -1,16 +1,22 @@
-name: CI
+name: CI/CD Pipeline
 
 on:
   pull_request:
+    branches: ["main", "master"]
   push:
     branches: ["main", "master", "lane-a/**", "lane-b/**"]
 
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' && github.ref != 'refs/heads/master' }}
+
+permissions:
+  contents: read
+  deployments: write
 
 jobs:
   verify:
+    name: Verify (Typecheck, Lint, Test, Build)
     runs-on: ubuntu-latest
     timeout-minutes: 20
     services:
@@ -38,7 +44,8 @@ jobs:
           node-version: 22
           cache: npm
 
-      - run: npm ci
+      - name: Install Dependencies
+        run: npm ci
 
       - name: Typecheck
         run: npm run typecheck
@@ -57,5 +64,69 @@ jobs:
           # Real Postgres service above; the suite builds a migrated template DB and copies it per test file.
           DATABASE_URL: postgres://mediflow@localhost:5432/mediflow_test
 
-      - name: Build
+      - name: Build Verification
         run: npm run build
+
+  deploy:
+    name: Auto Deploy to Production (Vercel)
+    needs: verify
+    if: (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master') && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Run Production Database Migrations
+        if: ${{ secrets.DATABASE_URL != '' }}
+        run: npm run db:migrate
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
+      - name: Install Vercel CLI
+        run: npm install --global vercel@latest
+
+      - name: Pull Vercel Environment Information
+        run: vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID || 'team_0vjeaamZrsAW1ORAKUnCKYX2' }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID || 'prj_od3DI3D0plUMQ78Wgzot5mteLaJn' }}
+
+      - name: Build Project Artifacts
+        run: vercel build --prod --token=${{ secrets.VERCEL_TOKEN }}
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID || 'team_0vjeaamZrsAW1ORAKUnCKYX2' }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID || 'prj_od3DI3D0plUMQ78Wgzot5mteLaJn' }}
+
+      - name: Deploy to Vercel (Production)
+        id: deploy-vercel
+        run: |
+          DEPLOY_URL=$(vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }})
+          echo "url=$DEPLOY_URL" >> $GITHUB_OUTPUT
+          echo "### 🚀 Production Deployment Successful!" >> $GITHUB_STEP_SUMMARY
+          echo "- **URL:** $DEPLOY_URL" >> $GITHUB_STEP_SUMMARY
+          echo "- **Commit:** ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID || 'team_0vjeaamZrsAW1ORAKUnCKYX2' }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID || 'prj_od3DI3D0plUMQ78Wgzot5mteLaJn' }}
+
+      - name: Post-Deploy Health Check Smoke Test
+        if: steps.deploy-vercel.outputs.url != ''
+        run: |
+          DEPLOY_URL="${{ steps.deploy-vercel.outputs.url }}"
+          echo "Checking health of $DEPLOY_URL..."
+          sleep 5
+          HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$DEPLOY_URL/api/health" || echo "000")
+          echo "Health endpoint returned HTTP $HTTP_STATUS"
+          if [ "$HTTP_STATUS" -ne 200 ] && [ "$HTTP_STATUS" -ne 307 ] && [ "$HTTP_STATUS" -ne 308 ]; then
+            echo "::warning::Health check returned status $HTTP_STATUS"
+          else
+            echo "✅ Health check passed with HTTP $HTTP_STATUS"
+          fi
