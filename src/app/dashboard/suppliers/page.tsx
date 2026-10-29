@@ -52,7 +52,12 @@ export default async function SuppliersPage({
                     <td>
                       <div className="flex items-center gap-2.5">
                         <Avatar name={s.name} />
-                        <span className="cell-primary">{s.name}</span>
+                        <Link
+                          href={`/dashboard/suppliers/${s.id}`}
+                          className="cell-primary hover:underline"
+                        >
+                          {s.name}
+                        </Link>
                       </div>
                     </td>
                     <td>
