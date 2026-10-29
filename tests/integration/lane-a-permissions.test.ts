@@ -25,6 +25,7 @@ import { getStoreSettings, updateStoreSettings } from "@/app/actions/settings";
 import { addOpeningStock, adjustBatchStock, getBatches } from "@/app/actions/stock";
 import { getAuditFilterOptions, getAuditLogs } from "@/app/actions/audit";
 import { getCustomersWithDue, getRecentReceipts } from "@/app/actions/payments";
+import { getRolesOverview, getTeam } from "@/app/actions/users";
 
 let t: Awaited<ReturnType<typeof createTestDb>>;
 beforeAll(async () => {
@@ -67,6 +68,9 @@ const CASES: Case[] = [
   { name: "getAccounts", permission: "accounting.view", kind: "read", call: () => getAccounts() },
   { name: "getJournalLines", permission: "accounting.view", kind: "read", call: () => getJournalLines() },
   { name: "getTrialBalance", permission: "accounting.view", kind: "read", call: () => getTrialBalance() },
+  // Staff & roles
+  { name: "getTeam", permission: "user.manage", kind: "read", call: () => getTeam() },
+  { name: "getRolesOverview", permission: "user.manage", kind: "read", call: () => getRolesOverview() },
   // Receipts
   { name: "getCustomersWithDue", permission: "accounting.post", kind: "read", call: () => getCustomersWithDue() },
   { name: "getRecentReceipts", permission: "accounting.post", kind: "read", call: () => getRecentReceipts() },

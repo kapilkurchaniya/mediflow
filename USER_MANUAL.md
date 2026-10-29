@@ -79,6 +79,10 @@ To leave, press the **Sign out** icon at the bottom of the left menu, next to yo
 
 Click **your name** at the bottom of the left menu to open **My profile**. Enter your **Current password**, then the **New password** twice (at least 8 characters, different from the current one) and press **Change password**. You stay signed in here; **every other device you were signed in on is signed out**. Your name, email and phone are shown above the form.
 
+### 2.1b Joining your team through an invitation
+
+Your owner sends you a link that looks like `…/invite/…`. Open it (you don't need to be signed in), type **Your name** and choose a **password** (8 or more characters), then press **Join and sign in**. If you already have a MediFlow account with that email, you enter your **existing password** instead. You land on the dashboard with the role your owner chose. A link works **once** and **expires after 7 days**; if it says the link is invalid or has expired, ask the owner for a new one.
+
 ### 2.2 Registering a new pharmacy
 
 On the sign-in page choose **Register**. Enter your pharmacy and personal details and choose an email and password. You become the **Owner** of the new pharmacy and can use every feature. (If the email is already registered, you'll be told.)
@@ -179,7 +183,7 @@ Examples of what a role does **not** see:
 - Only the owner and manager can enter **opening stock** or use **Bulk import**.
 - Discounts above your pharmacy's limit need owner or manager approval.
 
-> **Not available yet:** the screen to create staff logins, assign roles, and limit people to certain branches. For now accounts are created by your administrator.
+> The **owner** creates staff logins, picks each person's role and limits them to branches in **Directory → Staff & access** (see [15.6](#156-staff--access-invite-and-manage-your-team)). The list of what each role may do is under **Directory → Roles & permissions**.
 
 ---
 
@@ -662,6 +666,24 @@ Use the filters at the top (**User, Record type, Action, From, To**) and press *
 
 ---
 
+### 15.6 Staff & access: invite and manage your team
+
+**Directory → Staff & access** (owner only) is where you decide who can use MediFlow and what they can do.
+
+**Invite someone**
+1. Press **Invite person**.
+2. Type their **Email address**, choose a **Role** (the line under it explains the role) and the **Branch access**: **All branches**, or untick it and tick the branches they may work in.
+3. Press **Create invitation link**, then **Copy** the link and send it to the person yourself (WhatsApp, SMS, email). For safety **the link is shown only once**. If you lose it, create a new invitation for the same email: the old link stops working.
+4. The invitation waits under **Waiting to join** until they accept it (links last 7 days). Press **Revoke** to cancel one.
+
+**Change someone's access:** press **Edit** on their row, pick a different role or branches, **Save**. The change applies the next time they open a page.
+
+**Suspend:** press **Suspend** to sign a person out everywhere and stop them signing in (use it when someone leaves). **Re-activate** gives access back. You can't suspend yourself, and there must always be **at least one active owner**.
+
+**Roles & permissions** (also under Directory) lists every role and exactly what it can do. Roles are fixed for now: choose the one closest to the person's job.
+
+---
+
 ## 16. The AI assistant
 
 Press **Ctrl + J** (or choose *Ask MediFlow AI* in the palette) to open a chat panel. Ask in plain English, for example:
@@ -731,7 +753,7 @@ These are planned but **cannot be used today**. If you can't find a button for t
 | Billing | Cancel a bill; sales returns and credit notes; split payment (cash + UPI); credit sales; hold and resume a bill; cash register open/close; using loyalty points as a discount; billing without internet |
 | Stock | Stock adjustments and write-offs; transfers between branches; warehouse; physical stock count; reorder suggestions |
 | Buying | Purchase orders; returning goods to suppliers (debit notes); paying suppliers from the screen; supplier ledger |
-| People & security | Creating staff logins and roles from the screen; password reset by email; sign-in and role-change entries in the audit log (the audit log itself is available) |
+| People & security | Password reset by email; custom roles (you choose from the 7 built-in ones); sending invitations by email (you copy the link yourself); removing a person for good (you suspend instead) |
 | Multi-branch | Adding branches; switching between branches; chain-wide reports |
 | Accounts | Expenses; day-book drill-down and ledgers by party; receivables ageing with reminders; period locking; year-end closing (customer receipts are available) |
 | GST & messaging | Live e-invoice and e-way bill with the government portal; GSTR-2B / IMS matching; production WhatsApp and SMS rules; customer consent and privacy tools |

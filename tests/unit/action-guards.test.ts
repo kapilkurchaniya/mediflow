@@ -14,6 +14,7 @@ const PUBLIC_BY_DESIGN: Record<string, string> = {
   loginAction: "sign-in",
   registerAction: "creates a new pharmacy",
   logoutAction: "ends the session",
+  acceptInviteAction: "public: a new person accepts an invitation; the one-time token in the link is the credential",
   changePasswordAction: "any signed-in user changes their OWN password (requires sign-in and the current password, no permission)",
   createExternalOrderForTenant: "server-only helper called by /api/v1/orders after API-key auth",
 };

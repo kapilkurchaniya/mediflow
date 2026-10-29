@@ -3,7 +3,7 @@
 The one guide for testing everything in MediFlow by hand: every screen, every flow, every business rule, every permission. It replaces the separate Lane A and Lane B guides.
 
 - **Last verified against code:** 29 Oct 2026, branch `lane-a/overxpowered` after merging `origin/main` (Lane B PRs #12 and #13).
-- **Automated checks at that point:** `typecheck` ✅ · `lint:strict` ✅ · `npm test` ✅ **29 files / 466 tests** (after A1.5).
+- **Automated checks at that point:** `typecheck` ✅ · `lint:strict` ✅ · `npm test` ✅ **30 files / 498 tests** (after A1.4).
 - **Using the app rather than testing it?** Read [USER_MANUAL.md](USER_MANUAL.md).
 
 ---
@@ -99,7 +99,7 @@ If the login page shows *Failed query … AggregateError*, the database isn't re
 ```bash
 npm run typecheck && npm run lint:strict && npm test
 ```
-**Expect:** all exit 0; `Test Files 29 passed`, `Tests 466 passed` (numbers grow; "no failures" is what matters).
+**Expect:** all exit 0; `Test Files 30 passed`, `Tests 498 passed` (numbers grow; "no failures" is what matters).
 
 ### 2.4 Real medicines (optional)
 ```bash
@@ -151,7 +151,8 @@ Create this once; the tests refer to these names. **Do step 0 first.**
 
 | Area | Status | Notes |
 |---|---|---|
-| Login, register, sessions, **lockout after 10 wrong passwords, last-branch memory, change password** | ✅ | No staff invites yet (A1.4) |
+| Login, register, sessions, lockout after 10 wrong passwords, last-branch memory, change password | ✅ | No password reset by email |
+| **Staff & access**: invite by link, roles, branch access, suspend; read-only roles page | ✅ | Roles are the 7 built-ins (custom roles are a stretch goal); the invite link is copied by hand (no email yet) |
 | Roles & permissions (all pages/actions) | 🟡 | Lane A and most Lane B guarded. Gaps: API-keys page/actions, Omnichannel orders pages, a few actions (§18) |
 | Item master, racks, batches, opening stock, bulk import, schemes | ✅ | No stock-adjust screen (⏳) |
 | POS: search, cart, discount, one payment method, H/H1/X compliance, print | ✅ | No split tender, hold, cancel, returns, cash shift (⏳) |
@@ -249,6 +250,8 @@ Log in as each role and open each URL. **✓** opens, **403** shows the no-acces
 | `/reports` and sub-pages (report.view) | ✓ | ✓ | 403 | 403 | ✓ | ✓ | ✓ |
 | `/settings`, `/settings/sms`, `/settings/whatsapp`, `/whatsapp/templates` (settings.manage) | ✓ | 403 | 403 | 403 | 403 | 403 | 403 |
 | `/settings/audit` (audit.view) | ✓ | ✓ | 403 | 403 | 403 | 403 | ✓ |
+| `/settings/users`, `/settings/roles` (user.manage) | ✓ | 403 | 403 | 403 | 403 | 403 | 403 |
+| `/invite/<token>` (public, the token is the credential) | open to everyone, signed in or not | | | | | | |
 | `/accounting/receipts` (accounting.post) | ✓ | ✓ | 403 | 403 | 403 | ✓ | 403 |
 | ❗ `/orders`, `/orders/<id>`, `/settings/api-keys` (no check) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 
@@ -259,7 +262,7 @@ Log in as each role, count the sidebar links (not the logo), and press **Ctrl+K*
 
 | Role | Links | Settings link |
 |---|---|---|
-| owner | **33** | yes |
+| owner | **35** | yes |
 | manager | 33 | no |
 | pharmacist | 17 | no |
 | cashier | **13** | no |
@@ -779,7 +782,7 @@ Check each opens for the right role (see RBAC-2): Racks, Loyalty, Medical reps, 
 
 ### AUD-1 · Audit log page and who may open it ✅
 Roles: owner, manager, auditor open **Finance → Audit log** (`/dashboard/settings/audit`). Cashier, pharmacist, purchase manager, accountant → **403**.
-Expect: heading *Audit log*; filters **User**, **Record type**, **Action**, **From**, **To**, **Apply** / **Reset**; a table **When, User, Action, Record, Changes, Reason** (newest first); a footer like `12 entries · page 1 of 1` with **Previous / Next** when there are more than 50; the menu link appears only for roles with `audit.view` (owner 33 links, auditor 24).
+Expect: heading *Audit log*; filters **User**, **Record type**, **Action**, **From**, **To**, **Apply** / **Reset**; a table **When, User, Action, Record, Changes, Reason** (newest first); a footer like `12 entries · page 1 of 1` with **Previous / Next** when there are more than 50; the menu link appears only for roles with `audit.view` (owner 35 links, auditor 24).
 
 ### AUD-2 · What gets recorded ✅
 Do each action, then open the audit log.
@@ -801,6 +804,39 @@ Expect: only matching rows; the date range includes both end days; the count in 
 
 ### AUD-4 · Append-only and isolated ✅
 Expect: no edit or delete button anywhere on the page. A second pharmacy never sees the first's entries (register a second pharmacy and open its audit log: empty, and its filter lists contain only its own users).
+
+### USR-1 · Staff & access page ✅
+Role: **owner** (only the owner has `user.manage`). Open **Directory → Staff & access** (`/dashboard/settings/users`) and **Roles & permissions** (`/dashboard/settings/roles`).
+Expect: heading *Staff & access*; **Invite person** button; a **Team (N)** table with **Name, Email, Role, Branches, Status, Last sign-in** and **Edit / Suspend** per row (you cannot suspend yourself: the button is disabled and marked *(you)*); a **Waiting to join** table when invitations exist. *Roles & permissions* lists the 7 roles with their permission chips (owner 38 of 38 … auditor 11). Manager, pharmacist, cashier, purchase manager, accountant, auditor get **403** on both pages and do not see the menu links.
+
+### USR-2 · Invite a cashier and join ✅ (the key flow)
+1. As owner click **Invite person**: email `nina@example.test`, role **Cashier**, **All branches**, **Create invitation link**.
+2. **Copy** the link (`http://localhost:3000/invite/<64 hex>`); note the message that it is shown **only once**.
+3. Open it in a **private window** (no session). Fill **Your name** `Nina New` and a password of 8+ characters, **Join and sign in**.
+4. In Nina's session open the menu and these URLs: `/dashboard/sales/pos`, `/dashboard/accounting`, `/dashboard/settings`, `/dashboard/settings/users`.
+5. Reopen the same invitation link.
+6. As owner open **Waiting to join** and the **Team** table, and the audit log.
+Expect: (1) the link appears; the invitation is listed under *Waiting to join* with an expiry date 7 days ahead. (3) she lands on the dashboard as **Cashier** (13 menu links; the cashier's role). (4) POS opens; accounting, settings and staff pages show the no-access page. (5) *This invitation link is invalid or has expired. Ask your owner for a new one.* (6) Nina is in **Team** (Active, *All branches*) and the invitation is gone; the audit log has *Invitation created* and *Joined through an invitation* rows (no link or password in them).
+🛠 `select email, left(token_hash,8), expires_at, accepted_at from user_invites;` — only a hash is stored, never the link token. A wrong password length shows *The password must be at least 8 characters.* and does **not** use up the link.
+
+### USR-3 · Restrict a person to one branch ✅🛠
+There is no screen to add a branch yet (A3.1): add one by SQL (see AUTH-6). Then **Edit** Nina → untick **All branches**, tick only **Store B**, **Save**; sign in as Nina.
+Expect: the session starts in **Store B**, never in Store A; saving with no branch ticked shows *Choose at least one branch, or allow all branches.* Inviting someone limited to Store B behaves the same on joining.
+
+### USR-4 · Suspend, re-activate and the last owner ✅
+1. As owner **Suspend** Nina (confirm the dialog). In Nina's still-open window reload any page.
+2. Try to sign in as Nina.
+3. **Re-activate** her and sign in again.
+4. As the only owner, try **Edit** on yourself and change the role to Manager. Try to suspend yourself.
+Expect: (1) her status shows **Suspended**, and her open session is signed out. (2) *Your access has been suspended. Ask your administrator.* (3) works again. (4) *There must be at least one owner.* and *You cannot suspend yourself.* With a **second active owner** an owner can step down. A suspended owner does not count as an owner.
+
+### USR-5 · Invitations: expiry, replace, revoke, existing accounts ✅
+- Invite the same email twice: only the **newer** link works; **Waiting to join** shows one row.
+- **Revoke** a waiting invitation: the link then shows the invalid-link message.
+- Invite an email that is **already on the team** (even suspended): *… is already on your team.* A bad email: *Enter a valid email address.*
+- Invite an email that already has a MediFlow account in another pharmacy: the invitation page says to enter **its existing password** (no name field); a wrong password shows *That password is not correct for this email.*; the right one joins and keeps the old name.
+- 🛠 expiry: `update user_invites set expires_at = now() - interval '1 minute';` then open a link: invalid-link message.
+🛠 `npx vitest run tests/integration/users.test.ts` covers all of USR-1…5 plus role/branch edits, other-pharmacy isolation and who may call the actions.
 
 ### API-1 · `/api/v1/*` needs a key ✅
 ```bash
@@ -875,7 +911,7 @@ For each item, confirm there is **no** menu entry, page or button (so it isn't h
 
 | Roadmap | Feature | Quick check it is absent |
 |---|---|---|
-| A1.4 | Users, invites, roles screens | No Settings → Users/Roles; no `/invite/<token>` page |
+| A1.4 (stretch) | Custom roles; invite by email; remove a member | Roles page is read-only; no *Delete member*; no email is sent |
 | A2.2 | Split tender | Only one payment method per bill; no `F8` |
 | A2.3 | Hold / resume bills | `F6`/`F7` do nothing |
 | A2.4–A2.5 | Cancel bill, returns, credit notes | No cancel/return buttons on an invoice |
@@ -932,7 +968,7 @@ npm run typecheck && npm run lint:strict
 ### 19.2 Foundation checks
 | ID | Check | Expected |
 |---|---|---|
-| DEV-1 | `npm run db:reset`, then count tables: `select count(*) from information_schema.tables where table_schema='public' and table_type='BASE TABLE';` | prints `✓ database wiped / ✓ migrations applied / ✓ system roles synced`; **60** tables; `drizzle/` has `0000_init … 0006_login_hardening` |
+| DEV-1 | `npm run db:reset`, then count tables: `select count(*) from information_schema.tables where table_schema='public' and table_type='BASE TABLE';` | prints `✓ database wiped / ✓ migrations applied / ✓ system roles synced`; **61** tables; `drizzle/` has `0000_init … 0007_user_invites` |
 | DEV-2 | `npx drizzle-kit generate --name should_not_exist` | `No schema changes, nothing to migrate`. If it creates a file, delete it (`git clean -f drizzle`) and tell the schema author to commit a migration |
 | DEV-3 | `DATABASE_URL=postgres://u:p@db.example.com:5432/x npm run db:reset` (and `db:seed-users`) | `Refusing to … non-local database`; nothing changes. `npm run db:migrate` twice is safe (no duplicates) |
 | DEV-4 | `ls src/server/db/schema` | 12 module files (`platform catalog inventory sales accounting purchasing compliance gst crm comms banking ai`) + `_helpers.ts` + `index.ts`; no old `schema.ts` |
@@ -945,7 +981,7 @@ npm run typecheck && npm run lint:strict
 | DEV-11 | `npx vitest run tests/unit/permissions.test.ts` | role templates match the counts in RBAC-4 |
 | DEV-12 | `NEXT_TELEMETRY_DISABLED=1 npx next build` | succeeds (needs `DATABASE_URL`; `next start` also needs `APP_ENCRYPTION_KEY` and `CRON_SECRET`) |
 
-### 19.3 What the automated suite covers (29 files)
+### 19.3 What the automated suite covers (30 files)
 | File | Covers |
 |---|---|
 | `unit/money.test.ts`, `invoice-no.test.ts` | paise/bp math, GST split, invoice number format |
@@ -965,6 +1001,7 @@ npm run typecheck && npm run lint:strict
 | `unit/action-guards.test.ts` | every exported server action has a permission check (a new unguarded action fails; known gaps are listed in the test) |
 | `integration/isolation.test.ts` | pharmacy B signed in as OWNER cannot read or change pharmacy A's data through any list or by id (≈60 attacks across both lanes), nor point its records at A's |
 | `integration/payments.test.ts` | receipts and supplier/expense payments: journal, bill settlement, refusals, who may post |
+| `integration/users.test.ts` | invitations (hashed token, expiry, replace, one use), joining, role and branch access, last-owner rule, suspend, team list, who may manage staff |
 | `integration/login.test.ts` | lockout rules (10 failures / 15 min, reset on success, per email, unknown emails), store selection (last used, limited stores, inactive, suspended), change password and sign-out of other sessions |
 | `integration/audit-log.test.ts` | audit rows written by stock, store settings, medicines and discount overrides; filters, paging, tenant isolation, who may read |
 | `integration/rbac.test.ts` | membership/store/tenant checks |
@@ -998,6 +1035,7 @@ Copy this table into your notes and fill the last two columns.
 | COM-1…6 | WhatsApp, SMS, reminders, jobs, webhook | | |
 | AI-1…2 | AI assistant | | |
 | AUD-1…4 | Audit log | | |
+| USR-1…5 | Staff & access, invitations, branch access, suspend | | |
 | SET-1…2, API-1…4, ENV-1 | Settings, API keys, environment | | |
 | E2E-1…5 | End-to-end scenarios | | |
 | §17 | Absent features confirmed | | |

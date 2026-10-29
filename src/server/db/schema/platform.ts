@@ -127,6 +127,28 @@ export const memberships = pgTable(
 );
 
 /**
+ * Invitations to join a pharmacy (ROADMAP A1.4). The invite link carries a random token; only its sha256 is stored,
+ * so a database leak cannot be turned into working links.
+ */
+export const userInvites = pgTable(
+  "user_invites",
+  {
+    id: id(),
+    tenantId: tenantId(),
+    email: text("email").notNull(),
+    roleId: uuid("role_id").notNull().references(() => roles.id),
+    allStores: boolean("all_stores").notNull().default(true),
+    storeIds: uuid("store_ids").array().notNull().default(sql`'{}'::uuid[]`),
+    tokenHash: text("token_hash").notNull(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    acceptedAt: timestamp("accepted_at", { withTimezone: true }),
+    createdBy: uuid("created_by"),
+    createdAt: createdAt(),
+  },
+  (t) => [uniqueIndex("user_invites_token_uq").on(t.tokenHash), index("user_invites_tenant_email_idx").on(t.tenantId, t.email)],
+);
+
+/**
  * Every sign-in attempt (successful or not), used to lock an email out for 15 minutes after 10 failures.
  * Holds no password and no tenant: it is looked up by email before we know who the user is.
  */
