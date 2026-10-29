@@ -5,9 +5,9 @@ import { getSmsProvider } from "@/server/domain/sms";
 
 export async function handleReminderSend(event: {
   tenantId: string;
-  payload: any;
+  payload: Record<string, unknown>;
 }) {
-  const { reminderId } = event.payload;
+  const reminderId = typeof event.payload.reminderId === "string" ? event.payload.reminderId : undefined;
   if (!reminderId) throw new Error("Missing reminderId in reminder.send payload");
 
   const [reminder] = await db
