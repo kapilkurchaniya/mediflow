@@ -7,10 +7,12 @@ import { downloadGstr1JsonAction } from "@/app/actions/gst";
 export function ReturnsClientExport({
   month,
   year,
+  gstin,
   gstr3bSummary,
 }: {
   month: number;
   year: number;
+  gstin?: string;
   gstr3bSummary: {
     outwardTaxable: number;
     cgst: number;
@@ -29,7 +31,7 @@ export function ReturnsClientExport({
   async function handleDownloadJson() {
     setDownloadingJson(true);
     try {
-      const res = await downloadGstr1JsonAction(month, year);
+      const res = await downloadGstr1JsonAction(month, year, gstin);
       if (res.success && res.payload) {
         const jsonStr =
           "data:text/json;charset=utf-8," +

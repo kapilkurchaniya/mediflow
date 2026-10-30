@@ -10,7 +10,7 @@ import {
 } from "lucide-react";
 import { PageHeader, StatCard } from "@/app/components/ui";
 import { formatINR } from "@/lib/money";
-import { getOutwardSupplies } from "@/app/actions/gst";
+import { getOutwardSupplies, getTenantGstinsAction } from "@/app/actions/gst";
 import { GstPeriodSelector } from "../GstPeriodSelector";
 import { Gstr1ExportActions } from "./Gstr1ExportActions";
 
@@ -19,15 +19,24 @@ export const dynamic = "force-dynamic";
 export default async function Gstr1OutwardPage({
   searchParams,
 }: {
-  searchParams: Promise<{ month?: string; year?: string; tab?: string }>;
+  searchParams: Promise<{ month?: string; year?: string; tab?: string; gstin?: string }>;
 }) {
   const resolved = await searchParams;
   const now = new Date();
   const month = resolved.month ? Number(resolved.month) : now.getMonth() + 1;
   const year = resolved.year ? Number(resolved.year) : now.getFullYear();
   const activeTab = resolved.tab || "b2b";
+  const gstin = resolved.gstin?.trim() || undefined;
 
-  const gstr1 = await getOutwardSupplies({ month, year });
+  const [gstr1, tenantGstins] = await Promise.all([
+    getOutwardSupplies({ month, year, gstin }),
+    getTenantGstinsAction(),
+  ]);
+
+  const availableGstins = tenantGstins.map((g) => ({
+    gstin: g.gstin,
+    label: `${g.gstin} (${g.stateName} - ${g.storeNames.join(", ")})`,
+  }));
 
   const monthNames = [
     "January", "February", "March", "April", "May", "June",
@@ -42,10 +51,15 @@ export default async function Gstr1OutwardPage({
         backHref="/dashboard/gst"
         eyebrow="Government Returns (GSTR-1)"
         title="Outward Supplies Statement"
-        description={`Statement of outward supplies of medicines and health products for ${currentMonthName} ${year}.`}
+        description={`Statement of outward supplies of medicines and health products for ${currentMonthName} ${year}.${gstin ? ` (Filtered for GSTIN: ${gstin})` : ""}`}
         actions={
           <div className="flex flex-wrap items-center gap-2">
-            <GstPeriodSelector month={month} year={year} />
+            <GstPeriodSelector
+              month={month}
+              year={year}
+              selectedGstin={gstin}
+              availableGstins={availableGstins}
+            />
             <Gstr1ExportActions
               month={month}
               year={year}
