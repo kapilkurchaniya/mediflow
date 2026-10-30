@@ -174,6 +174,7 @@ export default function POSPage() {
       expiryDate: string;
       mrp: number;
       qtyOnHand: number;
+      totalAvailableStock?: number;
       gstRateBp: number;
       rxRequired?: boolean | null;
       schedule?: string | null;
@@ -183,6 +184,8 @@ export default function POSPage() {
       looseUnit: string;
       packQty: number;
       looseQty: number;
+      autoFefo?: boolean;
+      overrideBatch?: boolean;
     })[]
   >([]);
 
@@ -234,11 +237,14 @@ export default function POSPage() {
     }
   };
 
-  // Add item to cart
+  // Add item to cart (Auto-FEFO by default)
   const addToCart = useCallback(
     (
       medicine: SearchResult["medicine"],
-      batch: SearchResult["batches"][0]
+      batch: SearchResult["batches"][0],
+      isFefo = true,
+      isOverride = false,
+      allBatches: SearchResult["batches"] = []
     ) => {
       if (batch.qtyOnHand <= 0) return;
 
@@ -247,6 +253,10 @@ export default function POSPage() {
       const upp = Math.max(1, medicine.unitsPerPack ?? 1);
       const packUnit = medicine.packUnit ?? "strip";
       const looseUnit = medicine.looseUnit ?? "tablet";
+      const totalAvailableStock =
+        allBatches.length > 0
+          ? allBatches.reduce((acc, b) => acc + b.qtyOnHand, 0)
+          : batch.qtyOnHand;
 
       setCart((current) => {
         const existingIndex = current.findIndex((c) => c.batchId === batch.id);
@@ -255,7 +265,8 @@ export default function POSPage() {
           const item = updated[existingIndex];
           const newPackQty = (item.packQty ?? 0) + 1;
           const newTotalBase = (newPackQty * upp) + (item.looseQty ?? 0);
-          if (newTotalBase <= batch.qtyOnHand) {
+          const limit = isFefo ? (item.totalAvailableStock ?? totalAvailableStock) : batch.qtyOnHand;
+          if (newTotalBase <= limit) {
             item.packQty = newPackQty;
             item.qty = newTotalBase;
           }
@@ -276,12 +287,15 @@ export default function POSPage() {
               packUnit,
               looseUnit,
               qtyOnHand: batch.qtyOnHand,
+              totalAvailableStock,
               mrp: batch.mrp,
               rate: batch.saleRate || batch.mrp,
               discountBp: 0,
               gstRateBp: medicine.gstRateBp,
               rxRequired: medicine.rxRequired,
               schedule: medicine.schedule,
+              autoFefo: isFefo,
+              overrideBatch: isOverride,
             },
           ];
         }
@@ -398,7 +412,7 @@ export default function POSPage() {
         // Trigger search for this barcode
         searchPosItems(scannedCode).then((results) => {
           if (results.length > 0 && results[0].batches.length > 0) {
-            addToCart(results[0].medicine, results[0].batches[0]);
+            addToCart(results[0].medicine, results[0].batches[0], true, false, results[0].batches);
           }
         });
         return;
@@ -468,9 +482,23 @@ export default function POSPage() {
 
       // Arrow navigation in search results
       if (searchResults.length > 0) {
-        const flatBatches: { med: SearchResult["medicine"]; batch: SearchResult["batches"][0] }[] = [];
+        const flatBatches: {
+          med: SearchResult["medicine"];
+          batch: SearchResult["batches"][0];
+          isFefo: boolean;
+          isOverride: boolean;
+          allBatches: SearchResult["batches"];
+        }[] = [];
         searchResults.forEach((res) => {
-          res.batches.forEach((b) => flatBatches.push({ med: res.medicine, batch: b }));
+          res.batches.forEach((b, bIdx) =>
+            flatBatches.push({
+              med: res.medicine,
+              batch: b,
+              isFefo: bIdx === 0,
+              isOverride: bIdx > 0,
+              allBatches: res.batches,
+            })
+          );
         });
 
         if (e.key === "ArrowDown") {
@@ -482,7 +510,8 @@ export default function POSPage() {
         } else if (e.key === "Enter" && !e.ctrlKey) {
           if (flatBatches[selectedResultIndex]) {
             e.preventDefault();
-            addToCart(flatBatches[selectedResultIndex].med, flatBatches[selectedResultIndex].batch);
+            const chosen = flatBatches[selectedResultIndex];
+            addToCart(chosen.med, chosen.batch, chosen.isFefo, chosen.isOverride, chosen.allBatches);
           }
         }
       }
@@ -535,7 +564,8 @@ export default function POSPage() {
     const lQty = item.looseQty ?? 0;
     const upp = Math.max(1, item.unitsPerPack ?? 1);
     const totalBase = pQty * upp + lQty;
-    if (totalBase > 0 && totalBase <= item.qtyOnHand) {
+    const maxLimit = item.autoFefo ? (item.totalAvailableStock ?? item.qtyOnHand) : item.qtyOnHand;
+    if (totalBase > 0 && totalBase <= maxLimit) {
       item.packQty = pQty;
       item.qty = totalBase;
       setCart(newCart);
@@ -553,7 +583,8 @@ export default function POSPage() {
       lQty = lQty % upp;
     }
     const totalBase = pQty * upp + lQty;
-    if (totalBase > 0 && totalBase <= item.qtyOnHand) {
+    const maxLimit = item.autoFefo ? (item.totalAvailableStock ?? item.qtyOnHand) : item.qtyOnHand;
+    if (totalBase > 0 && totalBase <= maxLimit) {
       item.packQty = pQty;
       item.looseQty = lQty;
       item.qty = totalBase;
@@ -565,7 +596,8 @@ export default function POSPage() {
     const newCart = [...cart];
     const item = newCart[index];
     const upp = Math.max(1, item.unitsPerPack ?? 1);
-    if (newQty > 0 && newQty <= item.qtyOnHand) {
+    const maxLimit = item.autoFefo ? (item.totalAvailableStock ?? item.qtyOnHand) : item.qtyOnHand;
+    if (newQty > 0 && newQty <= maxLimit) {
       item.qty = newQty;
       item.packQty = Math.floor(newQty / upp);
       item.looseQty = newQty % upp;
@@ -870,9 +902,10 @@ export default function POSPage() {
                       );
                     }
 
-                    return res.batches.map((batch) => {
+                    return res.batches.map((batch, bIdx) => {
                       const currentIdx = flatIdx++;
                       const isHighlighted = currentIdx === selectedResultIndex;
+                      const isFefo = bIdx === 0;
 
                       return (
                         <tr
@@ -880,7 +913,7 @@ export default function POSPage() {
                           className={`cursor-pointer transition-colors ${
                             isHighlighted ? "bg-brand-50/70" : "hover:bg-ink-50"
                           }`}
-                          onClick={() => addToCart(res.medicine, batch)}
+                          onClick={() => addToCart(res.medicine, batch, isFefo, !isFefo, res.batches)}
                         >
                           <td>
                             <div className="flex items-center gap-1.5 flex-wrap">
@@ -899,7 +932,18 @@ export default function POSPage() {
                             </div>
                           </td>
                           <td>
-                            <span className="font-mono text-[12px] font-medium text-ink-800">{batch.batchNo}</span>
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span className="font-mono text-[12px] font-medium text-ink-800">{batch.batchNo}</span>
+                              {isFefo ? (
+                                <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded text-[9.5px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200" title="Earliest expiring batch (Auto-FEFO)">
+                                  ⚡ Auto-FEFO
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded text-[9.5px] font-medium bg-amber-50 text-amber-700 border border-amber-200" title="Later expiring batch (Selecting logs an audit override)">
+                                  Later Expiry
+                                </span>
+                              )}
+                            </div>
                             <div className="text-[11px] text-ink-500 num">
                               Exp: {new Date(batch.expiryDate).toLocaleDateString("en-IN", { month: "short", year: "numeric" })}
                             </div>
@@ -1017,14 +1061,28 @@ export default function POSPage() {
                               </span>
                             )}
                           </div>
-                          <div className="cell-sub font-mono">
-                            Batch: {item.batchNo} · Exp: {item.expiryDate}
+                          <div className="cell-sub font-mono flex items-center gap-1.5 flex-wrap">
+                            <span>Batch: {item.batchNo} · Exp: {item.expiryDate}</span>
+                            {item.autoFefo ? (
+                              <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded text-[9.5px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                ⚡ FEFO
+                              </span>
+                            ) : item.overrideBatch ? (
+                              <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded text-[9.5px] font-medium bg-amber-50 text-amber-800 border border-amber-200" title="Manual batch selection over earlier expiring batch">
+                                Override
+                              </span>
+                            ) : null}
                             {item.unitsPerPack > 1 && (
                               <span className="text-brand-600 font-medium ml-1">
                                 (1 {item.packUnit} = {item.unitsPerPack} {item.looseUnit}s)
                               </span>
                             )}
                           </div>
+                          {item.autoFefo && item.qty > item.qtyOnHand && (
+                            <div className="mt-1 text-[10.5px] font-medium text-emerald-800 bg-emerald-50/80 px-2 py-0.5 rounded border border-emerald-200 w-fit">
+                              ⚡ Multi-batch split: {item.qtyOnHand} units from {item.batchNo} + {item.qty - item.qtyOnHand} from next FEFO batch
+                            </div>
+                          )}
                           {item.schemeText && (
                             <div className="mt-1 flex items-center gap-1 text-[10.5px] font-semibold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200 w-fit">
                               <Tag className="h-2.5 w-2.5" /> {item.schemeText}

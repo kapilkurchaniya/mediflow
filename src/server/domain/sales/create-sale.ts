@@ -18,6 +18,7 @@ import { createGstDocumentFromSale, determineTaxContext, extractStateCodeFromGst
 import { LoyaltyService } from "@/server/domain/loyalty";
 import { enqueue } from "@/server/jobs/outbox";
 import { writeAudit } from "@/server/audit";
+import { allocateFefoBatches } from "./allocate-fefo";
 import type { CreateSaleOptions, CreateSaleResult, SaleInput } from "./types";
 
 /** Money methods a customer can hand over. "Credit" is not a method: it is whatever is left unpaid. */
@@ -156,84 +157,28 @@ export async function createSale(
     if (!customer) throw new DomainError("CUSTOMER_NOT_FOUND", "Customer not found.");
   }
 
-  // ── 3. Batches and medicines, read on the server (tenant + store scoped) ─────────────────────────
-  const batchIds = input.lines.map((l) => l.batchId);
-  const dbBatches = await tx
-    .select({ batch: schema.batches, medicine: schema.medicines, manufacturer: schema.manufacturers.name })
-    .from(schema.batches)
-    .innerJoin(schema.medicines, eq(schema.batches.medicineId, schema.medicines.id))
-    .leftJoin(schema.manufacturers, eq(schema.medicines.manufacturerId, schema.manufacturers.id))
-    .where(
-      and(
-        eq(schema.batches.tenantId, ctx.tenantId),
-        eq(schema.batches.storeId, ctx.storeId),
-        inArray(schema.batches.id, batchIds),
-      ),
-    );
-
-  const lineInputs: SaleLineInput[] = [];
-  const processed = input.lines.map((line) => {
-    const rec = dbBatches.find((b) => b.batch.id === line.batchId);
-    if (!rec) throw new DomainError("BATCH_NOT_FOUND", `Batch ${line.batchId} not found`);
-    const { batch, medicine, manufacturer } = rec;
-
-    const upp = Math.max(1, medicine.unitsPerPack ?? 1);
-    let packQty = line.packQty ?? 0;
-    let looseQty = line.looseQty ?? 0;
-    let baseQty = 0;
-
-    if (line.packQty !== undefined || line.looseQty !== undefined) {
-      if (looseQty >= upp) {
-        packQty += Math.floor(looseQty / upp);
-        looseQty = looseQty % upp;
-      }
-      baseQty = (packQty * upp) + looseQty;
-    } else {
-      baseQty = line.qty ?? 0;
-      packQty = Math.floor(baseQty / upp);
-      looseQty = baseQty % upp;
-    }
-
-    if (baseQty <= 0) {
-      throw new DomainError("INVALID_QUANTITY", `Quantity for ${medicine.name} must be greater than zero.`);
-    }
-
-    if (batch.qtyOnHand < baseQty && !opts.allowNegativeStock) {
-      throw new DomainError("INSUFFICIENT_STOCK", `Insufficient stock for ${medicine.name}. Available: ${batch.qtyOnHand}`);
-    }
-    if (batch.expiryDate <= todayStr) {
-      throw new DomainError("BATCH_EXPIRED", `Batch for ${medicine.name} has expired on ${batch.expiryDate}`);
-    }
-    // Server-side rate, falling back to MRP: the browser's price is ignored.
-    const saleRate = batch.saleRate ?? batch.mrp ?? 0;
-    lineInputs.push({
-      qty: baseQty,
-      packQty,
-      looseQty,
-      unitsPerPack: upp,
-      rate: saleRate,
-      discountBp: line.discountBp,
-      gstRateBp: medicine.gstRateBp,
-    });
-    return {
-      line,
-      medicine,
-      batch,
-      manufacturerName: manufacturer ?? null,
-      saleRate,
-      baseQty,
-      packQty,
-      looseQty,
-      unitsPerPack: upp,
-    };
+  // ── 3. FEFO Batch Allocation and validation (tenant + store scoped) ─────────────────────────
+  const { allocatedLines } = await allocateFefoBatches(tx, ctx, input.lines, {
+    todayStr,
+    allowNegativeStock: opts.allowNegativeStock,
   });
+
+  const lineInputs: SaleLineInput[] = allocatedLines.map((p) => ({
+    qty: p.baseQty,
+    packQty: p.packQty,
+    looseQty: p.looseQty,
+    unitsPerPack: p.unitsPerPack,
+    rate: p.saleRate,
+    discountBp: p.discountBp,
+    gstRateBp: p.medicine.gstRateBp,
+  }));
 
   // ── 4. Drug-schedule compliance (Drugs & Cosmetics Rules) ───────────────────────────────────────
   const c = input.compliance;
   const doctorName = c?.doctorName?.trim() || undefined;
   const patientName = c?.patientName?.trim() || customer?.name;
   const check = validateDispensingCompliance({
-    items: processed.map((p) => ({
+    items: allocatedLines.map((p) => ({
       medicineName: p.medicine.name,
       schedule: p.medicine.schedule,
       rxRequired: p.medicine.rxRequired,
@@ -360,16 +305,40 @@ export async function createSale(
     });
   }
 
+  // Record audit trails for any manual FEFO batch overrides at the counter
+  for (const p of allocatedLines) {
+    if (p.isOverride && p.earlierBatchesSkipped && p.earlierBatchesSkipped.length > 0) {
+      await writeAudit(tx, ctx, {
+        action: "fefo_override",
+        entityType: "sale",
+        entityId: sale.id,
+        newValue: {
+          invoiceNo,
+          medicineId: p.medicine.id,
+          medicineName: p.medicine.name,
+          selectedBatchId: p.batch.id,
+          selectedBatchNo: p.batch.batchNo,
+          selectedExpiryDate: p.batch.expiryDate,
+          skippedBatches: p.earlierBatchesSkipped,
+          reason: p.overrideReason || "Manual batch selection at counter overrode earlier-expiring batch",
+        },
+        reason:
+          p.overrideReason ||
+          `Counter manual override: Selected batch ${p.batch.batchNo} (${p.batch.expiryDate}) over earlier-expiring batch ${p.earlierBatchesSkipped[0].batchNo} (${p.earlierBatchesSkipped[0].expiryDate})`,
+      });
+    }
+  }
+
   // ── 7. Lines: stock movement (locks the batch) + sale items ─────────────────────────────────────
   const saleItems = [];
-  for (let i = 0; i < processed.length; i++) {
-    const p = processed[i];
+  for (let i = 0; i < allocatedLines.length; i++) {
+    const p = allocatedLines[i];
     const res = totals.lines[i];
     await recordStockMovement({
       tx,
       tenantId: ctx.tenantId,
       storeId: ctx.storeId,
-      batchId: p.line.batchId,
+      batchId: p.batch.id,
       medicineId: p.medicine.id,
       type: "sale",
       qtyChange: -p.baseQty,
@@ -382,7 +351,7 @@ export async function createSale(
       tenantId: ctx.tenantId,
       saleId: sale.id,
       medicineId: p.medicine.id,
-      batchId: p.line.batchId,
+      batchId: p.batch.id,
       medicineName: p.medicine.name,
       batchNo: p.batch.batchNo,
       expiryDate: p.batch.expiryDate,
@@ -394,7 +363,7 @@ export async function createSale(
       looseQty: p.looseQty,
       mrp: p.batch.mrp,
       rate: p.saleRate,
-      discountBp: p.line.discountBp,
+      discountBp: p.discountBp,
       discountAmount: res.discount,
       taxableAmount: res.taxable,
       gstRateBp: p.medicine.gstRateBp,
@@ -408,8 +377,8 @@ export async function createSale(
   const insertedItems = await tx.insert(schema.saleItems).values(saleItems).returning({ id: schema.saleItems.id });
 
   // ── 8. Statutory dispensing register (Schedule H / H1 / X / narcotics) ──────────────────────────
-  for (let i = 0; i < processed.length; i++) {
-    const p = processed[i];
+  for (let i = 0; i < allocatedLines.length; i++) {
+    const p = allocatedLines[i];
     if (!isScheduledDrug(p.medicine.schedule) || !insertedItems[i]) continue;
     await recordDispensingLog({
       tx,
@@ -418,7 +387,7 @@ export async function createSale(
       saleId: sale.id,
       saleItemId: insertedItems[i].id,
       medicineId: p.medicine.id,
-      batchId: p.line.batchId,
+      batchId: p.batch.id,
       medicineName: p.medicine.name,
       batchNo: p.batch.batchNo,
       expiryDate: p.batch.expiryDate,
@@ -448,7 +417,7 @@ export async function createSale(
         prescriptionId: c.prescriptionId,
         tenantId: ctx.tenantId,
         today: now,
-        lines: processed.map((p) => ({
+        lines: allocatedLines.map((p) => ({
           medicineId: p.medicine.id,
           medicineName: p.medicine.name,
           quantity: p.baseQty,

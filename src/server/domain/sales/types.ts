@@ -31,12 +31,20 @@ export type ComplianceDetails = z.infer<typeof ComplianceDetailsSchema>;
 
 export const SaleLineSchema = z
   .object({
-    batchId: z.string().uuid(),
+    batchId: z.string().uuid().optional(),
+    medicineId: z.string().uuid().optional(),
     qty: z.number().int().positive().optional(),
     packQty: z.number().int().min(0).optional(),
     looseQty: z.number().int().min(0).optional(),
     discountBp: z.number().int().min(0).max(10000),
+    autoFefo: z.boolean().optional(),
+    overrideBatch: z.boolean().optional(),
+    overrideReason: z.string().trim().max(255).optional(),
   })
+  .refine(
+    (l) => Boolean(l.batchId || l.medicineId),
+    { message: "Either batchId or medicineId must be provided." },
+  )
   .refine(
     (l) => (l.qty !== undefined && l.qty > 0) || ((l.packQty ?? 0) > 0 || (l.looseQty ?? 0) > 0),
     { message: "Quantity must be greater than zero." },

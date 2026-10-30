@@ -154,12 +154,15 @@ export async function findSubstitutes(genericName: string, excludeMedicineId?: s
 
 export type PosItemInput = {
   medicineId: string;
-  batchId: string;
+  batchId?: string;
   qty?: number;
   packQty?: number;
   looseQty?: number;
   rate: number; // paise - ignored by server, but we keep the type signature for now
   discountBp: number; // basis points
+  autoFefo?: boolean;
+  overrideBatch?: boolean;
+  overrideReason?: string;
 };
 
 export type ComplianceDetailsInput = {
@@ -239,10 +242,14 @@ export async function createSaleInvoice(
     customerId: customerId?.trim() || undefined,
     lines: items.map((i) => ({
       batchId: i.batchId,
+      medicineId: i.medicineId,
       qty: i.qty,
       packQty: i.packQty,
       looseQty: i.looseQty,
       discountBp: i.discountBp,
+      autoFefo: i.autoFefo,
+      overrideBatch: i.overrideBatch,
+      overrideReason: i.overrideReason,
     })),
     billDiscountPaise: 0,
     payments,

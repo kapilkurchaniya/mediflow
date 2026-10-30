@@ -581,5 +581,255 @@ describe("createSale: split tender, change and credit (A2.2)", () => {
       const [updatedBatch] = await t.db.select().from(schema.batches).where(eq(schema.batches.id, batch.id));
       expect(updatedBatch.qtyOnHand).toBe(86);
     });
+
+    describe("auto-FEFO batch allocation (A2.11)", () => {
+      it("auto-picks the earliest expiry batch by default when medicineId is passed", async () => {
+        const tenant = await makeTenant(t.db);
+        const store = await makeStore(t.db, tenant.id);
+        const user = await makeUser(t.db);
+        const maker = (await t.db.insert(schema.manufacturers).values({ tenantId: tenant.id, name: "Cipla" }).returning())[0];
+        const medicine = await makeMedicine(t.db, tenant.id, {
+          name: "Azithromycin 500",
+          unitsPerPack: 3,
+          manufacturerId: maker.id,
+        });
+
+        // Batch 1: Earlier expiry (30 days)
+        const batch1 = await makeBatch(t.db, {
+          tenantId: tenant.id,
+          storeId: store.id,
+          medicineId: medicine.id,
+          batchNo: "AZ-EARLY",
+          expiryDate: new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10),
+          qtyOnHand: 10,
+          mrp: 6000,
+          saleRate: 6000,
+        });
+
+        // Batch 2: Later expiry (180 days)
+        const batch2 = await makeBatch(t.db, {
+          tenantId: tenant.id,
+          storeId: store.id,
+          medicineId: medicine.id,
+          batchNo: "AZ-LATER",
+          expiryDate: new Date(Date.now() + 180 * 86400000).toISOString().slice(0, 10),
+          qtyOnHand: 20,
+          mrp: 6000,
+          saleRate: 6000,
+        });
+
+        const w = { tenant, store, user, medicine };
+
+        // Sell 4 units via auto-FEFO (medicineId without batchId)
+        const res = await t.db.transaction((tx) =>
+          createSale(
+            tx,
+            ctxFor(w),
+            SaleInput.parse({
+              lines: [{ medicineId: medicine.id, qty: 4, discountBp: 0 }],
+              payments: [{ method: "cash", amount: 8000 }],
+            }),
+            { source: "pos" },
+          ),
+        );
+
+        expect(res.saleId).toBeTruthy();
+
+        // Batch 1 should be decremented from 10 to 6
+        const [updatedB1] = await t.db.select().from(schema.batches).where(eq(schema.batches.id, batch1.id));
+        expect(updatedB1.qtyOnHand).toBe(6);
+
+        // Batch 2 should remain completely untouched at 20
+        const [updatedB2] = await t.db.select().from(schema.batches).where(eq(schema.batches.id, batch2.id));
+        expect(updatedB2.qtyOnHand).toBe(20);
+
+        // Sale item points to batch1
+        const items = await t.db.select().from(schema.saleItems).where(eq(schema.saleItems.saleId, res.saleId));
+        expect(items).toHaveLength(1);
+        expect(items[0].batchId).toBe(batch1.id);
+        expect(items[0].batchNo).toBe("AZ-EARLY");
+      });
+
+      it("auto-splits across multiple batches when requested quantity exceeds the first batch", async () => {
+        const tenant = await makeTenant(t.db);
+        const store = await makeStore(t.db, tenant.id);
+        const user = await makeUser(t.db);
+        const maker = (await t.db.insert(schema.manufacturers).values({ tenantId: tenant.id, name: "Sun Pharma" }).returning())[0];
+        const medicine = await makeMedicine(t.db, tenant.id, {
+          name: "Pantocid 40",
+          unitsPerPack: 10,
+          manufacturerId: maker.id,
+        });
+
+        const batch1 = await makeBatch(t.db, {
+          tenantId: tenant.id,
+          storeId: store.id,
+          medicineId: medicine.id,
+          batchNo: "PAN-EXP1",
+          expiryDate: new Date(Date.now() + 45 * 86400000).toISOString().slice(0, 10),
+          qtyOnHand: 6,
+          mrp: 10000,
+          saleRate: 10000,
+        });
+
+        const batch2 = await makeBatch(t.db, {
+          tenantId: tenant.id,
+          storeId: store.id,
+          medicineId: medicine.id,
+          batchNo: "PAN-EXP2",
+          expiryDate: new Date(Date.now() + 120 * 86400000).toISOString().slice(0, 10),
+          qtyOnHand: 15,
+          mrp: 10000,
+          saleRate: 10000,
+        });
+
+        const w = { tenant, store, user, medicine };
+
+        // Need 14 units: 6 from batch1 and 8 from batch2
+        const res = await t.db.transaction((tx) =>
+          createSale(
+            tx,
+            ctxFor(w),
+            SaleInput.parse({
+              lines: [{ medicineId: medicine.id, qty: 14, discountBp: 0 }],
+              payments: [{ method: "cash", amount: 14000 }],
+            }),
+            { source: "pos" },
+          ),
+        );
+
+        const [updatedB1] = await t.db.select().from(schema.batches).where(eq(schema.batches.id, batch1.id));
+        expect(updatedB1.qtyOnHand).toBe(0);
+
+        const [updatedB2] = await t.db.select().from(schema.batches).where(eq(schema.batches.id, batch2.id));
+        expect(updatedB2.qtyOnHand).toBe(7);
+
+        const items = await t.db.select().from(schema.saleItems).where(eq(schema.saleItems.saleId, res.saleId));
+        expect(items).toHaveLength(2);
+        expect(items.find((i) => i.batchId === batch1.id)?.qty).toBe(6);
+        expect(items.find((i) => i.batchId === batch2.id)?.qty).toBe(8);
+      });
+
+      it("strictly excludes expired batches from auto-FEFO allocation", async () => {
+        const tenant = await makeTenant(t.db);
+        const store = await makeStore(t.db, tenant.id);
+        const user = await makeUser(t.db);
+        const maker = (await t.db.insert(schema.manufacturers).values({ tenantId: tenant.id, name: "Lupin" }).returning())[0];
+        const medicine = await makeMedicine(t.db, tenant.id, {
+          name: "Cipcal 500",
+          unitsPerPack: 15,
+          manufacturerId: maker.id,
+        });
+
+        // Expired batch with stock
+        const expiredBatch = await makeBatch(t.db, {
+          tenantId: tenant.id,
+          storeId: store.id,
+          medicineId: medicine.id,
+          batchNo: "CIP-DEAD",
+          expiryDate: new Date(Date.now() - 10 * 86400000).toISOString().slice(0, 10),
+          qtyOnHand: 50,
+        });
+
+        // Fresh batch
+        const validBatch = await makeBatch(t.db, {
+          tenantId: tenant.id,
+          storeId: store.id,
+          medicineId: medicine.id,
+          batchNo: "CIP-FRESH",
+          expiryDate: new Date(Date.now() + 90 * 86400000).toISOString().slice(0, 10),
+          qtyOnHand: 20,
+        });
+
+        const w = { tenant, store, user, medicine };
+
+        const res = await t.db.transaction((tx) =>
+          createSale(
+            tx,
+            ctxFor(w),
+            SaleInput.parse({
+              lines: [{ medicineId: medicine.id, qty: 5, discountBp: 0 }],
+              payments: [{ method: "cash", amount: 50000 }],
+            }),
+            { source: "pos" },
+          ),
+        );
+
+        const [deadB] = await t.db.select().from(schema.batches).where(eq(schema.batches.id, expiredBatch.id));
+        expect(deadB.qtyOnHand).toBe(50); // Untouched
+
+        const [freshB] = await t.db.select().from(schema.batches).where(eq(schema.batches.id, validBatch.id));
+        expect(freshB.qtyOnHand).toBe(15); // 5 deducted
+
+        const items = await t.db.select().from(schema.saleItems).where(eq(schema.saleItems.saleId, res.saleId));
+        expect(items).toHaveLength(1);
+        expect(items[0].batchId).toBe(validBatch.id);
+      });
+
+      it("logs a fefo_override audit entry when a later-expiring batch is manually selected", async () => {
+        const tenant = await makeTenant(t.db);
+        const store = await makeStore(t.db, tenant.id);
+        const user = await makeUser(t.db);
+        const maker = (await t.db.insert(schema.manufacturers).values({ tenantId: tenant.id, name: "Torrent" }).returning())[0];
+        const medicine = await makeMedicine(t.db, tenant.id, {
+          name: "Losar 50",
+          unitsPerPack: 10,
+          manufacturerId: maker.id,
+        });
+
+        const nearBatch = await makeBatch(t.db, {
+          tenantId: tenant.id,
+          storeId: store.id,
+          medicineId: medicine.id,
+          batchNo: "LOS-NEAR",
+          expiryDate: new Date(Date.now() + 20 * 86400000).toISOString().slice(0, 10),
+          qtyOnHand: 10,
+        });
+
+        const farBatch = await makeBatch(t.db, {
+          tenantId: tenant.id,
+          storeId: store.id,
+          medicineId: medicine.id,
+          batchNo: "LOS-FAR",
+          expiryDate: new Date(Date.now() + 200 * 86400000).toISOString().slice(0, 10),
+          qtyOnHand: 10,
+        });
+
+        const w = { tenant, store, user, medicine };
+
+        // Explicitly pick farBatch, skipping nearBatch
+        const res = await t.db.transaction((tx) =>
+          createSale(
+            tx,
+            ctxFor(w),
+            SaleInput.parse({
+              lines: [{ batchId: farBatch.id, qty: 2, discountBp: 0, overrideReason: "Customer requested newest batch" }],
+              payments: [{ method: "cash", amount: 20000 }],
+            }),
+            { source: "pos" },
+          ),
+        );
+
+        expect(res.saleId).toBeTruthy();
+
+        // Verify audit log has the fefo_override record
+        const auditRows = await t.db
+          .select()
+          .from(schema.auditLogs)
+          .where(
+            and(
+              eq(schema.auditLogs.entityId, res.saleId),
+              eq(schema.auditLogs.action, "fefo_override"),
+            ),
+          );
+
+        expect(auditRows).toHaveLength(1);
+        expect(auditRows[0].reason).toContain("Customer requested newest batch");
+        const details = auditRows[0].newValue as Record<string, unknown>;
+        expect(details.selectedBatchNo).toBe("LOS-FAR");
+        expect(Array.isArray(details.skippedBatches)).toBe(true);
+        expect((details.skippedBatches as Array<{ batchNo: string }>)[0].batchNo).toBe("LOS-NEAR");
+      });
+    });
   });
 });
