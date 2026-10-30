@@ -1,7 +1,16 @@
 "use client";
 
 import { useState, useRef, useEffect, useActionState, useCallback } from "react";
-import { searchPosItems, createSaleInvoice, findSubstitutes, PosItemInput } from "@/app/actions/sales";
+import {
+  searchPosItems,
+  createSaleInvoice,
+  findSubstitutes,
+  PosItemInput,
+  holdSaleAction,
+  listHeldSalesAction,
+  resumeHeldSaleAction,
+  discardHeldSaleAction,
+} from "@/app/actions/sales";
 import { getCustomers, createQuickCustomer } from "@/app/actions/customers";
 import { getDoctors } from "@/app/actions/compliance";
 import { computeSaleTotals } from "@/lib/money";
@@ -30,6 +39,7 @@ import {
   Layers,
   Tag,
   Loader2,
+  Clock,
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -138,6 +148,36 @@ export default function POSPage() {
   const [splitError, setSplitError] = useState("");
   const [isSubmittingSplit, setIsSubmittingSplit] = useState(false);
 
+  // Held / Parked Bills state (ROADMAP Task A2.3)
+  const [heldCount, setHeldCount] = useState(0);
+  const [isHeldModalOpen, setIsHeldModalOpen] = useState(false);
+  const [isParkModalOpen, setIsParkModalOpen] = useState(false);
+  const [parkNotes, setParkNotes] = useState("");
+  const [resumedHeldId, setResumedHeldId] = useState<string | null>(null);
+  const [heldSales, setHeldSales] = useState<
+    Array<{
+      id: string;
+      customerName: string;
+      customerPhone?: string | null;
+      doctorName?: string | null;
+      itemCount: number;
+      totalAmount: number;
+      notes?: string | null;
+      createdAt: Date | string;
+      cashierName: string;
+      isOlderThan24h: boolean;
+    }>
+  >([]);
+  const [isLoadingHeld, setIsLoadingHeld] = useState(false);
+  const [isHolding, setIsHolding] = useState(false);
+  const [isResuming, setIsResuming] = useState(false);
+  const [revalidationAlert, setRevalidationAlert] = useState<{
+    hasIssues: boolean;
+    hasStockShortage: boolean;
+    hasExpiredBatches: boolean;
+    message: string;
+  } | null>(null);
+
   // Quick Customer modal state
   const [isCustomerModalOpen, setIsCustomerModalOpen] = useState(false);
   const [newCustName, setNewCustName] = useState("");
@@ -211,8 +251,27 @@ export default function POSPage() {
   const searchInputRef = useRef<HTMLInputElement>(null);
   const barcodeBufferRef = useRef<{ buffer: string; lastTime: number }>({ buffer: "", lastTime: 0 });
 
+  const refreshHeldSales = useCallback(async () => {
+    setIsLoadingHeld(true);
+    try {
+      const res = await listHeldSalesAction();
+      if (res.success && res.data) {
+        setHeldSales(res.data);
+        setHeldCount(res.data.length);
+      }
+    } finally {
+      setIsLoadingHeld(false);
+    }
+  }, []);
+
   // Load customer and doctor lists on mount
   useEffect(() => {
+    listHeldSalesAction().then((res) => {
+      if (res.success && res.data) {
+        setHeldSales(res.data);
+        setHeldCount(res.data.length);
+      }
+    });
     getCustomers().then((data) => {
       setCustomers(data.map((c) => ({ id: c.id, name: c.name, phone: c.phone, loyaltyPoints: c.loyaltyPoints || 0, creditLimit: c.creditLimit })));
     });
@@ -223,7 +282,7 @@ export default function POSPage() {
       setMedicalRepsList(data.filter((r) => r.isActive).map((r) => ({ id: r.id, name: r.name, companyName: r.companyName })));
     });
     if (searchInputRef.current) searchInputRef.current.focus();
-  }, []);
+  }, [refreshHeldSales]);
 
   const handleDoctorSelect = (docId: string) => {
     setSelectedDoctorId(docId);
@@ -456,6 +515,21 @@ export default function POSPage() {
         setIsCustomerModalOpen(true);
       }
 
+      // F6: Hold / Park current bill
+      if (e.key === "F6") {
+        e.preventDefault();
+        if (cart.length > 0) {
+          setIsParkModalOpen(true);
+        }
+      }
+
+      // F7: List / Resume Parked bills
+      if (e.key === "F7") {
+        e.preventDefault();
+        refreshHeldSales();
+        setIsHeldModalOpen(true);
+      }
+
       // F8: Split Tender
       if (e.key === "F8") {
         e.preventDefault();
@@ -474,6 +548,8 @@ export default function POSPage() {
         if (isSubstitutesModalOpen) setIsSubstitutesModalOpen(false);
         if (isPromiseModalOpen) setIsPromiseModalOpen(false);
         if (isSplitModalOpen) setIsSplitModalOpen(false);
+        if (isParkModalOpen) setIsParkModalOpen(false);
+        if (isHeldModalOpen) setIsHeldModalOpen(false);
         if (searchResults.length > 0) {
           setSearchResults([]);
           searchInputRef.current?.focus();
@@ -541,7 +617,7 @@ export default function POSPage() {
       window.removeEventListener("keydown", handleKeyDown);
       window.removeEventListener("ai-add-to-bill", handleAiAdd);
     };
-  }, [searchResults, selectedResultIndex, addToCart, cart.length, isCustomerModalOpen, isSubstitutesModalOpen, isPromiseModalOpen, isSplitModalOpen, soundEnabled, netPayable]);
+  }, [searchResults, selectedResultIndex, addToCart, cart.length, isCustomerModalOpen, isSubstitutesModalOpen, isPromiseModalOpen, isSplitModalOpen, isParkModalOpen, isHeldModalOpen, refreshHeldSales, soundEnabled, netPayable]);
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -702,11 +778,14 @@ export default function POSPage() {
         0,
         complianceDetails,
         selectedMedicalRepId || undefined,
-        splitPayments
+        splitPayments,
+        resumedHeldId || undefined
       );
 
       if (res.success && res.saleId) {
         if (soundEnabled) playSound("chime");
+        setResumedHeldId(null);
+        refreshHeldSales();
         setIsSplitModalOpen(false);
         router.push(`/dashboard/sales/${res.saleId}/print?format=thermal`);
       } else {
@@ -714,6 +793,168 @@ export default function POSPage() {
       }
     } finally {
       setIsSubmittingSplit(false);
+    }
+  };
+
+  const handleHoldSale = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (cart.length === 0 || isHolding) return;
+
+    setIsHolding(true);
+    try {
+      const selectedCustomer = customers.find((c) => c.id === customerId);
+      const items = cart.map((i) => ({
+        medicineId: i.medicineId,
+        medicineName: i.medicineName,
+        batchId: i.batchId!,
+        batchNo: i.batchNo,
+        expiryDate: i.expiryDate,
+        packQty: i.packQty ?? 0,
+        looseQty: i.looseQty ?? 0,
+        unitsPerPack: i.unitsPerPack ?? 1,
+        packUnit: i.packUnit ?? "strip",
+        looseUnit: i.looseUnit ?? "tablet",
+        rate: i.rate,
+        mrp: i.mrp,
+        discountBp: i.discountBp ?? 0,
+        gstRateBp: i.gstRateBp,
+        isAutoFefo: Boolean(i.autoFefo),
+      }));
+
+      const res = await holdSaleAction({
+        customerId: customerId || undefined,
+        customerName: selectedCustomer?.name || undefined,
+        customerPhone: selectedCustomer?.phone || undefined,
+        doctorName: doctorName.trim() || undefined,
+        doctorRegNo: doctorRegNo.trim() || undefined,
+        doctorAddress: doctorAddress.trim() || undefined,
+        patientAge: patientAge === "" ? undefined : Number(patientAge),
+        patientGender,
+        patientAddress: patientAddress.trim() || undefined,
+        prescriptionRef: prescriptionRef.trim() || undefined,
+        notes: parkNotes.trim() || undefined,
+        items,
+      });
+
+      if (res.success) {
+        if (soundEnabled) playSound("beep");
+        setCart([]);
+        setCustomerId("");
+        setDoctorName("");
+        setDoctorRegNo("");
+        setDoctorAddress("");
+        setPatientAge("");
+        setPatientAddress("");
+        setPrescriptionRef("");
+        setParkNotes("");
+        setIsParkModalOpen(false);
+        setResumedHeldId(null);
+        await refreshHeldSales();
+        searchInputRef.current?.focus();
+      } else {
+        alert(res.error || "Failed to hold bill");
+      }
+    } finally {
+      setIsHolding(false);
+    }
+  };
+
+  const handleResumeSale = async (heldSaleId: string) => {
+    if (isResuming) return;
+    if (cart.length > 0) {
+      if (!confirm("Your current active bill will be replaced with the parked bill. Proceed?")) {
+        return;
+      }
+    }
+    setIsResuming(true);
+    try {
+      const res = await resumeHeldSaleAction(heldSaleId);
+      if (!res.success) {
+        alert(res.error || "Failed to resume held bill");
+        return;
+      }
+
+      const p = res.payload;
+      setCustomerId(p.customerId || "");
+      setDoctorName(p.doctorName || "");
+      setDoctorRegNo(p.doctorRegNo || "");
+      setDoctorAddress(p.doctorAddress || "");
+      setPatientAge(p.patientAge ?? "");
+      setPatientGender(p.patientGender || "male");
+      setPatientAddress(p.patientAddress || "");
+      setPrescriptionRef(p.prescriptionRef || "");
+      setResumedHeldId(res.heldSaleId);
+
+      const revalItems = res.revalidation?.items || [];
+      const newCartItems = (p.items || []).map((it, idx: number) => {
+        const rev = revalItems[idx];
+        const qtyOnHand = rev ? rev.availableQtyOnHand : 0;
+        const upp = it.unitsPerPack || 1;
+        const packQty = it.packQty || 0;
+        const looseQty = it.looseQty || 0;
+        const totalQty = packQty * upp + looseQty;
+
+        return {
+          medicineId: it.medicineId,
+          batchId: it.batchId,
+          medicineName: it.medicineName,
+          batchNo: it.batchNo,
+          expiryDate: it.expiryDate,
+          qty: totalQty,
+          packQty,
+          looseQty,
+          unitsPerPack: upp,
+          packUnit: it.packUnit || "strip",
+          looseUnit: it.looseUnit || "tablet",
+          qtyOnHand,
+          totalAvailableStock: qtyOnHand,
+          mrp: it.mrp,
+          rate: rev?.currentRate ?? it.rate,
+          discountBp: it.discountBp || 0,
+          gstRateBp: it.gstRateBp,
+          autoFefo: Boolean(it.isAutoFefo),
+        };
+      });
+      setCart(newCartItems);
+
+      if (res.revalidation?.hasIssues) {
+        const issues: string[] = [];
+        if (res.revalidation.hasExpiredBatches) {
+          issues.push("Some batches in this bill have EXPIRED while parked!");
+        }
+        if (res.revalidation.hasStockShortage) {
+          issues.push("Some batches have insufficient stock (items were sold to other customers)!");
+        }
+        setRevalidationAlert({
+          hasIssues: true,
+          hasStockShortage: res.revalidation.hasStockShortage,
+          hasExpiredBatches: res.revalidation.hasExpiredBatches,
+          message: issues.join(" "),
+        });
+      } else {
+        setRevalidationAlert(null);
+      }
+
+      setIsHeldModalOpen(false);
+      if (soundEnabled) playSound("beep");
+      await refreshHeldSales();
+    } finally {
+      setIsResuming(false);
+    }
+  };
+
+  const handleDiscardHeldSale = async (heldSaleId: string) => {
+    if (!confirm("Are you sure you want to discard this parked bill? This cannot be undone.")) {
+      return;
+    }
+    const res = await discardHeldSaleAction(heldSaleId);
+    if (res.success) {
+      if (resumedHeldId === heldSaleId) {
+        setResumedHeldId(null);
+      }
+      await refreshHeldSales();
+    } else {
+      alert(res.error || "Failed to discard parked bill");
     }
   };
 
@@ -752,10 +993,14 @@ export default function POSPage() {
         paymentMethod,
         netPayable,
         complianceDetails,
-        selectedMedicalRepId || undefined
+        selectedMedicalRepId || undefined,
+        undefined,
+        resumedHeldId || undefined
       );
       if (res.success && res.saleId) {
         if (soundEnabled) playSound("chime");
+        setResumedHeldId(null);
+        refreshHeldSales();
         router.push(`/dashboard/sales/${res.saleId}/print?format=thermal`);
         return { success: true, error: undefined };
       }
@@ -801,10 +1046,40 @@ export default function POSPage() {
             <button
               type="button"
               onClick={() => {
+                if (cart.length === 0) return;
+                setIsParkModalOpen(true);
+              }}
+              disabled={cart.length === 0 || isHolding}
+              className="btn btn-secondary text-[12.5px]"
+              title="Park current bill (F6)"
+            >
+              <BookmarkCheck className="h-3.5 w-3.5 mr-1 text-amber-600" /> Hold (F6)
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                refreshHeldSales();
+                setIsHeldModalOpen(true);
+              }}
+              className="btn btn-secondary text-[12.5px] relative"
+              title="View parked bills (F7)"
+            >
+              <Layers className="h-3.5 w-3.5 mr-1 text-brand-600" /> Parked ({heldCount}) [F7]
+              {heldCount > 0 && (
+                <span className="absolute -top-1.5 -right-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-amber-500 text-[10px] font-bold text-white shadow">
+                  {heldCount}
+                </span>
+              )}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
                 if (confirm("Reset current bill?")) {
                   setCart([]);
                   setCustomerId("");
                   setDoctorName("");
+                  setResumedHeldId(null);
+                  setRevalidationAlert(null);
                   searchInputRef.current?.focus();
                 }
               }}
@@ -1003,6 +1278,48 @@ export default function POSPage() {
             <span>
               <strong>Schedule H / Prescription Drug in cart:</strong> Prescribing doctor name is required by Indian pharma regulations before billing.
             </span>
+          </div>
+        )}
+
+        {/* Resumed Held Bill Indicator */}
+        {resumedHeldId && (
+          <div className="rounded-lg border border-brand-300 bg-brand-50/90 p-2.5 flex items-center justify-between text-[12.5px] text-brand-900 shadow-xs">
+            <div className="flex items-center gap-2">
+              <BookmarkCheck className="h-4 w-4 text-brand-600 shrink-0" />
+              <span>
+                <strong>Resumed Parked Bill Active:</strong> Completing this transaction will finalize and remove this bill from the parked queue.
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                if (confirm("Disconnect active cart from parked bill? The parked bill will remain preserved in the parked queue.")) {
+                  setResumedHeldId(null);
+                }
+              }}
+              className="btn btn-secondary btn-sm !text-xs !py-0.5"
+            >
+              Detach
+            </button>
+          </div>
+        )}
+
+        {/* Revalidation Alert */}
+        {revalidationAlert && (
+          <div className="rounded-lg border border-rose-300 bg-rose-50 p-2.5 flex items-center justify-between text-[12.5px] text-rose-900 shadow-xs">
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="h-4 w-4 text-rose-600 shrink-0" />
+              <span>
+                <strong>Inventory Warning:</strong> {revalidationAlert.message}
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setRevalidationAlert(null)}
+              className="text-rose-600 hover:text-rose-800"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
           </div>
         )}
 
@@ -1917,6 +2234,228 @@ export default function POSPage() {
                     Complete & Print
                   </>
                 )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ──────────────── Modal 5: Park / Hold Bill (F6) ──────────────── */}
+      {isParkModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4">
+          <div className="card w-full max-w-md p-5 space-y-4 shadow-pop animate-enter">
+            <div className="flex items-center justify-between border-b border-ink-150 pb-3">
+              <h3 className="card-title flex items-center gap-2">
+                <BookmarkCheck className="h-4 w-4 text-amber-600" />
+                Park Current Bill (F6)
+              </h3>
+              <button
+                type="button"
+                onClick={() => setIsParkModalOpen(false)}
+                className="text-ink-400 hover:text-ink-700"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="bg-amber-50 p-3.5 rounded-lg border border-amber-200 flex justify-between items-center">
+              <div>
+                <span className="text-xs text-amber-800 font-semibold uppercase tracking-wider">Bill Summary</span>
+                <p className="text-xs text-amber-700">{cart.length} items ({cart.reduce((a, b) => a + b.qty, 0)} units)</p>
+                <p className="text-xs text-amber-600 font-medium mt-0.5">
+                  Customer: {customers.find((c) => c.id === customerId)?.name || "Walk-in Customer"}
+                </p>
+              </div>
+              <span className="text-2xl font-black text-amber-900 num">{formatINR(netPayable)}</span>
+            </div>
+
+            <form onSubmit={handleHoldSale} className="space-y-3">
+              <div>
+                <label className="label text-xs">
+                  Park Note / Reason (Optional)
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. Stepped out for cash, Waiting for prescription..."
+                  value={parkNotes}
+                  onChange={(e) => setParkNotes(e.target.value)}
+                  className="input text-sm"
+                  autoFocus
+                  maxLength={100}
+                />
+                <span className="text-[11px] text-ink-500 mt-1 block">
+                  Parked bills do not deduct stock or allocate an invoice number.
+                </span>
+              </div>
+
+              <div className="flex justify-end gap-2 pt-3 border-t border-ink-150">
+                <button
+                  type="button"
+                  onClick={() => setIsParkModalOpen(false)}
+                  className="btn btn-secondary text-xs"
+                >
+                  Cancel (Esc)
+                </button>
+                <button
+                  type="submit"
+                  disabled={isHolding}
+                  className="btn btn-primary text-xs font-bold !bg-amber-600 hover:!bg-amber-700 !text-white"
+                >
+                  {isHolding ? (
+                    <>
+                      <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" />
+                      Parking...
+                    </>
+                  ) : (
+                    <>
+                      <BookmarkCheck className="h-3.5 w-3.5 mr-1" />
+                      Park Bill (F6)
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ──────────────── Modal 6: Held / Parked Bills List (F7) ──────────────── */}
+      {isHeldModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4">
+          <div className="card w-full max-w-3xl p-5 space-y-4 shadow-pop animate-enter max-h-[85vh] flex flex-col">
+            <div className="flex items-center justify-between border-b border-ink-150 pb-3">
+              <div className="flex items-center gap-2">
+                <Layers className="h-4 w-4 text-brand-600" />
+                <h3 className="card-title">Parked / Held Bills ({heldSales.length})</h3>
+                <span className="badge badge-brand !text-[11px] font-mono">F7</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={refreshHeldSales}
+                  disabled={isLoadingHeld}
+                  className="btn btn-secondary btn-sm text-xs"
+                  title="Refresh parked bills list"
+                >
+                  <RotateCcw className={`h-3 w-3 mr-1 ${isLoadingHeld ? "animate-spin" : ""}`} /> Refresh
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsHeldModalOpen(false)}
+                  className="text-ink-400 hover:text-ink-700"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+
+            <div className="flex-1 overflow-y-auto">
+              {heldSales.length === 0 ? (
+                <div className="p-8 text-center text-ink-500 space-y-2">
+                  <BookmarkCheck className="h-8 w-8 mx-auto text-ink-300 stroke-[1.5]" />
+                  <p className="text-sm font-medium text-ink-700">No parked bills at this counter</p>
+                  <p className="text-xs text-ink-400">
+                    Press <kbd className="px-1.5 py-0.5 rounded bg-ink-100 font-mono text-[11px] text-ink-700">F6</kbd> on an active bill to park it and serve the next customer.
+                  </p>
+                </div>
+              ) : (
+                <table className="data-table">
+                  <thead className="sticky top-0 bg-ink-50">
+                    <tr>
+                      <th>Customer & Note</th>
+                      <th>Time Parked</th>
+                      <th>Items</th>
+                      <th className="text-right">Total</th>
+                      <th className="text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {heldSales.map((h) => {
+                      const parkedDate = new Date(h.createdAt);
+                      return (
+                        <tr key={h.id} className="hover:bg-ink-50/60">
+                          <td>
+                            <div className="flex items-center gap-1.5">
+                              <span className="font-semibold text-ink-900">{h.customerName}</span>
+                              {h.isOlderThan24h && (
+                                <span className="badge badge-warning !text-[10px] font-semibold" title="Parked for more than 24 hours">
+                                  ⚠️ &gt; 24h
+                                </span>
+                              )}
+                            </div>
+                            {h.customerPhone && (
+                              <div className="text-[11.5px] text-ink-500 font-mono">{h.customerPhone}</div>
+                            )}
+                            {h.notes && (
+                              <div className="text-[11.5px] text-brand-700 italic mt-0.5">
+                                &ldquo;{h.notes}&rdquo;
+                              </div>
+                            )}
+                            {h.doctorName && (
+                              <div className="text-[11px] text-ink-500">Dr. {h.doctorName}</div>
+                            )}
+                          </td>
+                          <td>
+                            <div className="text-[12px] text-ink-800 font-medium">
+                              {parkedDate.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}
+                            </div>
+                            <div className="text-[11px] text-ink-500">
+                              {parkedDate.toLocaleDateString("en-IN", { month: "short", day: "numeric" })}
+                            </div>
+                            <div className="text-[10px] text-ink-400">by {h.cashierName}</div>
+                          </td>
+                          <td>
+                            <span className="badge badge-neutral num font-medium">
+                              {h.itemCount} items
+                            </span>
+                          </td>
+                          <td className="text-right font-bold text-ink-900 num">
+                            {formatINR(h.totalAmount)}
+                          </td>
+                          <td className="text-right">
+                            <div className="inline-flex items-center gap-1.5">
+                              <button
+                                type="button"
+                                disabled={isResuming}
+                                onClick={() => handleResumeSale(h.id)}
+                                className="btn btn-primary btn-sm !px-2.5 text-xs font-semibold"
+                                title="Resume bill on counter"
+                              >
+                                {isResuming ? (
+                                  <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                                ) : (
+                                  <RotateCcw className="h-3 w-3 mr-1" />
+                                )}
+                                Resume
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleDiscardHeldSale(h.id)}
+                                className="btn btn-secondary btn-sm !p-1 text-ink-400 hover:text-rose-600"
+                                title="Discard parked bill"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              )}
+            </div>
+
+            <div className="pt-3 border-t border-ink-150 flex items-center justify-between text-xs text-ink-500">
+              <span>
+                Tip: Resuming a bill re-checks live inventory and flags any stock changes or expired batches.
+              </span>
+              <button
+                type="button"
+                onClick={() => setIsHeldModalOpen(false)}
+                className="btn btn-secondary text-xs"
+              >
+                Close (Esc)
               </button>
             </div>
           </div>

@@ -510,6 +510,7 @@ Full map in `.github/CODEOWNERS` and [ADR 0004](docs/adr/0004-two-lane-ownership
 - **Done when:** a bill paid ₹300 cash + ₹200 UPI shows 2 `sale_payments` rows and a balanced journal 🧪.
 
 #### A2.3 Held (parked) bills ⏱ 1 day
+- **Progress:** completed in `lane-a/a2-3-held-bills`. Domain service `src/server/domain/sales/held.ts` implements `holdSale`, `listHeldSales`, `resumeHeldSale`, `discardHeldSale` with live stock & expiry revalidation. Integrated into POS counter UI with `F6` (hold) and `F7` (list/resume), stock shortage and expiry alerts, aged (> 24h) badges, and atomic cleanup upon checkout. Verified by unit & integration tests.
 - **Files:** ➕ `src/server/domain/sales/held.ts` (`holdSale`, `listHeld`, `resumeHeld`, `discardHeld`), ✏️ POS UI (`F6` hold, `F7` list held).
 - **How:** insert `sales` with `status = 'held'`, no invoice number, `held_payload = { lines, customerId, … }`, and **no stock movement**. Resume loads it into the cart and deletes the held row on completion. Held bills older than 24 h show a warning.
 
@@ -999,7 +1000,7 @@ Tick items in PRs. One line per task, in the same order as above.
 
 **Phase 0** — A: [x] A0.1 [x] A0.2 [x] A0.3 [x] A0.4 [x] A0.5 [ ] A0.6 [x] A0.7 · B: [x] B0.1 [x] B0.2 [x] B0.3 [x] B0.4 [x] B0.5 [x] B0.6 [x] B0.7 [x] B0.8
 **Phase 1** — A: [x] A1.1 [x] A1.2 [x] A1.3 [x] A1.4 [x] A1.5 [x] A1.6 [x] A1.7 · B: [x] B1.1 [x] B1.2 [x] B1.3 [x] B1.4 [x] B1.5 [x] B1.6 [x] B1.7
-**Phase 2** — A: [x] A2.1 [x] A2.2 [ ] A2.3 [ ] A2.4 [ ] A2.5 [ ] A2.6 [ ] A2.7 [ ] A2.8 [x] A2.9 [x] A2.10 [x] A2.11 · B: [x] B2.1 [x] B2.2 [x] B2.3 [x] B2.4 [x] B2.5 [x] B2.6 [x] B2.7 [x] B2.8
+**Phase 2** — A: [x] A2.1 [x] A2.2 [x] A2.3 [ ] A2.4 [ ] A2.5 [ ] A2.6 [ ] A2.7 [ ] A2.8 [x] A2.9 [x] A2.10 [x] A2.11 · B: [x] B2.1 [x] B2.2 [x] B2.3 [x] B2.4 [x] B2.5 [x] B2.6 [x] B2.7 [x] B2.8
 **Phase 3** — A: [ ] A3.1 [ ] A3.2 [ ] A3.3 [ ] A3.4 [ ] A3.5 [ ] A3.6 · B: [ ] B3.1 [ ] B3.2 [ ] B3.3 [ ] B3.4 [ ] B3.5 [ ] B3.6 [ ] B3.7
 **Phase 4** — A: [ ] A4.1 [ ] A4.2 [ ] A4.3 [ ] A4.4 [ ] A4.5 [ ] A4.6 [ ] A4.7 [ ] A4.8 [ ] A4.9 · B: [ ] B4.1 [ ] B4.2 [ ] B4.3 [ ] B4.4 [ ] B4.5 [ ] B4.6
 **Phase 5** — A: [ ] A5.1 [ ] A5.2 [ ] A5.3 [ ] A5.4 [ ] A5.5 [ ] A5.6 [ ] A5.7 · B: [ ] B5.1 [ ] B5.2 [ ] B5.3 [ ] B5.4 [ ] B5.5 [ ] B5.6 [ ] B5.7
