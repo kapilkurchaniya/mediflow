@@ -418,7 +418,7 @@ export function ChainReportsClient({
                 <XAxis dataKey="name" stroke="#64748b" fontSize={11} tickLine={false} />
                 <YAxis stroke="#64748b" fontSize={11} tickLine={false} unit="L" />
                 <Tooltip
-                  formatter={(val: number | string | undefined) => [`₹${val} Lakhs`, ""]}
+                  formatter={(val) => [`₹${val} Lakhs`, ""]}
                   contentStyle={{
                     backgroundColor: "#ffffff",
                     borderColor: "#e2e8f0",

@@ -1,7 +1,8 @@
 "use server";
 
 import { z } from "zod";
-import { db } from "@/server/db";
+import { db, schema } from "@/server/db";
+import { eq, and, inArray } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { protectedAction } from "@/server/action";
 import { requirePermission } from "@/server/rbac";
@@ -21,6 +22,35 @@ export async function getReorderSuggestions(
   const ctx = await requirePermission("purchase.view");
   const targetStoreId = storeId || ctx.storeId;
   return computeReorderSuggestions(ctx.tenantId, targetStoreId, filters);
+}
+
+/**
+ * Get available stores for reorder evaluation
+ */
+export async function getReorderStoresAction() {
+  const ctx = await requirePermission("purchase.view");
+  const canViewAll = ctx.allowedStoreIds === "all" || ctx.permissions.has("report.all_stores");
+  if (!canViewAll && Array.isArray(ctx.allowedStoreIds)) {
+    return db
+      .select({ id: schema.stores.id, name: schema.stores.name, code: schema.stores.code })
+      .from(schema.stores)
+      .where(
+        and(
+          eq(schema.stores.tenantId, ctx.tenantId),
+          inArray(schema.stores.id, ctx.allowedStoreIds)
+        )
+      );
+  }
+  if (!canViewAll) {
+    return db
+      .select({ id: schema.stores.id, name: schema.stores.name, code: schema.stores.code })
+      .from(schema.stores)
+      .where(and(eq(schema.stores.tenantId, ctx.tenantId), eq(schema.stores.id, ctx.storeId)));
+  }
+  return db
+    .select({ id: schema.stores.id, name: schema.stores.name, code: schema.stores.code })
+    .from(schema.stores)
+    .where(eq(schema.stores.tenantId, ctx.tenantId));
 }
 
 const CreatePoFromReorderSchema = z.object({
