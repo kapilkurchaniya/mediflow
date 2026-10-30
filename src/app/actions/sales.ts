@@ -1,12 +1,19 @@
 "use server";
 
 import { db, schema } from "@/server/db";
-import { eq, and, desc, gt, gte, lte, ilike, or, sql, inArray } from "drizzle-orm";
+import { eq, and, desc, gt, gte, lte, ilike, or, sql, inArray, ne } from "drizzle-orm";
 import { checkPermission, requirePermission } from "@/server/rbac";
 import { revalidatePath } from "next/cache";
 import { format } from "date-fns";
 import { createSale } from "@/server/domain/sales/create-sale";
 import type { SaleInput, SalePayment } from "@/server/domain/sales/types";
+import {
+  holdSale,
+  listHeldSales,
+  resumeHeldSale,
+  discardHeldSale,
+  type HoldSaleInput,
+} from "@/server/domain/sales/held";
 
 export async function getSales(dateFrom?: string | null, dateTo?: string | null) {
   const ctx = await requirePermission("sale.view");
@@ -14,6 +21,7 @@ export async function getSales(dateFrom?: string | null, dateTo?: string | null)
   const conditions = [
     eq(schema.sales.tenantId, ctx.tenantId),
     eq(schema.sales.storeId, ctx.storeId),
+    ne(schema.sales.status, "held"),
   ];
 
   // Apply date filters if provided
@@ -192,7 +200,8 @@ export async function createSaleInvoice(
   amountPaid: number, // paise
   complianceDetails?: ComplianceDetailsInput,
   medicalRepId?: string,
-  paymentsInput?: SalePayment[]
+  paymentsInput?: SalePayment[],
+  heldSaleId?: string
 ) {
   const auth = await checkPermission("sale.create");
   if (!auth.ok) return { error: auth.error };
@@ -259,6 +268,7 @@ export async function createSaleInvoice(
       doctorName: complianceDetails?.doctorName || doctorName || undefined,
     },
     medicalRepId: medicalRepId?.trim() || undefined,
+    heldSaleId: heldSaleId?.trim() || undefined,
   };
 
   try {
@@ -267,6 +277,7 @@ export async function createSaleInvoice(
     revalidatePath("/dashboard/sales");
     revalidatePath("/dashboard/accounting");
     revalidatePath("/dashboard/gst");
+    revalidatePath("/dashboard/sales/pos");
 
     return {
       success: true,
@@ -277,6 +288,60 @@ export async function createSaleInvoice(
     };
   } catch (err: unknown) {
     return { error: (err instanceof Error ? err.message : String(err)) || "Failed to create sale invoice" };
+  }
+}
+
+export async function holdSaleAction(input: HoldSaleInput) {
+  const auth = await checkPermission("sale.create");
+  if (!auth.ok) return { success: false as const, error: auth.error };
+  const ctx = auth.ctx;
+
+  try {
+    const res = await db.transaction((tx) => holdSale(tx, ctx, input));
+    revalidatePath("/dashboard/sales/pos");
+    return { success: true as const, ...res };
+  } catch (err: unknown) {
+    return { success: false as const, error: (err instanceof Error ? err.message : String(err)) || "Failed to hold bill" };
+  }
+}
+
+export async function listHeldSalesAction() {
+  const auth = await checkPermission("sale.create");
+  if (!auth.ok) return { success: false as const, error: auth.error, data: [] };
+  const ctx = auth.ctx;
+
+  try {
+    const res = await db.transaction((tx) => listHeldSales(tx, ctx));
+    return { success: true as const, data: res };
+  } catch (err: unknown) {
+    return { success: false as const, error: (err instanceof Error ? err.message : String(err)) || "Failed to list held bills", data: [] };
+  }
+}
+
+export async function resumeHeldSaleAction(heldSaleId: string) {
+  const auth = await checkPermission("sale.create");
+  if (!auth.ok) return { success: false as const, error: auth.error };
+  const ctx = auth.ctx;
+
+  try {
+    const res = await db.transaction((tx) => resumeHeldSale(tx, ctx, heldSaleId));
+    return { success: true as const, ...res };
+  } catch (err: unknown) {
+    return { success: false as const, error: (err instanceof Error ? err.message : String(err)) || "Failed to resume held bill" };
+  }
+}
+
+export async function discardHeldSaleAction(heldSaleId: string, reason?: string) {
+  const auth = await checkPermission("sale.create");
+  if (!auth.ok) return { success: false as const, error: auth.error };
+  const ctx = auth.ctx;
+
+  try {
+    await db.transaction((tx) => discardHeldSale(tx, ctx, heldSaleId, reason));
+    revalidatePath("/dashboard/sales/pos");
+    return { success: true as const };
+  } catch (err: unknown) {
+    return { success: false as const, error: (err instanceof Error ? err.message : String(err)) || "Failed to discard held bill" };
   }
 }
 

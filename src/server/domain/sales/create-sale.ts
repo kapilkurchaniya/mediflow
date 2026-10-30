@@ -294,6 +294,20 @@ export async function createSale(
     })
     .returning({ id: schema.sales.id });
 
+  // ── 6b. Clean up resumed held bill if completing a parked cart (A2.3) ────────
+  if (input.heldSaleId) {
+    await tx
+      .delete(schema.sales)
+      .where(
+        and(
+          eq(schema.sales.id, input.heldSaleId),
+          eq(schema.sales.tenantId, ctx.tenantId),
+          eq(schema.sales.storeId, ctx.storeId),
+          eq(schema.sales.status, "held")
+        )
+      );
+  }
+
   // A discount above the shop's limit was allowed because the user holds sale.discount_override: leave a trail.
   if (aboveLimit) {
     await writeAudit(tx, ctx, {

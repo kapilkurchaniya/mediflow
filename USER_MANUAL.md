@@ -235,8 +235,21 @@ Press **F8** on the billing screen to open the payment modal:
 
 ### 5.1c Parking and resuming bills (Hold / Recall)
 
-- **Hold (F6):** If a customer forgets their wallet or steps out to ask a doctor, press **F6** to park the bill. It is safely stored without reducing stock.
-- **Resume (F7):** Press **F7** to see the list of parked bills. Click any bill to restore the items, patient details, and cart instantly and complete billing.
+When customers step away to fetch cash from an ATM or consult their doctor, cashiers can park the current transaction to immediately serve the next patient in line:
+- **Hold Bill (F6):** Press **F6** or click **Hold (F6)** at the top of the POS screen. You can optionally add a note (e.g., "Customer went to ATM", "Awaiting prescription verification"). The cart, customer, prescriber details, and packaging conversions are safely stored as a held bill without deducting stock or allocating an invoice number.
+- **Recall / Resume (F7):** Press **F7** or click **Parked ({count}) [F7]** to open the parked bills queue.
+  - **Live Inventory Revalidation:** When resuming a bill, MediFlow instantly re-verifies batch stock and expiry against live inventory. If another counter sold the remaining stock in the meantime, or if a batch expired while parked, an inventory warning alert is displayed with full shortage details.
+  - **Aged Bills Warning:** Parked bills older than 24 hours display a prominent **`⚠️ > 24h`** badge, alerting cashiers to verify patient intention before finalizing.
+  - **Discarding Stale Bills:** If a customer never returns, click the **Discard** trash icon to cancel the parked bill and clear the queue. An audit log is automatically recorded.
+  - **Atomic Checkout Cleanup:** When a resumed bill is finalized at checkout, the parked record is automatically removed from the queue and a completed, gap-free tax invoice is generated.
+
+### 5.1d Automatic FEFO (First-Expiry, First-Out) batch allocation
+
+To protect your pharmacy from expired inventory losses and speed up checkout:
+- **Automatic Selection:** When you scan a barcode or press **Enter** on a medicine search result, MediFlow automatically selects the batch expiring soonest (`expiry_date > today`, active status) that has stock on hand.
+- **Visual FEFO Badge:** In the search dropdown, the earliest-expiring batch is highlighted with a green **`⚡ Auto-FEFO`** badge. Later-expiring batches are tagged with a neutral badge.
+- **Multi-Batch Slicing:** If the soonest batch only has 4 tablets in stock but the customer needs 10, MediFlow automatically allocates 4 tablets from the first batch and slices the remaining 6 tablets from the next earliest batch. The cart displays a breakdown badge showing the multi-batch allocation.
+- **Audited Manual Overrides:** If a customer or doctor specifically insists on a newer batch, the cashier can manually click and select that batch. To prevent stock dumping, MediFlow records an immutable **`fefo_override`** audit event noting the selected batch and the earlier-expiring batches that were bypassed. Store owners and auditors can review all overrides in **Settings → Audit log**.
 
 ### 5.2 What MediFlow does for you when you complete a bill
 
@@ -402,11 +415,23 @@ When goods arrive, record the supplier's invoice so stock and accounts update. *
 - Splits GST as **CGST + SGST** when the supplier is in your state, or **IGST** when the supplier is in another state.
 - Posts the accounting entries and the GST input record.
 
+### 7.2a Pharma purchase schemes & layered discounts (10+1 free, TD%, CD%)
+
+Indian pharmaceutical distributors frequently supply medicines with promotional free goods and tiered discounts. MediFlow supports standard pharma trade terms directly on the purchase entry screen:
+- **Free Goods / Schemes (10+1, 10+2 free):** Enter the billed pack quantity under **Billed** and the bonus quantity under **Free (Scheme)**. MediFlow automatically displays the scheme badge (e.g. `10+1 Free`) and updates your physical stock ledger with the total units ($10 + 1 = 11$ packs, or 110 base units).
+- **Trade Discount (TD %):** Reduces the taxable gross purchase amount before GST. MediFlow calculates GST exclusively on the net taxable amount.
+- **Cash Discount (CD %):** Prompt settlement discount applied on the bill. Cash discount reduces your supplier payable amount and is credited to your **Discount Received** accounting ledger without disturbing statutory GST inputs.
+- **Landed Unit Cost Dilution:** The screen displays live calculations of your **Landed Cost per Pack** and **Landed Cost per Loose Tablet** ($(\text{Taxable} - \text{Cash Discount}) / \text{Total Base Units}$). This ensures profit margins are always derived from your true acquisition cost.
+
 ### 7.3 Looking back at purchases
 
-**Operations → Purchases (GRN)** lists **Supplier invoice, Date, Supplier, Taxable, GST, Total, Status**. Search by invoice number or supplier. Open one to see **Inward Medicine Batches** (medicine, batch, expiry, billed qty, free qty, rate, MRP, GST %, line total). **Export** downloads the list (owner, manager, accountant).
+**Operations → Purchases (GRN)** lists **Supplier invoice, Date, Supplier, Taxable, GST, Total, Status**. Search by invoice number or supplier. Open one to see **Inward Medicine Batches** (medicine, packaging, batch, expiry, billed qty, free qty, rate, MRP, GST %, line total). **Export** downloads the list (owner, manager, accountant).
 
-> **Not available yet:** purchase orders, returning goods to a supplier (debit notes), paying a supplier and seeing a supplier ledger, and reorder suggestions. See [chapter 19](#19-not-available-yet).
+### 7.4 Purchase orders, supplier debit notes & payments
+
+- **Purchase Orders (B2.3):** Create formal POs in **Purchases → Purchase Orders**, specify ordered quantities, rates and expected schemes, and generate printable PDF order sheets to email to distributors. When receiving goods against a PO, clicking **Receive Goods** pre-fills the GRN invoice automatically.
+- **Supplier Returns & Debit Notes (B1.2):** Generate statutory Debit Notes for near-expiry, damaged, or recalled stock directly from **Purchases → Returns**, adjusting supplier accounts and returning inventory.
+- **Supplier Payments (B2.4):** Settle distributor bills with multi-mode vouchers (Bank Transfer, Cheque, UPI) and view live balances on the supplier ledger under **Purchases → Suppliers → [Supplier Name] → Record Payment**.
 
 ---
 
@@ -778,9 +803,9 @@ These are planned but **cannot be used today**. If you can't find a button for t
 
 | Area | Planned feature |
 |---|---|
-| Billing | Cancel a bill; sales returns and credit notes; split payment (cash + UPI); credit sales; hold and resume a bill; cash register open/close; using loyalty points as a discount; billing without internet |
+| Billing | Cancel a bill (A2.4); sales returns and credit notes (A2.5); cash register open/close (A2.6); using loyalty points as a discount (A2.7); offline counter billing (Tauri desktop app in Phase 4) |
 | Stock | Stock adjustments and write-offs; transfers between branches; warehouse; physical stock count; reorder suggestions |
-| Buying | Purchase orders; returning goods to suppliers (debit notes); paying suppliers from the screen; supplier ledger |
+| Buying | Automated reorder suggestions based on sales velocity (Purchase orders, supplier debit notes, and supplier ledger payments are available) |
 | People & security | Password reset by email; custom roles (you choose from the 7 built-in ones); sending invitations by email (you copy the link yourself); removing a person for good (you suspend instead) |
 | Multi-branch | Adding branches; switching between branches; chain-wide reports |
 | Accounts | Expenses; day-book drill-down and ledgers by party; receivables ageing with reminders; period locking; year-end closing (customer receipts are available) |
