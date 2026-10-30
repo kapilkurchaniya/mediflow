@@ -15,7 +15,7 @@ export default async function PrescriptionsPage() {
 
   return (
     <PrescriptionsView
-      initialPrescriptions={prescriptions as any}
+      initialPrescriptions={prescriptions}
       doctorsList={doctors.map((d) => ({ id: d.id, name: d.name, regNo: d.regNo }))}
     />
   );

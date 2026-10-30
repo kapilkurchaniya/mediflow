@@ -39,37 +39,106 @@ function formatMarkdownTables(text: string): string {
   return formatted;
 }
 
+interface InvoiceItem {
+  invoice_no: string;
+  customer_name?: string;
+  amount_rupees: string;
+  payment_mode?: string;
+}
+
+interface BatchItem {
+  batch_no: string;
+  expiry_date: string;
+  qty_on_hand: number;
+  mrp_display: string;
+}
+
+interface MedicineStockItem {
+  name: string;
+  generic_composition?: string;
+  pack_size?: string;
+  stock_status?: string;
+  total_stock_units: number;
+  active_batches?: BatchItem[];
+}
+
+interface ToolInvocationRecord {
+  toolName: string;
+  result?: {
+    error?: string;
+    action?: string;
+    payload?: unknown;
+    invoices?: InvoiceItem[];
+    medicines?: MedicineStockItem[];
+    period?: string;
+    date_range?: string;
+    total_revenue_display?: string;
+    total_invoices?: number;
+    average_order_value_display?: string;
+    total_credit_display?: string;
+    cash_sales_display?: string;
+    upi_sales_display?: string;
+    card_sales_display?: string;
+    total_purchases_display?: string;
+    total_paid_display?: string;
+    outstanding_display?: string;
+    report_type?: string;
+    stock_cost_value_display?: string;
+    stock_sale_value_display?: string;
+    total_items?: number;
+    total_units?: number;
+    items_in_stock?: number;
+    low_stock_count?: number;
+    items?: Array<{
+      name: string;
+      generic_composition?: string;
+      total_stock: number;
+      reorder_level: number;
+      mrp_display?: string;
+    }>;
+  };
+}
+
+interface ToolInvocationPart {
+  type: "tool-invocation";
+  toolInvocation: {
+    toolName: string;
+    state: string;
+    result?: unknown;
+  };
+}
+
 /**
  * Custom styling for Markdown elements rendered in chat.
  */
 const markdownComponents = {
-  table: ({ children }: any) => (
+  table: ({ children }: { children?: React.ReactNode }) => (
     <div className="my-2.5 max-w-full overflow-x-auto rounded-lg border border-ink-200 bg-white shadow-xs">
       <table className="w-full text-left text-[12px] border-collapse">{children}</table>
     </div>
   ),
-  thead: ({ children }: any) => (
+  thead: ({ children }: { children?: React.ReactNode }) => (
     <thead className="bg-ink-50/90 border-b border-ink-150 text-[11px] font-semibold text-ink-600 uppercase tracking-wider">
       {children}
     </thead>
   ),
-  th: ({ children }: any) => (
+  th: ({ children }: { children?: React.ReactNode }) => (
     <th className="px-3 py-2 text-ink-700 font-semibold">{children}</th>
   ),
-  td: ({ children }: any) => (
+  td: ({ children }: { children?: React.ReactNode }) => (
     <td className="px-3 py-2 border-b border-ink-100 last:border-b-0 text-ink-800">{children}</td>
   ),
-  tr: ({ children }: any) => (
+  tr: ({ children }: { children?: React.ReactNode }) => (
     <tr className="hover:bg-brand-50/20 transition-colors">{children}</tr>
   ),
-  p: ({ children }: any) => <p className="my-1.5 leading-relaxed text-[12.5px]">{children}</p>,
-  strong: ({ children }: any) => <strong className="font-semibold text-ink-900">{children}</strong>,
-  ul: ({ children }: any) => <ul className="my-1.5 list-disc pl-4 space-y-1 text-[12px]">{children}</ul>,
-  ol: ({ children }: any) => <ol className="my-1.5 list-decimal pl-4 space-y-1 text-[12px]">{children}</ol>,
-  li: ({ children }: any) => <li className="text-[12px] text-ink-800">{children}</li>,
-  h3: ({ children }: any) => <h3 className="font-semibold text-[13px] text-ink-900 mt-2 mb-1">{children}</h3>,
-  h4: ({ children }: any) => <h4 className="font-medium text-[12.5px] text-ink-800 mt-2 mb-1">{children}</h4>,
-  code: ({ children }: any) => (
+  p: ({ children }: { children?: React.ReactNode }) => <p className="my-1.5 leading-relaxed text-[12.5px]">{children}</p>,
+  strong: ({ children }: { children?: React.ReactNode }) => <strong className="font-semibold text-ink-900">{children}</strong>,
+  ul: ({ children }: { children?: React.ReactNode }) => <ul className="my-1.5 list-disc pl-4 space-y-1 text-[12px]">{children}</ul>,
+  ol: ({ children }: { children?: React.ReactNode }) => <ol className="my-1.5 list-decimal pl-4 space-y-1 text-[12px]">{children}</ol>,
+  li: ({ children }: { children?: React.ReactNode }) => <li className="text-[12px] text-ink-800">{children}</li>,
+  h3: ({ children }: { children?: React.ReactNode }) => <h3 className="font-semibold text-[13px] text-ink-900 mt-2 mb-1">{children}</h3>,
+  h4: ({ children }: { children?: React.ReactNode }) => <h4 className="font-medium text-[12.5px] text-ink-800 mt-2 mb-1">{children}</h4>,
+  code: ({ children }: { children?: React.ReactNode }) => (
     <code className="rounded bg-ink-100/80 px-1 py-0.5 text-[11px] font-mono text-ink-800">{children}</code>
   ),
 };
@@ -77,7 +146,7 @@ const markdownComponents = {
 /**
  * Renders structured visual cards for specific tool results.
  */
-function StructuredToolResult({ toolInvocation }: { toolInvocation: any }) {
+function StructuredToolResult({ toolInvocation }: { toolInvocation: ToolInvocationRecord }) {
   const { toolName, result } = toolInvocation;
   if (!result || result.error) return null;
 
@@ -135,7 +204,7 @@ function StructuredToolResult({ toolInvocation }: { toolInvocation: any }) {
         </div>
 
         <div className="divide-y divide-ink-100 max-h-48 overflow-y-auto">
-          {result.invoices.map((inv: any, idx: number) => (
+          {(result.invoices || []).map((inv, idx: number) => (
             <div key={idx} className="py-2 flex items-center justify-between text-[12px]">
               <div>
                 <span className="font-mono font-medium text-ink-900">{inv.invoice_no}</span>
@@ -156,7 +225,7 @@ function StructuredToolResult({ toolInvocation }: { toolInvocation: any }) {
   if (toolName === "get_stock_details" && Array.isArray(result.medicines)) {
     return (
       <div className="my-2 space-y-2">
-        {result.medicines.map((med: any, idx: number) => {
+        {result.medicines.map((med, idx: number) => {
           const isOut = med.stock_status === "OUT_OF_STOCK";
           const isLow = med.stock_status === "LOW_STOCK";
           return (
@@ -189,7 +258,7 @@ function StructuredToolResult({ toolInvocation }: { toolInvocation: any }) {
                     <span className="text-right">Qty</span>
                     <span className="text-right">MRP</span>
                   </div>
-                  {med.active_batches.map((b: any, bIdx: number) => (
+                  {med.active_batches.map((b, bIdx: number) => (
                     <div key={bIdx} className="grid grid-cols-4 px-2 py-1 border-t border-ink-100 text-ink-700">
                       <span className="font-mono font-medium">{b.batch_no}</span>
                       <span>{b.expiry_date}</span>
@@ -303,13 +372,15 @@ export function AIAssistant() {
     // Check for tool results (e.g. POS add to bill)
     const lastMessage = messages[messages.length - 1];
     if (lastMessage?.role === "assistant" && lastMessage.parts) {
-      const toolResult = lastMessage.parts.find(
-        (p) => p.type === "tool-invocation" && (p as any).toolInvocation?.state === "result"
-      );
-      if (toolResult) {
-        const result = (toolResult as any).toolInvocation.result;
-        if (result?.action === "DISPATCH_ADD_TO_BILL") {
-          window.dispatchEvent(new CustomEvent("ai-add-to-bill", { detail: result.payload }));
+      for (const p of lastMessage.parts) {
+        if (p.type === "tool-invocation") {
+          const inv = p as unknown as ToolInvocationPart;
+          if (inv.toolInvocation?.state === "result") {
+            const res = inv.toolInvocation.result as { action?: string; payload?: unknown } | undefined;
+            if (res?.action === "DISPATCH_ADD_TO_BILL") {
+              window.dispatchEvent(new CustomEvent("ai-add-to-bill", { detail: res.payload }));
+            }
+          }
         }
       }
     }
@@ -457,14 +528,19 @@ export function AIAssistant() {
           ) : (
             messages.map((m: UIMessage) => {
               const isUser = m.role === "user";
-              const textContent = m.parts
-                .filter((p) => p.type === "text")
-                .map((p) => (p as any).text)
-                .join("");
-
-              const toolInvocations = m.parts
-                .filter((p) => p.type === "tool-invocation" && (p as any).toolInvocation?.state === "result")
-                .map((p) => (p as any).toolInvocation);
+              const textParts: string[] = [];
+              const toolInvocations: ToolInvocationRecord[] = [];
+              for (const p of m.parts) {
+                if (p.type === "text" && "text" in p && typeof (p as { text: unknown }).text === "string") {
+                  textParts.push((p as { text: string }).text);
+                } else if (p.type === "tool-invocation") {
+                  const inv = p as unknown as ToolInvocationPart;
+                  if (inv.toolInvocation?.state === "result") {
+                    toolInvocations.push(inv.toolInvocation as ToolInvocationRecord);
+                  }
+                }
+              }
+              const textContent = textParts.join("");
 
               return (
                 <div

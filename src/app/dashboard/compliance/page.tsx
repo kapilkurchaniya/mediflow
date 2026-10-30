@@ -16,7 +16,7 @@ export default async function CompliancePage() {
   return (
     <ComplianceRegisterView
       initialStats={stats}
-      initialLogs={logs as any}
+      initialLogs={logs}
       defaultRegister="all"
     />
   );

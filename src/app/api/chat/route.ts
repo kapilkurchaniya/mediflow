@@ -1,11 +1,9 @@
-// @ts-nocheck
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { createGroq } from "@ai-sdk/groq";
 import { streamText, tool, convertToModelMessages, isStepCount } from "ai";
 import { db, schema } from "@/server/db";
-import { sql } from "drizzle-orm";
+import { sql, type SQL } from "drizzle-orm";
 import { z } from "zod";
-import { getCurrentSession } from "@/server/auth";
 import { getAuthCtx, can } from "@/server/rbac";
 import { resolveAIPeriod } from "@/lib/date-range";
 
@@ -30,7 +28,7 @@ const MAX_RETRIES = 3;
 function getModel(entry: (typeof MODEL_CHAIN)[number]) {
   if (entry.provider === "google") return google(entry.id);
   if (entry.provider === "groq") return groq(entry.id);
-  throw new Error(`Unknown provider: ${entry.provider}`);
+  throw new Error("Unknown AI provider");
 }
 
 const SYSTEM_PROMPT = `You are MediFlow, an intelligent AI assistant for a pharmacy and clinic management system.
@@ -98,13 +96,12 @@ export async function POST(req: Request) {
       stopWhen: isStepCount(5),
       system: SYSTEM_PROMPT,
       tools: {
-        // @ts-ignore - Ignore zod v4 / ai SDK v7 type incompatibility
         get_stock_details: tool({
           description: "Get detailed stock information for specific medicines, generic compositions, or batch numbers. Returns active batches, quantities on hand, expiry dates, and MRP. Fully protected and scoped to this store.",
-          parameters: z.object({
+          inputSchema: z.object({
             searchTerm: z.string().describe("The name of the medicine, generic salt, or batch number to look up stock details for."),
           }),
-          execute: async ({ searchTerm }: any) => {
+          execute: async ({ searchTerm }) => {
             try {
               // 1. Fetch matching active medicines for this tenant
               const medResult = await db.execute(sql`
@@ -126,7 +123,7 @@ export async function POST(req: Request) {
               }
 
               const medicines = [];
-              for (const row of medResult.rows as any[]) {
+              for (const row of medResult.rows as Array<{ id: string; name: string; generic_name: string | null; pack_size: string | null; mrp: number | null; reorder_level: number | null }>) {
                 // Fetch active batches for this medicine in this store with tenant isolation
                 const batchResult = await db.execute(sql`
                   SELECT 
@@ -144,7 +141,7 @@ export async function POST(req: Request) {
                   ORDER BY b.expiry_date ASC
                 `);
 
-                const batches = (batchResult.rows as any[]).map((b) => ({
+                const batches = (batchResult.rows as Array<{ batch_no: string; expiry_date: string; qty_on_hand: number; mrp: number | null; sale_rate: number | null }>).map((b) => ({
                   batch_no: b.batch_no,
                   expiry_date: b.expiry_date,
                   qty_on_hand: Number(b.qty_on_hand),
@@ -179,13 +176,12 @@ export async function POST(req: Request) {
             }
           },
         }),
-        // @ts-ignore - Ignore zod v4 / ai SDK v7 type incompatibility
         check_inventory: tool({
           description: "Check inventory levels across the catalogue or list items that are currently low in stock. Fully protected and scoped to this store.",
-          parameters: z.object({
+          inputSchema: z.object({
             productName: z.string().optional().describe("Optional product name to search for. If omitted, returns low stock items."),
           }),
-          execute: async ({ productName }: any) => {
+          execute: async ({ productName }) => {
             try {
               let query;
               if (productName) {
@@ -211,7 +207,7 @@ export async function POST(req: Request) {
               }
               
               const res = await db.execute(query);
-              const items = (res.rows as any[]).map((r) => ({
+              const items = (res.rows as Array<{ name: string; generic_name: string | null; total_stock: number; reorder_level: number | null; mrp: number | null }>).map((r) => ({
                 name: r.name,
                 generic_composition: r.generic_name,
                 total_stock: Number(r.total_stock || 0),
@@ -228,16 +224,15 @@ export async function POST(req: Request) {
             }
           },
         }),
-        // @ts-ignore
         add_medicine: tool({
           description: "Add a new medicine/product to the pharmacy database. This can be used when the user asks to add a medicine via voice or text.",
-          parameters: z.object({
+          inputSchema: z.object({
             name: z.string().describe("The commercial name of the medicine (e.g. Dolo 650)"),
             genericName: z.string().optional().describe("The generic composition (e.g. Paracetamol)"),
             mrp: z.number().optional().describe("The MRP (Maximum Retail Price) in rupees"),
             packSize: z.string().optional().describe("The pack size (e.g. 15 tablets)")
           }),
-          execute: async ({ name, genericName, mrp, packSize }: any) => {
+          execute: async ({ name, genericName, mrp, packSize }) => {
             try {
               const [newMed] = await db.insert(schema.medicines).values({
                 tenantId: session.tenantId,
@@ -257,13 +252,12 @@ export async function POST(req: Request) {
             }
           }
         }),
-        // @ts-ignore
         check_interactions: tool({
           description: "Check if there are any known drug interactions between two or more medications.",
-          parameters: z.object({
+          inputSchema: z.object({
             medications: z.array(z.string()).describe("List of medication names to check interactions for (e.g., ['Ibuprofen', 'Aspirin'])"),
           }),
-          execute: async ({ medications }: any) => {
+          execute: async ({ medications }) => {
             return {
               status: "success",
               message: `Please evaluate the interactions between ${medications.join(' and ')} based on your medical knowledge.`,
@@ -271,24 +265,23 @@ export async function POST(req: Request) {
             };
           }
         }),
-        // @ts-ignore
         add_to_bill: tool({
           description: "Add a medicine to the current bill/cart in the Point of Sale interface. The user might say 'add dolo in the bill'.",
-          parameters: z.object({
+          inputSchema: z.object({
             medicineName: z.string().describe("The name of the medicine to add")
           }),
-          execute: async ({ medicineName }: any) => {
+          execute: async ({ medicineName }) => {
             try {
               const query = sql`SELECT id, name, mrp FROM medicines WHERE name ILIKE ${'%' + medicineName + '%'} AND tenant_id = ${session.tenantId} AND is_active = true LIMIT 1`;
               const res = await db.execute(query);
               if (res.rows.length === 0) return { error: "Medicine not found in inventory." };
               
-              const med = res.rows[0];
+              const med = res.rows[0] as { id: string; name: string; mrp: number | null };
               const batchQuery = sql`SELECT id as batch_id, batch_no, mrp, qty_on_hand, gst_rate_bp FROM batches WHERE medicine_id = ${med.id} AND qty_on_hand > 0 AND store_id = ${session.storeId} AND tenant_id = ${session.tenantId} LIMIT 1`;
               const batchRes = await db.execute(batchQuery);
               if (batchRes.rows.length === 0) return { error: "No available batches with stock for this medicine." };
               
-              const batch = batchRes.rows[0];
+              const batch = batchRes.rows[0] as { batch_id: string; batch_no: string; mrp: number | null; qty_on_hand: number; gst_rate_bp: number | null };
               return {
                 action: "DISPATCH_ADD_TO_BILL",
                 payload: {
@@ -308,21 +301,20 @@ export async function POST(req: Request) {
             }
           }
         }),
-        // @ts-ignore
         get_sales_summary: tool({
           description: "Get a summary of sales/revenue for a given period. Supports: today, yesterday, this week, last 7 days, this month, last month, this quarter, this year, or a custom date range.",
-          parameters: z.object({
+          inputSchema: z.object({
             period: z.string().describe("The time period for the sales summary (e.g., 'today', 'this week', 'this month', 'last month', 'this year', 'yesterday')"),
             from: z.string().optional().describe("Optional custom start date in YYYY-MM-DD format"),
             to: z.string().optional().describe("Optional custom end date in YYYY-MM-DD format"),
           }),
-          execute: async ({ period, from, to }: any) => {
+          execute: async ({ period, from, to }) => {
             try {
               const dateRange = from && to
                 ? { from, to }
                 : resolveAIPeriod(period);
               
-              const conditions: any[] = [
+              const conditions: SQL[] = [
                 sql`s.store_id = ${session.storeId}`,
                 sql`s.tenant_id = ${session.tenantId}`,
                 sql`s.status = 'completed'`,
@@ -348,7 +340,7 @@ export async function POST(req: Request) {
                 WHERE ${whereClause}
               `);
               
-              const row = result.rows[0] as any;
+              const row = result.rows[0] as Record<string, unknown> | undefined;
               const totalRevenue = Number(row?.total_revenue || 0);
               const totalInvoices = Number(row?.total_invoices || 0);
               const avgOrderValue = Number(row?.avg_order_value || 0);
@@ -375,17 +367,22 @@ export async function POST(req: Request) {
             }
           }
         }),
-        // @ts-ignore
         get_sales_details: tool({
           description: "Get detailed sales transaction list or look up specific invoices. Shows invoice number, customer name, total amount (₹), payment status, and timestamp. Strictly protected and scoped to this store.",
-          parameters: z.object({
+          inputSchema: z.object({
             period: z.string().optional().describe("Time period e.g. 'today', 'yesterday', 'this week', 'this month'"),
             from: z.string().optional().describe("Custom start date YYYY-MM-DD"),
             to: z.string().optional().describe("Custom end date YYYY-MM-DD"),
             invoiceNo: z.string().optional().describe("Optional invoice number to search for"),
             limit: z.number().optional().describe("Maximum number of records to return (default 10, max 25)"),
           }),
-          execute: async ({ period, from, to, invoiceNo, limit = 10 }: any) => {
+          execute: async ({
+            period,
+            from,
+            to,
+            invoiceNo,
+            limit = 10,
+          }) => {
             try {
               const dateRange = (from || to)
                 ? { from: from || null, to: to || null }
@@ -393,7 +390,7 @@ export async function POST(req: Request) {
                   ? resolveAIPeriod(period)
                   : { from: null, to: null };
 
-              const conditions: any[] = [
+              const conditions: SQL[] = [
                 sql`s.store_id = ${session.storeId}`,
                 sql`s.tenant_id = ${session.tenantId}`,
               ];
@@ -427,7 +424,16 @@ export async function POST(req: Request) {
                 LIMIT ${maxLimit}
               `);
 
-              const invoices = (result.rows as any[]).map((r) => ({
+              interface SalesDetailRow {
+                invoice_no: string;
+                customer_name: string | null;
+                total_amount: number | null;
+                payment_mode: string | null;
+                status: string;
+                created_at: string | Date | null;
+              }
+
+              const invoices = (result.rows as unknown as SalesDetailRow[]).map((r) => ({
                 invoice_no: r.invoice_no,
                 customer_name: r.customer_name || "Walk-in customer",
                 amount_rupees: `₹${(Number(r.total_amount || 0) / 100).toFixed(2)}`,
@@ -447,21 +453,20 @@ export async function POST(req: Request) {
             }
           },
         }),
-        // @ts-ignore
         get_purchase_summary: tool({
           description: "Get a summary of purchases for a given period. Shows total purchase value, number of invoices, and top suppliers.",
-          parameters: z.object({
+          inputSchema: z.object({
             period: z.string().describe("The time period (e.g., 'today', 'this week', 'this month', 'last month', 'this year')"),
             from: z.string().optional().describe("Optional custom start date YYYY-MM-DD"),
             to: z.string().optional().describe("Optional custom end date YYYY-MM-DD"),
           }),
-          execute: async ({ period, from, to }: any) => {
+          execute: async ({ period, from, to }) => {
             try {
               const dateRange = from && to
                 ? { from, to }
                 : resolveAIPeriod(period);
 
-              const conditions: any[] = [
+              const conditions: SQL[] = [
                 sql`p.store_id = ${session.storeId}`,
                 sql`p.tenant_id = ${session.tenantId}`,
                 sql`p.status = 'posted'`,
@@ -486,7 +491,7 @@ export async function POST(req: Request) {
                 WHERE ${whereClause}
               `);
 
-              const row = result.rows[0] as any;
+              const row = result.rows[0] as Record<string, unknown> | undefined;
               return {
                 period,
                 date_range: `${dateRange.from || 'all time'} to ${dateRange.to || 'now'}`,
@@ -503,13 +508,12 @@ export async function POST(req: Request) {
             }
           }
         }),
-        // @ts-ignore
         get_stock_report: tool({
           description: "Get a detailed stock report. Can show overall stock summary, stock value, low-stock items, or near-expiry items.",
-          parameters: z.object({
+          inputSchema: z.object({
             reportType: z.enum(["summary", "low_stock", "near_expiry", "value"]).describe("Type of stock report: 'summary' for overall counts, 'low_stock' for items below reorder level, 'near_expiry' for items expiring within 90 days, 'value' for total stock value"),
           }),
-          execute: async ({ reportType }: any) => {
+          execute: async ({ reportType }) => {
             try {
               if (reportType === "summary" || reportType === "value") {
                 const result = await db.execute(sql`
@@ -523,7 +527,7 @@ export async function POST(req: Request) {
                   LEFT JOIN batches b ON m.id = b.medicine_id AND b.store_id = ${session.storeId} AND b.tenant_id = ${session.tenantId}
                   WHERE m.tenant_id = ${session.tenantId} AND m.is_active = true
                 `);
-                const row = result.rows[0] as any;
+                const row = result.rows[0] as Record<string, unknown> | undefined;
                 return {
                   report_type: reportType,
                   total_items: Number(row?.total_items || 0),
@@ -621,7 +625,7 @@ export async function POST(req: Request) {
       }),
       { status: 503, headers: { "Content-Type": "application/json" } }
     );
-  } catch (err: any) {
-    return new Response(err.stack || String(err), { status: 500 });
+  } catch (err: unknown) {
+    return new Response(err instanceof Error ? err.stack || err.message : String(err), { status: 500 });
   }
 }

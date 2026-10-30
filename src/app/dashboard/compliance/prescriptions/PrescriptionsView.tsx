@@ -19,9 +19,9 @@ import {
   ExternalLink,
 } from "lucide-react";
 import { PageHeader, EmptyState } from "@/app/components/ui";
-import { createPrescription } from "@/app/actions/compliance";
+import { createPrescription, getPrescriptions } from "@/app/actions/compliance";
 
-interface PrescriptionItem {
+export interface PrescriptionItem {
   id?: string;
   medicineName: string;
   dosage?: string;
@@ -31,37 +31,7 @@ interface PrescriptionItem {
   instructions?: string;
 }
 
-interface PrescriptionRecord {
-  rx: {
-    id: string;
-    patientName: string;
-    patientAge: number | null;
-    patientGender: string | null;
-    patientPhone: string | null;
-    patientAddress: string | null;
-    doctorName: string;
-    doctorRegNo: string | null;
-    rxNumber: string | null;
-    prescriptionDate: string;
-    diagnosis: string | null;
-    notes: string | null;
-    imageUrl: string | null;
-    status: string;
-    validUntil: string | null;
-    createdAt: Date;
-  };
-  doctor: {
-    id: string;
-    name: string;
-    regNo: string;
-    hospital: string | null;
-  } | null;
-  customer: {
-    id: string;
-    name: string;
-    phone: string | null;
-  } | null;
-}
+export type PrescriptionRecord = Awaited<ReturnType<typeof getPrescriptions>>[number];
 
 export function PrescriptionsView({
   initialPrescriptions,
@@ -117,10 +87,17 @@ export function PrescriptionsView({
     setRxItems(rxItems.filter((_, i) => i !== index));
   };
 
-  const updateRxItem = (index: number, field: keyof PrescriptionItem, val: any) => {
+  const updateRxItem = <K extends keyof PrescriptionItem>(
+    index: number,
+    field: K,
+    val: PrescriptionItem[K]
+  ) => {
     const updated = [...rxItems];
-    (updated[index] as any)[field] = val;
-    setRxItems(updated);
+    const item = updated[index];
+    if (item) {
+      updated[index] = { ...item, [field]: val };
+      setRxItems(updated);
+    }
   };
 
   const handleSavePrescription = async (e: React.FormEvent) => {
