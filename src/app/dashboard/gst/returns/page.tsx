@@ -12,7 +12,7 @@ import {
 } from "lucide-react";
 import { PageHeader, StatCard } from "@/app/components/ui";
 import { formatINR } from "@/lib/money";
-import { getOutwardSupplies, getInwardSupplies, getGstReconciliation } from "@/app/actions/gst";
+import { getOutwardSupplies, getInwardSupplies, getGstReconciliation, getTenantGstinsAction } from "@/app/actions/gst";
 import { GstPeriodSelector } from "../GstPeriodSelector";
 import { ReturnsClientExport } from "./ReturnsClientExport";
 
@@ -21,18 +21,25 @@ export const dynamic = "force-dynamic";
 export default async function GstReturnsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ month?: string; year?: string }>;
+  searchParams: Promise<{ month?: string; year?: string; gstin?: string }>;
 }) {
   const resolved = await searchParams;
   const now = new Date();
   const month = resolved.month ? Number(resolved.month) : now.getMonth() + 1;
   const year = resolved.year ? Number(resolved.year) : now.getFullYear();
+  const gstin = resolved.gstin?.trim() || undefined;
 
-  const [gstr1, gstr2, recon] = await Promise.all([
-    getOutwardSupplies({ month, year }),
-    getInwardSupplies({ month, year }),
-    getGstReconciliation({ month, year }),
+  const [gstr1, gstr2, recon, tenantGstins] = await Promise.all([
+    getOutwardSupplies({ month, year, gstin }),
+    getInwardSupplies({ month, year, gstin }),
+    getGstReconciliation({ month, year, gstin }),
+    getTenantGstinsAction(),
   ]);
+
+  const availableGstins = tenantGstins.map((g) => ({
+    gstin: g.gstin,
+    label: `${g.gstin} (${g.stateName} - ${g.storeNames.join(", ")})`,
+  }));
 
   const monthNames = [
     "January", "February", "March", "April", "May", "June",
@@ -62,13 +69,19 @@ export default async function GstReturnsPage({
         backHref="/dashboard/gst"
         eyebrow="Government Return Filing"
         title="GST Returns Hub & Filing Worksheets"
-        description={`Government portal filing worksheets and GSTR-3B auto-computation for ${currentMonthName} ${year}.`}
+        description={`Government portal filing worksheets and GSTR-3B auto-computation for ${currentMonthName} ${year}.${gstin ? ` (Filtered for GSTIN: ${gstin})` : ""}`}
         actions={
           <div className="flex flex-wrap items-center gap-2">
-            <GstPeriodSelector month={month} year={year} />
+            <GstPeriodSelector
+              month={month}
+              year={year}
+              selectedGstin={gstin}
+              availableGstins={availableGstins}
+            />
             <ReturnsClientExport
               month={month}
               year={year}
+              gstin={gstin}
               gstr3bSummary={gstr3bSummary}
             />
           </div>
