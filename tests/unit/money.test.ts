@@ -67,6 +67,65 @@ describe("computeSaleLine", () => {
     expect(r.taxable).toBe(18000);
     expect(r.tax).toBe(900);
   });
+
+  it("selling 3 loose tablets from a ₹100 10-tablet strip bills ₹30 and reports 3 base units", () => {
+    const r = computeSaleLine({
+      packQty: 0,
+      looseQty: 3,
+      unitsPerPack: 10,
+      rate: 10000,
+      discountBp: 0,
+      gstRateBp: 500,
+    });
+    expect(r.gross).toBe(3000);
+    expect(r.total).toBe(3000);
+    expect(r.baseQty).toBe(3);
+    expect(r.packQty).toBe(0);
+    expect(r.looseQty).toBe(3);
+  });
+
+  it("selling 1 strip + 3 loose tablets computes ₹130 and 13 base units", () => {
+    const r = computeSaleLine({
+      packQty: 1,
+      looseQty: 3,
+      unitsPerPack: 10,
+      rate: 10000,
+      discountBp: 0,
+      gstRateBp: 500,
+    });
+    expect(r.gross).toBe(13000);
+    expect(r.total).toBe(13000);
+    expect(r.baseQty).toBe(13);
+  });
+
+  it("normalizes looseQty >= unitsPerPack into packs", () => {
+    const r = computeSaleLine({
+      packQty: 0,
+      looseQty: 15,
+      unitsPerPack: 10,
+      rate: 10000,
+      discountBp: 0,
+      gstRateBp: 500,
+    });
+    expect(r.packQty).toBe(1);
+    expect(r.looseQty).toBe(5);
+    expect(r.baseQty).toBe(15);
+    expect(r.gross).toBe(15000);
+  });
+
+  it("applies discounts to the combined gross of packs and loose tablets", () => {
+    const r = computeSaleLine({
+      packQty: 1,
+      looseQty: 3,
+      unitsPerPack: 10,
+      rate: 10000,
+      discountBp: 1000,
+      gstRateBp: 500,
+    });
+    expect(r.gross).toBe(13000);
+    expect(r.discount).toBe(1300);
+    expect(r.total).toBe(11700);
+  });
 });
 
 describe("roundToRupee", () => {

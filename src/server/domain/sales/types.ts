@@ -29,11 +29,18 @@ export const ComplianceDetailsSchema = z.object({
 });
 export type ComplianceDetails = z.infer<typeof ComplianceDetailsSchema>;
 
-export const SaleLineSchema = z.object({
-  batchId: z.string().uuid(),
-  qty: z.number().int().positive(),
-  discountBp: z.number().int().min(0).max(10000),
-});
+export const SaleLineSchema = z
+  .object({
+    batchId: z.string().uuid(),
+    qty: z.number().int().positive().optional(),
+    packQty: z.number().int().min(0).optional(),
+    looseQty: z.number().int().min(0).optional(),
+    discountBp: z.number().int().min(0).max(10000),
+  })
+  .refine(
+    (l) => (l.qty !== undefined && l.qty > 0) || ((l.packQty ?? 0) > 0 || (l.looseQty ?? 0) > 0),
+    { message: "Quantity must be greater than zero." },
+  );
 export type SaleLine = z.infer<typeof SaleLineSchema>;
 
 export const SalePaymentSchema = z.object({

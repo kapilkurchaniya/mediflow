@@ -47,6 +47,9 @@ interface SearchResult {
     schedule?: string | null;
     rackCode?: string | null;
     rackName?: string | null;
+    unitsPerPack?: number;
+    packUnit?: string;
+    looseUnit?: string;
   };
   batches: {
     id: string;
@@ -164,7 +167,8 @@ export default function POSPage() {
   const [selectedMedicalRepId, setSelectedMedicalRepId] = useState("");
 
   const [cart, setCart] = useState<
-    (PosItemInput & {
+    (Omit<PosItemInput, "qty"> & {
+      qty: number;
       medicineName: string;
       batchNo: string;
       expiryDate: string;
@@ -174,6 +178,11 @@ export default function POSPage() {
       rxRequired?: boolean | null;
       schedule?: string | null;
       schemeText?: string;
+      unitsPerPack: number;
+      packUnit: string;
+      looseUnit: string;
+      packQty: number;
+      looseQty: number;
     })[]
   >([]);
 
@@ -235,12 +244,20 @@ export default function POSPage() {
 
       if (soundEnabled) playSound("beep");
 
+      const upp = Math.max(1, medicine.unitsPerPack ?? 1);
+      const packUnit = medicine.packUnit ?? "strip";
+      const looseUnit = medicine.looseUnit ?? "tablet";
+
       setCart((current) => {
         const existingIndex = current.findIndex((c) => c.batchId === batch.id);
         if (existingIndex >= 0) {
           const updated = [...current];
-          if (updated[existingIndex].qty < batch.qtyOnHand) {
-            updated[existingIndex].qty += 1;
+          const item = updated[existingIndex];
+          const newPackQty = (item.packQty ?? 0) + 1;
+          const newTotalBase = (newPackQty * upp) + (item.looseQty ?? 0);
+          if (newTotalBase <= batch.qtyOnHand) {
+            item.packQty = newPackQty;
+            item.qty = newTotalBase;
           }
           return updated;
         } else {
@@ -252,7 +269,12 @@ export default function POSPage() {
               medicineName: medicine.name,
               batchNo: batch.batchNo,
               expiryDate: batch.expiryDate,
-              qty: 1,
+              qty: upp,
+              packQty: 1,
+              looseQty: 0,
+              unitsPerPack: upp,
+              packUnit,
+              looseUnit,
               qtyOnHand: batch.qtyOnHand,
               mrp: batch.mrp,
               rate: batch.saleRate || batch.mrp,
@@ -352,6 +374,9 @@ export default function POSPage() {
   const totals = computeSaleTotals(
     cart.map((c) => ({
       qty: c.qty,
+      packQty: c.packQty,
+      looseQty: c.looseQty,
+      unitsPerPack: c.unitsPerPack,
       rate: c.rate,
       discountBp: c.discountBp,
       gstRateBp: c.gstRateBp,
@@ -503,10 +528,47 @@ export default function POSPage() {
     }
   };
 
+  const updateCartPackQty = (index: number, newPackQty: number) => {
+    const newCart = [...cart];
+    const item = newCart[index];
+    const pQty = Math.max(0, newPackQty);
+    const lQty = item.looseQty ?? 0;
+    const upp = Math.max(1, item.unitsPerPack ?? 1);
+    const totalBase = pQty * upp + lQty;
+    if (totalBase > 0 && totalBase <= item.qtyOnHand) {
+      item.packQty = pQty;
+      item.qty = totalBase;
+      setCart(newCart);
+    }
+  };
+
+  const updateCartLooseQty = (index: number, newLooseQty: number) => {
+    const newCart = [...cart];
+    const item = newCart[index];
+    const upp = Math.max(1, item.unitsPerPack ?? 1);
+    let pQty = item.packQty ?? 0;
+    let lQty = Math.max(0, newLooseQty);
+    if (lQty >= upp) {
+      pQty += Math.floor(lQty / upp);
+      lQty = lQty % upp;
+    }
+    const totalBase = pQty * upp + lQty;
+    if (totalBase > 0 && totalBase <= item.qtyOnHand) {
+      item.packQty = pQty;
+      item.looseQty = lQty;
+      item.qty = totalBase;
+      setCart(newCart);
+    }
+  };
+
   const updateCartQty = (index: number, newQty: number) => {
     const newCart = [...cart];
-    if (newQty > 0 && newQty <= newCart[index].qtyOnHand) {
-      newCart[index].qty = newQty;
+    const item = newCart[index];
+    const upp = Math.max(1, item.unitsPerPack ?? 1);
+    if (newQty > 0 && newQty <= item.qtyOnHand) {
+      item.qty = newQty;
+      item.packQty = Math.floor(newQty / upp);
+      item.looseQty = newQty % upp;
       setCart(newCart);
     }
   };
@@ -844,6 +906,11 @@ export default function POSPage() {
                           </td>
                           <td className="text-right">
                             <span className="badge badge-success num font-semibold">{batch.qtyOnHand}</span>
+                            {res.medicine.unitsPerPack && res.medicine.unitsPerPack > 1 && (
+                              <div className="text-[10px] text-ink-500 font-mono">
+                                {Math.floor(batch.qtyOnHand / res.medicine.unitsPerPack)} {res.medicine.packUnit || "p"} + {batch.qtyOnHand % res.medicine.unitsPerPack} {res.medicine.looseUnit || "t"}
+                              </div>
+                            )}
                           </td>
                           <td className="text-right font-medium text-ink-900 num">
                             {formatINR(batch.saleRate || batch.mrp)}
@@ -952,6 +1019,11 @@ export default function POSPage() {
                           </div>
                           <div className="cell-sub font-mono">
                             Batch: {item.batchNo} · Exp: {item.expiryDate}
+                            {item.unitsPerPack > 1 && (
+                              <span className="text-brand-600 font-medium ml-1">
+                                (1 {item.packUnit} = {item.unitsPerPack} {item.looseUnit}s)
+                              </span>
+                            )}
                           </div>
                           {item.schemeText && (
                             <div className="mt-1 flex items-center gap-1 text-[10.5px] font-semibold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200 w-fit">
@@ -960,16 +1032,56 @@ export default function POSPage() {
                           )}
                         </td>
                         <td className="text-center">
-                          <input
-                            type="number"
-                            min="1"
-                            max={item.qtyOnHand}
-                            value={item.qty}
-                            onChange={(e) => updateCartQty(index, parseInt(e.target.value) || 1)}
-                            className="input !h-8 !w-16 !px-1 text-center font-bold num"
-                          />
+                          {item.unitsPerPack > 1 ? (
+                            <div className="flex flex-col items-center gap-1">
+                              <div className="flex items-center gap-1">
+                                <div className="flex items-center" title={`Full ${item.packUnit}s`}>
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    max={Math.floor(item.qtyOnHand / item.unitsPerPack)}
+                                    value={item.packQty ?? 0}
+                                    onChange={(e) => updateCartPackQty(index, parseInt(e.target.value) || 0)}
+                                    className="input !h-7 !w-11 !px-1 text-center font-bold num text-xs"
+                                  />
+                                  <span className="text-[10px] text-ink-500 font-medium ml-0.5">p</span>
+                                </div>
+                                <span className="text-ink-400 text-xs">+</span>
+                                <div className="flex items-center" title={`Loose ${item.looseUnit}s`}>
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    max={item.unitsPerPack - 1}
+                                    value={item.looseQty ?? 0}
+                                    onChange={(e) => updateCartLooseQty(index, parseInt(e.target.value) || 0)}
+                                    className="input !h-7 !w-11 !px-1 text-center font-bold num text-xs"
+                                  />
+                                  <span className="text-[10px] text-ink-500 font-medium ml-0.5">t</span>
+                                </div>
+                              </div>
+                              <span className="text-[10px] text-ink-400 font-mono">
+                                = {item.qty} {item.looseUnit}s
+                              </span>
+                            </div>
+                          ) : (
+                            <input
+                              type="number"
+                              min="1"
+                              max={item.qtyOnHand}
+                              value={item.qty}
+                              onChange={(e) => updateCartQty(index, parseInt(e.target.value) || 1)}
+                              className="input !h-8 !w-16 !px-1 text-center font-bold num"
+                            />
+                          )}
                         </td>
-                        <td className="text-right font-medium num text-ink-700">{formatINR(item.rate)}</td>
+                        <td className="text-right font-medium num text-ink-700">
+                          <div>{formatINR(item.rate)}</div>
+                          {item.unitsPerPack > 1 && (
+                            <div className="text-[10.5px] text-ink-400">
+                              {formatINR(Math.round(item.rate / item.unitsPerPack))}/{item.looseUnit.slice(0, 3)}
+                            </div>
+                          )}
+                        </td>
                         <td className="text-center">
                           <input
                             type="number"

@@ -485,4 +485,101 @@ describe("createSale: split tender, change and credit (A2.2)", () => {
     expect(first.changeDue).toBe(30000);
     expect(again).toMatchObject({ duplicate: true, changeDue: 30000 });
   });
+
+  describe("strip & loose tablet cutting (A2.10)", () => {
+    it("selling 3 loose tablets from a 10-tablet strip bills ₹30, deducts 3 base units, and snapshots unitsPerPack", async () => {
+      const tenant = await makeTenant(t.db);
+      const store = await makeStore(t.db, tenant.id);
+      const user = await makeUser(t.db);
+      const maker = (await t.db.insert(schema.manufacturers).values({ tenantId: tenant.id, name: "Acme Pharma" }).returning())[0];
+      const medicine = await makeMedicine(t.db, tenant.id, {
+        name: "Paracetamol 650",
+        unitsPerPack: 10,
+        packUnit: "strip",
+        looseUnit: "tablet",
+        manufacturerId: maker.id,
+      });
+      const batch = await makeBatch(t.db, {
+        tenantId: tenant.id,
+        storeId: store.id,
+        medicineId: medicine.id,
+        qtyOnHand: 50,
+        mrp: 10000,
+        saleRate: 10000,
+      });
+      const w = { tenant, store, user, medicine };
+
+      const res = await t.db.transaction((tx) =>
+        createSale(
+          tx,
+          ctxFor(w),
+          SaleInput.parse({
+            lines: [{ batchId: batch.id, packQty: 0, looseQty: 3, discountBp: 0 }],
+            payments: [{ method: "cash", amount: 3000 }],
+          }),
+          { source: "pos" },
+        ),
+      );
+
+      expect(res.total).toBe(3000);
+      expect(res.changeDue).toBe(0);
+
+      const [updatedBatch] = await t.db.select().from(schema.batches).where(eq(schema.batches.id, batch.id));
+      expect(updatedBatch.qtyOnHand).toBe(47);
+
+      const [movement] = await t.db
+        .select()
+        .from(schema.stockMovements)
+        .where(and(eq(schema.stockMovements.refId, res.saleId), eq(schema.stockMovements.refType, "sale")));
+      expect(movement.qtyChange).toBe(-3);
+
+      const [item] = await t.db.select().from(schema.saleItems).where(eq(schema.saleItems.saleId, res.saleId));
+      expect(item).toMatchObject({
+        qty: 3,
+        packQty: 0,
+        looseQty: 3,
+        unitsPerPack: 10,
+        packUnit: "strip",
+        looseUnit: "tablet",
+        totalAmount: 3000,
+      });
+    });
+
+    it("selling 1 strip and 4 loose tablets deducts 14 base units and computes ₹140", async () => {
+      const tenant = await makeTenant(t.db);
+      const store = await makeStore(t.db, tenant.id);
+      const user = await makeUser(t.db);
+      const maker = (await t.db.insert(schema.manufacturers).values({ tenantId: tenant.id, name: "Acme Pharma" }).returning())[0];
+      const medicine = await makeMedicine(t.db, tenant.id, {
+        name: "Amoxicillin 500",
+        unitsPerPack: 10,
+        manufacturerId: maker.id,
+      });
+      const batch = await makeBatch(t.db, {
+        tenantId: tenant.id,
+        storeId: store.id,
+        medicineId: medicine.id,
+        qtyOnHand: 100,
+        mrp: 10000,
+        saleRate: 10000,
+      });
+      const w = { tenant, store, user, medicine };
+
+      const res = await t.db.transaction((tx) =>
+        createSale(
+          tx,
+          ctxFor(w),
+          SaleInput.parse({
+            lines: [{ batchId: batch.id, packQty: 1, looseQty: 4, discountBp: 0 }],
+            payments: [{ method: "cash", amount: 14000 }],
+          }),
+          { source: "pos" },
+        ),
+      );
+
+      expect(res.total).toBe(14000);
+      const [updatedBatch] = await t.db.select().from(schema.batches).where(eq(schema.batches.id, batch.id));
+      expect(updatedBatch.qtyOnHand).toBe(86);
+    });
+  });
 });
