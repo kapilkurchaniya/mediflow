@@ -10,7 +10,7 @@ import {
 } from "lucide-react";
 import { PageHeader, StatCard } from "@/app/components/ui";
 import { formatINR } from "@/lib/money";
-import { getGstReconciliation } from "@/app/actions/gst";
+import { getGstReconciliation, getTenantGstinsAction } from "@/app/actions/gst";
 import { GstPeriodSelector } from "../GstPeriodSelector";
 
 export const dynamic = "force-dynamic";
@@ -18,14 +18,23 @@ export const dynamic = "force-dynamic";
 export default async function GstReconciliationPage({
   searchParams,
 }: {
-  searchParams: Promise<{ month?: string; year?: string }>;
+  searchParams: Promise<{ month?: string; year?: string; gstin?: string }>;
 }) {
   const resolved = await searchParams;
   const now = new Date();
   const month = resolved.month ? Number(resolved.month) : now.getMonth() + 1;
   const year = resolved.year ? Number(resolved.year) : now.getFullYear();
+  const gstin = resolved.gstin?.trim() || undefined;
 
-  const recon = await getGstReconciliation({ month, year });
+  const [recon, tenantGstins] = await Promise.all([
+    getGstReconciliation({ month, year, gstin }),
+    getTenantGstinsAction(),
+  ]);
+
+  const availableGstins = tenantGstins.map((g) => ({
+    gstin: g.gstin,
+    label: `${g.gstin} (${g.stateName} - ${g.storeNames.join(", ")})`,
+  }));
 
   const monthNames = [
     "January", "February", "March", "April", "May", "June",
@@ -43,12 +52,17 @@ export default async function GstReconciliationPage({
         backHref="/dashboard/gst"
         eyebrow="2A/2B & Books Matching"
         title="GST Reconciliation & Tax Netting"
-        description={`Cross-verification of outward tax liability against inward Input Tax Credit (ITC) for ${currentMonthName} ${year}.`}
+        description={`Cross-verification of outward tax liability against inward Input Tax Credit (ITC) for ${currentMonthName} ${year}.${gstin ? ` (Filtered for GSTIN: ${gstin})` : ""}`}
         actions={
           <div className="flex flex-wrap items-center gap-2">
-            <GstPeriodSelector month={month} year={year} />
+            <GstPeriodSelector
+              month={month}
+              year={year}
+              selectedGstin={gstin}
+              availableGstins={availableGstins}
+            />
             <Link
-              href={`/dashboard/gst/returns?month=${month}&year=${year}`}
+              href={`/dashboard/gst/returns?month=${month}&year=${year}${gstin ? `&gstin=${gstin}` : ""}`}
               className="btn btn-primary text-xs"
             >
               Proceed to GSTR-3B Filing

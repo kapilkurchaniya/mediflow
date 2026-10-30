@@ -1,7 +1,7 @@
 "use server";
 
 import { db, schema } from "@/server/db";
-import { eq, and, desc, gte, lte, sql, ilike } from "drizzle-orm";
+import { eq, and, desc, gte, lte, sql, ilike, inArray } from "drizzle-orm";
 import { requireAuth } from "@/server/auth";
 import { requirePermission } from "@/server/rbac";
 import { revalidatePath } from "next/cache";
@@ -13,6 +13,7 @@ import {
   buildGstr1JsonPayload,
   createGstDocumentFromSale,
   createGstDocumentFromPurchase,
+  getTenantGstins,
 } from "@/server/domain/gst";
 import {
   generateEInvoiceForDocument,
@@ -22,29 +23,52 @@ import {
 } from "@/server/domain/e-invoice";
 import { writeAudit } from "@/server/audit";
 
-export async function getGstDashboard(params?: { month?: number; year?: number }) {
+export async function getTenantGstinsAction() {
+  const ctx = await requirePermission("gst.view");
+  return getTenantGstins(db, ctx.tenantId);
+}
+
+export async function getGstDashboard(params?: { month?: number; year?: number; gstin?: string }) {
   const ctx = await requirePermission("gst.view");
 
   const now = new Date();
   const month = params?.month || now.getMonth() + 1;
   const year = params?.year || now.getFullYear();
+  const gstin = params?.gstin?.trim() || undefined;
 
   // Auto-sync any existing completed sales/purchases that don't have gstDocuments yet
   await syncPendingGstDocuments(ctx.tenantId, ctx.storeId);
 
+  const queryParams = gstin
+    ? { tenantId: ctx.tenantId, gstin, month, year }
+    : { tenantId: ctx.tenantId, storeId: ctx.storeId, month, year };
+
   const [gstr1, gstr2, recon] = await Promise.all([
-    buildGstr1Data(db, { tenantId: ctx.tenantId, storeId: ctx.storeId, month, year }),
-    buildGstr2Data(db, { tenantId: ctx.tenantId, storeId: ctx.storeId, month, year }),
-    reconcileGst(db, { tenantId: ctx.tenantId, storeId: ctx.storeId, month, year }),
+    buildGstr1Data(db, queryParams),
+    buildGstr2Data(db, queryParams),
+    reconcileGst(db, queryParams),
   ]);
 
-  // E-Invoice counts
+  // Base conditions scoped by tenant and optionally by GSTIN
+  const baseConditions = [eq(schema.gstDocuments.tenantId, ctx.tenantId)];
+
+  if (gstin) {
+    const matchingStores = await db
+      .select({ id: schema.stores.id })
+      .from(schema.stores)
+      .where(and(eq(schema.stores.tenantId, ctx.tenantId), eq(schema.stores.gstin, gstin)));
+    const storeIds = matchingStores.map((s) => s.id);
+    if (storeIds.length > 0) {
+      baseConditions.push(inArray(schema.gstDocuments.storeId, storeIds));
+    }
+  }
+
   const eInvoicesPending = await db
     .select({ count: sql<number>`count(*)` })
     .from(schema.gstDocuments)
     .where(
       and(
-        eq(schema.gstDocuments.tenantId, ctx.tenantId),
+        ...baseConditions,
         eq(schema.gstDocuments.supplyType, "B2B"),
         eq(schema.gstDocuments.refType, "sale"),
         sql`${schema.gstDocuments.irn} is null`,
@@ -57,7 +81,7 @@ export async function getGstDashboard(params?: { month?: number; year?: number }
     .from(schema.gstDocuments)
     .where(
       and(
-        eq(schema.gstDocuments.tenantId, ctx.tenantId),
+        ...baseConditions,
         sql`${schema.gstDocuments.eWayBillNo} is not null`,
         eq(schema.gstDocuments.status, "active")
       )
@@ -67,7 +91,7 @@ export async function getGstDashboard(params?: { month?: number; year?: number }
   const recentDocs = await db
     .select()
     .from(schema.gstDocuments)
-    .where(eq(schema.gstDocuments.tenantId, ctx.tenantId))
+    .where(and(...baseConditions))
     .orderBy(desc(schema.gstDocuments.docDate), desc(schema.gstDocuments.createdAt))
     .limit(10);
 
@@ -87,15 +111,17 @@ export async function getOutwardSupplies(params?: {
   month?: number;
   year?: number;
   supplyType?: string;
+  gstin?: string;
 }) {
   const ctx = await requirePermission("gst.view");
   const now = new Date();
   const month = params?.month || now.getMonth() + 1;
   const year = params?.year || now.getFullYear();
+  const gstin = params?.gstin?.trim() || undefined;
 
   const data = await buildGstr1Data(db, {
     tenantId: ctx.tenantId,
-    storeId: ctx.storeId,
+    ...(gstin ? { gstin } : { storeId: ctx.storeId }),
     month,
     year,
   });
@@ -106,15 +132,17 @@ export async function getOutwardSupplies(params?: {
 export async function getInwardSupplies(params?: {
   month?: number;
   year?: number;
+  gstin?: string;
 }) {
   const ctx = await requirePermission("gst.view");
   const now = new Date();
   const month = params?.month || now.getMonth() + 1;
   const year = params?.year || now.getFullYear();
+  const gstin = params?.gstin?.trim() || undefined;
 
   const data = await buildGstr2Data(db, {
     tenantId: ctx.tenantId,
-    storeId: ctx.storeId,
+    ...(gstin ? { gstin } : { storeId: ctx.storeId }),
     month,
     year,
   });
@@ -125,15 +153,17 @@ export async function getInwardSupplies(params?: {
 export async function getGstReconciliation(params?: {
   month?: number;
   year?: number;
+  gstin?: string;
 }) {
   const ctx = await requirePermission("gst.view");
   const now = new Date();
   const month = params?.month || now.getMonth() + 1;
   const year = params?.year || now.getFullYear();
+  const gstin = params?.gstin?.trim() || undefined;
 
   return reconcileGst(db, {
     tenantId: ctx.tenantId,
-    storeId: ctx.storeId,
+    ...(gstin ? { gstin } : { storeId: ctx.storeId }),
     month,
     year,
   });
@@ -253,7 +283,7 @@ export async function generateEWayBillAction(
   }
 }
 
-export async function downloadGstr1JsonAction(month: number, year: number) {
+export async function downloadGstr1JsonAction(month: number, year: number, selectedGstin?: string) {
   const ctx = await requirePermission("report.export");
 
   const [tenant] = await db
@@ -266,11 +296,11 @@ export async function downloadGstr1JsonAction(month: number, year: number) {
     .from(schema.stores)
     .where(eq(schema.stores.id, ctx.storeId));
 
-  const gstin = store?.gstin || tenant?.gstin || "27AAPCS1234F1Z5";
+  const gstin = selectedGstin?.trim() || store?.gstin || tenant?.gstin || "27AAPCS1234F1Z5";
 
   const gstr1 = await buildGstr1Data(db, {
     tenantId: ctx.tenantId,
-    storeId: ctx.storeId,
+    ...(selectedGstin ? { gstin: selectedGstin.trim() } : { storeId: ctx.storeId }),
     month,
     year,
   });

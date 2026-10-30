@@ -14,7 +14,7 @@ import {
 } from "lucide-react";
 import { PageHeader, StatCard } from "@/app/components/ui";
 import { formatINR } from "@/lib/money";
-import { getGstDashboard } from "@/app/actions/gst";
+import { getGstDashboard, getTenantGstinsAction } from "@/app/actions/gst";
 import { GstPeriodSelector } from "./GstPeriodSelector";
 
 export const dynamic = "force-dynamic";
@@ -22,14 +22,23 @@ export const dynamic = "force-dynamic";
 export default async function GstDashboardPage({
   searchParams,
 }: {
-  searchParams: Promise<{ month?: string; year?: string }>;
+  searchParams: Promise<{ month?: string; year?: string; gstin?: string }>;
 }) {
   const resolved = await searchParams;
   const now = new Date();
   const month = resolved.month ? Number(resolved.month) : now.getMonth() + 1;
   const year = resolved.year ? Number(resolved.year) : now.getFullYear();
+  const gstin = resolved.gstin?.trim() || undefined;
 
-  const data = await getGstDashboard({ month, year });
+  const [data, tenantGstins] = await Promise.all([
+    getGstDashboard({ month, year, gstin }),
+    getTenantGstinsAction(),
+  ]);
+
+  const availableGstins = tenantGstins.map((g) => ({
+    gstin: g.gstin,
+    label: `${g.gstin} (${g.stateName} - ${g.storeNames.join(", ")})`,
+  }));
 
   const monthNames = [
     "January", "February", "March", "April", "May", "June",
@@ -46,12 +55,17 @@ export default async function GstDashboardPage({
       <PageHeader
         eyebrow="Taxation & E-Invoicing Engine"
         title="GST Compliance Dashboard"
-        description={`Statutory filing returns, tax liability netting, and NIC E-Invoice operations for ${currentMonthName} ${year}.`}
+        description={`Statutory filing returns, tax liability netting, and NIC E-Invoice operations for ${currentMonthName} ${year}.${gstin ? ` (Filtered for GSTIN: ${gstin})` : ""}`}
         actions={
           <div className="flex flex-wrap items-center gap-2">
-            <GstPeriodSelector month={month} year={year} />
+            <GstPeriodSelector
+              month={month}
+              year={year}
+              selectedGstin={gstin}
+              availableGstins={availableGstins}
+            />
             <Link
-              href={`/dashboard/gst/returns?month=${month}&year=${year}`}
+              href={`/dashboard/gst/returns?month=${month}&year=${year}${gstin ? `&gstin=${gstin}` : ""}`}
               className="btn btn-secondary text-xs"
             >
               <FileDown className="h-3.5 w-3.5 mr-1" />

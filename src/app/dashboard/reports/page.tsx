@@ -31,6 +31,13 @@ const REPORT_CATEGORIES = [
         icon: BarChart3,
         badge: "Chain Owner",
       },
+      {
+        href: "/dashboard/reports/expiry-redistribution",
+        title: "Expiry Redistribution Suggestions",
+        desc: "Detect near-expiry batches in slow branches and reallocate to high-velocity stores before expiration.",
+        icon: TrendingUp,
+        badge: "Optimization",
+      },
     ],
   },
   {
