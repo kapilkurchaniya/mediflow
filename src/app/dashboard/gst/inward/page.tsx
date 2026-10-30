@@ -10,7 +10,7 @@ import {
 } from "lucide-react";
 import { PageHeader, StatCard } from "@/app/components/ui";
 import { formatINR } from "@/lib/money";
-import { getInwardSupplies } from "@/app/actions/gst";
+import { getInwardSupplies, getTenantGstinsAction } from "@/app/actions/gst";
 import { GstPeriodSelector } from "../GstPeriodSelector";
 
 export const dynamic = "force-dynamic";
@@ -18,14 +18,23 @@ export const dynamic = "force-dynamic";
 export default async function GstInwardPage({
   searchParams,
 }: {
-  searchParams: Promise<{ month?: string; year?: string }>;
+  searchParams: Promise<{ month?: string; year?: string; gstin?: string }>;
 }) {
   const resolved = await searchParams;
   const now = new Date();
   const month = resolved.month ? Number(resolved.month) : now.getMonth() + 1;
   const year = resolved.year ? Number(resolved.year) : now.getFullYear();
+  const gstin = resolved.gstin?.trim() || undefined;
 
-  const gstr2 = await getInwardSupplies({ month, year });
+  const [gstr2, tenantGstins] = await Promise.all([
+    getInwardSupplies({ month, year, gstin }),
+    getTenantGstinsAction(),
+  ]);
+
+  const availableGstins = tenantGstins.map((g) => ({
+    gstin: g.gstin,
+    label: `${g.gstin} (${g.stateName} - ${g.storeNames.join(", ")})`,
+  }));
 
   const monthNames = [
     "January", "February", "March", "April", "May", "June",
@@ -53,12 +62,17 @@ export default async function GstInwardPage({
         backHref="/dashboard/gst"
         eyebrow="Input Tax Credit (ITC / GSTR-2)"
         title="Inward Supplies & ITC Register"
-        description={`Register of pharmaceutical supplier invoices, GST inwards, and claimable Input Tax Credit for ${currentMonthName} ${year}.`}
+        description={`Register of pharmaceutical supplier invoices, GST inwards, and claimable Input Tax Credit for ${currentMonthName} ${year}.${gstin ? ` (Filtered for GSTIN: ${gstin})` : ""}`}
         actions={
           <div className="flex flex-wrap items-center gap-2">
-            <GstPeriodSelector month={month} year={year} />
+            <GstPeriodSelector
+              month={month}
+              year={year}
+              selectedGstin={gstin}
+              availableGstins={availableGstins}
+            />
             <Link
-              href={`/dashboard/gst/reconciliation?month=${month}&year=${year}`}
+              href={`/dashboard/gst/reconciliation?month=${month}&year=${year}${gstin ? `&gstin=${gstin}` : ""}`}
               className="btn btn-primary text-xs"
             >
               Reconcile with Books
