@@ -55,3 +55,4 @@ describe("Chain Reports & Multi-Store Filtering (Task B3.1)", () => {
     expect(marginPct).toBe(0);
   });
 });
+
