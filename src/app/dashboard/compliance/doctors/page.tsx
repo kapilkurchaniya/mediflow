@@ -12,5 +12,5 @@ export default async function DoctorsPage() {
   await requirePagePermission("prescription.approve");
   const doctors = await getDoctors();
 
-  return <DoctorsView initialDoctors={doctors as any} />;
+  return <DoctorsView initialDoctors={doctors} />;
 }

@@ -19,6 +19,11 @@ import {
 import { updateOrderStatus } from "@/app/actions/external-orders";
 import clsx from "clsx";
 
+interface OrderItemPreview {
+  name: string;
+  qty: number;
+}
+
 interface ExternalOrderItem {
   id: string;
   source: string;
@@ -27,7 +32,7 @@ interface ExternalOrderItem {
   customerName: string;
   customerPhone: string;
   status: string;
-  items: any;
+  items: unknown;
   totalAmount: number | null;
   notes: string | null;
   saleId: string | null;
@@ -110,7 +115,7 @@ export function OrdersClient({ initialOrders }: { initialOrders: ExternalOrderIt
           </div>
         ) : (
           filtered.map((order) => {
-            const items = Array.isArray(order.items) ? order.items : [];
+            const items = (Array.isArray(order.items) ? order.items : []) as OrderItemPreview[];
 
             return (
               <div key={order.id} className="card p-5 space-y-3 flex flex-col justify-between">
@@ -147,7 +152,7 @@ export function OrdersClient({ initialOrders }: { initialOrders: ExternalOrderIt
 
                   {/* Items Preview */}
                   <div className="pt-2 border-t border-ink-100 text-xs text-ink-600 space-y-1 bg-ink-50/50 p-2.5 rounded-lg">
-                    {items.slice(0, 3).map((it: any, idx: number) => (
+                    {items.slice(0, 3).map((it, idx: number) => (
                       <div key={idx} className="flex justify-between">
                         <span className="truncate max-w-[180px]">{it.name}</span>
                         <span className="font-mono text-ink-500">×{it.qty}</span>

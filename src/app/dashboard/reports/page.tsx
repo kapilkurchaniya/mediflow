@@ -21,6 +21,19 @@ export const metadata = {
 
 const REPORT_CATEGORIES = [
   {
+    category: "Multi-Store & Chain Intelligence",
+    desc: "Consolidated performance, store ranking, gross margins, and cross-branch inventory health.",
+    reports: [
+      {
+        href: "/dashboard/reports/chain",
+        title: "Chain Overview & Branch Performance",
+        desc: "Consolidated revenue, store ranking, margin comparisons, and near-expiry exposure.",
+        icon: BarChart3,
+        badge: "Chain Owner",
+      },
+    ],
+  },
+  {
     category: "Financial Statements",
     desc: "Statutory statements posted automatically via double-entry principles.",
     reports: [

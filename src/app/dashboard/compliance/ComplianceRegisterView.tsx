@@ -33,36 +33,7 @@ interface ComplianceStats {
   activePrescriptions: number;
 }
 
-interface DispensingLogRow {
-  log: {
-    id: string;
-    saleId: string;
-    medicineName: string;
-    batchNo: string;
-    expiryDate: string;
-    schedule: string;
-    patientName: string;
-    patientAge: number | null;
-    patientGender: string | null;
-    patientAddress: string | null;
-    patientPhone: string | null;
-    doctorName: string;
-    doctorRegNo: string | null;
-    doctorAddress: string | null;
-    prescriptionRef: string | null;
-    prescriptionDate: string | null;
-    quantityDispensed: number;
-    pharmacistName: string | null;
-    pharmacistRegNo: string | null;
-    statutoryRegister: string;
-    dispensedAt: Date;
-    notes: string | null;
-  };
-  sale: {
-    invoiceNo: string | null;
-    createdAt: Date;
-  };
-}
+export type DispensingLogRow = Awaited<ReturnType<typeof getDispensingLogs>>[number];
 
 export function ComplianceRegisterView({
   initialStats,
