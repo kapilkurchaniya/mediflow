@@ -71,6 +71,13 @@
       "when": 1793371169015,
       "tag": "0009_real_deadpool",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1793373987373,
+      "tag": "0010_eminent_white_queen",
+      "breakpoints": true
     }
   ]
 }

@@ -20,6 +20,7 @@ export const DEFAULT_ACCOUNTS = [
   { code: "2060", name: "Output SGST", type: "liability", systemKey: "sgst_output" },
   { code: "2070", name: "Output IGST", type: "liability", systemKey: "igst_output" },
   { code: "3010", name: "Sales Account", type: "income", systemKey: "sales" },
+  { code: "3020", name: "Discount Received", type: "income", systemKey: "discounts" },
   { code: "4010", name: "Purchase Account", type: "expense", systemKey: "purchases" },
   { code: "4090", name: "Round Off Account", type: "expense", systemKey: "roundoff" },
 ] as const;
@@ -281,6 +282,7 @@ export interface PostPurchaseJournalParams {
   sgst: number; // in paise
   igst: number; // in paise
   roundOff?: number; // in paise
+  cashDiscountAmount?: number; // in paise
   totalAmount: number; // in paise
 }
 
@@ -305,6 +307,7 @@ export async function postPurchaseJournalEntry(params: PostPurchaseJournalParams
     sgst,
     igst,
     roundOff,
+    cashDiscountAmount,
     totalAmount,
   } = params;
 
@@ -397,6 +400,17 @@ export async function postPurchaseJournalEntry(params: PostPurchaseJournalParams
         credit: 0,
       });
     }
+  }
+
+  // --- 2b. CASH DISCOUNT / DISCOUNT RECEIVED ---
+  if (cashDiscountAmount !== undefined && cashDiscountAmount > 0 && accounts.discounts) {
+    lines.push({
+      tenantId,
+      entryId: entry.id,
+      accountId: accounts.discounts,
+      debit: 0,
+      credit: cashDiscountAmount,
+    });
   }
 
   // --- 3. CREDIT (Supplier Creditors) ---

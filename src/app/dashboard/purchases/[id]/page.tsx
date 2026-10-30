@@ -93,9 +93,17 @@ export default async function PurchaseDetailPage({
             <span className="badge badge-success badge-dot">Stock Updated</span>
           </div>
           <div className="text-2xl font-black text-ink-900 num">{formatINR(purchase.totalAmount)}</div>
-          <div className="text-[12.5px] text-ink-500 flex justify-between">
-            <span>Taxable: {formatINR(purchase.taxableAmount ?? 0)}</span>
-            <span>Total GST: {formatINR(totalTax)}</span>
+          <div className="text-[12.5px] text-ink-500 space-y-0.5">
+            <div className="flex justify-between">
+              <span>Taxable: {formatINR(purchase.taxableAmount ?? 0)}</span>
+              <span>Total GST: {formatINR(totalTax)}</span>
+            </div>
+            {(purchase.cashDiscountAmount ?? 0) > 0 && (
+              <div className="flex justify-between text-emerald-700 font-medium">
+                <span>Cash Discount (CD):</span>
+                <span>- {formatINR(purchase.cashDiscountAmount ?? 0)}</span>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -139,6 +147,11 @@ export default async function PurchaseDetailPage({
                     {medicine.genericName && (
                       <p className="cell-sub">{medicine.genericName}</p>
                     )}
+                    {item.unitsPerPack > 1 && (
+                      <p className="text-[11px] text-brand-700 font-medium">
+                        1 {item.packUnit} = {item.unitsPerPack} {item.looseUnit}s
+                      </p>
+                    )}
                   </td>
                   <td className="font-mono text-[12.5px] font-bold text-ink-800">
                     {item.batchNo}
@@ -150,7 +163,16 @@ export default async function PurchaseDetailPage({
                     {item.qty}
                   </td>
                   <td className="text-right num text-emerald-700 font-medium">
-                    {item.freeQty > 0 ? `+${item.freeQty}` : "—"}
+                    {item.freeQty > 0 ? (
+                      <div>
+                        <span>+{item.freeQty}</span>
+                        <span className="badge badge-success text-[10px] block mt-0.5">
+                          {item.schemeType || `${item.qty}+${item.freeQty}`}
+                        </span>
+                      </div>
+                    ) : (
+                      "—"
+                    )}
                   </td>
                   <td className="text-right num text-ink-800">
                     {formatINR(item.rate)}
@@ -180,6 +202,7 @@ export default async function PurchaseDetailPage({
                 </td>
                 <td colSpan={3} className="text-right num text-ink-600 text-[12.5px]">
                   Taxable: {formatINR(purchase.taxableAmount ?? 0)} · GST: {formatINR(totalTax)}
+                  {(purchase.cashDiscountAmount ?? 0) > 0 ? ` · CD: -${formatINR(purchase.cashDiscountAmount ?? 0)}` : ""}
                 </td>
                 <td className="text-right num text-brand-700 text-[15px]">
                   {formatINR(purchase.totalAmount)}

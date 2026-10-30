@@ -125,6 +125,7 @@ export interface DocTotals {
   cgst: number;
   sgst: number;
   igst: number;
+  tax?: number;
   roundOff: number;
   total: number;
 }
@@ -162,6 +163,7 @@ export function computeSaleTotals(lines: SaleLineInput[], interState = false, bi
     cgst: sum("cgst"),
     sgst: sum("sgst"),
     igst: sum("igst"),
+    tax: sum("tax"),
     roundOff,
     total: rounded,
   };
@@ -170,25 +172,59 @@ export function computeSaleTotals(lines: SaleLineInput[], interState = false, bi
 export interface PurchaseLineInput {
   qty: number;
   freeQty: number;
-  rate: number; // GST-exclusive per unit
-  discountBp: number;
+  rate: number; // GST-exclusive per purchase pack
+  discountBp?: number; // legacy alias for tradeDiscountBp
+  tradeDiscountBp?: number;
+  cashDiscountBp?: number;
+  unitsPerPack?: number;
   gstRateBp: number;
 }
 
 export interface PurchaseLineResult extends TaxSplit {
   gross: number;
-  discount: number;
+  discount: number; // trade discount in paise
+  tradeDiscount: number; // trade discount in paise
+  cashDiscount: number; // cash discount in paise
   total: number;
-  landedUnitCost: number; // taxable / (qty + free)
+  totalPacks: number;
+  totalBaseUnits: number;
+  unitsPerPack: number;
+  landedPackCost: number; // (taxable - cashDiscount) / totalPacks
+  landedUnitCost: number; // (taxable - cashDiscount) / totalBaseUnits
 }
 
 export function computePurchaseLine(line: PurchaseLineInput, interState = false): PurchaseLineResult {
+  const tradeDiscountBp = line.tradeDiscountBp ?? line.discountBp ?? 0;
+  const cashDiscountBp = line.cashDiscountBp ?? 0;
+  const upp = Math.max(1, line.unitsPerPack ?? 1);
+
   const gross = line.qty * line.rate;
-  const discount = Math.round((gross * line.discountBp) / 10000);
-  const taxable = gross - discount;
+  const tradeDiscount = Math.round((gross * tradeDiscountBp) / 10000);
+  const taxable = gross - tradeDiscount;
   const t = taxOnExclusive(taxable, line.gstRateBp, interState);
-  const units = line.qty + line.freeQty;
-  return { gross, discount, ...t, total: taxable + t.tax, landedUnitCost: units > 0 ? Math.round(taxable / units) : 0 };
+
+  const cashDiscount = Math.round((taxable * cashDiscountBp) / 10000);
+  const total = taxable + t.tax - cashDiscount;
+
+  const totalPacks = line.qty + line.freeQty;
+  const totalBaseUnits = totalPacks * upp;
+
+  const landedPackCost = totalPacks > 0 ? Math.round((taxable - cashDiscount) / totalPacks) : 0;
+  const landedUnitCost = totalBaseUnits > 0 ? Math.round((taxable - cashDiscount) / totalBaseUnits) : 0;
+
+  return {
+    gross,
+    discount: tradeDiscount,
+    tradeDiscount,
+    cashDiscount,
+    ...t,
+    total,
+    totalPacks,
+    totalBaseUnits,
+    unitsPerPack: upp,
+    landedPackCost,
+    landedUnitCost,
+  };
 }
 
 export function computePurchaseTotals(lines: PurchaseLineInput[], interState = false) {
@@ -200,10 +236,13 @@ export function computePurchaseTotals(lines: PurchaseLineInput[], interState = f
     lines: results,
     gross: sum("gross"),
     discount: sum("discount"),
+    tradeDiscount: sum("tradeDiscount"),
+    cashDiscount: sum("cashDiscount"),
     taxable: sum("taxable"),
     cgst: sum("cgst"),
     sgst: sum("sgst"),
     igst: sum("igst"),
+    tax: sum("tax"),
     roundOff,
     total: rounded,
   };

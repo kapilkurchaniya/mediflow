@@ -7,9 +7,10 @@ import { createPurchaseInvoice, PurchaseItemInput } from "@/app/actions/purchase
 import { getSuppliers } from "@/app/actions/suppliers";
 import { getMedicines } from "@/app/actions/inventory";
 import { getPurchaseOrder } from "@/app/actions/purchase-orders";
-import { Save, Plus, Trash2, FileText, Truck, AlertCircle, ClipboardList } from "lucide-react";
+import { Save, Plus, Trash2, FileText, Truck, AlertCircle, ClipboardList, Layers } from "lucide-react";
 import { PageHeader } from "@/app/components/ui";
 import { formatINR } from "@/lib/format";
+import { computePurchaseTotals } from "@/lib/money";
 import { DEFAULT_GST_RATE_BP, isValidGstRateBp, type GstRateBp } from "@/lib/regulatory";
 
 function NewPurchaseForm() {
@@ -17,7 +18,14 @@ function NewPurchaseForm() {
   const poId = searchParams.get("poId");
 
   const [suppliers, setSuppliers] = useState<{ id: string; name: string }[]>([]);
-  const [medicines, setMedicines] = useState<{ id: string; name: string; gstRateBp: number }[]>([]);
+  const [medicines, setMedicines] = useState<{
+    id: string;
+    name: string;
+    gstRateBp: number;
+    unitsPerPack: number;
+    packUnit: string;
+    looseUnit: string;
+  }[]>([]);
   const [linkedPo, setLinkedPo] = useState<{ id: string; poNo: string } | null>(null);
 
   const [supplierId, setSupplierId] = useState("");
@@ -34,6 +42,9 @@ function NewPurchaseForm() {
           id: m.medicine.id,
           name: m.medicine.name,
           gstRateBp: m.medicine.gstRateBp,
+          unitsPerPack: m.medicine.unitsPerPack ?? 1,
+          packUnit: m.medicine.packUnit ?? "strip",
+          looseUnit: m.medicine.looseUnit ?? "tablet",
         }))
       );
     });
@@ -55,6 +66,11 @@ function NewPurchaseForm() {
                 mrp: Math.round(i.rate * 1.3),
                 saleRate: Math.round(i.rate * 1.2),
                 discountBp: 0,
+                tradeDiscountBp: 0,
+                cashDiscountBp: 0,
+                unitsPerPack: 1,
+                packUnit: "strip",
+                looseUnit: "tablet",
                 gstRateBp: DEFAULT_GST_RATE_BP,
               }))
             );
@@ -97,6 +113,11 @@ function NewPurchaseForm() {
         mrp: 0,
         saleRate: 0,
         discountBp: 0,
+        tradeDiscountBp: 0,
+        cashDiscountBp: 0,
+        unitsPerPack: 1,
+        packUnit: "strip",
+        looseUnit: "tablet",
         gstRateBp: DEFAULT_GST_RATE_BP,
       },
     ]);
@@ -112,22 +133,16 @@ function NewPurchaseForm() {
     setItems(items.filter((_, i) => i !== index));
   };
 
-  const totals = items.reduce(
-    (acc, item) => {
-      const gross = item.qty * item.rate;
-      const discount = Math.round((gross * (item.discountBp || 0)) / 10000);
-      const taxable = gross - discount;
-      const gst = Math.round((taxable * item.gstRateBp) / 10000);
-      const total = taxable + gst;
-
-      return {
-        gross: acc.gross + gross,
-        disc: acc.disc + discount,
-        tax: acc.tax + gst,
-        net: acc.net + total,
-      };
-    },
-    { gross: 0, disc: 0, tax: 0, net: 0 }
+  const totals = computePurchaseTotals(
+    items.map((item) => ({
+      qty: item.qty,
+      freeQty: item.freeQty || 0,
+      rate: item.rate,
+      tradeDiscountBp: item.tradeDiscountBp ?? item.discountBp ?? 0,
+      cashDiscountBp: item.cashDiscountBp ?? 0,
+      unitsPerPack: item.unitsPerPack ?? 1,
+      gstRateBp: item.gstRateBp,
+    }))
   );
 
   return (
@@ -240,34 +255,32 @@ function NewPurchaseForm() {
             <table className="data-table text-[12px] w-full">
               <thead>
                 <tr>
-                  <th className="w-48">Medicine</th>
+                  <th className="w-56">Medicine & Packaging</th>
                   <th className="w-28">Batch No</th>
                   <th className="w-28">Expiry</th>
-                  <th className="w-16 text-center">Qty</th>
-                  <th className="w-16 text-center">Free</th>
-                  <th className="w-24 text-right">Cost Rate (₹)</th>
-                  <th className="w-20 text-center">GST %</th>
-                  <th className="w-24 text-right">MRP (₹)</th>
-                  <th className="w-24 text-right">Sale Rate (₹)</th>
-                  <th className="w-16 text-center">Disc %</th>
-                  <th className="w-24 text-right">Total</th>
+                  <th className="w-18 text-center">Billed (Pk)</th>
+                  <th className="w-18 text-center">Free (Scheme)</th>
+                  <th className="w-24 text-right">Cost/Pk (₹)</th>
+                  <th className="w-16 text-center">TD %</th>
+                  <th className="w-18 text-center">GST %</th>
+                  <th className="w-16 text-center">CD %</th>
+                  <th className="w-24 text-right">MRP/Pk (₹)</th>
+                  <th className="w-28 text-right">Landed Cost</th>
+                  <th className="w-24 text-right">Payable</th>
                   <th className="w-10"></th>
                 </tr>
               </thead>
               <tbody>
                 {items.length === 0 ? (
                   <tr>
-                    <td colSpan={12} className="text-center py-8 text-ink-400">
+                    <td colSpan={13} className="text-center py-8 text-ink-400">
                       No line items yet. Click &ldquo;Add Row&rdquo; to start recording received batches.
                     </td>
                   </tr>
                 ) : (
                   items.map((item, index) => {
-                    const gross = item.qty * item.rate;
-                    const discount = Math.round((gross * (item.discountBp || 0)) / 10000);
-                    const taxable = gross - discount;
-                    const gst = Math.round((taxable * item.gstRateBp) / 10000);
-                    const lineTotal = taxable + gst;
+                    const lineRes = totals.lines[index];
+                    const upp = Math.max(1, item.unitsPerPack ?? 1);
 
                     return (
                       <tr key={index} className="hover:bg-ink-50/50">
@@ -279,6 +292,9 @@ function NewPurchaseForm() {
                               updateItem(index, "medicineId", e.target.value);
                               if (med) {
                                 updateItem(index, "gstRateBp", isValidGstRateBp(med.gstRateBp) ? med.gstRateBp : DEFAULT_GST_RATE_BP);
+                                updateItem(index, "unitsPerPack", med.unitsPerPack || 1);
+                                updateItem(index, "packUnit", med.packUnit || "strip");
+                                updateItem(index, "looseUnit", med.looseUnit || "tablet");
                               }
                             }}
                             className="input !h-8.5 text-[12px]"
@@ -291,6 +307,14 @@ function NewPurchaseForm() {
                               </option>
                             ))}
                           </select>
+                          {upp > 1 && (
+                            <div className="flex items-center gap-1 mt-1 text-[11px] text-brand-700 font-medium">
+                              <Layers className="w-3 h-3" />
+                              <span>
+                                1 {item.packUnit || "strip"} = {upp} {item.looseUnit || "tablet"}s
+                              </span>
+                            </div>
+                          )}
                         </td>
                         <td>
                           <input
@@ -330,6 +354,11 @@ function NewPurchaseForm() {
                             className="input !h-8.5 text-center num text-[12.5px]"
                             placeholder="0"
                           />
+                          {(item.freeQty || 0) > 0 && (
+                            <span className="badge badge-success text-[10px] mt-0.5 font-mono whitespace-nowrap block text-center">
+                              {item.qty}+{item.freeQty} Free
+                            </span>
+                          )}
                         </td>
                         <td>
                           <input
@@ -343,6 +372,22 @@ function NewPurchaseForm() {
                             className="input !h-8.5 text-right num text-[12.5px]"
                             placeholder="0.00"
                             required
+                          />
+                        </td>
+                        <td>
+                          <input
+                            type="number"
+                            step="0.1"
+                            min="0"
+                            max="100"
+                            value={item.tradeDiscountBp !== undefined ? item.tradeDiscountBp / 100 : item.discountBp ? item.discountBp / 100 : ""}
+                            onChange={(e) => {
+                              const bp = Math.round(parseFloat(e.target.value) * 100) || 0;
+                              updateItem(index, "tradeDiscountBp", bp);
+                              updateItem(index, "discountBp", bp);
+                            }}
+                            className="input !h-8.5 text-center num text-[12px]"
+                            placeholder="0"
                           />
                         </td>
                         <td>
@@ -361,6 +406,21 @@ function NewPurchaseForm() {
                         <td>
                           <input
                             type="number"
+                            step="0.1"
+                            min="0"
+                            max="100"
+                            value={item.cashDiscountBp ? item.cashDiscountBp / 100 : ""}
+                            onChange={(e) => {
+                              const bp = Math.round(parseFloat(e.target.value) * 100) || 0;
+                              updateItem(index, "cashDiscountBp", bp);
+                            }}
+                            className="input !h-8.5 text-center num text-[12px]"
+                            placeholder="0"
+                          />
+                        </td>
+                        <td>
+                          <input
+                            type="number"
                             step="0.01"
                             min="0"
                             value={item.mrp ? (item.mrp / 100).toFixed(2) : ""}
@@ -372,35 +432,20 @@ function NewPurchaseForm() {
                             required
                           />
                         </td>
-                        <td>
-                          <input
-                            type="number"
-                            step="0.01"
-                            min="0"
-                            value={item.saleRate ? (item.saleRate / 100).toFixed(2) : ""}
-                            onChange={(e) =>
-                              updateItem(index, "saleRate", Math.round(parseFloat(e.target.value) * 100) || 0)
-                            }
-                            className="input !h-8.5 text-right num text-[12.5px]"
-                            placeholder="0.00"
-                          />
-                        </td>
-                        <td>
-                          <input
-                            type="number"
-                            step="0.1"
-                            min="0"
-                            max="100"
-                            value={item.discountBp ? item.discountBp / 100 : ""}
-                            onChange={(e) =>
-                              updateItem(index, "discountBp", Math.round(parseFloat(e.target.value) * 100) || 0)
-                            }
-                            className="input !h-8.5 text-center num text-[12px]"
-                            placeholder="0"
-                          />
+                        <td className="text-right text-[11.5px] leading-snug">
+                          <div className="font-semibold text-ink-900 num">
+                            {formatINR(lineRes.landedPackCost)}
+                            <span className="text-[10px] text-ink-500 font-normal">/{item.packUnit || "pk"}</span>
+                          </div>
+                          {upp > 1 && (
+                            <div className="text-brand-700 font-medium num text-[10.5px]">
+                              {formatINR(lineRes.landedUnitCost)}
+                              <span className="text-[9.5px] text-ink-400">/{item.looseUnit || "unit"}</span>
+                            </div>
+                          )}
                         </td>
                         <td className="text-right font-bold num text-ink-900 text-[13px]">
-                          {formatINR(lineTotal)}
+                          {formatINR(lineRes.total)}
                         </td>
                         <td className="text-right">
                           <button
@@ -430,17 +475,29 @@ function NewPurchaseForm() {
                 <span>Gross Amount</span>
                 <span className="num font-medium text-ink-900">{formatINR(totals.gross)}</span>
               </div>
-              <div className="flex justify-between text-brand-700">
-                <span>Total Discount</span>
-                <span className="num font-medium">- {formatINR(totals.disc)}</span>
+              {totals.tradeDiscount > 0 && (
+                <div className="flex justify-between text-brand-700">
+                  <span>Trade Discount (TD)</span>
+                  <span className="num font-medium">- {formatINR(totals.tradeDiscount)}</span>
+                </div>
+              )}
+              <div className="flex justify-between text-ink-600 font-medium pt-1 border-t border-ink-150">
+                <span>Taxable Amount</span>
+                <span className="num font-semibold text-ink-900">{formatINR(totals.taxable)}</span>
               </div>
               <div className="flex justify-between text-ink-600">
                 <span>Input GST</span>
                 <span className="num font-medium text-ink-900">+ {formatINR(totals.tax)}</span>
               </div>
+              {totals.cashDiscount > 0 && (
+                <div className="flex justify-between text-emerald-700">
+                  <span>Cash Discount (CD)</span>
+                  <span className="num font-medium">- {formatINR(totals.cashDiscount)}</span>
+                </div>
+              )}
               <div className="flex justify-between text-base font-bold text-ink-900 pt-3 border-t border-ink-200">
                 <span>Total Payable</span>
-                <span className="text-xl font-black text-brand-700 num">{formatINR(totals.net)}</span>
+                <span className="text-xl font-black text-brand-700 num">{formatINR(totals.total)}</span>
               </div>
             </div>
 
