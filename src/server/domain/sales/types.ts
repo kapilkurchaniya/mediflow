@@ -62,6 +62,8 @@ export type SalePayment = z.infer<typeof SalePaymentSchema>;
 export const SaleInput = z.object({
   /** Idempotency key (double click, offline retry). A second call with the same id returns the first sale. */
   clientSaleId: z.string().uuid().optional(),
+  /** Resumed held sale ID to delete/clean up upon completion (A2.3). */
+  heldSaleId: z.string().uuid().optional(),
   customerId: z.string().uuid().optional(),
   lines: z.array(SaleLineSchema).min(1, "No items to bill"),
   /** Extra discount on the whole bill, paise (A2.2+). */
