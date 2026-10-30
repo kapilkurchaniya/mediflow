@@ -266,4 +266,144 @@ describe("Purchase Totals & Landed Cost Integration (B1.7 / B-2.0 / B-2.0a)", ()
       )
     ).rejects.toThrow();
   });
+
+  it("processes pharma schemes (10+1 free, TD 10%, CD 2%, 10 tablets/pack) with stock units, landed unit cost, and balanced discount received ledger posting", async () => {
+    const world = await makeWorld(t.db);
+    const supplier = await makeSupplier(t.db, world.tenant.id, {
+      name: "Apex Pharma Stockist",
+      stateCode: "27", // intra-state
+    });
+
+    const medicine = await makeMedicine(t.db, world.tenant.id, {
+      name: "Amoxyclav 625mg",
+      unitsPerPack: 10,
+      packUnit: "strip",
+      looseUnit: "tablet",
+      gstRateBp: 1200,
+    });
+
+    // Scheme: Buy 10 strips, get 1 strip free (10+1)
+    // Strip rate: ₹100 (10000 paise excl GST)
+    // Trade discount: 10% (1000 bp)
+    // Cash discount: 2% (200 bp)
+    // GST: 12% (1200 bp)
+    const res = await t.db.transaction((tx) =>
+      createPurchase(
+        tx,
+        {
+          tenantId: world.tenant.id,
+          storeId: world.store.id,
+          userId: world.user.id,
+        },
+        {
+          supplierId: supplier.id,
+          supplierInvoiceNo: "APEX-SCH-101",
+          invoiceDate: "2026-10-22",
+          items: [
+            {
+              medicineId: medicine.id,
+              batchNo: "APX-88",
+              expiryDate: "2027-11-30",
+              qty: 10,
+              freeQty: 1,
+              rate: 10000,
+              mrp: 18000,
+              saleRate: 16000,
+              tradeDiscountBp: 1000,
+              cashDiscountBp: 200,
+              gstRateBp: 1200,
+            },
+          ],
+        }
+      )
+    );
+
+    // 1. Purchase invoice financial assertions
+    // Gross: 10 * 10000 = 100000
+    // Trade discount: 10000
+    // Taxable: 90000
+    // CGST: 5400, SGST: 5400
+    // Cash discount: 1800 (2% of 90000)
+    // Total payable: 90000 + 10800 - 1800 = 99000
+    expect(res.purchase.grossAmount).toBe(100000);
+    expect(res.purchase.tradeDiscountAmount).toBe(10000);
+    expect(res.purchase.taxableAmount).toBe(90000);
+    expect(res.purchase.cgst).toBe(5400);
+    expect(res.purchase.sgst).toBe(5400);
+    expect(res.purchase.cashDiscountAmount).toBe(1800);
+    expect(res.purchase.totalAmount).toBe(99000);
+
+    // 2. Physical batch inventory conversion: 11 strips * 10 tablets/strip = 110 base units
+    // Landed cost per tablet: (90000 - 1800) / 110 = 802 paise (₹8.02)
+    const [batch] = await t.db
+      .select()
+      .from(schema.batches)
+      .where(
+        and(
+          eq(schema.batches.storeId, world.store.id),
+          eq(schema.batches.batchNo, "APX-88")
+        )
+      );
+
+    expect(batch).toBeDefined();
+    expect(batch.qtyOnHand).toBe(110);
+    expect(batch.purchaseRate).toBe(802); // Landed cost per base unit (tablet)
+
+    // 3. Purchase item packaging & scheme record
+    const [purchaseItem] = await t.db
+      .select()
+      .from(schema.purchaseItems)
+      .where(eq(schema.purchaseItems.purchaseId, res.purchase.id));
+
+    expect(purchaseItem).toBeDefined();
+    expect(purchaseItem.unitsPerPack).toBe(10);
+    expect(purchaseItem.packUnit).toBe("strip");
+    expect(purchaseItem.looseUnit).toBe("tablet");
+    expect(purchaseItem.schemeType).toBe("10+1");
+    expect(purchaseItem.tradeDiscountBp).toBe(1000);
+    expect(purchaseItem.cashDiscountBp).toBe(200);
+    expect(purchaseItem.discountAmount).toBe(10000);
+    expect(purchaseItem.cashDiscountAmount).toBe(1800);
+    expect(purchaseItem.landedUnitCost).toBe(802);
+
+    // 4. Stock movement audit
+    const [movement] = await t.db
+      .select()
+      .from(schema.stockMovements)
+      .where(
+        and(
+          eq(schema.stockMovements.storeId, world.store.id),
+          eq(schema.stockMovements.refId, res.purchase.id)
+        )
+      );
+
+    expect(movement).toBeDefined();
+    expect(movement.qtyChange).toBe(110);
+    expect(movement.unitCost).toBe(802);
+
+    // 5. Double-entry accounting ledger balance
+    const [journalEntry] = await t.db
+      .select()
+      .from(schema.journalEntries)
+      .where(
+        and(
+          eq(schema.journalEntries.tenantId, world.tenant.id),
+          eq(schema.journalEntries.refId, res.purchase.id)
+        )
+      );
+
+    expect(journalEntry).toBeDefined();
+    const journalLines = await t.db
+      .select()
+      .from(schema.journalLines)
+      .where(eq(schema.journalLines.entryId, journalEntry.id));
+
+    // Debits: Purchases (90000) + CGST Input (5400) + SGST Input (5400) = 100800
+    // Credits: Supplier Creditors (99000) + Discount Received (1800) = 100800
+    const totalDebit = journalLines.reduce((s, l) => s + (l.debit ?? 0), 0);
+    const totalCredit = journalLines.reduce((s, l) => s + (l.credit ?? 0), 0);
+    expect(totalDebit).toBe(100800);
+    expect(totalCredit).toBe(100800);
+    expect(totalDebit).toBe(totalCredit);
+  });
 });

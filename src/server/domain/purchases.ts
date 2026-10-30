@@ -29,6 +29,12 @@ export const PurchaseItemInputSchema = z.object({
   mrp: z.number().int().min(0, "MRP cannot be negative"), // paise
   saleRate: z.number().int().min(0, "Sale rate cannot be negative"), // paise
   discountBp: z.number().int().min(0).max(10000, "Discount cannot exceed 100%").default(0),
+  tradeDiscountBp: z.number().int().min(0).max(10000, "Trade discount cannot exceed 100%").optional(),
+  cashDiscountBp: z.number().int().min(0).max(10000, "Cash discount cannot exceed 100%").optional(),
+  schemeType: z.string().optional(),
+  unitsPerPack: z.number().int().min(1).optional(),
+  packUnit: z.string().optional(),
+  looseUnit: z.string().optional(),
   gstRateBp: z.number().int().refine((bp) => isValidGstRateBp(bp), {
     message: "Invalid GST rate",
   }),
@@ -46,6 +52,12 @@ export interface CreatePurchaseItemInput {
   mrp: number; // paise
   saleRate: number; // paise
   discountBp?: number; // basis points, default 0
+  tradeDiscountBp?: number;
+  cashDiscountBp?: number;
+  schemeType?: string;
+  unitsPerPack?: number;
+  packUnit?: string;
+  looseUnit?: string;
   gstRateBp: number; // basis points (must be in GST_RATES_BP)
 }
 
@@ -174,14 +186,30 @@ export async function createPurchase(
   const supplierStateCode = (supplier.stateCode || extractStateCodeFromGstin(supplier.gstin) || storeStateCode).padStart(2, "0");
   const isInterState = supplierStateCode !== storeStateCode;
 
+  // 2b. Fetch Medicines for packaging conversion & metadata snapshots
+  const medIds = input.items.map((i) => i.medicineId);
+  const dbMedicines = await tx
+    .select()
+    .from(schema.medicines)
+    .where(and(eq(schema.medicines.tenantId, ctx.tenantId), inArray(schema.medicines.id, medIds)));
+
   // 3. Compute Totals on Server
-  const normalizedLines = input.items.map((item) => ({
-    qty: item.qty,
-    freeQty: item.freeQty ?? 0,
-    rate: item.rate,
-    discountBp: item.discountBp ?? 0,
-    gstRateBp: item.gstRateBp,
-  }));
+  const normalizedLines = input.items.map((item) => {
+    const med = dbMedicines.find((m) => m.id === item.medicineId);
+    const upp = Math.max(1, item.unitsPerPack ?? med?.unitsPerPack ?? 1);
+    const tradeDiscountBp = item.tradeDiscountBp ?? item.discountBp ?? 0;
+    const cashDiscountBp = item.cashDiscountBp ?? 0;
+    return {
+      qty: item.qty,
+      freeQty: item.freeQty ?? 0,
+      rate: item.rate,
+      discountBp: tradeDiscountBp,
+      tradeDiscountBp,
+      cashDiscountBp,
+      unitsPerPack: upp,
+      gstRateBp: item.gstRateBp,
+    };
+  });
 
   const totals = computePurchaseTotals(normalizedLines, isInterState);
 
@@ -203,6 +231,8 @@ export async function createPurchase(
       isInterState,
       grossAmount: totals.gross,
       discountAmount: totals.discount,
+      tradeDiscountAmount: totals.tradeDiscount,
+      cashDiscountAmount: totals.cashDiscount,
       taxableAmount: totals.taxable,
       cgst: totals.cgst,
       sgst: totals.sgst,
@@ -221,7 +251,14 @@ export async function createPurchase(
   for (let i = 0; i < input.items.length; i++) {
     const item = input.items[i];
     const lineRes = totals.lines[i];
-    const landedCost = lineRes.landedUnitCost; // taxable / (qty + free)
+    const med = dbMedicines.find((m) => m.id === item.medicineId);
+    const upp = Math.max(1, item.unitsPerPack ?? med?.unitsPerPack ?? 1);
+    const packUnit = item.packUnit ?? med?.packUnit ?? "strip";
+    const looseUnit = item.looseUnit ?? med?.looseUnit ?? "tablet";
+    const tradeDiscountBp = item.tradeDiscountBp ?? item.discountBp ?? 0;
+    const cashDiscountBp = item.cashDiscountBp ?? 0;
+
+    const landedCost = lineRes.landedUnitCost; // taxable / totalBaseUnits
     const cleanBatchNo = item.batchNo.trim().toUpperCase();
 
     // Check if batch already exists in this store
@@ -271,8 +308,9 @@ export async function createPurchase(
       batchId = newBatch.id;
     }
 
-    // Record stock movement (qty + freeQty)
-    const totalQtyReceived = item.qty + (item.freeQty ?? 0);
+    // Record stock movement (canonical base units: (qty + freeQty) * unitsPerPack)
+    const totalPacksReceived = item.qty + (item.freeQty ?? 0);
+    const totalBaseUnitsReceived = totalPacksReceived * upp;
     await recordStockMovement({
       tx: tx as unknown as Tx,
       tenantId: ctx.tenantId,
@@ -280,7 +318,7 @@ export async function createPurchase(
       batchId,
       medicineId: item.medicineId,
       type: "purchase",
-      qtyChange: totalQtyReceived,
+      qtyChange: totalBaseUnitsReceived,
       unitCost: landedCost, // landed unit cost
       refType: "purchase",
       refId: purchase.id,
@@ -297,13 +335,20 @@ export async function createPurchase(
         batchId,
         batchNo: cleanBatchNo,
         expiryDate: item.expiryDate,
+        unitsPerPack: upp,
+        packUnit,
+        looseUnit,
+        schemeType: item.schemeType ?? (item.freeQty ? `${item.qty}+${item.freeQty}` : null),
         qty: item.qty,
         freeQty: item.freeQty ?? 0,
         rate: item.rate,
         mrp: item.mrp,
         saleRate: item.saleRate,
-        discountBp: item.discountBp ?? 0,
-        discountAmount: lineRes.discount,
+        discountBp: tradeDiscountBp,
+        tradeDiscountBp,
+        cashDiscountBp,
+        discountAmount: lineRes.tradeDiscount,
+        cashDiscountAmount: lineRes.cashDiscount,
         taxableAmount: lineRes.taxable,
         gstRateBp: item.gstRateBp,
         cgst: lineRes.cgst,
@@ -404,6 +449,7 @@ export async function createPurchase(
     sgst: totals.sgst,
     igst: totals.igst,
     roundOff: totals.roundOff,
+    cashDiscountAmount: totals.cashDiscount,
     totalAmount: totals.total,
   });
 

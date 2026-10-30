@@ -13,7 +13,7 @@ In addition, we performed in-depth competitive research comparing MediFlow again
 All 4 strict validation checks are **100% passing**:
 - **TypeScript**: 0 errors
 - **Strict Linting**: 0 warnings, 0 errors
-- **Automated Tests**: 34 test files, 537 integration & unit tests passing
+- **Automated Tests**: 34 test files, 541 integration & unit tests passing
 - **Production Build**: Next.js 16 (Turbopack) compiled cleanly across all 58 routes
 
 ---
@@ -84,6 +84,22 @@ A dedicated partner research dossier was added at:
 
 ---
 
+### F. Pharma Purchase Scheme Engine & Landed Cost Derivation (Task B2.8)
+* **Real-World Procurement Problem:** In Indian pharma distribution, stockists rarely sell medicines at flat rates. Orders include free goods (e.g., `10+1 free`, `10+2 free`, `100+10`), Trade Discounts (TD% reducing the invoice taxable base), and Cash Discounts (CD% for prompt payment). If a chemist doesn't dilute the purchase cost across both paid and bonus stock, inventory is overvalued on the balance sheet, tax is overpaid, and retail profit margins are distorted.
+* **The Solution:**
+  1. **Canonical Landed Unit Cost Dilution Formula:**
+     $$\text{gross} = \text{billedQty} \times \text{packRate}$$
+     $$\text{tradeDiscount} = \operatorname{round}\left(\frac{\text{gross} \times \text{TD}}{10000}\right)$$
+     $$\text{taxable} = \text{gross} - \text{tradeDiscount}$$
+     $$\text{cashDiscount} = \operatorname{round}\left(\frac{\text{taxable} \times \text{CD}}{10000}\right)$$
+     $$\text{landedCostPerBaseUnit} = \operatorname{round}\left(\frac{\text{taxable} - \text{cashDiscount}}{(\text{billedQty} + \text{freeQty}) \times \text{unitsPerPack}}\right)$$
+  2. **Base-Unit Stock Ledger Synchronization:** Free packs are added to physical inventory in canonical base units without entering taxable accounts. For example, a `10+1 free` invoice for a 10-tablet strip immediately adds $11 \times 10 = 110$ tablets to `batches.qtyOnHand` and `stock_movements`.
+  3. **Double-Entry Discount Posting:** Cash discounts are credited to `Discount Received` (`3020`), perfectly balancing the general ledger:
+     $$\text{Debit Purchases} + \text{Debit Input GST} = \text{Credit Supplier Payable} + \text{Credit Discount Received}$$
+  4. **GRN Counter UI & Live Cost Preview:** The purchase entry screen displays real-time previews of landed cost per pack and per loose tablet alongside scheme badges (e.g. `10+1 Free`) and packaging ratios.
+
+---
+
 ## 3. Pull Request Consolidation History
 
 Every PR in the queue has been systematically repaired, tested, and squash-merged into `main`:
@@ -100,11 +116,8 @@ Every PR in the queue has been systematically repaired, tested, and squash-merge
 | **#25** | `lane-a/a2-2-split-tender` | Split-tender POS payments, credit ledger, packaging schema, Marg research | Merged |
 | **#26** | `lane-a/docs-partner-summary` | Partner update summary and architecture briefing | Merged |
 | **#27** | `lane-a/a2-10-unit-conversion` | Pharmacy unit conversion engine & loose tablet cutting | Merged |
-
-**Current Repository State:**
-* `origin/main` is up to date (`97eb6dd`).
-* Zero open PRs.
-* Zero merge conflicts.
+| **#28** | `lane-a/a2-11-fefo-allocation` | Automatic FEFO batch allocation & audited overrides | Merged |
+| **#29** | `lane-a/b2-8-purchase-schemes` | Pharma purchase scheme engine (10+1 free, TD%, CD%) | Active / In Review |
 
 ---
 
@@ -123,7 +136,7 @@ git pull origin main
 # 3. Ensure dependencies are up to date
 npm install
 
-# 4. Verify test suite (all 34 test files, 537 tests)
+# 4. Verify test suite (all 34 test files, 541 tests)
 npm test
 
 # 5. Verify TypeScript and Strict Linter
@@ -136,8 +149,9 @@ npm run dev
 
 ---
 
-## 5. Next Planned Milestone: Task B2.8
+## 5. Next Planned Milestones
 
-Based on our architectural consultation with ChatGPT in the `"Mediflow Assistance chat"` thread:
-* **Task B2.8:** **Pharma Purchase Scheme Engine (`10+1 free`, Trade Discount % + Cash Discount % landed unit cost derivation)**.
-* **Why next:** With canonical base-unit inventory (A2.10) and auto-FEFO dispensing (A2.11) complete, procurement scheme costing closes the loop on batch inventory valuation and gross margin calculations across paid and bonus stock.
+With **Phase 2 Lane B (B2.1 to B2.8)** 100% complete:
+1. **Task A2.3:** Prescription Management & Statutory Drug Registers (Schedule H, H1, X, Narcotics).
+2. **Task A2.4:** Customer Khata & Outstanding Receivables Ledger.
+3. **Phase 3:** Advanced Inventory, Physical Stocktake & Multi-Store Transfers.

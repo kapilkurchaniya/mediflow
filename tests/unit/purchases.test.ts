@@ -279,4 +279,94 @@ describe("Purchase Input Schema & Validation (B1.7)", () => {
     expect(computed.total).toBe(630000);
     expect(computed.landedUnitCost).toBe(5455);
   });
+
+  describe("Pharma Purchase Scheme Engine (Task B2.8)", () => {
+    it("computes 10+1 free goods scheme with Trade Discount 10% and Cash Discount 2%", () => {
+      // 10 billed packs + 1 free pack at ₹100 (10000 paise) per pack
+      // Units per pack: 10 tablets/pack -> 110 total tablets received
+      // Gross: 10 * 10000 = 100000 paise
+      // Trade Discount (10%): 10000 paise
+      // Taxable: 90000 paise
+      // GST (12%): 10800 paise
+      // Cash Discount (2% on taxable): 1800 paise
+      // Net Total Payable: 90000 + 10800 - 1800 = 99000 paise (₹990.00)
+      // Net Cost after cash discount: 90000 - 1800 = 88200 paise
+      // Landed Pack Cost: 88200 / 11 = 8018 paise (₹80.18/pack)
+      // Landed Base Unit Cost: 88200 / 110 = 802 paise (₹8.02/tablet)
+      const line = computePurchaseLine({
+        qty: 10,
+        freeQty: 1,
+        rate: 10000,
+        tradeDiscountBp: 1000,
+        cashDiscountBp: 200,
+        unitsPerPack: 10,
+        gstRateBp: 1200,
+      });
+
+      expect(line.gross).toBe(100000);
+      expect(line.tradeDiscount).toBe(10000);
+      expect(line.taxable).toBe(90000);
+      expect(line.cgst).toBe(5400);
+      expect(line.sgst).toBe(5400);
+      expect(line.tax).toBe(10800);
+      expect(line.cashDiscount).toBe(1800);
+      expect(line.total).toBe(99000);
+      expect(line.totalPacks).toBe(11);
+      expect(line.totalBaseUnits).toBe(110);
+      expect(line.landedPackCost).toBe(8018);
+      expect(line.landedUnitCost).toBe(802);
+    });
+
+    it("aggregates purchase totals with TD and CD across multiple scheme lines", () => {
+      const totals = computePurchaseTotals([
+        {
+          qty: 10,
+          freeQty: 1,
+          rate: 10000,
+          tradeDiscountBp: 1000, // 10% TD
+          cashDiscountBp: 200, // 2% CD
+          unitsPerPack: 10,
+          gstRateBp: 1200,
+        },
+        {
+          qty: 20,
+          freeQty: 2, // 20+2 scheme
+          rate: 5000, // ₹50/pack
+          tradeDiscountBp: 500, // 5% TD
+          cashDiscountBp: 100, // 1% CD
+          unitsPerPack: 15,
+          gstRateBp: 500,
+        },
+      ]);
+
+      // Line 1:
+      // Gross: 100,000, TD: 10,000, Taxable: 90,000, Tax: 10,800, CD: 1,800, Total: 99,000
+      // Line 2:
+      // Gross: 20 * 5000 = 100,000, TD: 5000, Taxable: 95,000, Tax (5%): 4,750, CD: 950, Total: 98,800
+      // Aggregate:
+      // Gross: 200,000, TradeDiscount: 15,000, Taxable: 185,000, Tax: 15,550, CashDiscount: 2,750
+      // Net Total: 185,000 + 15,550 - 2,750 = 197,800
+      expect(totals.gross).toBe(200000);
+      expect(totals.tradeDiscount).toBe(15000);
+      expect(totals.taxable).toBe(185000);
+      expect(totals.tax).toBe(15550);
+      expect(totals.cashDiscount).toBe(2750);
+      expect(totals.total).toBe(197800);
+    });
+
+    it("falls back to discountBp when tradeDiscountBp is not explicitly passed", () => {
+      const line = computePurchaseLine({
+        qty: 5,
+        freeQty: 0,
+        rate: 8000,
+        discountBp: 1500, // 15% legacy discount
+        gstRateBp: 1800,
+      });
+
+      expect(line.tradeDiscount).toBe(6000); // 15% of 40000
+      expect(line.taxable).toBe(34000);
+      expect(line.cashDiscount).toBe(0);
+      expect(line.total).toBe(40120); // 34000 + 18% (6120)
+    });
+  });
 });
