@@ -207,13 +207,36 @@ The billing screen has two halves:
 5. (Optional) Type a **Disc %** on a line to give a discount on that item.
 6. **Customer:** leave **Walk-in Customer**, or pick a regular customer from the list. For someone new, press **Quick Add (F4)**, enter *Patient / Customer Name* and *Mobile Phone (for WhatsApp bill)*, and save. When you pick a customer who has reward points, their points and rupee value are shown.
 7. **Prescription medicines:** if the bill has a prescription medicine, the doctor box turns amber. See [5.3](#53-prescription-medicines-schedule-h-h1-x).
-8. **Payment Method:** choose **Cash**, **UPI** or **Card**.
+8. **Payment Method:** choose **Cash**, **UPI** or **Card**, or press **F8** to open the split-tender payment panel to mix modes or put an unpaid balance on customer credit.
 9. Check the summary: **Subtotal (Gross)**, **Discount**, **Taxable Value**, the GST split, **Round Off** (to the nearest rupee) and **Net Payable**.
-10. Press **Complete & Print (₹ amount)**.
+10. Press **Complete & Print (₹ amount)** (or press **F10** / **End**).
 
 When it succeeds, the invoice opens and can be printed. To start the next bill press **F2** (or **Clear (F2)**; you'll be asked to confirm because it empties the current bill).
 
 **Audio:** a small beep confirms each scan and a chime confirms a completed bill. Use the speaker icon at the top to mute it.
+
+### 5.1a Loose tablet & strip cutting
+
+When a customer wants individual tablets instead of a full strip:
+- In the cart, the quantity column allows entering loose tablets from a strip (e.g., 3 tablets from a 10-tablet strip).
+- The system calculates the unit price proportionally ($\text{Strip Price} / 10$) without rounding errors.
+- The invoice displays the exact units billed (e.g. `3 Tabs @ ₹10.00 = ₹30.00`), and your batch inventory is deducted by exactly 3 tablets.
+
+### 5.1b Split-tender payments & customer credit ("Khata")
+
+Press **F8** on the billing screen to open the payment modal:
+- **Split Payment:** A customer can pay partially in Cash (e.g., ₹200) and the rest via UPI (e.g., ₹300).
+- **Cash Overpayment & Change Due:** If a customer hands you ₹1,000 cash for an ₹850 bill, type ₹1,000 in Cash. MediFlow displays **Change Due: ₹150** and posts the net ₹850 to your Cash on Hand ledger.
+- **Customer Credit (Udhaar / Khata):** Any remaining balance on a bill is placed on the customer's account. Selling on credit requires:
+  1. Selecting an identified customer (not a walk-in).
+  2. Having the `customer.credit` staff permission.
+  3. The customer having an approved credit limit with enough available balance.
+- Credit sales post directly to your double-entry Accounts Receivable ledger and appear in the customer's outstanding balance. Customers can settle their account later via **Accounting → Receipts**.
+
+### 5.1c Parking and resuming bills (Hold / Recall)
+
+- **Hold (F6):** If a customer forgets their wallet or steps out to ask a doctor, press **F6** to park the bill. It is safely stored without reducing stock.
+- **Resume (F7):** Press **F7** to see the list of parked bills. Click any bill to restore the items, patient details, and cart instantly and complete billing.
 
 ### 5.2 What MediFlow does for you when you complete a bill
 
@@ -708,6 +731,11 @@ It answers from your live data. If it hasn't been set up with an AI key, it will
 | Billing | **F2** | Start a new / clear the bill |
 | Billing | **F3** (or **Ctrl+F**, or **/**) | Jump to the medicine search box |
 | Billing | **F4** | Quick-add a customer |
+| Billing | **F6** | Park (hold) the active bill |
+| Billing | **F7** | Recall (resume) parked bills |
+| Billing | **F8** | Open split-tender payment & customer credit panel |
+| Billing | **F9** | Substitute medicine / chemical salt lookup |
+| Billing | **F10** / **End** | Complete bill and print receipt |
 | Billing | **↑ / ↓**, then **Enter** | Choose a medicine from the search results |
 | Billing | Barcode scanner | Scan a pack to add it to the bill |
 

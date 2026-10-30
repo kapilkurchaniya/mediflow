@@ -1,9 +1,10 @@
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import { format } from "date-fns";
 import { schema, type Tx } from "@/server/db";
 import { can, type AuthCtx } from "@/server/rbac";
 import { DomainError } from "@/server/errors";
 import { computeSaleTotals, type SaleLineInput } from "@/lib/money";
+import { formatINR } from "@/lib/format";
 import { recordStockMovement } from "@/server/domain/stock";
 import { nextDocNumber } from "@/server/domain/sequence";
 import { postSaleJournalEntry } from "@/server/domain/accounting";
@@ -19,8 +20,8 @@ import { enqueue } from "@/server/jobs/outbox";
 import { writeAudit } from "@/server/audit";
 import type { CreateSaleOptions, CreateSaleResult, SaleInput } from "./types";
 
-/** Payment methods the journal can book today. Split tender and credit arrive with A2.2. */
-const SUPPORTED_METHODS = ["cash", "upi", "card", "bank"] as const;
+/** Money methods a customer can hand over. "Credit" is not a method: it is whatever is left unpaid. */
+const MONEY_METHODS = ["cash", "upi", "card", "bank"] as const;
 
 /**
  * 🤝 CONTRACT (ROADMAP A2.1). Creates one completed sale inside the caller's transaction:
@@ -31,8 +32,11 @@ const SUPPORTED_METHODS = ["cash", "upi", "card", "bank"] as const;
  * Throws DomainError for expected failures (the message is safe to show to the user).
  * Optional steps (GST document, loyalty, receipt) run in savepoints, so a failure in one never loses the sale.
  *
- * Reserved for later tasks: `redeemPoints` (A2.7), more than one payment / credit (A2.2) and
- * `opts.allowNegativeStock` (A4.3) are rejected or ignored for now.
+ * Payment rules (A2.2): any mix of cash / UPI / card / bank. Less than the total is credit and needs a customer, the
+ * `customer.credit` permission and room under the customer's credit limit (0 = no credit). More than the total is only
+ * allowed in cash and is handed back as change (`changeDue`).
+ *
+ * Reserved for later tasks: `redeemPoints` (A2.7) and `opts.allowNegativeStock` (A4.3) are rejected or ignored for now.
  */
 export async function createSale(
   tx: Tx,
@@ -63,7 +67,7 @@ export async function createSale(
         );
       const r = prior?.response as Partial<Omit<CreateSaleResult, "duplicate">> | undefined;
       if (r?.saleId && r.invoiceNo && typeof r.total === "number") {
-        return { saleId: r.saleId, invoiceNo: r.invoiceNo, total: r.total, duplicate: true };
+        return { saleId: r.saleId, invoiceNo: r.invoiceNo, total: r.total, changeDue: r.changeDue ?? 0, duplicate: true };
       }
       throw new DomainError("SALE_IN_PROGRESS", "This bill is already being processed. Please check the sales list.");
     }
@@ -87,18 +91,13 @@ export async function createSale(
       throw new DomainError("INVALID_PAYMENT", "Amount paid must be zero or more.");
     }
   }
-  const payments = input.payments.filter((p) => p.amount > 0);
-  if (payments.length > 1) {
-    throw new DomainError("SPLIT_NOT_AVAILABLE", "Split payments are not available yet.");
-  }
-  if (payments[0] && !(SUPPORTED_METHODS as readonly string[]).includes(payments[0].method)) {
-    throw new DomainError("METHOD_NOT_AVAILABLE", `Payment by ${payments[0].method} is not available yet.`);
+  const tendered = input.payments.filter((p) => p.amount > 0);
+  if (tendered.some((p) => !(MONEY_METHODS as readonly string[]).includes(p.method))) {
+    throw new DomainError("INVALID_PAYMENT", "Leave the unpaid part empty: it becomes credit on the customer's account.");
   }
   if (input.redeemPoints > 0) {
     throw new DomainError("REDEEM_NOT_AVAILABLE", "Redeeming loyalty points at the counter is not available yet.");
   }
-  const paidAmount = payments.reduce((s, p) => s + p.amount, 0);
-  const paymentMethod = payments[0]?.method ?? "cash";
 
   // Optional per-pharmacy discount ceiling (tenants.settings.maxDiscountBp, basis points; unset = no limit).
   // Going above it needs sale.discount_override (managers/owners). A settings screen arrives in A3.1.
@@ -127,7 +126,7 @@ export async function createSale(
   if (!store) throw new DomainError("STORE_NOT_FOUND", "Store not found");
 
   let customer:
-    | { name: string; phone: string | null; gstin: string | null; stateCode: string | null }
+    | { name: string; phone: string | null; gstin: string | null; stateCode: string | null; creditLimit: number | null }
     | undefined;
   if (input.customerId) {
     [customer] = await tx
@@ -136,9 +135,11 @@ export async function createSale(
         phone: schema.customers.phone,
         gstin: schema.customers.gstin,
         stateCode: schema.customers.stateCode,
+        creditLimit: schema.customers.creditLimit,
       })
       .from(schema.customers)
-      .where(and(eq(schema.customers.id, input.customerId), eq(schema.customers.tenantId, ctx.tenantId)));
+      .where(and(eq(schema.customers.id, input.customerId), eq(schema.customers.tenantId, ctx.tenantId)))
+      .for("update");
     if (!customer) throw new DomainError("CUSTOMER_NOT_FOUND", "Customer not found.");
   }
 
@@ -208,7 +209,52 @@ export async function createSale(
     : false;
 
   const totals = computeSaleTotals(lineInputs, isInterState, input.billDiscountPaise);
+
+  // ── 5b. Payments: split tender, credit and change ───────────────────────────────────────────────
+  const tenderedTotal = tendered.reduce((s, p) => s + p.amount, 0);
+  let changeDue = 0;
+  // what the shop actually keeps, per method (cash is reduced by the change handed back)
+  const payments = tendered.map((p) => ({ ...p }));
+  if (tenderedTotal > totals.total) {
+    const excess = tenderedTotal - totals.total;
+    const cashIn = payments.filter((p) => p.method === "cash").reduce((s, p) => s + p.amount, 0);
+    if (excess > cashIn) {
+      throw new DomainError("OVERPAID", "Only cash can be overpaid (the change is given back in cash). Reduce the UPI/card amount.");
+    }
+    changeDue = excess;
+    let left = excess;
+    for (const p of payments.filter((x) => x.method === "cash")) {
+      const take = Math.min(p.amount, left);
+      p.amount -= take;
+      left -= take;
+    }
+  }
+  const kept = payments.filter((p) => p.amount > 0);
+  const paidAmount = kept.reduce((s, p) => s + p.amount, 0);
   const creditAmount = Math.max(totals.total - paidAmount, 0);
+  if (creditAmount > 0) {
+    if (!input.customerId || !customer) {
+      throw new DomainError("CREDIT_NEEDS_CUSTOMER", "Choose a customer to put the unpaid amount on credit, or collect the full amount.");
+    }
+    if (!can(ctx, "customer.credit")) {
+      throw new DomainError("CREDIT_NOT_ALLOWED", 'You don\'t have permission to sell on credit (permission "customer.credit"). Collect the full amount.');
+    }
+    const limit = customer.creditLimit ?? 0;
+    if (limit <= 0) {
+      throw new DomainError("NO_CREDIT_LIMIT", `${customer.name} has no credit limit. Set one on the customer's profile, or collect the full amount.`);
+    }
+    const [owed] = await tx
+      .select({ due: sql<number>`coalesce(sum(${schema.sales.creditAmount}), 0)::bigint` })
+      .from(schema.sales)
+      .where(and(eq(schema.sales.tenantId, ctx.tenantId), eq(schema.sales.customerId, input.customerId), eq(schema.sales.status, "completed")));
+    const outstanding = Number(owed?.due ?? 0);
+    if (outstanding + creditAmount > limit) {
+      throw new DomainError(
+        "CREDIT_LIMIT",
+        `Credit limit exceeded: ${customer.name} already owes ${formatINR(outstanding)} and the limit is ${formatINR(limit)}. Collect more now.`,
+      );
+    }
+  }
 
   // ── 6. Invoice number (gap-free, row-locked) and the sale header ─────────────────────────────────
   const invoiceNo =
@@ -356,15 +402,17 @@ export async function createSale(
   }
 
   // ── 10. Payment rows and the double-entry journal ───────────────────────────────────────────────
-  if (payments[0]) {
-    await tx.insert(schema.salePayments).values({
-      tenantId: ctx.tenantId,
-      saleId: sale.id,
-      method: payments[0].method,
-      amount: payments[0].amount,
-      reference: payments[0].reference ?? null,
-      status: "success",
-    });
+  if (kept.length > 0) {
+    await tx.insert(schema.salePayments).values(
+      kept.map((p) => ({
+        tenantId: ctx.tenantId,
+        saleId: sale.id,
+        method: p.method,
+        amount: p.amount,
+        reference: p.reference ?? null,
+        status: "success",
+      })),
+    );
   }
   await postSaleJournalEntry({
     tx,
@@ -376,7 +424,8 @@ export async function createSale(
     invoiceDate: now,
     customerId: input.customerId ?? null,
     customerName: customer?.name ?? null,
-    paymentMethod,
+    paymentMethod: kept[0]?.method ?? "cash",
+    payments: kept.map((p) => ({ method: p.method, amount: p.amount })),
     taxableAmount: totals.taxable,
     cgst: totals.cgst,
     sgst: totals.sgst,
@@ -420,7 +469,7 @@ export async function createSale(
     await queueOptional(tx, ctx.tenantId, "whatsapp.receipt", { saleId: sale.id });
   }
 
-  const result = { saleId: sale.id, invoiceNo, total: totals.total };
+  const result = { saleId: sale.id, invoiceNo, total: totals.total, changeDue };
   if (input.clientSaleId) {
     await tx
       .update(schema.idempotencyKeys)

@@ -29,9 +29,16 @@ Payments ◄── Accounts payable   Transfers between stores   Receivables, lo
 
 A sale reduces stock, writes an immutable stock-ledger row, posts a balanced accounting journal, creates a GST document, records a compliance register line (for scheduled drugs) and may earn loyalty points, all in one database transaction.
 
-**Differentiators the product is built around:** keyboard-fast counter billing, offline billing (planned), "correct by construction" money and stock (integer paise, immutable ledger, double-entry), automatic compliance registers and GSTR-1, chain control through roles and dashboards, and AI helpers.
+**Differentiators the product is built around:** 
+- **Keyboard-fast counter billing** (`F2`, `F3`, `F6`, `F8`) with loose tablet/strip cutting and auto-FEFO batch picking.
+- **Three-tier platform deployment:** Cloud Web ERP (admin & chain oversight), Native Desktop App (Tauri for offline billing & raw ESC/POS dot-matrix/thermal printing), and Native Mobile App (React Native for owner live sales, chain stock lookups, and delivery).
+- **"Correct by construction" money and stock** (integer paise, immutable ledger, double-entry accounting).
+- **Automatic compliance registers and GSTR-1** (Schedule H/H1/Narcotics, e-invoicing).
+- **Chain control** through multi-branch roles and real-time consolidated dashboards.
+- **AI helpers** (substitutes, expiry redistribution, reorder drafts).
+- **Complete Marg ERP 9+ operational parity** (see `docs/MARG_COMPETITIVE_RESEARCH.md`).
 
-**Non-goals for the first 6 months:** wholesale/distributor billing, HR/payroll, a customer-facing mobile app, native mobile apps.
+**Non-goals for the first 6 months:** wholesale/distributor billing, HR/payroll, consumer e-commerce storefront.
 
 ---
 
@@ -41,17 +48,17 @@ Two developers work in parallel "lanes" (see §10):
 
 | Lane | Owner | Branch | Covers |
 |---|---|---|---|
-| **A** | overxpowered | `lane-a/overxpowered` | platform (auth, RBAC, stores, audit, CI, tests), POS/sales, inventory & stock, accounting core, offline POS, deployment |
+| **A** | overxpowered | `lane-a/overxpowered` | platform (auth, RBAC, stores, audit, CI, tests), POS/sales, inventory & stock, accounting core, offline POS, desktop/mobile apps |
 | **B** | Kapil | `lane-b/kapil` | purchasing & suppliers, compliance registers, GST & e-invoice, customers/loyalty/orders, WhatsApp/SMS/reminders, reports, AI, data import |
 
-The roadmap is 26 weeks in 7 phases (0–6). On the **merged tree** (both lanes), per the roadmap tracker, `typecheck` and `lint:strict` pass and `npm test` runs **21 files / 307 tests, all passing**:
+The roadmap is 26 weeks in 7 phases (0–6). On the **mainline tree**, `typecheck` and `lint:strict` pass and `npm test` runs **34 files / 526 tests, all passing**:
 
 | Phase | Theme | Status |
 |---|---|---|
-| 0 | Foundation & safety | **Done** except B0.8 (collect real Marg exports, a non-code task) and the whole-repo lint (still not zero; `lint:strict` covers clean paths). |
-| 1 | Platform & correctness | Lane A: **A1.1–A1.3 done** (RBAC core, `protectedAction`, permissions on all modules); A1.4 users/invites, A1.5 login lockout, A1.6 audit-log screen and A1.7 isolation suite **not built**. Lane B: **B1.1–B1.7 all done** (regulatory constants, inter-state GST function, GST tests, compliance hardening, RBAC on Lane B, GST re-rate tool, purchase hardening). |
-| 2 | Transaction loop | Lane B: **B2.1 outbox + cron, B2.5 loyalty redeem/reverse service, B2.6 return/cancel GST-document service done**; B2.2 purchase orders, B2.3 purchase returns, B2.4 supplier ledger, B2.7 auto reminders not built. Lane A: **nothing yet** (A2.1–A2.9: split tender, hold, cancel, returns, cash shifts, payments). |
-| 3–6 | Multi-store, offline, finance, launch | Not built. |
+| 0 | Foundation & safety | **Done** (multi-tenant schema, RBAC foundation, CI baseline). |
+| 1 | Platform & correctness | **100% Complete** (Lane A: A1.1–A1.7; Lane B: B1.1–B1.7 merged into `main`). |
+| 2 | Transaction loop | **Active**: Lane B (B2.1–B2.7 complete); Lane A: A2.1 (createSale) and A2.9 (payments) merged; A2.2 (split tender) in progress. Added Marg-parity tasks A2.10 (loose tablet cutting), A2.11 (auto-FEFO), B2.8 (purchase schemes). |
+| 3–6 | Multi-store, offline, finance, launch | Planned. |
 
 **Important nuance:** several Lane B items are ticked because the *backend piece* exists and is tested, but the POS doesn't call it yet because that wiring belongs to Lane A's A2.1 sale-service refactor. Specifically: inter-state GST on sales (`determineTaxContext`), prescription dispensing tracking (`applyPrescriptionDispensing`), loyalty redemption, and credit-note/cancel GST documents (there is no cancel or return screen). The outbox so far only carries reminders, not sale receipts.
 

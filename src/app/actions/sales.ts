@@ -186,7 +186,8 @@ export async function createSaleInvoice(
   paymentMethod: string,
   amountPaid: number, // paise
   complianceDetails?: ComplianceDetailsInput,
-  medicalRepId?: string
+  medicalRepId?: string,
+  paymentsInput?: SalePayment[]
 ) {
   const auth = await checkPermission("sale.create");
   if (!auth.ok) return { error: auth.error };
@@ -201,13 +202,27 @@ export async function createSaleInvoice(
       return { error: "Discount must be between 0% and 100%." };
     }
   }
-  if (!Number.isInteger(amountPaid) || amountPaid < 0) return { error: "Amount paid must be zero or more." };
+
+  let payments: SalePayment[] = [];
+  if (paymentsInput && paymentsInput.length > 0) {
+    for (const p of paymentsInput) {
+      if (!Number.isInteger(p.amount) || p.amount < 0) {
+        return { error: "Payment amounts must be whole numbers of paise zero or greater." };
+      }
+    }
+    payments = paymentsInput;
+  } else {
+    if (!Number.isInteger(amountPaid) || amountPaid < 0) return { error: "Amount paid must be zero or more." };
+    if (amountPaid > 0) {
+      payments = [{ method: paymentMethod as SalePayment["method"], amount: amountPaid }];
+    }
+  }
 
   const input: SaleInput = {
     customerId: customerId?.trim() || undefined,
     lines: items.map((i) => ({ batchId: i.batchId, qty: i.qty, discountBp: i.discountBp })),
     billDiscountPaise: 0,
-    payments: amountPaid > 0 ? [{ method: paymentMethod as SalePayment["method"], amount: amountPaid }] : [],
+    payments,
     redeemPoints: 0,
     compliance: {
       ...complianceDetails,
@@ -223,7 +238,13 @@ export async function createSaleInvoice(
     revalidatePath("/dashboard/accounting");
     revalidatePath("/dashboard/gst");
 
-    return { success: true, saleId: result.saleId };
+    return {
+      success: true,
+      saleId: result.saleId,
+      invoiceNo: result.invoiceNo,
+      total: result.total,
+      changeDue: result.changeDue,
+    };
   } catch (err: unknown) {
     return { error: (err instanceof Error ? err.message : String(err)) || "Failed to create sale invoice" };
   }

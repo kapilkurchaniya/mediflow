@@ -124,9 +124,9 @@ describe("audit rows are written by the actions", () => {
     const s = await scene("owner");
     await t.db.update(schema.tenants).set({ settings: { maxDiscountBp: 1000 } }).where(eq(schema.tenants.id, s.tenant.id));
     const item = (discountBp: number) => [{ medicineId: s.medicine.id, batchId: s.batch.id, qty: 1, rate: 0, discountBp }];
-    expect(await createSaleInvoice(undefined, "", item(1000), "cash", 0)).toMatchObject({ success: true });
+    expect(await createSaleInvoice(undefined, "", item(1000), "cash", 20000)).toMatchObject({ success: true });
     expect((await s.audit({ action: "discount_override" })).total).toBe(0);
-    const res = await createSaleInvoice(undefined, "", item(1500), "cash", 0);
+    const res = await createSaleInvoice(undefined, "", item(1500), "cash", 20000);
     expect(res).toMatchObject({ success: true });
     const { rows } = await s.audit({ action: "discount_override" });
     expect(rows).toHaveLength(1);

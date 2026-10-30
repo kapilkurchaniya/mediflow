@@ -116,7 +116,7 @@ function playSound(type: "beep" | "chime") {
 
 export default function POSPage() {
   const router = useRouter();
-  const [customers, setCustomers] = useState<{ id: string; name: string; phone?: string | null; loyaltyPoints?: number }[]>([]);
+  const [customers, setCustomers] = useState<{ id: string; name: string; phone?: string | null; loyaltyPoints?: number; creditLimit?: number | null }[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [isSearching, setIsSearching] = useState(false);
@@ -126,6 +126,14 @@ export default function POSPage() {
   const [doctorName, setDoctorName] = useState("");
   const [paymentMethod, setPaymentMethod] = useState("cash");
   const [soundEnabled, setSoundEnabled] = useState(true);
+
+  // Split Tender Modal state
+  const [isSplitModalOpen, setIsSplitModalOpen] = useState(false);
+  const [splitCash, setSplitCash] = useState("");
+  const [splitUpi, setSplitUpi] = useState("");
+  const [splitCard, setSplitCard] = useState("");
+  const [splitError, setSplitError] = useState("");
+  const [isSubmittingSplit, setIsSubmittingSplit] = useState(false);
 
   // Quick Customer modal state
   const [isCustomerModalOpen, setIsCustomerModalOpen] = useState(false);
@@ -194,7 +202,7 @@ export default function POSPage() {
   // Load customer and doctor lists on mount
   useEffect(() => {
     getCustomers().then((data) => {
-      setCustomers(data.map((c) => ({ id: c.id, name: c.name, phone: c.phone, loyaltyPoints: c.loyaltyPoints || 0 })));
+      setCustomers(data.map((c) => ({ id: c.id, name: c.name, phone: c.phone, loyaltyPoints: c.loyaltyPoints || 0, creditLimit: c.creditLimit })));
     });
     getDoctors().then((data) => {
       setDoctorsList(data.map((d) => ({ id: d.id, name: d.name, regNo: d.regNo, hospital: d.hospital })));
@@ -341,6 +349,17 @@ export default function POSPage() {
     }
   };
 
+  const totals = computeSaleTotals(
+    cart.map((c) => ({
+      qty: c.qty,
+      rate: c.rate,
+      discountBp: c.discountBp,
+      gstRateBp: c.gstRateBp,
+    }))
+  );
+
+  const netPayable = totals.total;
+
   // Keyboard navigation & Barcode buffer listener
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -398,10 +417,24 @@ export default function POSPage() {
         setIsCustomerModalOpen(true);
       }
 
+      // F8: Split Tender
+      if (e.key === "F8") {
+        e.preventDefault();
+        if (cart.length > 0) {
+          setSplitCash((netPayable / 100).toString());
+          setSplitUpi("");
+          setSplitCard("");
+          setSplitError("");
+          setIsSplitModalOpen(true);
+        }
+      }
+
       // Esc: Dismiss modals or search
       if (e.key === "Escape") {
         if (isCustomerModalOpen) setIsCustomerModalOpen(false);
         if (isSubstitutesModalOpen) setIsSubstitutesModalOpen(false);
+        if (isPromiseModalOpen) setIsPromiseModalOpen(false);
+        if (isSplitModalOpen) setIsSplitModalOpen(false);
         if (searchResults.length > 0) {
           setSearchResults([]);
           searchInputRef.current?.focus();
@@ -454,7 +487,7 @@ export default function POSPage() {
       window.removeEventListener("keydown", handleKeyDown);
       window.removeEventListener("ai-add-to-bill", handleAiAdd);
     };
-  }, [searchResults, selectedResultIndex, addToCart, cart.length, isCustomerModalOpen, isSubstitutesModalOpen, soundEnabled]);
+  }, [searchResults, selectedResultIndex, addToCart, cart.length, isCustomerModalOpen, isSubstitutesModalOpen, isPromiseModalOpen, isSplitModalOpen, soundEnabled, netPayable]);
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -514,16 +547,81 @@ export default function POSPage() {
     }
   };
 
-  const totals = computeSaleTotals(
-    cart.map((c) => ({
-      qty: c.qty,
-      rate: c.rate,
-      discountBp: c.discountBp,
-      gstRateBp: c.gstRateBp,
-    }))
-  );
+  const handleSplitCheckout = async () => {
+    if (cart.length === 0) return;
+    setSplitError("");
 
-  const netPayable = totals.total;
+    if (isComplianceMandatory && !doctorName.trim()) {
+      setSplitError("Doctor's name is mandatory for Schedule H / Prescription (Rx) medicines in this bill.");
+      return;
+    }
+    if (isH1OrHigher && !doctorRegNo.trim()) {
+      setSplitError("Doctor Medical Council Registration Number is mandatory for Schedule H1 / Schedule X drugs.");
+      return;
+    }
+
+    const cashPaise = Math.round((parseFloat(splitCash) || 0) * 100);
+    const upiPaise = Math.round((parseFloat(splitUpi) || 0) * 100);
+    const cardPaise = Math.round((parseFloat(splitCard) || 0) * 100);
+    const tenderedTotal = cashPaise + upiPaise + cardPaise;
+
+    if (tenderedTotal > netPayable) {
+      const excess = tenderedTotal - netPayable;
+      if (excess > cashPaise) {
+        setSplitError("Only cash can be overpaid. Non-cash payments cannot exceed the bill total.");
+        return;
+      }
+    }
+
+    const paidAmount = Math.min(tenderedTotal, netPayable);
+    const creditAmount = Math.max(0, netPayable - paidAmount);
+
+    if (creditAmount > 0 && !customerId) {
+      setSplitError("Please select a registered customer to allow selling on credit.");
+      return;
+    }
+
+    const splitPayments: { method: "cash" | "upi" | "card"; amount: number }[] = [];
+    if (cashPaise > 0) splitPayments.push({ method: "cash", amount: cashPaise });
+    if (upiPaise > 0) splitPayments.push({ method: "upi", amount: upiPaise });
+    if (cardPaise > 0) splitPayments.push({ method: "card", amount: cardPaise });
+
+    const complianceDetails = isComplianceMandatory ? {
+      doctorName: doctorName.trim(),
+      doctorRegNo: doctorRegNo.trim() || undefined,
+      doctorAddress: doctorAddress.trim() || undefined,
+      patientName: customers.find((c) => c.id === customerId)?.name || undefined,
+      patientAge: patientAge === "" ? undefined : Number(patientAge),
+      patientGender,
+      patientAddress: patientAddress.trim() || undefined,
+      prescriptionRef: prescriptionRef.trim() || undefined,
+      prescriptionDate,
+    } : undefined;
+
+    setIsSubmittingSplit(true);
+    try {
+      const res = await createSaleInvoice(
+        customerId,
+        doctorName,
+        cart,
+        "split",
+        0,
+        complianceDetails,
+        selectedMedicalRepId || undefined,
+        splitPayments
+      );
+
+      if (res.success && res.saleId) {
+        if (soundEnabled) playSound("chime");
+        setIsSplitModalOpen(false);
+        router.push(`/dashboard/sales/${res.saleId}/print?format=thermal`);
+      } else {
+        setSplitError(res.error || "Failed to complete sale");
+      }
+    } finally {
+      setIsSubmittingSplit(false);
+    }
+  };
 
   const [state, formAction, isPending] = useActionState(
     async (_prevState: { error?: string; success?: boolean } | null, _formData: FormData) => {
@@ -1130,11 +1228,11 @@ export default function POSPage() {
             <div className="mt-4 pt-3 border-t border-ink-150 space-y-3">
               <div>
                 <label className="label text-[12px] mb-1.5">Payment Method</label>
-                <div className="grid grid-cols-3 gap-2">
+                <div className="grid grid-cols-4 gap-1.5">
                   <button
                     type="button"
                     onClick={() => setPaymentMethod("cash")}
-                    className={`btn btn-sm justify-center ${
+                    className={`btn btn-sm justify-center !px-1 text-[12px] ${
                       paymentMethod === "cash"
                         ? "btn-primary !bg-brand-600 !text-white"
                         : "btn-secondary text-ink-700"
@@ -1145,7 +1243,7 @@ export default function POSPage() {
                   <button
                     type="button"
                     onClick={() => setPaymentMethod("upi")}
-                    className={`btn btn-sm justify-center ${
+                    className={`btn btn-sm justify-center !px-1 text-[12px] ${
                       paymentMethod === "upi"
                         ? "btn-primary !bg-brand-600 !text-white"
                         : "btn-secondary text-ink-700"
@@ -1156,13 +1254,29 @@ export default function POSPage() {
                   <button
                     type="button"
                     onClick={() => setPaymentMethod("card")}
-                    className={`btn btn-sm justify-center ${
+                    className={`btn btn-sm justify-center !px-1 text-[12px] ${
                       paymentMethod === "card"
                         ? "btn-primary !bg-brand-600 !text-white"
                         : "btn-secondary text-ink-700"
                     }`}
                   >
                     <CreditCard className="h-3.5 w-3.5 mr-1" /> Card
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (cart.length > 0) {
+                        setSplitCash((netPayable / 100).toString());
+                        setSplitUpi("");
+                        setSplitCard("");
+                        setSplitError("");
+                        setIsSplitModalOpen(true);
+                      }
+                    }}
+                    className="btn btn-sm btn-secondary justify-center text-ink-700 hover:text-brand-700 !px-1 text-[11.5px]"
+                    title="Split Tender & Store Credit (F8)"
+                  >
+                    <Layers className="h-3.5 w-3.5 mr-1" /> Split (F8)
                   </button>
                 </div>
               </div>
@@ -1436,6 +1550,206 @@ export default function POSPage() {
               </button>
             </div>
           </form>
+        </div>
+      )}
+
+      {/* ──────────────── Modal 4: Split Tender & Store Credit (F8) ──────────────── */}
+      {isSplitModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4">
+          <div className="card w-full max-w-lg p-5 space-y-4 shadow-pop animate-enter">
+            <div className="flex items-center justify-between border-b border-ink-150 pb-3">
+              <h3 className="card-title flex items-center gap-2">
+                <Layers className="h-4 w-4 text-brand-600" />
+                Split-Tender Payment (F8)
+              </h3>
+              <button
+                type="button"
+                onClick={() => setIsSplitModalOpen(false)}
+                className="text-ink-400 hover:text-ink-700"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="bg-brand-50 p-3.5 rounded-lg border border-brand-200 flex justify-between items-center">
+              <div>
+                <span className="text-xs text-brand-700 font-semibold uppercase tracking-wider">Total Bill Amount</span>
+                <p className="text-xs text-brand-600">{cart.length} items ({cart.reduce((a, b) => a + b.qty, 0)} units)</p>
+              </div>
+              <span className="text-2xl font-black text-brand-900 num">{formatINR(netPayable)}</span>
+            </div>
+
+            {/* Customer credit status info */}
+            {(() => {
+              const sel = customers.find((c) => c.id === customerId);
+              if (sel) {
+                return (
+                  <div className="p-2.5 rounded-lg bg-ink-50 border border-ink-200 text-xs flex justify-between items-center">
+                    <div>
+                      <span className="font-semibold text-ink-900">Customer: {sel.name}</span>
+                      <span className="text-ink-500 block text-[11px]">{sel.phone || "No phone"}</span>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-ink-500 text-[11px] block">Credit Limit</span>
+                      <span className="font-bold num text-ink-800">{formatINR(sel.creditLimit ?? 0)}</span>
+                    </div>
+                  </div>
+                );
+              }
+              return (
+                <div className="p-2.5 rounded-lg bg-amber-50 border border-amber-200 text-xs text-amber-800 flex items-center gap-2">
+                  <AlertTriangle className="h-4 w-4 shrink-0 text-amber-600" />
+                  <span>Walk-in customer selected. Any unpaid balance requires selecting a registered customer for store credit.</span>
+                </div>
+              );
+            })()}
+
+            {/* Split Tender Inputs */}
+            <div className="space-y-3">
+              <div>
+                <label className="label text-xs flex items-center justify-between">
+                  <span className="flex items-center gap-1.5">
+                    <Banknote className="h-3.5 w-3.5 text-emerald-600" /> Cash Tendered (₹)
+                  </span>
+                  <span className="text-[11px] text-ink-500">Overpayment returns change</span>
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  step="any"
+                  placeholder="0.00"
+                  value={splitCash}
+                  onChange={(e) => setSplitCash(e.target.value)}
+                  className="input font-mono font-bold text-sm"
+                  autoFocus
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="label text-xs flex items-center gap-1.5">
+                    <QrCode className="h-3.5 w-3.5 text-indigo-600" /> UPI Received (₹)
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="any"
+                    placeholder="0.00"
+                    value={splitUpi}
+                    onChange={(e) => setSplitUpi(e.target.value)}
+                    className="input font-mono font-bold text-sm"
+                  />
+                </div>
+
+                <div>
+                  <label className="label text-xs flex items-center gap-1.5">
+                    <CreditCard className="h-3.5 w-3.5 text-blue-600" /> Card / POS (₹)
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="any"
+                    placeholder="0.00"
+                    value={splitCard}
+                    onChange={(e) => setSplitCard(e.target.value)}
+                    className="input font-mono font-bold text-sm"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Live calculation banner */}
+            {(() => {
+              const cashPaise = Math.round((parseFloat(splitCash) || 0) * 100);
+              const upiPaise = Math.round((parseFloat(splitUpi) || 0) * 100);
+              const cardPaise = Math.round((parseFloat(splitCard) || 0) * 100);
+              const tenderedTotal = cashPaise + upiPaise + cardPaise;
+              let changeDue = 0;
+              let overpaidNonCash = false;
+
+              if (tenderedTotal > netPayable) {
+                const excess = tenderedTotal - netPayable;
+                if (excess > cashPaise) {
+                  overpaidNonCash = true;
+                } else {
+                  changeDue = excess;
+                }
+              }
+
+              const paidAmount = Math.min(tenderedTotal - changeDue, netPayable);
+              const creditAmount = Math.max(0, netPayable - paidAmount);
+              const sel = customers.find((c) => c.id === customerId);
+
+              return (
+                <div className="space-y-2 pt-2 border-t border-ink-150">
+                  <div className="flex justify-between text-xs text-ink-600">
+                    <span>Total Tendered:</span>
+                    <span className="font-mono font-bold text-ink-900">{formatINR(tenderedTotal)}</span>
+                  </div>
+
+                  {changeDue > 0 && (
+                    <div className="flex justify-between items-center p-2 rounded bg-emerald-50 border border-emerald-200 text-xs font-semibold text-emerald-800">
+                      <span>Change to Return (Cash):</span>
+                      <span className="font-mono text-sm font-bold text-emerald-900">{formatINR(changeDue)}</span>
+                    </div>
+                  )}
+
+                  {creditAmount > 0 && (
+                    <div className={`flex justify-between items-center p-2 rounded border text-xs font-semibold ${
+                      !customerId
+                        ? "bg-rose-50 border-rose-300 text-rose-800"
+                        : (sel?.creditLimit ?? 0) <= 0
+                        ? "bg-amber-50 border-amber-300 text-amber-800"
+                        : "bg-blue-50 border-blue-300 text-blue-900"
+                    }`}>
+                      <span>Balance to Credit Ledger:</span>
+                      <span className="font-mono text-sm font-bold">{formatINR(creditAmount)}</span>
+                    </div>
+                  )}
+
+                  {overpaidNonCash && (
+                    <div className="p-2 rounded bg-rose-50 border border-rose-200 text-xs text-rose-700 font-medium">
+                      Only cash can be overpaid. The total of UPI and Card exceeds the bill amount.
+                    </div>
+                  )}
+
+                  {splitError && (
+                    <div className="p-2 rounded bg-rose-50 border border-rose-200 text-xs text-rose-700">
+                      {splitError}
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
+
+            <div className="flex justify-end gap-2 pt-3 border-t border-ink-150">
+              <button
+                type="button"
+                onClick={() => setIsSplitModalOpen(false)}
+                className="btn btn-secondary text-xs"
+              >
+                Cancel (Esc)
+              </button>
+              <button
+                type="button"
+                disabled={isSubmittingSplit}
+                onClick={handleSplitCheckout}
+                className="btn btn-primary text-xs font-bold"
+              >
+                {isSubmittingSplit ? (
+                  <>
+                    <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" />
+                    Processing...
+                  </>
+                ) : (
+                  <>
+                    <Printer className="h-3.5 w-3.5 mr-1" />
+                    Complete & Print
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

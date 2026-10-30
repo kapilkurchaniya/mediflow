@@ -37,10 +37,18 @@ Every arrow in that diagram must be automatic. If a pharmacist has to type the s
 
 Pricing reference points came from secondary sources and vary between them. Treat them as indicative ([techimply](https://www.techimply.com/blog/pharmacy-management-system), [accountune](https://accountune.com/best-billing-software-medical-store-india), [codingclave](https://codingclave.com/blog/best-pharmacy-software-india-2026)).
 
+### Platform Strategy: Web, Desktop & Mobile
+
+To replace Marg ERP 9+ permanently, MediFlow spans three dedicated form factors:
+
+1. **Web ERP (Cloud Control Plane):** Central administration for head office, accounting, GST filing, multi-store stock visibility, and purchasing.
+2. **Desktop Application (Tauri / Native):** Counter POS billing running locally on Windows/Linux. Embeds local offline data caching, raw ESC/POS printing for 80-column dot-matrix printers (Epson LX-300/LQ-310) and thermal slip printers without browser dialogs, barcode scanner integration, and cash drawer kick.
+3. **Mobile Application (React Native):** Native companion for pharmacy owners and branch managers. Provides live sales/margin dashboards, cross-store stock lookups, near-expiry alerts, remote credit/discount approvals, and delivery fulfillment.
+
 ### Differentiators to protect
 
-1. **Speed at the counter.** Bill a 5-item prescription in under 30 seconds, keyboard only. This is the #1 reason pharmacists refuse to switch.
-2. **Offline billing.** Indian shops lose internet regularly. A cloud POS that stops billing loses the customer on day one.
+1. **Speed at the counter.** Bill a 5-item prescription in under 25 seconds, keyboard only (`F2`, `F3`, `F6`, `F8`). Support loose tablet/strip cutting with exact base-unit fractional math.
+2. **Offline billing.** Indian shops lose internet regularly. A cloud POS that stops billing loses the customer on day one. Our desktop app and PWA ensure zero billing interruptions.
 3. **Correct by construction.** Integer paise, an immutable stock ledger, and double-entry journals generated from every transaction. Pharmacists trust software that never "loses" a strip.
 4. **Compliance without effort.** Schedule H/H1/X registers fill themselves from POS sales, and GSTR-1 is generated, not typed.
 5. **Chain control.** Owner-level dashboards across branches, plus role-based permissions so cashiers can't see margins or give unapproved discounts.
@@ -50,8 +58,7 @@ Pricing reference points came from secondary sources and vary between them. Trea
 
 - Wholesale/distributor billing (C&F, stockist credit schemes). The schema doesn't stop it later.
 - HR and payroll.
-- Customer-facing mobile app or storefront. Online orders arrive via WhatsApp and the `/api/v1/orders` API instead.
-- Native mobile apps. The web app is responsive and installable as a PWA.
+- Customer-facing consumer e-commerce storefront. Customer orders arrive via WhatsApp and the `/api/v1/orders` API instead.
 
 ## Success criteria for "v1 sellable" (end of roadmap)
 

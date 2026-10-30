@@ -77,6 +77,8 @@ export interface CreateSaleResult {
   invoiceNo: string;
   /** paise */
   total: number;
+  /** Cash handed back to the customer (paise) when they paid more than the bill. 0 otherwise. */
+  changeDue: number;
   /** true when `clientSaleId` matched an earlier sale and nothing new was written. */
   duplicate: boolean;
 }

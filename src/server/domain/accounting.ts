@@ -84,6 +84,8 @@ export interface PostSaleJournalParams {
   customerId?: string | null;
   customerName?: string | null;
   paymentMethod?: string; // cash | upi | card | credit
+  /** Split tender: what was actually received, per method. When given it replaces paymentMethod + paidAmount for the debit side. */
+  payments?: { method: string; amount: number }[];
   taxableAmount: number; // in paise
   cgst: number; // in paise
   sgst: number; // in paise
@@ -148,18 +150,21 @@ export async function postSaleJournalEntry(params: PostSaleJournalParams) {
   }[] = [];
 
   // --- 1. DEBITS (Cash / Bank / Debtors) ---
-  if (paidAmount > 0) {
-    const isBank = paymentMethod === "upi" || paymentMethod === "card" || paymentMethod === "bank";
-    const debitAccountKey = isBank ? "bank" : "cash";
-    const debitAccId = accounts[debitAccountKey] || accounts.cash;
-
-    lines.push({
-      tenantId,
-      entryId: entry.id,
-      accountId: debitAccId,
-      debit: paidAmount,
-      credit: 0,
-    });
+  // One line per account: cash goes to Cash on Hand, UPI / card / bank to Bank / Digital Payments.
+  const received = params.payments?.length
+    ? params.payments
+    : paidAmount > 0
+      ? [{ method: paymentMethod, amount: paidAmount }]
+      : [];
+  const byAccount = new Map<string, number>();
+  for (const p of received) {
+    if (p.amount <= 0) continue;
+    const isBank = p.method === "upi" || p.method === "card" || p.method === "bank";
+    const accId = accounts[isBank ? "bank" : "cash"] || accounts.cash;
+    byAccount.set(accId, (byAccount.get(accId) ?? 0) + p.amount);
+  }
+  for (const [accountId, amount] of byAccount) {
+    lines.push({ tenantId, entryId: entry.id, accountId, debit: amount, credit: 0 });
   }
 
   if (creditAmount > 0 && accounts.debtors) {
