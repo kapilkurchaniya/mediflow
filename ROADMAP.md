@@ -551,6 +551,25 @@ Full map in `.github/CODEOWNERS` and [ADR 0004](docs/adr/0004-two-lane-ownership
   ➕ `src/app/dashboard/accounting/receipts/page.tsx` (receive from customer, pick outstanding bills). Lane B builds the supplier-payment UI on top of this (B2.4).
 - **Done when:** receiving ₹500 against a credit bill reduces the customer's outstanding and the bill's `credit_amount` 🧪.
 
+#### A2.10 🤝 Pharmacy unit conversion engine (Strip & loose tablet cutting) ⏱ 1.5 days
+- **Why:** In Indian retail pharmacies, customers routinely purchase loose tablets or partial strips (e.g., 3 tablets from a 10-tablet strip). Selling only full strips is a blocker for any chemist migrating from Marg.
+- **Files:** ✏️ `schema/catalog.ts` (numeric `units_per_pack`, `loose_unit`, `pack_unit`), ✏️ `src/server/domain/sales/create-sale.ts`, ✏️ `src/app/dashboard/sales/pos/*` (loose quantity input).
+- **How:**
+  - `medicines` maintains an integer conversion factor (`units_per_pack: integer`, e.g. 10 or 15).
+  - The POS input accepts either full packs or loose units (e.g. `1 pack + 3 loose` or `1.3`).
+  - Pricing is proportional: $\text{unit\_price} = \text{pack\_rate} / \text{units\_per\_pack}$.
+  - Stock movements and batch `qty_on_hand` are tracked in base units (tablets) or normalized units without floating point loss.
+- **Done when:** selling 3 loose tablets from a ₹100 10-tablet strip bills ₹30, deducts exactly 3 units from batch stock, and prints clearly on the invoice 🧪.
+
+#### A2.11 🤝 Auto-FEFO batch allocation ⏱ 1 day
+- **Why:** Chemists must liquidate older stock first to prevent expiry losses. Manually picking batches at the counter causes human error.
+- **Files:** ✏️ `src/server/domain/sales/create-sale.ts`, ✏️ `src/app/dashboard/sales/pos/page.tsx`.
+- **How:**
+  - When a medicine is added to the cart, the system automatically allocates the batch with the earliest valid expiry date (`expiry_date > today`) with available stock.
+  - If the nearest-expiry batch has insufficient stock, it splits across the next FEFO batch.
+  - Manual batch override requires explicit selection and logs an audit trail if an older batch was skipped.
+- **Done when:** adding an item auto-picks the earliest expiry batch by default without manual clicks 🧪.
+
 ### Lane B · Phase 2
 
 #### B2.1 ⛔ 🤝 Outbox worker & cron endpoint ⏱ 2 days
@@ -609,6 +628,16 @@ Full map in `.github/CODEOWNERS` and [ADR 0004](docs/adr/0004-two-lane-ownership
 
 #### B2.7 Automated reminders via cron ⏱ 1 day
 - **Files:** ✏️ `src/server/domain/reminders.ts` (`processDueReminders` enqueues `reminder.send` instead of sending directly), `src/app/api/cron/reminders/route.ts` (daily). Refill reminders are auto-created on sale for chronic medicines: a medicine flag `is_chronic` or the category, plus the days of supply from prescription `duration_days`. Respect the customer's opt-out (B5.6).
+
+#### B2.8 🤝 Pharma purchase scheme engine (10+1 free, trade/cash discounts) ⏱ 2 days
+- **Why:** In Indian pharma supply chains, distributors sell medicines with free goods (e.g. `10+1 free`, `10+2 free`, `100+15`) and layered Trade Discounts (TD%) and Cash Discounts (CD%). The true landed cost per unit must be calculated accurately across paid + free units.
+- **Files:** ✏️ `schema/purchases.ts`: ➕ `free_qty`, `scheme_type`, `trade_discount_bp`, `cash_discount_bp`, ✏️ `src/server/domain/purchases.ts`, ✏️ `src/app/dashboard/purchases/new/page.tsx`.
+- **How:**
+  - Support `billedQty` and `freeQty` per line.
+  - Total units received into batch = $\text{billedQty} + \text{freeQty}$.
+  - Landed cost per unit = $(\text{taxableAmount} - \text{cashDiscount}) / (\text{billedQty} + \text{freeQty})$.
+  - Accounting journal: Input GST is calculated on the taxable amount according to GST valuation rules.
+- **Done when:** a purchase of 10 strips @ ₹100 + 1 free with 5% GST creates 11 strips in stock with landed cost ₹90.91 and balanced accounts 🧪.
 
 **Phase 2 exit:** split-tender, hold, cancel and return all work end to end · shift close report · PO → GRN → return → supplier payment loop · messages go through the outbox · Playwright smoke in CI.
 
@@ -690,6 +719,25 @@ Full map in `.github/CODEOWNERS` and [ADR 0004](docs/adr/0004-two-lane-ownership
 #### B3.5 Expiry redistribution suggestions ⏱ 1.5 days
 - ➕ `src/app/dashboard/reports/expiry-redistribution/page.tsx`: batches expiring in 30–120 days at store X, where another store Y sells that medicine faster, with a suggested quantity. "Create transfer" button (Lane A API). This is a strong owner-facing feature.
 
+#### B3.6 🤝 Expiry claim & quarantine dump stock lifecycle ⏱ 2 days
+- **Why:** Pharmacies must isolate expired/broken medicines so they cannot be sold, and generate formal debit claims against the supplying distributor.
+- **Files:** ✏️ `schema/inventory.ts`: ➕ `quarantine_batches`, ➕ `expiry_claims`, ✏️ `src/server/domain/inventory/expiry-claims.ts`, ➕ `src/app/dashboard/inventory/quarantine/page.tsx`.
+- **How:**
+  - One-click transfer of expired batches into a non-saleable quarantine status (`status: "quarantined"`).
+  - Supplier-wise claim generation: group quarantined stock by supplier, generate Debit Notes (`DN/EXP/…`), update accounts payable ledger (Dr Supplier, Cr Purchase Returns).
+  - Settle claims: record whether the distributor issued a credit note (reducing payable balance) or replacement stock.
+- **Done when:** expired batch is quarantined, cannot be billed in POS, and a supplier debit note is generated and tracked 🧪.
+
+#### B3.7 🤝 Physical stocktake & rack audit sessions ⏱ 2 days
+- **Why:** Discrepancies between system stock and physical shelf stock are a major pain point. Pharmacies perform weekly/monthly rack audits.
+- **Files:** ➕ `src/server/domain/inventory/stocktake.ts`, ➕ `src/app/dashboard/inventory/stocktake/{page,new/page,[id]/page}.tsx`.
+- **How:**
+  - Create audit session: full store or selected racks (e.g. `Rack A-1` to `Rack A-5`).
+  - Blind count mode (staff enters physical count without seeing system numbers to prevent bias).
+  - Discrepancy report: calculates variance (shortage/excess), potential financial impact at cost and MRP.
+  - Owner approval: creates immutable `stock_movements` (type `audit_adjustment`) and balanced accounting entries (Loss on inventory shortage).
+- **Done when:** physical count variance produces an audited stock movement and balanced ledger adjustment on sign-off 🧪.
+
 **Phase 3 exit:** the demo chain (warehouse + 3 branches, 2 GSTINs) runs a full week of scripted operations, and the consolidated numbers reconcile with per-store numbers.
 
 ---
@@ -750,6 +798,16 @@ Full map in `.github/CODEOWNERS` and [ADR 0004](docs/adr/0004-two-lane-ownership
 #### A4.8 🧪 Offline E2E ⏱ 1 day
 - ➕ `tests/e2e/offline.spec.ts`, scenario in docs/10 "Test plan".
 
+#### A4.9 🤝 Desktop POS App (Tauri, SQLite & Hardware Print Bridge) ⏱ 3 days
+- **Why:** Chrome browser popups block fast counter billing. Chemists with dot-matrix printers (Epson LX-300) and thermal printers require direct, silent raw printing and zero-latency local SQLite billing.
+- **Files:** ➕ `desktop/` (Tauri 2.x shell wrapping the React POS), ➕ `src/desktop/hardware-bridge.ts`, ➕ `src/desktop/print-service.ts`.
+- **How:**
+  - Tauri native wrapper for Windows and Linux.
+  - Local durable storage in SQLite (WAL mode) synced with the backend via `/api/sync/*`.
+  - Native print manager with direct ESC/POS (thermal) and Epson ESC/P (dot-matrix 80-col) printer commands.
+  - Direct USB barcode scanner input and automatic cash drawer kick.
+- **Done when:** bills print silently to an 80-col dot-matrix printer or thermal printer in under 1 second without browser print preview dialogs 🧪.
+
 ### Lane B · Phase 4
 
 #### B4.1 Import data model & domain ⏱ 2 days
@@ -767,6 +825,15 @@ Full map in `.github/CODEOWNERS` and [ADR 0004](docs/adr/0004-two-lane-ownership
 
 #### B4.5 🧪 Import integration tests ⏱ 1 day
 - A synthetic 2,000-item file plus 3,000 batches imports in under 2 minutes locally. A re-run creates nothing new. The stock ledger and trial balance are consistent afterwards.
+
+#### B4.6 🤝 Distributor electronic bill import (Pharmarack, Retailio, Marg CSV) ⏱ 2 days
+- **Why:** Distributors supply retail pharmacies with electronic invoices (CSV/EDI). Typing 50 lines manually wastes hours daily and introduces batch/expiry typos.
+- **Files:** ➕ `src/server/domain/import/presets/pharmarack.ts`, `presets/retailio.ts`, ✏️ `src/app/dashboard/purchases/new/page.tsx` ("Import distributor bill" button).
+- **How:**
+  - Parse distributor invoice lines: Product, Batch, Expiry, Pack, Billed Qty, Free Qty, PTR, MRP, Scheme, GST %, HSN.
+  - Automatic medicine match against catalog (barcode first, then name + pack + manufacturer). Unmatched items allow one-click master creation.
+  - Automatically populates the New Purchase GRN form with verified quantities and schemes.
+- **Done when:** a 40-item Pharmarack CSV imports into a draft purchase bill in 3 seconds with zero manual typing 🧪.
 
 **Phase 4 exit:** a 2-hour offline drill (unplug the router, bill 30 sales from 2 devices, reconnect) gives zero lost bills and unique numbers · a Marg sample from a real shop imports end to end.
 
@@ -796,6 +863,16 @@ Full map in `.github/CODEOWNERS` and [ADR 0004](docs/adr/0004-two-lane-ownership
 #### A5.6 Year-end ⏱ 1.5 days
 - Fiscal-year rollover checks: sequences reset on 1 April (already keyed by FY; test it). A closing-stock valuation report as of 31 March (FIFO/landed cost from batches) for the CA. Reset of the near-expiry and returns cycle is unaffected.
 
+#### A5.7 🤝 Mobile Management App (React Native / Expo) ⏱ 3 days
+- **Why:** Pharmacy owners are on the move. They require mobile real-time sales visibility, low stock alerts, remote credit approvals, and delivery fulfillment.
+- **Files:** ➕ `mobile/` (React Native / Expo project), ➕ `src/app/api/v1/mobile/*` (lightweight authenticated REST endpoints for owner dashboard & approvals).
+- **How:**
+  - Owner Dashboard: live counter sales across all chain branches, today's gross margin, cash vs digital collections.
+  - Multi-Branch Stock Lookup: instant barcode search showing batch-level inventory at each store.
+  - Remote Approvals: push notification for customer credit overrides or purchase orders exceeding limits.
+  - Doorstep Delivery: delivery boy marks prescription delivered, collects payment via UPI dynamic QR.
+- **Done when:** owner can view live multi-branch sales on mobile and approve a credit override remotely 🧪.
+
 ### Lane B · Phase 5
 
 #### B5.1 Real e-invoicing via a GSP (sandbox first) ⏱ 4 days
@@ -817,6 +894,16 @@ Full map in `.github/CODEOWNERS` and [ADR 0004](docs/adr/0004-two-lane-ownership
 
 #### B5.6 DPDP consent & data-subject tools ⏱ 2.5 days
 - ✏️ `schema/crm.ts`: ➕ `customer_consents (customer_id, purpose 'transactional'|'marketing'|'reminders', granted bool, source, captured_by, captured_at)`. Consent capture on customer creation at the POS (one tap) and on the first WhatsApp message. Marketing and reminders require consent; transactional receipts follow the pharmacy's notice. ➕ `src/app/dashboard/customers/[id]/privacy/page.tsx`: export the customer's data as JSON, and an **erasure** request that anonymises the name, phone and address on non-statutory records but keeps statutory registers (with a note explaining why). Add a privacy notice template to settings. Get a lawyer's review before launch (open question Q5).
+
+#### B5.7 🤝 Regulatory compliance & drug license renewal alerts ⏱ 1.5 days
+- **Why:** Running a retail pharmacy with an expired Drug License (Form 20/21) or expired Chief Pharmacist council registration leads to immediate sealing and cancellation by state drug inspectors.
+- **Files:** ✏️ `schema/platform.ts` (store licenses & pharmacist registrations), ➕ `src/server/domain/compliance/license-tracker.ts`, ➕ `src/app/dashboard/compliance/licenses/page.tsx`.
+- **How:**
+  - Track Drug License Form 20, 21, 20B, 21B validity dates per store.
+  - Track Pharmacist State Pharmacy Council registration number and renewal validity.
+  - Track FSSAI registration number and expiry date.
+  - Automatic 60-day, 30-day, and 7-day advance warnings in Topbar and owner dashboard.
+- **Done when:** an upcoming license expiry triggers clear dashboard alerts and notification reminders 🧪.
 
 **Phase 5 exit:** month-end close demo: receipts and payments → bank reconciliation → GSTR-1 and 2B reconciliation → period lock. A sandbox IRN on a B2B invoice. Opt-out respected by reminders.
 
@@ -912,10 +999,10 @@ Tick items in PRs. One line per task, in the same order as above.
 
 **Phase 0** — A: [x] A0.1 [x] A0.2 [x] A0.3 [x] A0.4 [x] A0.5 [ ] A0.6 [x] A0.7 · B: [x] B0.1 [x] B0.2 [x] B0.3 [x] B0.4 [x] B0.5 [x] B0.6 [x] B0.7 [ ] B0.8
 **Phase 1** — A: [x] A1.1 [x] A1.2 [x] A1.3 [x] A1.4 [x] A1.5 [x] A1.6 [x] A1.7 · B: [x] B1.1 [x] B1.2 [x] B1.3 [x] B1.4 [x] B1.5 [x] B1.6 [x] B1.7
-**Phase 2** — A: [x] A2.1 [ ] A2.2 [ ] A2.3 [ ] A2.4 [ ] A2.5 [ ] A2.6 [ ] A2.7 [ ] A2.8 [x] A2.9 · B: [x] B2.1 [x] B2.2 [x] B2.3 [x] B2.4 [x] B2.5 [x] B2.6 [x] B2.7
-**Phase 3** — A: [ ] A3.1 [ ] A3.2 [ ] A3.3 [ ] A3.4 [ ] A3.5 [ ] A3.6 · B: [ ] B3.1 [ ] B3.2 [ ] B3.3 [ ] B3.4 [ ] B3.5
-**Phase 4** — A: [ ] A4.1 [ ] A4.2 [ ] A4.3 [ ] A4.4 [ ] A4.5 [ ] A4.6 [ ] A4.7 [ ] A4.8 · B: [ ] B4.1 [ ] B4.2 [ ] B4.3 [ ] B4.4 [ ] B4.5
-**Phase 5** — A: [ ] A5.1 [ ] A5.2 [ ] A5.3 [ ] A5.4 [ ] A5.5 [ ] A5.6 · B: [ ] B5.1 [ ] B5.2 [ ] B5.3 [ ] B5.4 [ ] B5.5 [ ] B5.6
+**Phase 2** — A: [x] A2.1 [x] A2.2 [ ] A2.3 [ ] A2.4 [ ] A2.5 [ ] A2.6 [ ] A2.7 [ ] A2.8 [x] A2.9 [ ] A2.10 [ ] A2.11 · B: [x] B2.1 [x] B2.2 [x] B2.3 [x] B2.4 [x] B2.5 [x] B2.6 [x] B2.7 [ ] B2.8
+**Phase 3** — A: [ ] A3.1 [ ] A3.2 [ ] A3.3 [ ] A3.4 [ ] A3.5 [ ] A3.6 · B: [ ] B3.1 [ ] B3.2 [ ] B3.3 [ ] B3.4 [ ] B3.5 [ ] B3.6 [ ] B3.7
+**Phase 4** — A: [ ] A4.1 [ ] A4.2 [ ] A4.3 [ ] A4.4 [ ] A4.5 [ ] A4.6 [ ] A4.7 [ ] A4.8 [ ] A4.9 · B: [ ] B4.1 [ ] B4.2 [ ] B4.3 [ ] B4.4 [ ] B4.5 [ ] B4.6
+**Phase 5** — A: [ ] A5.1 [ ] A5.2 [ ] A5.3 [ ] A5.4 [ ] A5.5 [ ] A5.6 [ ] A5.7 · B: [ ] B5.1 [ ] B5.2 [ ] B5.3 [ ] B5.4 [ ] B5.5 [ ] B5.6 [ ] B5.7
 **Phase 6** — A: [ ] A6.1 [ ] A6.2 [ ] A6.3 [ ] A6.4 [ ] A6.5 [ ] A6.6 · B: [ ] B6.1 [ ] B6.2 [ ] B6.3 [ ] B6.4 [ ] B6.5 [ ] B6.6
 
 ---

@@ -57,6 +57,13 @@
       "when": 1793216571688,
       "tag": "0007_user_invites",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1793347231738,
+      "tag": "0008_medical_nicolaos",
+      "breakpoints": true
     }
   ]
 }

@@ -54,6 +54,10 @@ export const medicines = pgTable(
     dosageForm: text("dosage_form"), // tablet | capsule | syrup | injection | ...
     packSize: text("pack_size"), // "15 tablets", "100 ml"
     unit: text("unit").notNull().default("strip"),
+    /** Numeric unit conversion factor (e.g. 10 tablets per strip). Base inventory math uses this. */
+    unitsPerPack: integer("units_per_pack").notNull().default(1),
+    packUnit: text("pack_unit").notNull().default("strip"),
+    looseUnit: text("loose_unit").notNull().default("tablet"),
     manufacturerId: uuid("manufacturer_id").references(() => manufacturers.id),
     categoryId: uuid("category_id").references(() => categories.id),
     rackId: uuid("rack_id").references(() => racks.id),

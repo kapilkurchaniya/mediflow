@@ -122,10 +122,11 @@ describe("createSale: a full sale", () => {
 
   it("ignores any price from the caller: the server rate is used", async () => {
     const s = await scene();
-    const res = await s.sell({ payments: [] });
+    const c = await makeCustomer(t.db, s.w.tenant.id, { creditLimit: 50000 });
+    const res = await s.sell({ payments: [], customerId: c.id });
     expect(res.total).toBe(20000); // 2 x ₹100 (batch sale rate)
     const [sale] = await s.sales();
-    expect(sale.creditAmount).toBe(20000); // nothing paid, all outstanding
+    expect(sale.creditAmount).toBe(20000); // nothing paid, all outstanding on credit
   });
 
   it("numbers by financial year and honours a pre-assigned invoice number", async () => {
@@ -248,7 +249,7 @@ describe("createSale: prescriptions (🤝 B1.4)", () => {
     let st = await s.rxState();
     expect(st.item.quantityDispensed).toBe(2);
     expect(st.rx.status).toBe("partially_dispensed");
-    await s.sell({ compliance: s.compliance, lines: [{ batchId: s.batch.id, qty: 1, discountBp: 0 }], payments: [] });
+    await s.sell({ compliance: s.compliance, lines: [{ batchId: s.batch.id, qty: 1, discountBp: 0 }], payments: [{ method: "cash", amount: 10000 }] });
     st = await s.rxState();
     expect(st.item.quantityDispensed).toBe(3);
     expect(st.rx.status).toBe("fully_dispensed");
@@ -308,13 +309,10 @@ describe("createSale: refusals change nothing", () => {
     expect(await s.stock()).toBe(10);
   });
 
-  it("split payments, credit and point redemption are not available yet", async () => {
+  it("loyalty point redemption is not available yet, and 'credit' is not a payment method", async () => {
     const s = await scene();
-    await expect(
-      s.sell({ payments: [{ method: "cash", amount: 10000 }, { method: "upi", amount: 10000 }] }),
-    ).rejects.toThrow(/Split payments are not available yet/);
-    await expect(s.sell({ payments: [{ method: "credit", amount: 10000 }] })).rejects.toThrow(/not available yet/);
     await expect(s.sell({ redeemPoints: 5 })).rejects.toThrow(/not available yet/);
+    await expect(s.sell({ payments: [{ method: "credit", amount: 10000 }] })).rejects.toThrow(/Leave the unpaid part empty/);
     expect(await s.sales()).toHaveLength(0);
   });
 
@@ -358,5 +356,133 @@ describe("createSale: optional steps never lose the sale", () => {
     } finally {
       await t.db.execute(sql`alter table outbox_events drop constraint tmp_no_receipt`);
     }
+  });
+});
+
+describe("createSale: split tender, change and credit (A2.2)", () => {
+  async function journalDebits(saleId: string) {
+    const rows = await t.db
+      .select({ key: schema.accounts.systemKey, debit: schema.journalLines.debit, credit: schema.journalLines.credit, partyId: schema.journalLines.partyId })
+      .from(schema.journalLines)
+      .innerJoin(schema.journalEntries, eq(schema.journalLines.entryId, schema.journalEntries.id))
+      .innerJoin(schema.accounts, eq(schema.journalLines.accountId, schema.accounts.id))
+      .where(eq(schema.journalEntries.refId, saleId));
+    expect(rows.reduce((a, r) => a + Number(r.debit), 0), "journal must balance").toBe(rows.reduce((a, r) => a + Number(r.credit), 0));
+    return rows;
+  }
+  const payments = (saleId: string) => t.db.select().from(schema.salePayments).where(eq(schema.salePayments.saleId, saleId));
+  const sale = async (id: string) => (await t.db.select().from(schema.sales).where(eq(schema.sales.id, id)))[0];
+
+  it("₹300 cash + ₹200 UPI on a ₹500 bill: two payment rows and a balanced journal on two accounts", async () => {
+    const s = await scene();
+    // 5 units x ₹100 = ₹500
+    const res = await s.sell({ lines: [{ batchId: s.batch.id, qty: 5, discountBp: 0 }], payments: [{ method: "cash", amount: 30000 }, { method: "upi", amount: 20000, reference: "UTR1" }] });
+    expect(res).toMatchObject({ total: 50000, changeDue: 0 });
+    const rows = await payments(res.saleId);
+    expect(rows.map((r) => [r.method, r.amount]).sort()).toEqual([["cash", 30000], ["upi", 20000]]);
+    expect(rows.find((r) => r.method === "upi")!.reference).toBe("UTR1");
+    expect(await sale(res.saleId)).toMatchObject({ paidAmount: 50000, creditAmount: 0 });
+    const debits = (await journalDebits(res.saleId)).filter((r) => r.debit > 0);
+    expect(debits.find((r) => r.key === "cash")!.debit).toBe(30000);
+    expect(debits.find((r) => r.key === "bank")!.debit).toBe(20000);
+  });
+
+  it("card and bank go to the bank account; two UPI rows add up on one journal line", async () => {
+    const s = await scene();
+    const res = await s.sell({ payments: [{ method: "upi", amount: 5000 }, { method: "card", amount: 5000 }, { method: "bank", amount: 10000 }] });
+    const bank = (await journalDebits(res.saleId)).filter((r) => r.key === "bank" && r.debit > 0);
+    expect(bank).toHaveLength(1);
+    expect(bank[0].debit).toBe(20000);
+  });
+
+  it("paying too much in cash gives change; the shop keeps exactly the bill", async () => {
+    const s = await scene();
+    const res = await s.sell({ payments: [{ method: "cash", amount: 50000 }] }); // ₹500 for a ₹200 bill
+    expect(res).toMatchObject({ total: 20000, changeDue: 30000 });
+    expect(await sale(res.saleId)).toMatchObject({ paidAmount: 20000, creditAmount: 0 });
+    expect((await payments(res.saleId)).map((r) => [r.method, r.amount])).toEqual([["cash", 20000]]);
+    expect((await journalDebits(res.saleId)).find((r) => r.key === "cash")!.debit).toBe(20000);
+  });
+
+  it("overpaying with UPI or card is refused; overpaying across cash + UPI is fine when cash covers it", async () => {
+    const s = await scene();
+    await expect(s.sell({ payments: [{ method: "upi", amount: 25000 }] })).rejects.toThrow(/Only cash can be overpaid/);
+    await expect(s.sell({ payments: [{ method: "cash", amount: 1000 }, { method: "upi", amount: 25000 }] })).rejects.toThrow(/Only cash can be overpaid/);
+    expect(await s.sales()).toHaveLength(0);
+    const ok = await s.sell({ payments: [{ method: "cash", amount: 5000 }, { method: "upi", amount: 20000 }] }); // ₹250 for ₹200: ₹50 change
+    expect(ok.changeDue).toBe(5000);
+    expect((await payments(ok.saleId)).map((r) => [r.method, r.amount])).toEqual([["upi", 20000]]); // the cash row was all change
+  });
+
+  describe("credit", () => {
+    it("the unpaid part goes on the customer's account (debtors, with the customer as party)", async () => {
+      const s = await scene();
+      const c = await makeCustomer(t.db, s.w.tenant.id, { creditLimit: 100000 });
+      const res = await s.sell({ customerId: c.id, payments: [{ method: "cash", amount: 5000 }] }); // ₹50 of ₹200 paid
+      expect(await sale(res.saleId)).toMatchObject({ paidAmount: 5000, creditAmount: 15000 });
+      const debtors = (await journalDebits(res.saleId)).find((r) => r.key === "debtors")!;
+      expect(debtors).toMatchObject({ debit: 15000, partyId: c.id });
+    });
+
+    it("needs a customer", async () => {
+      const s = await scene();
+      await expect(s.sell({ payments: [{ method: "cash", amount: 5000 }] })).rejects.toThrow(/Choose a customer/);
+      expect(await s.sales()).toHaveLength(0);
+    });
+
+    it("needs the customer.credit permission", async () => {
+      const s = await scene();
+      const c = await makeCustomer(t.db, s.w.tenant.id, { creditLimit: 100000 });
+      const noCredit = ctxFor(s.w, ["sale.create"]);
+      await expect(s.sell({ customerId: c.id, payments: [] }, { ctx: noCredit })).rejects.toThrow(/permission to sell on credit/);
+      // paying in full needs no credit permission
+      await s.sell({ customerId: c.id }, { ctx: noCredit });
+    });
+
+    it("a customer with no credit limit (0) cannot buy on credit", async () => {
+      const s = await scene();
+      const c = await makeCustomer(t.db, s.w.tenant.id, { creditLimit: 0 });
+      await expect(s.sell({ customerId: c.id, payments: [] })).rejects.toThrow(/no credit limit/);
+    });
+
+    it("stops at the credit limit, counting what the customer already owes (cancelled bills do not count)", async () => {
+      const s = await scene();
+      const c = await makeCustomer(t.db, s.w.tenant.id, { creditLimit: 30000 }); // ₹300
+      await s.sell({ customerId: c.id, payments: [] }); // owes ₹200
+      await expect(s.sell({ customerId: c.id, payments: [] })).rejects.toThrow(/Credit limit exceeded: .*already owes ₹200\.00 and the limit is ₹300\.00/);
+      // paying ₹150 of the next ₹200 bill puts only ₹50 on credit: ₹250 total, within ₹300
+      await s.sell({ customerId: c.id, payments: [{ method: "cash", amount: 15000 }] });
+      await expect(s.sell({ customerId: c.id, payments: [] })).rejects.toThrow(/Credit limit exceeded/);
+      // cancelled bills no longer count
+      await t.db.update(schema.sales).set({ status: "cancelled" }).where(eq(schema.sales.customerId, c.id));
+      await s.sell({ customerId: c.id, payments: [] });
+      expect((await s.sales()).filter((x) => x.status === "completed")).toHaveLength(1);
+    });
+
+    it("serializes concurrent credit sales against the same customer and enforces credit limit", async () => {
+      const s = await scene();
+      const c = await makeCustomer(t.db, s.w.tenant.id, { creditLimit: 30000 }); // ₹300 limit
+      // Each sale is ₹200. Two concurrent credit sales would total ₹400 (> ₹300).
+      // Because customer is locked for update, one must succeed and one must fail with CREDIT_LIMIT.
+      const p1 = s.sell({ customerId: c.id, payments: [] });
+      const p2 = s.sell({ customerId: c.id, payments: [] });
+      const results = await Promise.allSettled([p1, p2]);
+      const fulfilled = results.filter((r) => r.status === "fulfilled");
+      const rejected = results.filter((r) => r.status === "rejected");
+      expect(fulfilled).toHaveLength(1);
+      expect(rejected).toHaveLength(1);
+      if (rejected[0].status === "rejected") {
+        expect((rejected[0].reason as Error).message).toMatch(/Credit limit exceeded/);
+      }
+    });
+  });
+
+  it("the replay of an idempotent sale reports the same change", async () => {
+    const s = await scene();
+    const clientSaleId = "44444444-4444-4444-8444-444444444444";
+    const first = await s.sell({ clientSaleId, payments: [{ method: "cash", amount: 50000 }] });
+    const again = await s.sell({ clientSaleId, payments: [{ method: "cash", amount: 50000 }] });
+    expect(first.changeDue).toBe(30000);
+    expect(again).toMatchObject({ duplicate: true, changeDue: 30000 });
   });
 });
