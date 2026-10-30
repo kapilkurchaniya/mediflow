@@ -561,6 +561,7 @@ export async function buildGstr1Data(
     month: number; // 1-12
     year: number;
     storeId?: string;
+    gstin?: string;
   }
 ): Promise<Gstr1Summary> {
   const fromDate = `${params.year}-${String(params.month).padStart(2, "0")}-01`;
@@ -569,12 +570,49 @@ export async function buildGstr1Data(
 
   const conditions = [
     eq(schema.gstDocuments.tenantId, params.tenantId),
-    inArray(schema.gstDocuments.refType, ["sale", "return"]),
+    inArray(schema.gstDocuments.refType, ["sale", "return", "transfer_out"]),
     gte(schema.gstDocuments.docDate, fromDate),
     lte(schema.gstDocuments.docDate, toDate),
   ];
 
-  if (params.storeId) {
+  if (params.gstin) {
+    const cleanGstin = params.gstin.trim().toUpperCase();
+    const matchingStores = await db
+      .select({ id: schema.stores.id })
+      .from(schema.stores)
+      .where(and(eq(schema.stores.tenantId, params.tenantId), eq(schema.stores.gstin, cleanGstin)));
+    const storeIds = matchingStores.map((s) => s.id);
+    if (storeIds.length === 0) {
+      return {
+        period: { month: params.month, year: params.year, fromDate, toDate },
+        b2b: [],
+        b2cs: [],
+        b2cl: [],
+        cdnr: [],
+        hsnSummary: [],
+        docSummary: { totalIssued: 0, cancelled: 0, netIssued: 0, fromDocNo: "None", toDocNo: "None" },
+        totals: { taxable: 0, cgst: 0, sgst: 0, igst: 0, cess: 0, totalTax: 0, grossTotal: 0, b2bCount: 0, b2cCount: 0 },
+      };
+    }
+    if (params.storeId) {
+      if (storeIds.includes(params.storeId)) {
+        conditions.push(eq(schema.gstDocuments.storeId, params.storeId));
+      } else {
+        return {
+          period: { month: params.month, year: params.year, fromDate, toDate },
+          b2b: [],
+          b2cs: [],
+          b2cl: [],
+          cdnr: [],
+          hsnSummary: [],
+          docSummary: { totalIssued: 0, cancelled: 0, netIssued: 0, fromDocNo: "None", toDocNo: "None" },
+          totals: { taxable: 0, cgst: 0, sgst: 0, igst: 0, cess: 0, totalTax: 0, grossTotal: 0, b2bCount: 0, b2cCount: 0 },
+        };
+      }
+    } else {
+      conditions.push(inArray(schema.gstDocuments.storeId, storeIds));
+    }
+  } else if (params.storeId) {
     conditions.push(eq(schema.gstDocuments.storeId, params.storeId));
   }
 
@@ -632,7 +670,7 @@ export async function buildGstr1Data(
       continue;
     }
 
-    if (doc.refId) {
+    if (doc.refId && doc.refType === "sale") {
       saleIds.push(doc.refId);
     }
 
@@ -877,6 +915,7 @@ export async function buildGstr2Data(
     month: number;
     year: number;
     storeId?: string;
+    gstin?: string;
   }
 ): Promise<Gstr2Summary> {
   const fromDate = `${params.year}-${String(params.month).padStart(2, "0")}-01`;
@@ -885,12 +924,39 @@ export async function buildGstr2Data(
 
   const conditions = [
     eq(schema.gstDocuments.tenantId, params.tenantId),
-    eq(schema.gstDocuments.refType, "purchase"),
+    inArray(schema.gstDocuments.refType, ["purchase", "transfer_in"]),
     gte(schema.gstDocuments.docDate, fromDate),
     lte(schema.gstDocuments.docDate, toDate),
   ];
 
-  if (params.storeId) {
+  if (params.gstin) {
+    const cleanGstin = params.gstin.trim().toUpperCase();
+    const matchingStores = await db
+      .select({ id: schema.stores.id })
+      .from(schema.stores)
+      .where(and(eq(schema.stores.tenantId, params.tenantId), eq(schema.stores.gstin, cleanGstin)));
+    const storeIds = matchingStores.map((s) => s.id);
+    if (storeIds.length === 0) {
+      return {
+        period: { month: params.month, year: params.year, fromDate, toDate },
+        inwardSupplies: [],
+        totals: { taxable: 0, cgst: 0, sgst: 0, igst: 0, totalItc: 0, grossTotal: 0, billCount: 0 },
+      };
+    }
+    if (params.storeId) {
+      if (storeIds.includes(params.storeId)) {
+        conditions.push(eq(schema.gstDocuments.storeId, params.storeId));
+      } else {
+        return {
+          period: { month: params.month, year: params.year, fromDate, toDate },
+          inwardSupplies: [],
+          totals: { taxable: 0, cgst: 0, sgst: 0, igst: 0, totalItc: 0, grossTotal: 0, billCount: 0 },
+        };
+      }
+    } else {
+      conditions.push(inArray(schema.gstDocuments.storeId, storeIds));
+    }
+  } else if (params.storeId) {
     conditions.push(eq(schema.gstDocuments.storeId, params.storeId));
   }
 
@@ -989,6 +1055,7 @@ export async function reconcileGst(
     month: number;
     year: number;
     storeId?: string;
+    gstin?: string;
   }
 ): Promise<GstReconciliationResult> {
   const [gstr1, gstr2] = await Promise.all([
@@ -1347,4 +1414,281 @@ export async function createGstDocumentFromPurchaseReturn(
     .returning();
 
   return gstDoc;
+}
+
+/**
+ * Retrieves all distinct active GSTINs for a tenant (from stores and tenant record).
+ */
+export async function getTenantGstins(
+  db: DbOrTx,
+  tenantId: string
+): Promise<Array<{ gstin: string; stateCode: string; stateName: string; storeNames: string[] }>> {
+  const allStores = await db
+    .select({
+      id: schema.stores.id,
+      name: schema.stores.name,
+      gstin: schema.stores.gstin,
+      stateCode: schema.stores.stateCode,
+    })
+    .from(schema.stores)
+    .where(and(eq(schema.stores.tenantId, tenantId), eq(schema.stores.isActive, true)));
+
+  const gstinMap = new Map<string, { gstin: string; stateCode: string; stateName: string; storeNames: string[] }>();
+
+  for (const s of allStores) {
+    if (!s.gstin) continue;
+    const cleanGstin = s.gstin.trim().toUpperCase();
+    if (!cleanGstin) continue;
+
+    const stateCode = (s.stateCode || extractStateCodeFromGstin(cleanGstin) || "27").padStart(2, "0");
+    const stateName = getStateName(stateCode);
+
+    const existing = gstinMap.get(cleanGstin) || {
+      gstin: cleanGstin,
+      stateCode,
+      stateName,
+      storeNames: [],
+    };
+    if (!existing.storeNames.includes(s.name)) {
+      existing.storeNames.push(s.name);
+    }
+    gstinMap.set(cleanGstin, existing);
+  }
+
+  // Also check tenant primary GSTIN if not present
+  const [tenantRec] = await db
+    .select({
+      gstin: schema.tenants.gstin,
+      stateCode: schema.tenants.stateCode,
+    })
+    .from(schema.tenants)
+    .where(eq(schema.tenants.id, tenantId));
+
+  if (tenantRec?.gstin) {
+    const cleanGstin = tenantRec.gstin.trim().toUpperCase();
+    if (cleanGstin && !gstinMap.has(cleanGstin)) {
+      const stateCode = (tenantRec.stateCode || extractStateCodeFromGstin(cleanGstin) || "27").padStart(2, "0");
+      gstinMap.set(cleanGstin, {
+        gstin: cleanGstin,
+        stateCode,
+        stateName: getStateName(stateCode),
+        storeNames: ["Headquarters / Central"],
+      });
+    }
+  }
+
+  return Array.from(gstinMap.values()).sort((a, b) => a.gstin.localeCompare(b.gstin));
+}
+
+export interface CreateGstTransferLine {
+  batchId?: string;
+  medicineId?: string;
+  medicineName?: string;
+  qty: number;
+  unitCostPaise: number;
+  gstRateBp?: number;
+}
+
+export interface CreateGstDocumentFromTransferParams {
+  transferId: string;
+  tenantId: string;
+  fromStoreId: string;
+  toStoreId: string;
+  transferNo: string;
+  transferDate?: string;
+  lines: CreateGstTransferLine[];
+}
+
+export interface CreateGstTransferResult {
+  kind: "delivery_challan" | "tax_invoice";
+  outwardDoc: typeof schema.gstDocuments.$inferSelect;
+  inwardDoc: typeof schema.gstDocuments.$inferSelect | null;
+  eWayBillRequired: boolean;
+  totalTaxable: number;
+  totalTax: number;
+  grandTotal: number;
+}
+
+/**
+ * Creates compliant GST documents for inter-store stock transfers (Task B3.4).
+ *
+ * Rules:
+ * - If fromStore.gstin === toStore.gstin (same registration / intra-entity):
+ *   Generates a Delivery Challan (Rule 55, CGST Rules). Non-taxable supply.
+ * - If fromStore.gstin !== toStore.gstin (distinct persons under GST Sec 25(4)):
+ *   Generates an outward Tax Invoice under fromStore (B2B supply) and an inward
+ *   supply for toStore (for Input Tax Credit in GSTR-2).
+ *   Applies IGST for inter-state and CGST+SGST for intra-state.
+ *   Flags eWayBillRequired if grandTotal >= ₹50,000.
+ */
+export async function createGstDocumentFromTransfer(
+  dbOrTx: DbOrTx,
+  params: CreateGstDocumentFromTransferParams
+): Promise<CreateGstTransferResult> {
+  const [fromStore] = await dbOrTx
+    .select({
+      id: schema.stores.id,
+      name: schema.stores.name,
+      gstin: schema.stores.gstin,
+      stateCode: schema.stores.stateCode,
+    })
+    .from(schema.stores)
+    .where(and(eq(schema.stores.id, params.fromStoreId), eq(schema.stores.tenantId, params.tenantId)));
+
+  if (!fromStore) {
+    throw new Error(`Source store ${params.fromStoreId} not found`);
+  }
+
+  const [toStore] = await dbOrTx
+    .select({
+      id: schema.stores.id,
+      name: schema.stores.name,
+      gstin: schema.stores.gstin,
+      stateCode: schema.stores.stateCode,
+    })
+    .from(schema.stores)
+    .where(and(eq(schema.stores.id, params.toStoreId), eq(schema.stores.tenantId, params.tenantId)));
+
+  if (!toStore) {
+    throw new Error(`Destination store ${params.toStoreId} not found`);
+  }
+
+  const fromGstin = fromStore.gstin?.trim().toUpperCase() || null;
+  const toGstin = toStore.gstin?.trim().toUpperCase() || null;
+  const fromState = (fromStore.stateCode || extractStateCodeFromGstin(fromGstin) || "27").padStart(2, "0");
+  const toState = (toStore.stateCode || extractStateCodeFromGstin(toGstin) || fromState).padStart(2, "0");
+
+  const isSameGstin = Boolean(fromGstin && toGstin && fromGstin === toGstin) || (!fromGstin && !toGstin);
+  const isInterState = fromState !== toState;
+
+  let totalTaxable = 0;
+  let totalCgst = 0;
+  let totalSgst = 0;
+  let totalIgst = 0;
+
+  for (const line of params.lines) {
+    const lineTaxable = Math.max(0, line.qty * line.unitCostPaise);
+    totalTaxable += lineTaxable;
+
+    if (!isSameGstin) {
+      const rateBp = line.gstRateBp ?? DEFAULT_GST_RATE_BP;
+      if (isInterState) {
+        totalIgst += Math.round((lineTaxable * rateBp) / 10000);
+      } else {
+        const halfRateBp = rateBp / 2;
+        totalCgst += Math.round((lineTaxable * halfRateBp) / 10000);
+        totalSgst += Math.round((lineTaxable * halfRateBp) / 10000);
+      }
+    }
+  }
+
+  const totalTax = totalCgst + totalSgst + totalIgst;
+  const grandTotal = totalTaxable + totalTax;
+  const eWayBillRequired = grandTotal >= 5000000; // >= ₹50,000 (paise)
+  const docDate = params.transferDate || new Date().toISOString().split("T")[0]!;
+  const posStr = `${toState}-${getStateName(toState)}`;
+
+  if (isSameGstin) {
+    // Delivery Challan under Rule 55 of CGST rules (non-taxable branch movement)
+    const [outwardDoc] = await dbOrTx
+      .insert(schema.gstDocuments)
+      .values({
+        tenantId: params.tenantId,
+        storeId: params.fromStoreId,
+        docType: "delivery_challan",
+        docNo: params.transferNo,
+        docDate,
+        partyGstin: toGstin,
+        partyName: toStore.name,
+        partyStateCode: toState,
+        placeOfSupply: posStr,
+        supplyType: "B2B",
+        isReverseCharge: false,
+        taxableAmount: totalTaxable,
+        cgst: 0,
+        sgst: 0,
+        igst: 0,
+        cess: 0,
+        total: grandTotal,
+        refType: "transfer",
+        refId: params.transferId,
+        status: "active",
+      })
+      .returning();
+
+    return {
+      kind: "delivery_challan",
+      outwardDoc,
+      inwardDoc: null,
+      eWayBillRequired,
+      totalTaxable,
+      totalTax: 0,
+      grandTotal,
+    };
+  }
+
+  // Distinct GSTINs: Deemed taxable supply under GST Sec 25(4)
+  // 1. Outward Tax Invoice under source store (B2B outward supply)
+  const [outwardDoc] = await dbOrTx
+    .insert(schema.gstDocuments)
+    .values({
+      tenantId: params.tenantId,
+      storeId: params.fromStoreId,
+      docType: "invoice",
+      docNo: params.transferNo,
+      docDate,
+      partyGstin: toGstin,
+      partyName: toStore.name,
+      partyStateCode: toState,
+      placeOfSupply: posStr,
+      supplyType: "B2B",
+      isReverseCharge: false,
+      taxableAmount: totalTaxable,
+      cgst: totalCgst,
+      sgst: totalSgst,
+      igst: totalIgst,
+      cess: 0,
+      total: grandTotal,
+      refType: "transfer_out",
+      refId: params.transferId,
+      status: "active",
+    })
+    .returning();
+
+  // 2. Inward supply under destination store for ITC
+  const [inwardDoc] = await dbOrTx
+    .insert(schema.gstDocuments)
+    .values({
+      tenantId: params.tenantId,
+      storeId: params.toStoreId,
+      docType: "invoice",
+      docNo: params.transferNo,
+      docDate,
+      partyGstin: fromGstin,
+      partyName: fromStore.name,
+      partyStateCode: fromState,
+      placeOfSupply: posStr,
+      supplyType: "B2B",
+      isReverseCharge: false,
+      taxableAmount: totalTaxable,
+      cgst: totalCgst,
+      sgst: totalSgst,
+      igst: totalIgst,
+      cess: 0,
+      total: grandTotal,
+      refType: "transfer_in",
+      refId: params.transferId,
+      status: "active",
+    })
+    .returning();
+
+  return {
+    kind: "tax_invoice",
+    outwardDoc,
+    inwardDoc,
+    eWayBillRequired,
+    totalTaxable,
+    totalTax,
+    grandTotal,
+  };
 }
