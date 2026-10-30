@@ -155,7 +155,9 @@ export async function findSubstitutes(genericName: string, excludeMedicineId?: s
 export type PosItemInput = {
   medicineId: string;
   batchId: string;
-  qty: number;
+  qty?: number;
+  packQty?: number;
+  looseQty?: number;
   rate: number; // paise - ignored by server, but we keep the type signature for now
   discountBp: number; // basis points
 };
@@ -197,7 +199,22 @@ export async function createSaleInvoice(
 
   // Never trust numbers from the browser: a negative discount would add to the bill, one above 100% would make it negative.
   for (const i of items) {
-    if (!Number.isInteger(i.qty) || i.qty <= 0) return { error: "Quantity must be a whole number above zero." };
+    const hasPackOrLoose = i.packQty !== undefined || i.looseQty !== undefined;
+    if (hasPackOrLoose) {
+      if (
+        (i.packQty !== undefined && (!Number.isInteger(i.packQty) || i.packQty < 0)) ||
+        (i.looseQty !== undefined && (!Number.isInteger(i.looseQty) || i.looseQty < 0))
+      ) {
+        return { error: "Quantities must be whole numbers zero or greater." };
+      }
+      if ((i.packQty ?? 0) <= 0 && (i.looseQty ?? 0) <= 0) {
+        return { error: "Total quantity must be greater than zero." };
+      }
+    } else {
+      if (!Number.isInteger(i.qty) || (i.qty ?? 0) <= 0) {
+        return { error: "Quantity must be a whole number above zero." };
+      }
+    }
     if (!Number.isInteger(i.discountBp) || i.discountBp < 0 || i.discountBp > 10000) {
       return { error: "Discount must be between 0% and 100%." };
     }
@@ -220,7 +237,13 @@ export async function createSaleInvoice(
 
   const input: SaleInput = {
     customerId: customerId?.trim() || undefined,
-    lines: items.map((i) => ({ batchId: i.batchId, qty: i.qty, discountBp: i.discountBp })),
+    lines: items.map((i) => ({
+      batchId: i.batchId,
+      qty: i.qty,
+      packQty: i.packQty,
+      looseQty: i.looseQty,
+      discountBp: i.discountBp,
+    })),
     billDiscountPaise: 0,
     payments,
     redeemPoints: 0,

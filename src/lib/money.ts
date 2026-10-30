@@ -61,8 +61,11 @@ export function taxOnExclusive(taxable: number, gstRateBp: number, interState = 
 }
 
 export interface SaleLineInput {
-  qty: number;
-  rate: number; // GST-inclusive per unit
+  qty?: number;
+  packQty?: number;
+  looseQty?: number;
+  unitsPerPack?: number;
+  rate: number; // GST-inclusive per whole pack in paise
   discountBp: number;
   gstRateBp: number;
 }
@@ -71,13 +74,48 @@ export interface SaleLineResult extends TaxSplit {
   gross: number;
   discount: number;
   total: number; // GST-inclusive after discount
+  baseQty: number;
+  packQty: number;
+  looseQty: number;
 }
 
 export function computeSaleLine(line: SaleLineInput, interState = false): SaleLineResult {
-  const gross = line.qty * line.rate;
+  const upp = Math.max(1, line.unitsPerPack ?? 1);
+  let pQty = line.packQty ?? 0;
+  let lQty = line.looseQty ?? 0;
+  let baseQty = 0;
+  let gross = 0;
+
+  if (line.packQty !== undefined || line.looseQty !== undefined) {
+    if (lQty >= upp) {
+      pQty += Math.floor(lQty / upp);
+      lQty = lQty % upp;
+    }
+    baseQty = (pQty * upp) + lQty;
+    const looseAmount = upp > 1 ? Math.round((lQty * line.rate) / upp) : 0;
+    gross = (pQty * line.rate) + (upp === 1 ? lQty * line.rate : looseAmount);
+  } else {
+    baseQty = line.qty ?? 0;
+    pQty = Math.floor(baseQty / upp);
+    lQty = baseQty % upp;
+    if (upp > 1) {
+      gross = (pQty * line.rate) + Math.round((lQty * line.rate) / upp);
+    } else {
+      gross = baseQty * line.rate;
+    }
+  }
+
   const discount = Math.round((gross * line.discountBp) / 10000);
   const total = gross - discount;
-  return { gross, discount, total, ...taxFromInclusive(total, line.gstRateBp, interState) };
+  return {
+    gross,
+    discount,
+    total,
+    baseQty,
+    packQty: pQty,
+    looseQty: lQty,
+    ...taxFromInclusive(total, line.gstRateBp, interState),
+  };
 }
 
 export interface DocTotals {

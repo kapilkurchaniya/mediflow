@@ -80,7 +80,13 @@ export const saleItems = pgTable(
     batchNo: text("batch_no").notNull(),
     expiryDate: date("expiry_date").notNull(),
     hsn: text("hsn"),
+    /** Total base units sold (packQty * unitsPerPack + looseQty). Drives inventory deduction. */
     qty: integer("qty").notNull(),
+    unitsPerPack: integer("units_per_pack").notNull().default(1),
+    packUnit: text("pack_unit").notNull().default("strip"),
+    looseUnit: text("loose_unit").notNull().default("tablet"),
+    packQty: integer("pack_qty").notNull().default(0),
+    looseQty: integer("loose_qty").notNull().default(0),
     returnedQty: integer("returned_qty").notNull().default(0),
     mrp: money("mrp"),
     rate: money("rate"),

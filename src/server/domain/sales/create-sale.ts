@@ -76,8 +76,21 @@ export async function createSale(
   // ── 1. Never trust numbers from the browser ──────────────────────────────────────────────────────
   if (input.lines.length === 0) throw new DomainError("NO_ITEMS", "No items to bill");
   for (const l of input.lines) {
-    if (!Number.isInteger(l.qty) || l.qty <= 0) {
-      throw new DomainError("INVALID_QTY", "Quantity must be a whole number above zero.");
+    const hasPackOrLoose = l.packQty !== undefined || l.looseQty !== undefined;
+    if (hasPackOrLoose) {
+      if (
+        (l.packQty !== undefined && (!Number.isInteger(l.packQty) || l.packQty < 0)) ||
+        (l.looseQty !== undefined && (!Number.isInteger(l.looseQty) || l.looseQty < 0))
+      ) {
+        throw new DomainError("INVALID_QTY", "Pack and loose quantities must be whole numbers zero or greater.");
+      }
+      if ((l.packQty ?? 0) <= 0 && (l.looseQty ?? 0) <= 0) {
+        throw new DomainError("INVALID_QTY", "Total quantity must be greater than zero.");
+      }
+    } else {
+      if (!Number.isInteger(l.qty) || (l.qty ?? 0) <= 0) {
+        throw new DomainError("INVALID_QTY", "Quantity must be a whole number above zero.");
+      }
     }
     if (!Number.isInteger(l.discountBp) || l.discountBp < 0 || l.discountBp > 10000) {
       throw new DomainError("INVALID_DISCOUNT", "Discount must be between 0% and 100%.");
@@ -163,7 +176,29 @@ export async function createSale(
     const rec = dbBatches.find((b) => b.batch.id === line.batchId);
     if (!rec) throw new DomainError("BATCH_NOT_FOUND", `Batch ${line.batchId} not found`);
     const { batch, medicine, manufacturer } = rec;
-    if (batch.qtyOnHand < line.qty) {
+
+    const upp = Math.max(1, medicine.unitsPerPack ?? 1);
+    let packQty = line.packQty ?? 0;
+    let looseQty = line.looseQty ?? 0;
+    let baseQty = 0;
+
+    if (line.packQty !== undefined || line.looseQty !== undefined) {
+      if (looseQty >= upp) {
+        packQty += Math.floor(looseQty / upp);
+        looseQty = looseQty % upp;
+      }
+      baseQty = (packQty * upp) + looseQty;
+    } else {
+      baseQty = line.qty ?? 0;
+      packQty = Math.floor(baseQty / upp);
+      looseQty = baseQty % upp;
+    }
+
+    if (baseQty <= 0) {
+      throw new DomainError("INVALID_QUANTITY", `Quantity for ${medicine.name} must be greater than zero.`);
+    }
+
+    if (batch.qtyOnHand < baseQty && !opts.allowNegativeStock) {
       throw new DomainError("INSUFFICIENT_STOCK", `Insufficient stock for ${medicine.name}. Available: ${batch.qtyOnHand}`);
     }
     if (batch.expiryDate <= todayStr) {
@@ -171,8 +206,26 @@ export async function createSale(
     }
     // Server-side rate, falling back to MRP: the browser's price is ignored.
     const saleRate = batch.saleRate ?? batch.mrp ?? 0;
-    lineInputs.push({ qty: line.qty, rate: saleRate, discountBp: line.discountBp, gstRateBp: medicine.gstRateBp });
-    return { line, medicine, batch, manufacturerName: manufacturer ?? null, saleRate };
+    lineInputs.push({
+      qty: baseQty,
+      packQty,
+      looseQty,
+      unitsPerPack: upp,
+      rate: saleRate,
+      discountBp: line.discountBp,
+      gstRateBp: medicine.gstRateBp,
+    });
+    return {
+      line,
+      medicine,
+      batch,
+      manufacturerName: manufacturer ?? null,
+      saleRate,
+      baseQty,
+      packQty,
+      looseQty,
+      unitsPerPack: upp,
+    };
   });
 
   // ── 4. Drug-schedule compliance (Drugs & Cosmetics Rules) ───────────────────────────────────────
@@ -184,7 +237,7 @@ export async function createSale(
       medicineName: p.medicine.name,
       schedule: p.medicine.schedule,
       rxRequired: p.medicine.rxRequired,
-      qty: p.line.qty,
+      qty: p.baseQty,
     })),
     doctorName,
     doctorRegNo: c?.doctorRegNo,
@@ -319,7 +372,7 @@ export async function createSale(
       batchId: p.line.batchId,
       medicineId: p.medicine.id,
       type: "sale",
-      qtyChange: -p.line.qty,
+      qtyChange: -p.baseQty,
       unitCost: p.batch.purchaseRate,
       refType: "sale",
       refId: sale.id,
@@ -333,7 +386,12 @@ export async function createSale(
       medicineName: p.medicine.name,
       batchNo: p.batch.batchNo,
       expiryDate: p.batch.expiryDate,
-      qty: p.line.qty,
+      qty: p.baseQty,
+      unitsPerPack: p.unitsPerPack,
+      packUnit: p.medicine.packUnit ?? "strip",
+      looseUnit: p.medicine.looseUnit ?? "tablet",
+      packQty: p.packQty,
+      looseQty: p.looseQty,
       mrp: p.batch.mrp,
       rate: p.saleRate,
       discountBp: p.line.discountBp,
@@ -376,7 +434,7 @@ export async function createSale(
       doctorAddress: c?.doctorAddress || null,
       prescriptionRef: c?.prescriptionRef || null,
       prescriptionDate: c?.prescriptionDate || todayStr,
-      quantityDispensed: p.line.qty,
+      quantityDispensed: p.baseQty,
       pharmacistId: ctx.userId,
       pharmacistName: ctx.user.name,
       pharmacistRegNo: ctx.user.pharmacistRegNo || null,
@@ -393,7 +451,7 @@ export async function createSale(
         lines: processed.map((p) => ({
           medicineId: p.medicine.id,
           medicineName: p.medicine.name,
-          quantity: p.line.qty,
+          quantity: p.baseQty,
         })),
       });
     } catch (e) {
