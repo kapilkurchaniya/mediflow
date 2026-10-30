@@ -46,10 +46,7 @@ export function CustomerGroupsClient({
 }) {
   const [groups, setGroups] = useState(initialGroups);
   const [selectedGroupId, setSelectedGroupId] = useState<string | null>(initialGroups[0]?.id || null);
-  const [groupDetails, setGroupDetails] = useState<{
-    summary: any;
-    ledger: any[];
-  } | null>(null);
+  const [groupDetails, setGroupDetails] = useState<Awaited<ReturnType<typeof getFamilyGroupDetails>> | null>(null);
   const [loadingDetails, setLoadingDetails] = useState(false);
 
   // Modals
@@ -242,7 +239,7 @@ export function CustomerGroupsClient({
                     Household Members
                   </h4>
                   <div className="divide-y divide-ink-100 border border-ink-150 rounded-lg overflow-hidden">
-                    {groupDetails.summary.members.map((m: any) => (
+                    {groupDetails.summary.members.map((m) => (
                       <div key={m.id} className="p-3 flex items-center justify-between text-xs bg-white">
                         <div>
                           <span className="font-semibold text-ink-900">{m.name}</span>
@@ -292,7 +289,7 @@ export function CustomerGroupsClient({
                           </td>
                         </tr>
                       ) : (
-                        groupDetails.ledger.map((s: any) => (
+                        groupDetails.ledger.map((s) => (
                           <tr key={s.id}>
                             <td className="font-mono text-xs text-ink-600">
                               {new Date(s.date).toLocaleDateString("en-IN", {

@@ -552,7 +552,7 @@ export async function applyPrescriptionDispensing(
     ? "fully_dispensed"
     : anyDispensed
     ? "partially_dispensed"
-    : (rx.status as any);
+    : (rx.status === "partially_dispensed" || rx.status === "fully_dispensed" ? rx.status : "active");
 
   await tx
     .update(schema.prescriptions)

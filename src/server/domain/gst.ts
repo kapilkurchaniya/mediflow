@@ -1175,7 +1175,30 @@ export function buildGstr1JsonPayload(
     ],
   };
 
-  const cdnrMap = new Map<string, Array<any>>();
+  interface Gstr1CdnrNote {
+    ntty: string;
+    nt_num: string;
+    nt_dt: string;
+    val: number;
+    pos: string;
+    rchrg: string;
+    inv_typ: string;
+    inum?: string;
+    idt?: string;
+    itms: Array<{
+      num: number;
+      itm_det: {
+        txval: number;
+        rt: number;
+        camt: number;
+        samt: number;
+        iamt: number;
+        csamt: number;
+      };
+    }>;
+  }
+
+  const cdnrMap = new Map<string, Array<Gstr1CdnrNote>>();
   if (gstr1.cdnr && gstr1.cdnr.length > 0) {
     for (const cn of gstr1.cdnr) {
       const ctin = cn.partyGstin;

@@ -1,5 +1,5 @@
 import { db, schema } from "@/server/db";
-import { eq, and, sql, desc, asc, gte, lte, inArray, gt } from "drizzle-orm";
+import { eq, and, sql, desc, gte, lte, inArray, gt, type Column, type SQL } from "drizzle-orm";
 import { getOrSeedAccounts } from "./accounting";
 import { format, differenceInDays, subMonths } from "date-fns";
 
@@ -10,26 +10,38 @@ export interface DateRangeFilter {
 
 export type StoreScope = string | string[] | "all";
 
-export function getStoreCondition(column: any, scope?: StoreScope) {
+function isSql(col: Column | SQL): col is SQL {
+  return "queryChunks" in col;
+}
+
+export function getStoreCondition(column: Column | SQL, scope?: StoreScope) {
   if (!scope || scope === "all") {
     return sql`TRUE`;
   }
   if (Array.isArray(scope)) {
     if (scope.length === 0) return sql`TRUE`;
-    if (scope.length === 1) return eq(column, scope[0]);
+    if (isSql(column)) {
+      if (scope.length === 1) return eq(column, scope[0]!);
+      return inArray(column, scope);
+    }
+    if (scope.length === 1) return eq(column, scope[0]!);
     return inArray(column, scope);
+  }
+  if (isSql(column)) {
+    return eq(column, scope);
   }
   return eq(column, scope);
 }
 
-export function getStoreOrNullCondition(column: any, scope?: StoreScope) {
+export function getStoreOrNullCondition(column: Column | SQL, scope?: StoreScope) {
   if (!scope || scope === "all") {
     return sql`TRUE`;
   }
   if (Array.isArray(scope)) {
     if (scope.length === 0) return sql`TRUE`;
     if (scope.length === 1) return sql`(${column} = ${scope[0]} OR ${column} IS NULL)`;
-    return sql`(${inArray(column, scope)} OR ${column} IS NULL)`;
+    const inCond = isSql(column) ? inArray(column, scope) : inArray(column, scope);
+    return sql`(${inCond} OR ${column} IS NULL)`;
   }
   return sql`(${column} = ${scope} OR ${column} IS NULL)`;
 }
@@ -416,10 +428,10 @@ export async function generateCashFlow(
     .where(and(...conditions, inArray(schema.journalLines.accountId, cashAccountIds)));
 
   let cashSales = 0;
-  let digitalSales = 0;
+  const digitalSales = 0;
   let debtorReceipts = 0;
   let cashPurchases = 0;
-  let creditorPayments = 0;
+  const creditorPayments = 0;
   let expenses = 0;
 
   for (const tx of cashTransactions) {

@@ -28,7 +28,7 @@ import {
 import {
   calculateCentralPoMatrix,
   type CentralSplitPoResult,
-} from "@/server/domain/purchasing/central-po";
+} from "@/lib/purchasing/central-po";
 
 interface MatrixRowItem {
   medicineId: string;

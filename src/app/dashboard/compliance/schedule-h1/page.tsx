@@ -19,7 +19,7 @@ export default async function ScheduleH1Page() {
   return (
     <ComplianceRegisterView
       initialStats={stats}
-      initialLogs={logs as any}
+      initialLogs={logs}
       defaultRegister="schedule_h1"
     />
   );
