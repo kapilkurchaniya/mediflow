@@ -1,13 +1,14 @@
 import { getSaleById } from "@/app/actions/sales";
 import { notFound } from "next/navigation";
 import { format } from "date-fns";
-import { Printer, Receipt, User, Stethoscope, AlertOctagon } from "lucide-react";
+import { Printer, Receipt, User, Stethoscope, AlertOctagon, RotateCcw, FileText, ChevronRight } from "lucide-react";
 import Link from "next/link";
 import { PageHeader } from "@/app/components/ui";
 import { formatINR } from "@/lib/format";
 import { can, requirePagePermission } from "@/server/rbac";
 import { getIndianBusinessDate } from "@/server/domain/sales/cancel-sale";
 import { CancelSaleButton } from "./CancelSaleButton";
+import { ReturnSaleButton } from "./ReturnSaleButton";
 
 export const metadata = { title: "Invoice Details" };
 
@@ -22,7 +23,7 @@ export default async function SaleDetailPage({
 
   if (!data) return notFound();
 
-  const { sale, items, customer, store } = data;
+  const { sale, items, customer, store, returns = [] } = data;
   const isCancelled = sale.status === "cancelled";
   const isPaid = !sale.creditAmount || sale.creditAmount <= 0;
   const isPartial = !isPaid && (sale.paidAmount ?? 0) > 0;
@@ -30,7 +31,9 @@ export default async function SaleDetailPage({
   const saleDate = new Date(sale.completedAt ?? sale.createdAt!);
   const isSameDay = getIndianBusinessDate(saleDate) === getIndianBusinessDate(new Date());
   const canCancel = can(ctx, "sale.cancel");
+  const canReturn = can(ctx, "sale.return");
   const hasReturns = (sale.returnedAmount ?? 0) > 0 || items.some((item) => (item.returnedQty ?? 0) > 0);
+  const availableReturnUnits = items.reduce((sum, item) => sum + Math.max(0, item.qty - (item.returnedQty ?? 0)), 0);
 
   return (
     <div className="page space-y-6">
@@ -40,6 +43,9 @@ export default async function SaleDetailPage({
         backHref="/dashboard/sales"
         actions={
           <div className="flex items-center gap-2">
+            {!isCancelled && sale.status === "completed" && canReturn && availableReturnUnits > 0 && (
+              <ReturnSaleButton saleId={sale.id} />
+            )}
             {!isCancelled && sale.status === "completed" && (
               <CancelSaleButton
                 saleId={sale.id}
@@ -257,6 +263,66 @@ export default async function SaleDetailPage({
           </div>
         </div>
       </div>
+
+      {/* Returns & Credit Notes Section */}
+      {returns.length > 0 && (
+        <div className="card overflow-hidden shadow-xs border-amber-200">
+          <div className="card-header !py-3 bg-amber-50/60 border-b border-amber-200/80 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <RotateCcw className="h-4 w-4 text-amber-700" />
+              <h3 className="card-title text-[14px] text-amber-950 font-bold">
+                Credit Notes & Returns Issued ({returns.length})
+              </h3>
+            </div>
+            <span className="text-xs font-semibold text-amber-800">
+              Total Returned: {formatINR(sale.returnedAmount ?? 0)}
+            </span>
+          </div>
+
+          <div className="divide-y divide-ink-100">
+            {returns.map((ret) => (
+              <div
+                key={ret.id}
+                className="p-4 flex items-center justify-between gap-4 hover:bg-ink-25/50 transition-colors"
+              >
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono font-bold text-ink-900 text-[14px]">
+                      {ret.returnNo}
+                    </span>
+                    <span className="badge badge-neutral uppercase text-[10.5px]">
+                      {ret.refundMethod}
+                    </span>
+                  </div>
+                  <div className="text-[12px] text-ink-500">
+                    Issued on {format(new Date(ret.createdAt!), "d MMM yyyy, hh:mm a")} &bull; Reason:{" "}
+                    <span className="italic text-ink-700 font-medium">&ldquo;{ret.reason}&rdquo;</span>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-4">
+                  <div className="text-right">
+                    <div className="font-bold text-amber-800 text-[15px] num">
+                      {formatINR(ret.totalAmount)}
+                    </div>
+                    <div className="text-[11px] text-ink-400 num">
+                      Taxable: {formatINR(ret.taxableAmount ?? 0)}
+                    </div>
+                  </div>
+                  <Link
+                    href={`/dashboard/sales/returns/${ret.id}/print`}
+                    className="btn btn-secondary !py-1 !px-2.5 text-xs text-ink-800 flex items-center gap-1"
+                  >
+                    <FileText className="h-3.5 w-3.5 text-amber-600" />
+                    Credit Note
+                    <ChevronRight className="h-3 w-3 text-ink-400" />
+                  </Link>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

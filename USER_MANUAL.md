@@ -71,6 +71,8 @@ Here is a clear summary of all the core features and flows MediFlow provides to 
 - **Salt / Substitute finder (`F9`):** When a prescribed brand is out of stock, press `F9` to instantly see all available in-stock alternatives sharing the exact same active pharmaceutical molecule.
 - **Prescription & Schedule H/H1/X compliance:** The counter alerts you when prescription drugs are in the cart and mandates entering the prescribing doctor and patient details before completing the sale.
 - **Instant invoice printing:** Print 2-inch or 3-inch thermal receipts or full A4/A5 tax invoices with HSN summaries.
+- **Same-day bill cancellation (`Alt + C`):** Void bills made by mistake on the same business day with automated batch stock restoration, reversing journal entries, and GSTR-1 voiding.
+- **Sale returns & GST credit notes (`Alt + R`):** Process customer medicine returns (full or partial strips/loose tablets), restore inventory to exact batches, automatically quarantine expired batches (`hold`), post balanced credit note journals, and issue GST Credit Notes (`CN/YY-YY/000000`).
 
 #### 2. Inventory & Batch Management Flow
 - **Batch & expiry tracking:** Full visibility into every batch, its manufacturer, manufacturing date, expiry date, purchase rate, and current stock on shelf.
@@ -386,7 +388,37 @@ When a customer changes their mind before leaving the pharmacy, or when an accid
 5. **Loyalty Points Reversal:** Any customer loyalty reward points earned on the bill are automatically deducted from the customer's balance.
 6. **Immutable Audit Trail:** An audit row is written to **Settings → Audit log** recording who cancelled the bill, at what exact second, and why.
 
-> **Not available yet:** sales returns and credit notes (A2.5), using loyalty points as a bill discount (A2.7), and the cash-register shift (A2.6). See [chapter 19](#19-not-available-yet).
+### 5.8 Customer Sale Returns & GST Credit Notes
+
+When a patient brings back unconsumed medicines, when a doctor alters an ongoing course of treatment, or when a return occurs after the same-day cancellation window:
+
+- **Where to process a return:**
+  - Open the invoice under **Operations → Sales & invoices** (or press **Alt + M**) and click **Return Items** (or press **Alt + R**).
+  - Or review past returns under **Operations → Sale returns (Credit Notes)**.
+- **Permissions:** Staff with the **`sale.return`** permission (Owner, Store Manager, Pharmacist, Cashier) can process customer returns.
+- **Completed bills only:** Returns can be performed only on completed sales. Cancelled bills cannot be returned.
+- **Partial returns supported:** You do not have to return the entire bill. Customers can return 1 strip out of 3, or even 2 loose tablets out of a strip.
+- **Enforced quantity caps:** MediFlow tracks `returned_qty` per line item. You cannot return more than the remaining sold units. Once a line is fully returned, it is disabled.
+- **Dual input ergonomics:**
+  - **Mouse:** Click **Return Items**, adjust pack and loose quantities, pick the refund method, type the mandatory reason, and click **Issue Credit Note**.
+  - **Keyboard:**
+    - On the invoice page, press **Alt + R** to open the Return form.
+    - Press **Tab** or **↑ / ↓** to navigate between items.
+    - Type the return pack or loose quantity.
+    - Press **Alt + S** (or **Ctrl + Enter**) to issue and save the Credit Note.
+    - Press **Esc** to cancel and return to the invoice.
+
+#### What MediFlow does automatically when a return is submitted:
+1. **Batch Stock Restoration & Expiry Quarantine:** Returned units are restored to the **exact batch** originally sold (`type: "sale_return"`, `refType: "sale_return"`).
+   - **Automatic Statutory Quarantine:** If the batch expired between the original bill date and the return date, MediFlow automatically changes the batch status to **`hold`** (quarantine). This guarantees expired medicines can never be accidentally re-sold at the counter, pending supplier return.
+2. **Double-Entry General Ledger Credit Note:** Automatically generates a balanced General Ledger Credit Note voucher (`refType: "sale_return"`). Debits Sales Revenue and Output GST (CGST/SGST or IGST), and credits the chosen refund account (Cash on Hand, Bank/Digital Payments, or Customer Receivables). Balanced to 0 paise.
+3. **GST Credit Note (GSTR-1 Table 9B):** Generates an official Credit Note document linked to the original tax invoice. B2B credit notes are reported under GSTR-1 CDNR; B2C returns are reported under CDNUR or net turnover adjustments.
+4. **Permanent Sequence Number:** Generates a compliant Credit Note number (`CN/YY-YY/000000`) adhering to GST Rule 46 (maximum 16 characters).
+5. **Loyalty Reward Points Reversal:** Reverses customer loyalty points earned on the returned items proportionally (`fraction = returnTotal / billTotal`).
+6. **Customer Account Credit:** If the customer has an account and you select **Customer Ledger** (`credit_note`), their outstanding balance is credited immediately.
+7. **Print-Ready Documents:** Automatically opens the Credit Note print preview with options for **80mm Thermal POS Slip** or **Full A4 GST Tax Credit Note** with statutory customer acknowledgement and pharmacist signature blocks.
+
+> **Not available yet:** using loyalty points as a bill discount (A2.7), and the cash-register shift (A2.6). See [chapter 19](#19-not-available-yet).
 
 ---
 
@@ -851,6 +883,10 @@ It answers from your live data. If it hasn't been set up with an AI key, it will
 | Billing | **F10** / **End** | Complete bill and print receipt |
 | Billing | **↑ / ↓**, then **Enter** | Choose a medicine from the search results |
 | Billing | Barcode scanner | Scan a pack to add it to the bill |
+| Invoice page | **Alt + C** | Cancel bill (same-day cancellation) |
+| Invoice page | **Alt + R** | Return items & issue GST Credit Note |
+| Return form | **Alt + S** / **Ctrl + Enter** | Issue and save GST Credit Note |
+| Return form | **Esc** | Cancel return & return to invoice |
 
 ### 17.1 Marg ERP Migration Guide: Shortcut Cross-Reference
 
@@ -866,6 +902,8 @@ If your pharmacy staff is accustomed to Marg ERP 9+ or Marg Books, here is how t
 | **Hold / Park Active Bill** | Special menu | **`F6`** | Frees counter for next patient; zero stock deduction |
 | **Recall / Resume Parked Bill** | Bill lookup | **`F7`** | Instant resume with live stock shortage and expiry alerts |
 | **Split Tender / Store Credit** | `Tab` / `Ctrl + W` | **`F8`** | Splits across Cash, UPI, Card, and Customer Ledger |
+| **Cancel Bill (Same-Day)** | Void bill menu | **`Alt + C`** | Exact batch stock restoration, reversing JV, and GSTR-1 voiding |
+| **Sale Return / Credit Note** | `*` / Special return | **`Alt + R`** | Full or partial strip/loose returns, automatic expiry quarantine (`hold`), and GSTR-1 Table 9B |
 | **Save & Print Receipt** | `Ctrl + W` / `End` / `F10` | **`F10`** / **`End`** | One-key thermal or A4 tax invoice print |
 | **Barcode Scanner** | Fast scan mode | **Automatic** | High-speed hardware buffer (<45ms) auto-adds scanned packs |
 | **Help / Cheat Sheet** | `Ctrl + F1` / `Alt + F1` | **`?`** | Instant on-screen cheat sheet |
@@ -893,7 +931,7 @@ If your pharmacy staff is accustomed to Marg ERP 9+ or Marg Books, here is how t
 | *E-invoicing is not configured* | E-invoicing hasn't been switched on by your administrator. |
 | *Something went wrong. Please try again.* | A temporary problem. Try again; if it repeats, tell your administrator. |
 | The page says "Offline Mode" | Your internet dropped. Wait until it returns before saving. |
-| I made a mistake on a bill | Cancelling and returns are not available yet. Ask your manager how to handle it for now. |
+| I made a mistake on a bill | Use **Cancel Bill** (Alt+C) on the same business day, or **Return Items** (Alt+R) to issue a GST Credit Note. |
 
 **Good habits**
 - Keep batch numbers and expiry dates exactly as printed on the pack.
@@ -909,7 +947,7 @@ These are planned but **cannot be used today**. If you can't find a button for t
 
 | Area | Planned feature |
 |---|---|
-| Billing | Sales returns and credit notes (A2.5); cash register open/close (A2.6); using loyalty points as a discount (A2.7); offline counter billing (Tauri desktop app in Phase 4) |
+| Billing | Cash register open/close (A2.6); using loyalty points as a discount (A2.7); offline counter billing (Tauri desktop app in Phase 4) |
 | Stock | Stock adjustments and write-offs; transfers between branches; warehouse; physical stock count; reorder suggestions |
 | Buying | Automated reorder suggestions based on sales velocity (Purchase orders, supplier debit notes, and supplier ledger payments are available) |
 | People & security | Password reset by email; custom roles (you choose from the 7 built-in ones); sending invitations by email (you copy the link yourself); removing a person for good (you suspend instead) |
