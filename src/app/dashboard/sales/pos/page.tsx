@@ -40,12 +40,16 @@ import {
   Tag,
   Loader2,
   Clock,
+  Lock,
+  Unlock,
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createPromiseOrder } from "@/app/actions/promise-orders";
 import { checkItemScheme } from "@/app/actions/schemes";
 import { getMedicalReps } from "@/app/actions/medical-reps";
+import { getPosShiftStatusAction } from "@/app/actions/cash-sessions";
+import type { CurrentShiftStats } from "@/server/domain/cash-sessions";
 
 interface SearchResult {
   medicine: {
@@ -205,6 +209,8 @@ export default function POSPage() {
   );
   const [medicalRepsList, setMedicalRepsList] = useState<Array<{ id: string; name: string; companyName: string | null }>>([]);
   const [selectedMedicalRepId, setSelectedMedicalRepId] = useState("");
+  const [activeShift, setActiveShift] = useState<CurrentShiftStats | null>(null);
+  const [requireShift, setRequireShift] = useState(false);
 
   const [cart, setCart] = useState<
     (Omit<PosItemInput, "qty"> & {
@@ -280,6 +286,12 @@ export default function POSPage() {
     });
     getMedicalReps().then((data) => {
       setMedicalRepsList(data.filter((r) => r.isActive).map((r) => ({ id: r.id, name: r.name, companyName: r.companyName })));
+    });
+    getPosShiftStatusAction().then((res) => {
+      if (res.ok) {
+        setActiveShift(res.shift);
+        setRequireShift(res.requireShift);
+      }
     });
     if (searchInputRef.current) searchInputRef.current.focus();
   }, [refreshHeldSales]);
@@ -542,6 +554,15 @@ export default function POSPage() {
         }
       }
 
+      // F10: Complete & Print Invoice
+      if (e.key === "F10") {
+        e.preventDefault();
+        const submitBtn = document.querySelector('button[type="submit"].btn-primary') as HTMLButtonElement | null;
+        if (cart.length > 0 && submitBtn && !submitBtn.disabled) {
+          submitBtn.click();
+        }
+      }
+
       // Esc: Dismiss modals or search
       if (e.key === "Escape") {
         if (isCustomerModalOpen) setIsCustomerModalOpen(false);
@@ -741,6 +762,11 @@ export default function POSPage() {
         setSplitError("Only cash can be overpaid. Non-cash payments cannot exceed the bill total.");
         return;
       }
+    }
+
+    if (requireShift && !activeShift) {
+      setSplitError("An open cash register shift is required to complete sales. Please open the register first.");
+      return;
     }
 
     const paidAmount = Math.min(tenderedTotal, netPayable);
@@ -962,6 +988,12 @@ export default function POSPage() {
     async (_prevState: { error?: string; success?: boolean } | null, _formData: FormData) => {
       if (cart.length === 0) return { error: "Cart is empty" };
 
+      if (requireShift && !activeShift) {
+        return {
+          error: "An open cash register shift is required to complete sales. Please open the register first.",
+        };
+      }
+
       // Drug Compliance validation: require doctor name if Rx or controlled drug in cart
       if (isComplianceMandatory && !doctorName.trim()) {
         return {
@@ -1088,8 +1120,49 @@ export default function POSPage() {
             >
               <RotateCcw className="h-3.5 w-3.5 mr-1" /> Clear (F2)
             </button>
+            <Link
+              href="/dashboard/sales/register"
+              className={`btn btn-secondary text-[12.5px] flex items-center gap-1.5 ${
+                activeShift
+                  ? "text-emerald-700 border-emerald-200 bg-emerald-50/50 hover:bg-emerald-100"
+                  : requireShift
+                  ? "text-amber-800 border-amber-300 bg-amber-50 hover:bg-amber-100 font-bold"
+                  : "text-ink-600 hover:bg-ink-100"
+              }`}
+              title="Cash Register Shift (F4/F8)"
+            >
+              {activeShift ? (
+                <>
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                  <span>Register Open</span>
+                </>
+              ) : (
+                <>
+                  <Lock className="h-3.5 w-3.5 text-amber-600" />
+                  <span>Register Closed</span>
+                </>
+              )}
+            </Link>
           </div>
         </div>
+
+        {/* Banner: Open Register to Start Billing */}
+        {requireShift && !activeShift && (
+          <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 flex items-center justify-between text-amber-900 text-xs shadow-xs">
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+              <span>
+                <strong>Open the register to start billing:</strong> An active cash register shift is required for this store.
+              </span>
+            </div>
+            <Link
+              href="/dashboard/sales/register"
+              className="btn btn-primary bg-amber-600 hover:bg-amber-700 text-white text-xs py-1 px-3 flex items-center gap-1.5 font-bold"
+            >
+              <Unlock className="w-3.5 h-3.5" /> Open Register (F4)
+            </Link>
+          </div>
+        )}
 
         {/* Search Bar with live dropdown */}
         <div className="card p-3 relative shadow-xs">
@@ -1776,11 +1849,15 @@ export default function POSPage() {
 
               <button
                 type="submit"
-                disabled={isPending || cart.length === 0}
+                disabled={isPending || cart.length === 0 || (requireShift && !activeShift)}
                 className="btn btn-primary w-full !py-3.5 !text-[15px] font-bold shadow-md shadow-brand-600/20"
               >
                 <Printer className="h-4 w-4 mr-2" />
-                {isPending ? "Generating Invoice..." : `Complete & Print (${formatINR(netPayable)})`}
+                {isPending
+                  ? "Generating Invoice..."
+                  : requireShift && !activeShift
+                  ? "Open Register to Bill (F4)"
+                  : `Complete & Print (F10) · ${formatINR(netPayable)}`}
               </button>
             </div>
           </div>
@@ -2219,7 +2296,7 @@ export default function POSPage() {
               </button>
               <button
                 type="button"
-                disabled={isSubmittingSplit}
+                disabled={isSubmittingSplit || (requireShift && !activeShift)}
                 onClick={handleSplitCheckout}
                 className="btn btn-primary text-xs font-bold"
               >

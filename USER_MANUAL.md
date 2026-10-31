@@ -418,7 +418,54 @@ When a patient brings back unconsumed medicines, when a doctor alters an ongoing
 6. **Customer Account Credit:** If the customer has an account and you select **Customer Ledger** (`credit_note`), their outstanding balance is credited immediately.
 7. **Print-Ready Documents:** Automatically opens the Credit Note print preview with options for **80mm Thermal POS Slip** or **Full A4 GST Tax Credit Note** with statutory customer acknowledgement and pharmacist signature blocks.
 
-> **Not available yet:** using loyalty points as a bill discount (A2.7), and the cash-register shift (A2.6). See [chapter 19](#19-not-available-yet).
+### 5.9 Cash Register & Shifts (Drawer Tally, X-Report & Z-Report)
+
+In retail pharmacies, shift handover and physical drawer cash reconciliation protect against counter discrepancies, till shortages, and unrecorded cash leakages. MediFlow provides end-to-end shift lifecycle management accessible via **Operations → Cash register (Shifts)** or directly from the POS billing counter.
+
+#### 1. Shift Open & Cash Float Tally (`F4`)
+- When starting your morning or evening shift, click **Open Register** or press **F4**.
+- **Denomination Tally Counter:** Count physical notes and coins in your drawer. Enter the count for ₹500, ₹200, ₹100, ₹50, ₹20, ₹10, ₹5, ₹2, ₹1, and coins. MediFlow automatically sums the float in real-time.
+- Press **Enter** on any denomination row to jump immediately to the next note.
+- Optionally type shift notes or cashier handover instructions.
+- Click **Confirm & Open Register** to activate the till.
+- **One Open Shift Rule:** MediFlow strictly enforces a single open shift per pharmacy branch (`cash_sessions_one_open_uq`). A cashier cannot open a new shift until the preceding shift is formally closed.
+
+#### 2. Billing Counter Enforcement (`requireShift`)
+- If your pharmacy enables the **Shift Required** setting, billing is blocked whenever the register is closed:
+  - A prominent banner appears across the POS terminal: *"Open the register to start billing"*.
+  - The **Complete & Print** button is disabled until an open shift is active.
+  - Cashiers can click **Open Register (F4)** to open their drawer in seconds without leaving the POS.
+
+#### 3. Real-Time Expected Drawer Cash Calculation
+Throughout the shift, MediFlow continuously computes the exact physical cash that must be present in the till:
+$$\text{Expected Cash} = \text{Opening Float} + \text{Cash Sales} + \text{Cash Receipts} - \text{Cash Returns} - \text{Cash Cancels} - \text{Cash Payouts}$$
+- **Cash Sales:** Sum of all physical cash collected from completed retail bills.
+- **Cash Receipts:** Customer khata debt settlements paid in cash at the counter.
+- **Cash Returns:** Cash refunded to customers for medicine returns.
+- **Cash Cancellations:** Same-day cancelled bills refunded in cash at the counter.
+- **Cash Payouts:** Petty cash vouchers paid out (e.g., daily tea, stationery, or supplier cash payments).
+- **Non-Cash Tenders Separated:** Digital payments (UPI QR, Debit/Credit Card, Bank NEFT, and Store Credit) do not alter drawer cash and are audited in a separate Tender Breakdown table.
+
+#### 4. Mid-Shift Snapshot: The X-Report (`Alt + P`)
+- At any time during an active shift (e.g., during lunchtime cashier relief or manager spot-checks), click **X-Report** or press **Alt + P**.
+- Generates an interim, non-closing snapshot of drawer contents, gross sales, payment splits, and transaction counts.
+- Available in **80mm Thermal POS slip format** and **A4 sheet format**.
+- **Non-closing:** The shift remains open and billing continues uninterrupted.
+
+#### 5. Shift Closing Audit: The Z-Report (`F8`)
+- At the end of the cashier's shift, click **Close Register** or press **F8**.
+- MediFlow displays the **Expected Cash** calculated by the system.
+- Count the drawer cash using the **Denomination Tally Counter** (₹500, ₹200, ₹100, etc.).
+- **Live Discrepancy Tracking (Over / Short):**
+  - **Balanced:** Exact match (₹0.00 variance).
+  - **Shortage (Red):** Physical cash is missing (e.g., `-₹50.00 Short`).
+  - **Overage (Amber):** Excess cash in till (e.g., `+₹100.00 Over`).
+- Enter an explanatory note if there is any variance.
+- Click **Confirm & Lock Shift (Z-Report)**.
+- **Z-Report Printout:** Automatically opens the official closing audit slip containing opening float, net sales, expected cash, counted actual cash, variance, cashier signature block, and manager approval line.
+- The shift is permanently locked and stamped in the immutable audit log.
+
+> **Not available yet:** using loyalty points as a bill discount (A2.7). See [chapter 19](#19-not-available-yet).
 
 ---
 
@@ -887,6 +934,10 @@ It answers from your live data. If it hasn't been set up with an AI key, it will
 | Invoice page | **Alt + R** | Return items & issue GST Credit Note |
 | Return form | **Alt + S** / **Ctrl + Enter** | Issue and save GST Credit Note |
 | Return form | **Esc** | Cancel return & return to invoice |
+| Register screen | **F4** | Open register shift modal |
+| Register screen | **F8** | Close register shift & tally modal |
+| Register screen | **Alt + P** / **Ctrl + P** | Print mid-shift X-Report snapshot |
+| Tally counter | **Enter** | Move to next currency denomination input |
 
 ### 17.1 Marg ERP Migration Guide: Shortcut Cross-Reference
 
@@ -904,6 +955,9 @@ If your pharmacy staff is accustomed to Marg ERP 9+ or Marg Books, here is how t
 | **Split Tender / Store Credit** | `Tab` / `Ctrl + W` | **`F8`** | Splits across Cash, UPI, Card, and Customer Ledger |
 | **Cancel Bill (Same-Day)** | Void bill menu | **`Alt + C`** | Exact batch stock restoration, reversing JV, and GSTR-1 voiding |
 | **Sale Return / Credit Note** | `*` / Special return | **`Alt + R`** | Full or partial strip/loose returns, automatic expiry quarantine (`hold`), and GSTR-1 Table 9B |
+| **Cash Register / Shift Open** | Cash drawer menu | **`F4`** | Opening cash float with Indian banknote denomination tally |
+| **Close Register (Z-Report)** | Day close | **`F8`** | Reconciles expected cash against counted till with over/short variance |
+| **Mid-Shift Snapshot (X-Report)** | Till summary | **`Alt + P`** | Real-time audit snapshot without closing shift |
 | **Save & Print Receipt** | `Ctrl + W` / `End` / `F10` | **`F10`** / **`End`** | One-key thermal or A4 tax invoice print |
 | **Barcode Scanner** | Fast scan mode | **Automatic** | High-speed hardware buffer (<45ms) auto-adds scanned packs |
 | **Help / Cheat Sheet** | `Ctrl + F1` / `Alt + F1` | **`?`** | Instant on-screen cheat sheet |
@@ -932,6 +986,8 @@ If your pharmacy staff is accustomed to Marg ERP 9+ or Marg Books, here is how t
 | *Something went wrong. Please try again.* | A temporary problem. Try again; if it repeats, tell your administrator. |
 | The page says "Offline Mode" | Your internet dropped. Wait until it returns before saving. |
 | I made a mistake on a bill | Use **Cancel Bill** (Alt+C) on the same business day, or **Return Items** (Alt+R) to issue a GST Credit Note. |
+| *An open cash register shift is required to complete sales* | Your store has shift enforcement enabled. Open a shift with your initial float under **Operations → Cash register (Shifts)** or press **F4** on POS. |
+| *An active register shift is already open for this store* | Exactly one shift can be open per branch. Close the previous cashier's shift before opening a new one. |
 
 **Good habits**
 - Keep batch numbers and expiry dates exactly as printed on the pack.
@@ -947,7 +1003,7 @@ These are planned but **cannot be used today**. If you can't find a button for t
 
 | Area | Planned feature |
 |---|---|
-| Billing | Cash register open/close (A2.6); using loyalty points as a discount (A2.7); offline counter billing (Tauri desktop app in Phase 4) |
+| Billing | Using loyalty points as a discount (A2.7); offline counter billing (Tauri desktop app in Phase 4) |
 | Stock | Stock adjustments and write-offs; transfers between branches; warehouse; physical stock count; reorder suggestions |
 | Buying | Automated reorder suggestions based on sales velocity (Purchase orders, supplier debit notes, and supplier ledger payments are available) |
 | People & security | Password reset by email; custom roles (you choose from the 7 built-in ones); sending invitations by email (you copy the link yourself); removing a person for good (you suspend instead) |
