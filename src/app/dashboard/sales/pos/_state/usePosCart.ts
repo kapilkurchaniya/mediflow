@@ -84,16 +84,30 @@ export function posCartReducer(state: PosState, action: PosAction): PosState {
       const safePack = Math.max(0, action.payload.packQty);
       const nextCart = state.cart.map((line) => {
         if (line.batchId !== action.payload.batchId) return line;
-        return { ...line, packQty: safePack, qty: safePack * line.unitsPerPack + line.looseQty };
+        const upp = Math.max(1, line.unitsPerPack ?? 1);
+        let packQty = safePack;
+        let looseQty = line.looseQty;
+        if (upp > 1 && looseQty >= upp) {
+          packQty += Math.floor(looseQty / upp);
+          looseQty = looseQty % upp;
+        }
+        return { ...line, packQty, looseQty, qty: packQty * upp + looseQty };
       });
       return { ...state, cart: nextCart };
     }
 
     case "UPDATE_LINE_LOOSE_QTY": {
-      const safeLoose = Math.max(0, action.payload.looseQty);
+      const rawLoose = Math.max(0, action.payload.looseQty);
       const nextCart = state.cart.map((line) => {
         if (line.batchId !== action.payload.batchId) return line;
-        return { ...line, looseQty: safeLoose, qty: line.packQty * line.unitsPerPack + safeLoose };
+        const upp = Math.max(1, line.unitsPerPack ?? 1);
+        let packQty = line.packQty;
+        let looseQty = rawLoose;
+        if (upp > 1 && looseQty >= upp) {
+          packQty += Math.floor(looseQty / upp);
+          looseQty = looseQty % upp;
+        }
+        return { ...line, packQty, looseQty, qty: packQty * upp + looseQty };
       });
       return { ...state, cart: nextCart };
     }

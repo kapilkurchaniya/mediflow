@@ -4,7 +4,7 @@ import { format } from "date-fns";
 import { Printer, Receipt, User, Stethoscope, AlertOctagon, RotateCcw, FileText, ChevronRight } from "lucide-react";
 import Link from "next/link";
 import { PageHeader } from "@/app/components/ui";
-import { formatINR } from "@/lib/format";
+import { formatINR, formatItemQuantity } from "@/lib/format";
 import { can, requirePagePermission } from "@/server/rbac";
 import { getIndianBusinessDate } from "@/server/domain/sales/cancel-sale";
 import { CancelSaleButton } from "./CancelSaleButton";
@@ -204,13 +204,18 @@ export default async function SaleDetailPage({
                 <tr key={item.id}>
                   <td>
                     <span className="font-bold text-ink-900">{item.medicineName}</span>
+                    {item.unitsPerPack > 1 && (
+                      <div className="text-[11px] text-ink-500 font-mono">
+                        1 {item.packUnit} = {item.unitsPerPack} {item.looseUnit}s
+                      </div>
+                    )}
                   </td>
                   <td>
                     <span className="font-mono text-[12.5px] font-medium text-ink-800">{item.batchNo}</span>
                     <div className="cell-sub num">{item.expiryDate}</div>
                   </td>
                   <td className="text-center">
-                    <span className="badge badge-neutral num font-bold">{item.qty}</span>
+                    <span className="badge badge-neutral num font-bold">{formatItemQuantity(item)}</span>
                   </td>
                   <td className="text-right num text-ink-600">{formatINR(item.mrp)}</td>
                   <td className="text-right num text-ink-800">{formatINR(item.rate)}</td>

@@ -627,6 +627,56 @@ describe("createSale: split tender, change and credit (A2.2)", () => {
       expect(updatedBatch.qtyOnHand).toBe(86);
     });
 
+    it("historical snapshot isolation: changing medicine unitsPerPack later does not alter historical sale items or past invoices", async () => {
+      const tenant = await makeTenant(t.db);
+      const store = await makeStore(t.db, tenant.id);
+      const user = await makeUser(t.db);
+      const maker = (await t.db.insert(schema.manufacturers).values({ tenantId: tenant.id, name: "Acme Pharma" }).returning())[0];
+      const medicine = await makeMedicine(t.db, tenant.id, {
+        name: "Historical Med 10",
+        unitsPerPack: 10,
+        packUnit: "strip",
+        looseUnit: "tablet",
+        manufacturerId: maker.id,
+      });
+      const batch = await makeBatch(t.db, {
+        tenantId: tenant.id,
+        storeId: store.id,
+        medicineId: medicine.id,
+        qtyOnHand: 50,
+        mrp: 10000,
+        saleRate: 10000,
+      });
+      const w = { tenant, store, user, medicine };
+
+      // Complete a sale of 1 strip + 4 loose (14 base units @ ₹140.00)
+      const res = await t.db.transaction((tx) =>
+        createSale(
+          tx,
+          ctxFor(w),
+          SaleInput.parse({
+            lines: [{ batchId: batch.id, packQty: 1, looseQty: 4, discountBp: 0 }],
+            payments: [{ method: "cash", amount: 14000 }],
+          }),
+          { source: "pos" },
+        ),
+      );
+
+      // Later, the pharmacy updates the master catalog conversion factor to 15 tablets/strip
+      await t.db
+        .update(schema.medicines)
+        .set({ unitsPerPack: 15 })
+        .where(eq(schema.medicines.id, medicine.id));
+
+      // The historical sale item must strictly preserve original snapshot: unitsPerPack=10, packQty=1, looseQty=4, qty=14
+      const [item] = await t.db.select().from(schema.saleItems).where(eq(schema.saleItems.saleId, res.saleId));
+      expect(item.unitsPerPack).toBe(10);
+      expect(item.packQty).toBe(1);
+      expect(item.looseQty).toBe(4);
+      expect(item.qty).toBe(14);
+      expect(item.totalAmount).toBe(14000);
+    });
+
     describe("auto-FEFO batch allocation (A2.11)", () => {
       it("auto-picks the earliest expiry batch by default when medicineId is passed", async () => {
         const tenant = await makeTenant(t.db);

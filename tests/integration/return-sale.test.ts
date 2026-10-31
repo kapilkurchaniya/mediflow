@@ -570,4 +570,60 @@ describe("Sale Returns & Credit Notes (Integration - Task A2.5)", () => {
     expect(details.items[0].availablePackQty).toBe(1);
     expect(details.items[0].availableLooseQty).toBe(2);
   });
+
+  it("repeated partial returns with cumulative rounding on uneven pack division sum to exact original line total with 0 drift", async () => {
+    // 1 strip = 3 tablets, rate ₹100.00 (10000 paise)
+    const s = await setupSaleScene({ initialStock: 30, unitsPerPack: 3, rate: 10000 });
+    const saleInput: SaleInput = {
+      lines: [{ medicineId: s.medicine.id, batchId: s.batch.id, qty: 3, discountBp: 0 }],
+      billDiscountPaise: 0,
+      payments: [{ method: "cash", amount: 10000 }],
+      redeemPoints: 0,
+    };
+
+    const createdSale = await t.db.transaction((tx) =>
+      createSale(tx, s.ctx, saleInput, { source: "pos" }),
+    );
+
+    const [saleItem] = await t.db
+      .select()
+      .from(schema.saleItems)
+      .where(eq(schema.saleItems.saleId, createdSale.saleId));
+
+    // Return 1st tablet:
+    const ret1 = await t.db.transaction((tx) =>
+      returnSale(tx, s.ctx, {
+        saleId: createdSale.saleId,
+        items: [{ saleItemId: saleItem.id, packQty: 0, looseQty: 1 }],
+        refundMethod: "cash",
+        reason: "Partial return 1",
+      }),
+    );
+    expect(ret1.totalAmount).toBe(3333);
+
+    // Return 2nd tablet:
+    const ret2 = await t.db.transaction((tx) =>
+      returnSale(tx, s.ctx, {
+        saleId: createdSale.saleId,
+        items: [{ saleItemId: saleItem.id, packQty: 0, looseQty: 1 }],
+        refundMethod: "cash",
+        reason: "Partial return 2",
+      }),
+    );
+    expect(ret2.totalAmount).toBe(3334);
+
+    // Return 3rd tablet:
+    const ret3 = await t.db.transaction((tx) =>
+      returnSale(tx, s.ctx, {
+        saleId: createdSale.saleId,
+        items: [{ saleItemId: saleItem.id, packQty: 0, looseQty: 1 }],
+        refundMethod: "cash",
+        reason: "Partial return 3",
+      }),
+    );
+    expect(ret3.totalAmount).toBe(3333);
+
+    // Sum of all 3 partial returns is exactly equal to the original 10000 paise (₹100.00)
+    expect(ret1.totalAmount + ret2.totalAmount + ret3.totalAmount).toBe(10000);
+  });
 });
