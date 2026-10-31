@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect } from "react";
 
 export interface ShortcutHandlers {
   onFocusSearch?: () => void;
@@ -16,24 +16,21 @@ export interface ShortcutHandlers {
 }
 
 export function usePosShortcuts(handlers: ShortcutHandlers) {
-  const handlersRef = useRef(handlers);
-  handlersRef.current = handlers;
-
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
       // Function keys F2-F10 and / are reserved for counter operations
       switch (e.key) {
         case "F2":
           e.preventDefault();
-          if (handlersRef.current.onResetSale) {
-            handlersRef.current.onResetSale();
+          if (handlers.onResetSale) {
+            handlers.onResetSale();
           } else {
-            handlersRef.current.onFocusSearch?.();
+            handlers.onFocusSearch?.();
           }
           break;
         case "F3":
           e.preventDefault();
-          handlersRef.current.onFocusSearch?.();
+          handlers.onFocusSearch?.();
           break;
         case "/":
           if (
@@ -41,35 +38,35 @@ export function usePosShortcuts(handlers: ShortcutHandlers) {
             document.activeElement?.tagName !== "TEXTAREA"
           ) {
             e.preventDefault();
-            handlersRef.current.onFocusSearch?.();
+            handlers.onFocusSearch?.();
           }
           break;
         case "F4":
           e.preventDefault();
-          handlersRef.current.onOpenRegister?.();
+          handlers.onOpenRegister?.();
           break;
         case "F6":
           e.preventDefault();
-          handlersRef.current.onHoldBill?.();
+          handlers.onHoldBill?.();
           break;
         case "F7":
           e.preventDefault();
-          handlersRef.current.onListHeldBills?.();
+          handlers.onListHeldBills?.();
           break;
         case "F8":
           e.preventDefault();
-          handlersRef.current.onOpenPaymentModal?.();
+          handlers.onOpenPaymentModal?.();
           break;
         case "F9":
           e.preventDefault();
-          handlersRef.current.onOpenPromiseModal?.();
+          handlers.onOpenPromiseModal?.();
           break;
         case "F10":
           e.preventDefault();
-          handlersRef.current.onCompleteSale?.();
+          handlers.onCompleteSale?.();
           break;
         case "Escape":
-          handlersRef.current.onEscape?.();
+          handlers.onEscape?.();
           break;
         default:
           break;
@@ -78,5 +75,5 @@ export function usePosShortcuts(handlers: ShortcutHandlers) {
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, []);
+  }, [handlers]);
 }
