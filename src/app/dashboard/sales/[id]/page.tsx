@@ -1,11 +1,13 @@
 import { getSaleById } from "@/app/actions/sales";
 import { notFound } from "next/navigation";
 import { format } from "date-fns";
-import { Printer, Receipt, User, Stethoscope } from "lucide-react";
+import { Printer, Receipt, User, Stethoscope, AlertOctagon } from "lucide-react";
 import Link from "next/link";
 import { PageHeader } from "@/app/components/ui";
 import { formatINR } from "@/lib/format";
-import { requirePagePermission } from "@/server/rbac";
+import { can, requirePagePermission } from "@/server/rbac";
+import { getIndianBusinessDate } from "@/server/domain/sales/cancel-sale";
+import { CancelSaleButton } from "./CancelSaleButton";
 
 export const metadata = { title: "Invoice Details" };
 
@@ -14,24 +16,39 @@ export default async function SaleDetailPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  await requirePagePermission("sale.view");
+  const ctx = await requirePagePermission("sale.view");
   const { id } = await params;
   const data = await getSaleById(id);
 
   if (!data) return notFound();
 
   const { sale, items, customer, store } = data;
+  const isCancelled = sale.status === "cancelled";
   const isPaid = !sale.creditAmount || sale.creditAmount <= 0;
   const isPartial = !isPaid && (sale.paidAmount ?? 0) > 0;
+
+  const saleDate = new Date(sale.completedAt ?? sale.createdAt!);
+  const isSameDay = getIndianBusinessDate(saleDate) === getIndianBusinessDate(new Date());
+  const canCancel = can(ctx, "sale.cancel");
+  const hasReturns = (sale.returnedAmount ?? 0) > 0 || items.some((item) => (item.returnedQty ?? 0) > 0);
 
   return (
     <div className="page space-y-6">
       <PageHeader
-        title={`Invoice ${sale.invoiceNo}`}
-        description={`Raised on ${format(new Date(sale.completedAt ?? sale.createdAt!), "d MMMM yyyy, hh:mm a")}`}
+        title={`Invoice ${sale.invoiceNo ?? "Draft"}`}
+        description={`Raised on ${format(saleDate, "d MMMM yyyy, hh:mm a")}`}
         backHref="/dashboard/sales"
         actions={
           <div className="flex items-center gap-2">
+            {!isCancelled && sale.status === "completed" && (
+              <CancelSaleButton
+                saleId={sale.id}
+                invoiceNo={sale.invoiceNo}
+                isSameDay={isSameDay}
+                canCancel={canCancel}
+                hasReturns={hasReturns}
+              />
+            )}
             <Link
               href={`/dashboard/sales/${sale.id}/print?format=thermal`}
               className="btn btn-secondary"
@@ -47,6 +64,37 @@ export default async function SaleDetailPage({
           </div>
         }
       />
+
+      {/* Prominent Cancellation Status Banner */}
+      {isCancelled && (
+        <div className="rounded-xl border border-rose-200 bg-rose-50/80 p-4.5 text-rose-950 shadow-xs space-y-2 animate-enter">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2 font-bold text-rose-900 text-[15px]">
+              <AlertOctagon className="h-5 w-5 text-rose-600" />
+              <span>This sale invoice has been cancelled</span>
+            </div>
+            <span className="badge badge-danger text-[11.5px] uppercase font-bold tracking-wider px-2.5 py-1">
+              Cancelled
+            </span>
+          </div>
+          <div className="text-[13px] text-rose-800 space-y-0.5">
+            <p>
+              Cancelled on{" "}
+              <strong>
+                {sale.cancelledAt
+                  ? format(new Date(sale.cancelledAt), "d MMMM yyyy, hh:mm a")
+                  : "Same day"}
+              </strong>
+              {sale.cancelReason ? (
+                <> &bull; Reason: <span className="font-semibold italic">&ldquo;{sale.cancelReason}&rdquo;</span></>
+              ) : null}
+            </p>
+            <p className="text-[12px] text-rose-700/90">
+              Inventory batches have been restored to shelf stock, the outward GST document is voided, customer loyalty points/credit reversed, and an exact reversing journal entry was posted.
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Top Status & Party Overview */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -87,17 +135,27 @@ export default async function SaleDetailPage({
             <span>Payment Status</span>
             <span
               className={`badge badge-dot ${
-                isPaid ? "badge-success" : isPartial ? "badge-warning" : "badge-danger"
+                isCancelled
+                  ? "badge-danger"
+                  : isPaid
+                  ? "badge-success"
+                  : isPartial
+                  ? "badge-warning"
+                  : "badge-danger"
               }`}
             >
-              {isPaid ? "Fully Paid" : isPartial ? "Partially Paid" : "Unpaid Credit"}
+              {isCancelled ? "Cancelled" : isPaid ? "Fully Paid" : isPartial ? "Partially Paid" : "Unpaid Credit"}
             </span>
           </div>
-          <div className="text-2xl font-black text-ink-900 num">{formatINR(sale.totalAmount)}</div>
+          <div className={`text-2xl font-black num ${isCancelled ? "line-through text-ink-400" : "text-ink-900"}`}>
+            {formatINR(sale.totalAmount)}
+          </div>
           <div className="text-[12.5px] text-ink-500 flex justify-between">
             <span>Paid: {formatINR(sale.paidAmount ?? 0)}</span>
             {sale.creditAmount && sale.creditAmount > 0 ? (
-              <span className="font-semibold text-amber-700">Due: {formatINR(sale.creditAmount)}</span>
+              <span className={`font-semibold ${isCancelled ? "line-through text-ink-400" : "text-amber-700"}`}>
+                Due: {formatINR(sale.creditAmount)}
+              </span>
             ) : null}
           </div>
         </div>

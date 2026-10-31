@@ -515,6 +515,7 @@ Full map in `.github/CODEOWNERS` and [ADR 0004](docs/adr/0004-two-lane-ownership
 - **How:** insert `sales` with `status = 'held'`, no invoice number, `held_payload = { lines, customerId, … }`, and **no stock movement**. Resume loads it into the cart and deletes the held row on completion. Held bills older than 24 h show a warning.
 
 #### A2.4 Sale cancellation ⏱ 1.5 days
+- **Progress:** completed in `lane-a/a2-4-sale-cancellation`. Domain service `src/server/domain/sales/cancel-sale.ts` implements `cancelSale` with same-day IST window validation, exact batch inventory restoration (`type: sale_return`, `refType: sale_cancel`), exact reversing double-entry journal entry, statutory Schedule H/H1/X dispensing log preservation with cancellation annotation, GST document voiding in GSTR-1 (`cancelGstDocumentForSale`), loyalty points reversal, and immutable audit logging. Integrated with `cancelSaleAction` (`sale.cancel`), invoice detail page UI button (`Alt + C`) and accessible confirmation modal. Verified by unit & integration tests.
 - **Files:** ➕ `src/server/domain/sales/cancel-sale.ts`, action `cancelSale` (`sale.cancel`), button on `src/app/dashboard/sales/[id]/page.tsx`.
 - **Rules:** allowed only on the **same business day** and before any return. The reason is required. Cancelling reverses stock (`type: "sale_return"`, `refType: "sale_cancel"`), posts a **reversing journal entry** (don't delete the original), sets `status = 'cancelled'`, `cancelled_at` and `cancel_reason`, calls 🤝 B2.6 `cancelGstDocumentForSale`, calls 🤝 B2.5 loyalty reversal, writes an audit row, and marks dispensing logs with a cancellation note (never deletes them). The invoice number stays used; it's reported as cancelled in GSTR-1's document summary.
 - **Done when:** after a cancel, stock, ledger and GST report are back to their pre-sale state 🧪.
@@ -570,6 +571,16 @@ Full map in `.github/CODEOWNERS` and [ADR 0004](docs/adr/0004-two-lane-ownership
   - If the nearest-expiry batch has insufficient stock, it splits across the next FEFO batch.
   - Manual batch override requires explicit selection and logs an audit trail if an older batch was skipped.
 - **Done when:** adding an item auto-picks the earliest expiry batch by default without manual clicks 🧪.
+
+#### A2.12 ⌨️ Marg ERP keyboard parity & counter ergonomics ⏱ 1 day
+- **Why:** Pharmacy cashiers accustomed to Marg ERP 9+ and Marg Books expect rapid, 100% keyboard-only counter operations without touching the mouse.
+- **Files:** ✏️ `src/app/dashboard/sales/pos/page.tsx`, ✏️ `src/app/components/CommandPalette.tsx`, ✏️ `USER_MANUAL.md`.
+- **How:**
+  - `Ctrl + F1` (or `?`): Show in-counter keyboard shortcut cheat sheet popup.
+  - Cart row keyboard navigation: `Delete` key deletes active/selected line item; `+` / `-` keys increment/decrement pack or loose quantity.
+  - Global ERP navigation hotkeys: `Alt + N` (New Sale Counter), `Alt + P` (New Purchase Bill), `Alt + M` (Sales Register / Modify Bill), `Alt + I` (Item / Batch Stock lookup), `Alt + L` (Ledgers / Customers).
+  - Floating counter calculator (`Alt + F12` or `Ctrl + K calc`).
+- **Done when:** a cashier can navigate from any screen to sale counter, add items, adjust quantities, hold/resume, and complete checkout without touching the mouse 🧪.
 
 ### Lane B · Phase 2
 
@@ -1000,7 +1011,7 @@ Tick items in PRs. One line per task, in the same order as above.
 
 **Phase 0** — A: [x] A0.1 [x] A0.2 [x] A0.3 [x] A0.4 [x] A0.5 [ ] A0.6 [x] A0.7 · B: [x] B0.1 [x] B0.2 [x] B0.3 [x] B0.4 [x] B0.5 [x] B0.6 [x] B0.7 [x] B0.8
 **Phase 1** — A: [x] A1.1 [x] A1.2 [x] A1.3 [x] A1.4 [x] A1.5 [x] A1.6 [x] A1.7 · B: [x] B1.1 [x] B1.2 [x] B1.3 [x] B1.4 [x] B1.5 [x] B1.6 [x] B1.7
-**Phase 2** — A: [x] A2.1 [x] A2.2 [x] A2.3 [ ] A2.4 [ ] A2.5 [ ] A2.6 [ ] A2.7 [ ] A2.8 [x] A2.9 [x] A2.10 [x] A2.11 · B: [x] B2.1 [x] B2.2 [x] B2.3 [x] B2.4 [x] B2.5 [x] B2.6 [x] B2.7 [x] B2.8
+**Phase 2** — A: [x] A2.1 [x] A2.2 [x] A2.3 [x] A2.4 [ ] A2.5 [ ] A2.6 [ ] A2.7 [ ] A2.8 [x] A2.9 [x] A2.10 [x] A2.11 [ ] A2.12 · B: [x] B2.1 [x] B2.2 [x] B2.3 [x] B2.4 [x] B2.5 [x] B2.6 [x] B2.7 [x] B2.8
 **Phase 3** — A: [ ] A3.1 [ ] A3.2 [ ] A3.3 [ ] A3.4 [ ] A3.5 [ ] A3.6 · B: [x] B3.1 [x] B3.2 [x] B3.3 [x] B3.4 [x] B3.5 [x] B3.6 [x] B3.7
 **Phase 4** — A: [ ] A4.1 [ ] A4.2 [ ] A4.3 [ ] A4.4 [ ] A4.5 [ ] A4.6 [ ] A4.7 [ ] A4.8 [ ] A4.9 · B: [ ] B4.1 [ ] B4.2 [ ] B4.3 [ ] B4.4 [ ] B4.5 [ ] B4.6
 **Phase 5** — A: [ ] A5.1 [ ] A5.2 [ ] A5.3 [ ] A5.4 [ ] A5.5 [ ] A5.6 [ ] A5.7 · B: [ ] B5.1 [ ] B5.2 [ ] B5.3 [ ] B5.4 [ ] B5.5 [ ] B5.6 [ ] B5.7

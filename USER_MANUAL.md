@@ -11,6 +11,7 @@ This manual teaches you how to run your pharmacy in MediFlow: how to bill a cust
 ## Contents
 
 1. [What MediFlow does](#1-what-mediflow-does)
+   - [1.1 Features and workflows at a glance](#11-features-and-workflows-at-a-glance)
 2. [Getting started](#2-getting-started)
 3. [Finding your way around](#3-finding-your-way-around)
 4. [Who can do what (roles)](#4-who-can-do-what-roles)
@@ -56,6 +57,72 @@ When you bill a customer, MediFlow automatically:
 - gives loyalty points to the customer, if you run a rewards programme.
 
 **Good to know:** all prices include GST (like the MRP on the pack). MediFlow works backwards to show you the taxable value and the CGST/SGST split.
+
+### 1.1 Features and workflows at a glance
+
+Here is a clear summary of all the core features and flows MediFlow provides to run your pharmacy:
+
+#### 1. Point of Sale (POS) & Counter Billing Flow
+- **High-speed billing:** Search medicines instantly by brand name, generic molecule (e.g. *Paracetamol*), or by scanning pack barcodes with a handheld hardware scanner.
+- **Auto-FEFO batch allocation:** MediFlow automatically picks the batch expiring soonest so you never sell older stock accidentally. If a batch doesn't have enough units, it slices stock across multiple batches seamlessly.
+- **Loose tablet cutting (Unit conversions):** Sell individual tablets or capsules out of strips or boxes. Prices and stock update automatically without rounding errors.
+- **Held / Parked bills (`F6` / `F7`):** Park an active customer's cart when they step away to fetch cash or call their doctor. Serve the next patient in line, and resume the parked cart later with live stock revalidation.
+- **Split-tender & credit sales (`F8`):** Split a single payment across Cash, UPI, and Card. Allow registered customers to take medicines on credit within their credit limit, with automatic change calculation for cash overpayment.
+- **Salt / Substitute finder (`F9`):** When a prescribed brand is out of stock, press `F9` to instantly see all available in-stock alternatives sharing the exact same active pharmaceutical molecule.
+- **Prescription & Schedule H/H1/X compliance:** The counter alerts you when prescription drugs are in the cart and mandates entering the prescribing doctor and patient details before completing the sale.
+- **Instant invoice printing:** Print 2-inch or 3-inch thermal receipts or full A4/A5 tax invoices with HSN summaries.
+
+#### 2. Inventory & Batch Management Flow
+- **Batch & expiry tracking:** Full visibility into every batch, its manufacturer, manufacturing date, expiry date, purchase rate, and current stock on shelf.
+- **Rack & shelf locations:** Assign medicines to specific physical racks (e.g. *Rack A-12*); rack locations appear directly on the POS search dropdown for instant retrieval.
+- **Opening stock entry:** Rapidly add your starting inventory with batch numbers, MRP, and landed cost.
+- **Expiry & low-stock monitoring:** Built-in dashboard alerts identify batches expiring within 30, 60, or 90 days and medicines falling below reorder thresholds.
+- **Bulk spreadsheet import:** Import thousands of medicines and batch records from Excel or CSV files in minutes.
+
+#### 3. Purchasing & Supplier Operations Flow
+- **Supplier directory & ledgers:** Maintain distributor profiles, GSTINs, drug licences, payment terms, and live account balances.
+- **Purchase Orders (PO):** Generate formal purchase orders for suppliers, print or export them to PDF, and convert them directly into Goods Received Notes.
+- **Goods Received Notes (GRN / Supplier Bills):** Record incoming supplier shipments with batch numbers, expiry dates, trade rates, and tax rates.
+- **Pharma purchase schemes:** Automatically compute deals like *10+1 free*, Trade Discounts (TD%), Cash Discounts (CD%), and effective landed cost per tablet.
+- **Supplier debit notes:** Issue debit notes for damaged stock, expired goods, or rate differences with automated supplier ledger debits.
+- **Supplier payments:** Record bank, UPI, cheque, or cash payments against distributor bills and keep a running supplier ledger.
+
+#### 4. Prescriptions & Statutory Legal Registers Flow
+- **Schedule H, H1 & X registers:** Auto-generate official dispensing registers as required by Indian Drug & Cosmetics Rules.
+- **Doctor master:** Save prescribing doctors with their state Medical Council Registration numbers and hospitals.
+- **Prescription tracking:** Link dispensing records to prescription slip numbers and doctor details.
+- **Inspection-ready printouts:** Filter and print Form 35 and Schedule H1 registers by date range ready for drug inspector audits.
+
+#### 5. Customer Care, Loyalty & CRM Flow
+- **Customer directory & credit limits:** Store patient phone numbers, addresses, outstanding balances, and credit limits.
+- **Quick customer creation (`F4`):** Add a new customer directly from the billing counter in 3 seconds without losing your current bill.
+- **Family health groups:** Group family members together under one head-of-household to track shared credit and prescriptions.
+- **Customer loyalty rewards:** Award reward points for every purchase to encourage repeat pharmacy visits.
+
+#### 6. Patient Care, Orders & Reminders Flow
+- **Promise orders:** When a customer requests a medicine that is currently out of stock, record a promise order. When the medicine arrives via supplier GRN, notify the customer.
+- **Omnichannel order desk:** Receive and manage phone, prescription-photo, and online customer orders for counter pickup or home delivery.
+- **Chronic refill reminders:** Track regular patients taking daily medications (hypertension, diabetes, thyroid) and send refill reminders before they run out.
+
+#### 7. Accounting & Financial Ledgers Flow
+- **Automated double-entry bookkeeping:** Every sale, purchase, customer receipt, and supplier payment automatically writes debit and credit journal entries.
+- **Day book:** Review every transaction recorded on any day with complete debit/credit breakdowns.
+- **Customer receipts:** Accept pending balance payments from credit customers and issue official payment receipts.
+- **Trial Balance, P&L & Balance Sheet:** Real-time financial reports showing gross profit, net profit, assets, liabilities, and ledger balances.
+
+#### 8. GST & Tax Compliance Flow
+- **Pharma GST 2.0:** Full support for 0%, 5%, 12%, and 18% GST rates, including the 5% medicine GST transition.
+- **Intrastate vs. Interstate tax:** Automatically splits taxes into CGST + SGST for local sales, or IGST for out-of-state business customers.
+- **GSTR-1 tax summary:** Monthly sales summaries grouped into B2B, B2C Large, B2C Small, and HSN-wise breakdowns for GST filing.
+- **Input Tax Credit (ITC):** Track all GST paid on supplier purchases to offset against your monthly output GST liability.
+
+#### 9. Staff Roles, Security & Auditing Flow
+- **7 Pharmacy roles:** Assign staff members exact roles (*Owner, Manager, Pharmacist, Cashier, Purchase Manager, Accountant, Auditor*) so they only see what their job allows.
+- **Manager discount overrides:** Limit how much discount cashiers can give; require a manager's permission to exceed the pharmacy discount limit.
+- **Audit logs:** Every sensitive change (price edits, manual FEFO overrides, stock adjustments, voided bills) is permanently logged with timestamp and staff name.
+
+#### 10. Pharmacy AI Assistant Flow
+- **Smart natural language queries:** Ask questions like *"Which medicines are expiring this month?"* or *"What were our top 5 selling products yesterday?"* directly in natural language.
 
 ---
 
@@ -298,7 +365,28 @@ Open **Operations → Sales & invoices**.
 - **Print Thermal 80mm Slip** opens a print-ready slip for a receipt printer. Use your browser's print command.
 - Use **Export** to download the list (owner, manager, accountant).
 
-> **Not available yet:** cancelling a bill, returning items / credit notes, split payments (part cash, part UPI), holding a bill to finish later, and the cash-register shift. See [chapter 19](#19-not-available-yet).
+### 5.7 Cancelling a bill (Same-day cancellation)
+
+When a customer changes their mind before leaving the pharmacy, or when an accidental entry error is identified immediately after completing a bill:
+
+- **Where to cancel:** Open the invoice under **Operations → Sales & invoices** (or press **Alt + M** from the counter and click the bill).
+- **Staff permissions:** Only staff with the **`sale.cancel`** permission (**Owner** or **Store Manager**) can cancel a bill. Cashiers cannot void bills without manager oversight.
+- **Same-day rule:** Under Indian Pharma retail and GST compliance rules, bill cancellations are strictly limited to the **same business day** (before midnight IST, `Asia/Kolkata`). For past transactions, please issue a **Sale Return & Credit Note** instead.
+- **No prior returns:** A bill that already has partial returns cannot be cancelled directly; issue a credit note for the remaining items.
+- **Mandatory reason:** You must type an explicit reason for cancellation (minimum 3 characters) for statutory audit compliance.
+- **Dual input ergonomics:**
+  - **Mouse:** Click the red **Cancel Bill** button, review the reversal summary, enter the reason, and click **Confirm Cancellation**.
+  - **Keyboard:** Press **Alt + C** on the invoice page to open the cancellation modal, type your reason, press **Enter** to confirm, or **Esc** to dismiss.
+
+#### What MediFlow does automatically when a bill is cancelled:
+1. **Batch Stock Restored:** Medicine units are immediately added back into the **exact batches** originally sold with an immutable, traceable **`sale_return`** movement (`refType: "sale_cancel"`).
+2. **Double-Entry Journal Reversal:** MediFlow automatically posts a reversing Journal Voucher (`JV`) mirroring the original lines (original debits become credits, and credits become debits). This guarantees an exact 0-paise balance with zero rounding drift. Any unpaid customer credit is removed from their outstanding balance.
+3. **GST Document Voided:** The outward tax invoice in your GSTR-1 register is marked **`cancelled`**. In compliance with GST law, the invoice number is never deleted or reused; it remains permanently reported under cancelled documents in GSTR-1 Table 13 (Document Summary).
+4. **Statutory Legal Registers Preserved:** Under Indian Drug & Cosmetics Rules, Schedule H, H1, and X dispensing records can **never be deleted**. MediFlow keeps the original dispensing log and stamps it with an indelible audit annotation: `[CANCELLED: <reason> at <timestamp>]`.
+5. **Loyalty Points Reversal:** Any customer loyalty reward points earned on the bill are automatically deducted from the customer's balance.
+6. **Immutable Audit Trail:** An audit row is written to **Settings → Audit log** recording who cancelled the bill, at what exact second, and why.
+
+> **Not available yet:** sales returns and credit notes (A2.5), using loyalty points as a bill discount (A2.7), and the cash-register shift (A2.6). See [chapter 19](#19-not-available-yet).
 
 ---
 
@@ -764,6 +852,24 @@ It answers from your live data. If it hasn't been set up with an AI key, it will
 | Billing | **↑ / ↓**, then **Enter** | Choose a medicine from the search results |
 | Billing | Barcode scanner | Scan a pack to add it to the bill |
 
+### 17.1 Marg ERP Migration Guide: Shortcut Cross-Reference
+
+If your pharmacy staff is accustomed to Marg ERP 9+ or Marg Books, here is how the primary keyboard workflows map to MediFlow:
+
+| Workflow / Action | Marg ERP Key | MediFlow Key | MediFlow Advantage |
+|---|---|---|---|
+| **New Sale Bill** | `Alt + N` / `F2` | **`F2`** | Clears counter and focuses search box instantly |
+| **Search Medicine / Salt** | Item list search | **`F3`** / **`Ctrl + F`** / **`/`** | Unified search across brand, generic molecule, and barcode |
+| **Batch Selection** | `Ctrl + Tab` / `Enter` | **`↑ / ↓` + `Enter`** | **Auto-FEFO**: automatically selects earliest expiring batch |
+| **Substitute / Molecule Finder** | `F7` (Books) / `F9` | **`F9`** | Compares active molecule, available stock, and price difference |
+| **Quick Customer Creation** | `F2` on ledger | **`F4`** | Adds patient in 3 seconds without losing entered items |
+| **Hold / Park Active Bill** | Special menu | **`F6`** | Frees counter for next patient; zero stock deduction |
+| **Recall / Resume Parked Bill** | Bill lookup | **`F7`** | Instant resume with live stock shortage and expiry alerts |
+| **Split Tender / Store Credit** | `Tab` / `Ctrl + W` | **`F8`** | Splits across Cash, UPI, Card, and Customer Ledger |
+| **Save & Print Receipt** | `Ctrl + W` / `End` / `F10` | **`F10`** / **`End`** | One-key thermal or A4 tax invoice print |
+| **Barcode Scanner** | Fast scan mode | **Automatic** | High-speed hardware buffer (<45ms) auto-adds scanned packs |
+| **Help / Cheat Sheet** | `Ctrl + F1` / `Alt + F1` | **`?`** | Instant on-screen cheat sheet |
+
 ---
 
 ## 18. Common questions and error messages
@@ -803,7 +909,7 @@ These are planned but **cannot be used today**. If you can't find a button for t
 
 | Area | Planned feature |
 |---|---|
-| Billing | Cancel a bill (A2.4); sales returns and credit notes (A2.5); cash register open/close (A2.6); using loyalty points as a discount (A2.7); offline counter billing (Tauri desktop app in Phase 4) |
+| Billing | Sales returns and credit notes (A2.5); cash register open/close (A2.6); using loyalty points as a discount (A2.7); offline counter billing (Tauri desktop app in Phase 4) |
 | Stock | Stock adjustments and write-offs; transfers between branches; warehouse; physical stock count; reorder suggestions |
 | Buying | Automated reorder suggestions based on sales velocity (Purchase orders, supplier debit notes, and supplier ledger payments are available) |
 | People & security | Password reset by email; custom roles (you choose from the 7 built-in ones); sending invitations by email (you copy the link yourself); removing a person for good (you suspend instead) |
