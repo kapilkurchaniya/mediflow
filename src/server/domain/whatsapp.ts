@@ -1,5 +1,41 @@
 import { db, schema } from "@/server/db";
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
+
+export interface MetaWebhookPayload {
+  object?: string;
+  entry?: Array<{
+    id?: string;
+    changes?: Array<{
+      field?: string;
+      value?: {
+        messaging_product?: string;
+        metadata?: {
+          display_phone_number?: string;
+          phone_number_id?: string;
+        };
+        statuses?: Array<{
+          id?: string;
+          status?: string;
+          timestamp?: string;
+          recipient_id?: string;
+        }>;
+        contacts?: Array<{ profile?: { name?: string }; wa_id?: string }>;
+        messages?: Array<{
+          from?: string;
+          id?: string;
+          timestamp?: string;
+          type?: string;
+          text?: { body?: string };
+          interactive?: {
+            button_reply?: {
+              title?: string;
+            };
+          };
+        }>;
+      };
+    }>;
+  }>;
+}
 import { decryptSecret } from "@/server/crypto";
 
 export interface WhatsAppSendParams {
@@ -214,15 +250,17 @@ export class WhatsAppService {
   /**
    * Process incoming webhook payload from Meta
    */
-  static async handleIncomingWebhook(payload: any) {
+  static async handleIncomingWebhook(payload: MetaWebhookPayload) {
     if (payload.object !== "whatsapp_business_account") return;
 
     for (const entry of payload.entry || []) {
       for (const change of entry.changes || []) {
         if (change.field !== "messages") continue;
         const val = change.value;
+        if (!val) continue;
         const metadata = val.metadata;
         const phoneNumberId = metadata?.phone_number_id;
+        if (!phoneNumberId) continue;
 
         // Find tenant by phoneNumberId
         const [config] = await db
@@ -235,6 +273,7 @@ export class WhatsAppService {
 
         // Process message statuses (delivery receipts)
         for (const st of val.statuses || []) {
+          if (!st.status || !st.id) continue;
           const statusMap: Record<string, "sent" | "delivered" | "read" | "failed"> = {
             sent: "sent",
             delivered: "delivered",
@@ -242,7 +281,7 @@ export class WhatsAppService {
             failed: "failed",
           };
           const mappedStatus = statusMap[st.status];
-          if (mappedStatus && st.id) {
+          if (mappedStatus) {
             await db
               .update(schema.whatsappMessages)
               .set({ status: mappedStatus })
@@ -252,11 +291,11 @@ export class WhatsAppService {
 
         // Process incoming user messages
         for (const msg of val.messages || []) {
+          if (!msg.from) continue;
           const fromPhone = msg.from;
           const body = msg.text?.body || (msg.type === "interactive" ? msg.interactive?.button_reply?.title : "") || `[${msg.type} message]`;
 
           // Find customer by phone
-          const phonePattern = `%${fromPhone.slice(-10)}%`;
           const [customer] = await db
             .select()
             .from(schema.customers)

@@ -1,11 +1,49 @@
 import { db, schema } from "@/server/db";
-import { eq, and, sql, desc, asc, gte, lte, inArray, gt } from "drizzle-orm";
+import { eq, and, sql, desc, gte, lte, inArray, gt, type Column, type SQL } from "drizzle-orm";
 import { getOrSeedAccounts } from "./accounting";
-import { format, differenceInDays } from "date-fns";
+import { format, differenceInDays, subMonths } from "date-fns";
 
 export interface DateRangeFilter {
   from?: string | null;
   to?: string | null;
+}
+
+export type StoreScope = string | string[] | "all";
+
+function isSql(col: Column | SQL): col is SQL {
+  return "queryChunks" in col;
+}
+
+export function getStoreCondition(column: Column | SQL, scope?: StoreScope) {
+  if (!scope || scope === "all") {
+    return sql`TRUE`;
+  }
+  if (Array.isArray(scope)) {
+    if (scope.length === 0) return sql`TRUE`;
+    if (isSql(column)) {
+      if (scope.length === 1) return eq(column, scope[0]!);
+      return inArray(column, scope);
+    }
+    if (scope.length === 1) return eq(column, scope[0]!);
+    return inArray(column, scope);
+  }
+  if (isSql(column)) {
+    return eq(column, scope);
+  }
+  return eq(column, scope);
+}
+
+export function getStoreOrNullCondition(column: Column | SQL, scope?: StoreScope) {
+  if (!scope || scope === "all") {
+    return sql`TRUE`;
+  }
+  if (Array.isArray(scope)) {
+    if (scope.length === 0) return sql`TRUE`;
+    if (scope.length === 1) return sql`(${column} = ${scope[0]} OR ${column} IS NULL)`;
+    const inCond = isSql(column) ? inArray(column, scope) : inArray(column, scope);
+    return sql`(${inCond} OR ${column} IS NULL)`;
+  }
+  return sql`(${column} = ${scope} OR ${column} IS NULL)`;
 }
 
 /* ───────────────────────────── 1. Trial Balance ───────────────────────────── */
@@ -40,7 +78,7 @@ export interface TrialBalanceReport {
 
 export async function generateTrialBalance(
   tenantId: string,
-  storeId: string,
+  storeScope: StoreScope = "all",
   dateRange: DateRangeFilter = {}
 ): Promise<TrialBalanceReport> {
   await getOrSeedAccounts(db, tenantId);
@@ -67,7 +105,7 @@ export async function generateTrialBalance(
     .where(
       and(
         eq(schema.journalLines.tenantId, tenantId),
-        sql`(${schema.journalEntries.storeId} = ${storeId} OR ${schema.journalEntries.storeId} IS NULL)`
+        getStoreOrNullCondition(schema.journalEntries.storeId, storeScope)
       )
     );
 
@@ -174,10 +212,10 @@ export interface ProfitAndLossReport {
 
 export async function generateProfitAndLoss(
   tenantId: string,
-  storeId: string,
+  storeScope: StoreScope = "all",
   dateRange: DateRangeFilter = {}
 ): Promise<ProfitAndLossReport> {
-  const tb = await generateTrialBalance(tenantId, storeId, dateRange);
+  const tb = await generateTrialBalance(tenantId, storeScope, dateRange);
 
   const revenueAccounts: Array<{ code: string; name: string; amount: number }> = [];
   const cogsAccounts: Array<{ code: string; name: string; amount: number }> = [];
@@ -251,11 +289,11 @@ export interface BalanceSheetReport {
 
 export async function generateBalanceSheet(
   tenantId: string,
-  storeId: string,
+  storeScope: StoreScope = "all",
   asOfDate: string = format(new Date(), "yyyy-MM-dd")
 ): Promise<BalanceSheetReport> {
-  const tb = await generateTrialBalance(tenantId, storeId, { to: asOfDate });
-  const pnl = await generateProfitAndLoss(tenantId, storeId, { to: asOfDate });
+  const tb = await generateTrialBalance(tenantId, storeScope, { to: asOfDate });
+  const pnl = await generateProfitAndLoss(tenantId, storeScope, { to: asOfDate });
 
   const currentAssets: Array<{ code: string; name: string; amount: number }> = [];
   const fixedAssets: Array<{ code: string; name: string; amount: number }> = [];
@@ -342,10 +380,10 @@ export interface CashFlowReport {
 
 export async function generateCashFlow(
   tenantId: string,
-  storeId: string,
+  storeScope: StoreScope = "all",
   dateRange: DateRangeFilter = {}
 ): Promise<CashFlowReport> {
-  const tb = await generateTrialBalance(tenantId, storeId, dateRange);
+  const tb = await generateTrialBalance(tenantId, storeScope, dateRange);
 
   // Cash on Hand (1010) & Bank / Digital Payments (1020)
   const cashAccounts = tb.items.filter(
@@ -364,7 +402,7 @@ export async function generateCashFlow(
   // Parse lines to categorize cash inflows vs outflows
   const conditions = [
     eq(schema.journalLines.tenantId, tenantId),
-    sql`(${schema.journalEntries.storeId} = ${storeId} OR ${schema.journalEntries.storeId} IS NULL)`,
+    getStoreOrNullCondition(schema.journalEntries.storeId, storeScope),
   ];
   if (dateRange.from) {
     conditions.push(gte(schema.journalEntries.entryDate, dateRange.from));
@@ -390,10 +428,10 @@ export async function generateCashFlow(
     .where(and(...conditions, inArray(schema.journalLines.accountId, cashAccountIds)));
 
   let cashSales = 0;
-  let digitalSales = 0;
+  const digitalSales = 0;
   let debtorReceipts = 0;
   let cashPurchases = 0;
-  let creditorPayments = 0;
+  const creditorPayments = 0;
   let expenses = 0;
 
   for (const tx of cashTransactions) {
@@ -468,7 +506,7 @@ export interface OutstandingReport {
 
 export async function generateOutstanding(
   tenantId: string,
-  storeId: string,
+  storeScope: StoreScope = "all",
   type: "receivable" | "payable"
 ): Promise<OutstandingReport> {
   const today = new Date();
@@ -485,7 +523,7 @@ export async function generateOutstanding(
       .where(
         and(
           eq(schema.sales.tenantId, tenantId),
-          eq(schema.sales.storeId, storeId),
+          getStoreCondition(schema.sales.storeId, storeScope),
           gt(schema.sales.creditAmount, 0),
           eq(schema.sales.status, "completed")
         )
@@ -562,7 +600,7 @@ export async function generateOutstanding(
       .where(
         and(
           eq(schema.purchases.tenantId, tenantId),
-          eq(schema.purchases.storeId, storeId),
+          getStoreCondition(schema.purchases.storeId, storeScope),
           sql`${schema.purchases.totalAmount} > ${schema.purchases.paidAmount}`
         )
       );
@@ -652,12 +690,12 @@ export interface InventoryMovementReport {
 
 export async function generateInventoryAnalytics(
   tenantId: string,
-  storeId: string,
+  storeScope: StoreScope = "all",
   dateRange: DateRangeFilter = {}
 ): Promise<InventoryMovementReport> {
   const conditions = [
     eq(schema.saleItems.tenantId, tenantId),
-    eq(schema.sales.storeId, storeId),
+    getStoreCondition(schema.sales.storeId, storeScope),
     eq(schema.sales.status, "completed"),
   ];
 
@@ -690,7 +728,13 @@ export async function generateInventoryAnalytics(
       stockValuation: sql<number>`COALESCE(SUM(${schema.batches.qtyOnHand} * ${schema.batches.purchaseRate}), 0)`,
     })
     .from(schema.batches)
-    .where(and(eq(schema.batches.storeId, storeId), gt(schema.batches.qtyOnHand, 0)))
+    .where(
+      and(
+        eq(schema.batches.tenantId, tenantId),
+        getStoreCondition(schema.batches.storeId, storeScope),
+        gt(schema.batches.qtyOnHand, 0)
+      )
+    )
     .groupBy(schema.batches.medicineId);
 
   const stockMap = new Map<string, { totalStock: number; valuation: number }>();
@@ -788,7 +832,7 @@ export interface ExpiryExposureReport {
 
 export async function generateExpiryReport(
   tenantId: string,
-  storeId: string
+  storeScope: StoreScope = "all"
 ): Promise<ExpiryExposureReport> {
   const today = new Date();
   const todayStr = format(today, "yyyy-MM-dd");
@@ -800,7 +844,13 @@ export async function generateExpiryReport(
     })
     .from(schema.batches)
     .innerJoin(schema.medicines, eq(schema.batches.medicineId, schema.medicines.id))
-    .where(and(eq(schema.batches.storeId, storeId), gt(schema.batches.qtyOnHand, 0)))
+    .where(
+      and(
+        eq(schema.batches.tenantId, tenantId),
+        getStoreCondition(schema.batches.storeId, storeScope),
+        gt(schema.batches.qtyOnHand, 0)
+      )
+    )
     .orderBy(schema.batches.expiryDate);
 
   const expired: ExpiryBatchRow[] = [];
@@ -850,5 +900,270 @@ export async function generateExpiryReport(
     expiringIn90Days,
     totalExpiredLossPaise,
     totalAtRiskLossPaise,
+  };
+}
+
+/* ───────────────────────────── 8. Chain-Wide Overview Report (B3.1) ───────────────────────────── */
+
+export interface ChainStoreSummary {
+  storeId: string;
+  storeName: string;
+  storeCode: string;
+  storeCity: string | null;
+  totalRevenuePaise: number;
+  totalCogsPaise: number;
+  grossMarginPaise: number;
+  grossMarginPercent: number;
+  salesCount: number;
+  stockValuationPaise: number;
+  nearExpiryValuationPaise: number;
+  outOfStockSkus: number;
+}
+
+export interface ChainOverviewReport {
+  periodLabel: string;
+  totalChainRevenuePaise: number;
+  totalChainCogsPaise: number;
+  chainGrossMarginPaise: number;
+  chainGrossMarginPercent: number;
+  totalSalesCount: number;
+  totalStockValuationPaise: number;
+  totalNearExpiryValuationPaise: number;
+  totalOutOfStockSkus: number;
+  stores: ChainStoreSummary[];
+  monthlyTrend: Array<{
+    month: string;
+    revenuePaise: number;
+    marginPaise: number;
+  }>;
+}
+
+export async function generateChainOverviewReport(
+  tenantId: string,
+  storeScope: StoreScope = "all",
+  dateRange: DateRangeFilter = {}
+): Promise<ChainOverviewReport> {
+  const today = new Date();
+  const todayStr = format(today, "yyyy-MM-dd");
+  const ninetyDaysFromNowStr = format(new Date(Date.now() + 90 * 86400000), "yyyy-MM-dd");
+
+  // 1. Fetch target stores
+  const storeConds = [eq(schema.stores.tenantId, tenantId), eq(schema.stores.isActive, true)];
+  if (storeScope !== "all") {
+    if (Array.isArray(storeScope)) {
+      if (storeScope.length > 0) storeConds.push(inArray(schema.stores.id, storeScope));
+    } else {
+      storeConds.push(eq(schema.stores.id, storeScope));
+    }
+  }
+
+  const storesList = await db
+    .select({
+      id: schema.stores.id,
+      name: schema.stores.name,
+      code: schema.stores.code,
+      city: schema.stores.city,
+    })
+    .from(schema.stores)
+    .where(and(...storeConds))
+    .orderBy(schema.stores.name);
+
+  const targetStoreIds = storesList.map((s) => s.id);
+  if (targetStoreIds.length === 0) {
+    return {
+      periodLabel: "No stores",
+      totalChainRevenuePaise: 0,
+      totalChainCogsPaise: 0,
+      chainGrossMarginPaise: 0,
+      chainGrossMarginPercent: 0,
+      totalSalesCount: 0,
+      totalStockValuationPaise: 0,
+      totalNearExpiryValuationPaise: 0,
+      totalOutOfStockSkus: 0,
+      stores: [],
+      monthlyTrend: [],
+    };
+  }
+
+  // 2. Query completed sales in the period
+  const salesConds = [
+    eq(schema.sales.tenantId, tenantId),
+    eq(schema.sales.status, "completed"),
+    inArray(schema.sales.storeId, targetStoreIds),
+  ];
+  if (dateRange.from) {
+    salesConds.push(gte(schema.sales.createdAt, new Date(dateRange.from + "T00:00:00")));
+  }
+  if (dateRange.to) {
+    salesConds.push(lte(schema.sales.createdAt, new Date(dateRange.to + "T23:59:59.999")));
+  }
+
+  const sales = await db
+    .select({
+      id: schema.sales.id,
+      storeId: schema.sales.storeId,
+      totalAmount: schema.sales.totalAmount,
+      createdAt: schema.sales.createdAt,
+    })
+    .from(schema.sales)
+    .where(and(...salesConds));
+
+  // 3. Query sale items with purchase cost to derive COGS
+  const saleItems = await db
+    .select({
+      storeId: schema.sales.storeId,
+      qty: schema.saleItems.qty,
+      purchaseRate: schema.batches.purchaseRate,
+    })
+    .from(schema.saleItems)
+    .innerJoin(schema.sales, eq(schema.saleItems.saleId, schema.sales.id))
+    .leftJoin(schema.batches, eq(schema.saleItems.batchId, schema.batches.id))
+    .where(and(...salesConds));
+
+  // Map store sales and cogs
+  const revenueMap = new Map<string, number>();
+  const salesCountMap = new Map<string, number>();
+  for (const s of sales) {
+    revenueMap.set(s.storeId, (revenueMap.get(s.storeId) || 0) + (s.totalAmount || 0));
+    salesCountMap.set(s.storeId, (salesCountMap.get(s.storeId) || 0) + 1);
+  }
+
+  const cogsMap = new Map<string, number>();
+  for (const item of saleItems) {
+    const cost = (item.qty || 0) * (item.purchaseRate || 0);
+    cogsMap.set(item.storeId, (cogsMap.get(item.storeId) || 0) + cost);
+  }
+
+  // 4. Query batches for stock and expiry valuation
+  const batches = await db
+    .select({
+      storeId: schema.batches.storeId,
+      medicineId: schema.batches.medicineId,
+      qtyOnHand: schema.batches.qtyOnHand,
+      purchaseRate: schema.batches.purchaseRate,
+      expiryDate: schema.batches.expiryDate,
+      status: schema.batches.status,
+    })
+    .from(schema.batches)
+    .where(
+      and(
+        eq(schema.batches.tenantId, tenantId),
+        inArray(schema.batches.storeId, targetStoreIds),
+        gt(schema.batches.qtyOnHand, 0)
+      )
+    );
+
+  const stockValMap = new Map<string, number>();
+  const nearExpiryValMap = new Map<string, number>();
+  const stockedMedsPerStore = new Map<string, Set<string>>();
+
+  for (const b of batches) {
+    const val = (b.qtyOnHand || 0) * (b.purchaseRate || 0);
+    stockValMap.set(b.storeId, (stockValMap.get(b.storeId) || 0) + val);
+
+    if (b.expiryDate >= todayStr && b.expiryDate <= ninetyDaysFromNowStr) {
+      nearExpiryValMap.set(b.storeId, (nearExpiryValMap.get(b.storeId) || 0) + val);
+    }
+
+    if (b.status === "active") {
+      let set = stockedMedsPerStore.get(b.storeId);
+      if (!set) {
+        set = new Set<string>();
+        stockedMedsPerStore.set(b.storeId, set);
+      }
+      set.add(b.medicineId);
+    }
+  }
+
+  // 5. Total active medicines in catalog
+  const activeMeds = await db
+    .select({ id: schema.medicines.id })
+    .from(schema.medicines)
+    .where(and(eq(schema.medicines.tenantId, tenantId), eq(schema.medicines.isActive, true)));
+  const totalCatalogMeds = activeMeds.length;
+
+  // 6. Build per-store summary
+  let totalChainRevenue = 0;
+  let totalChainCogs = 0;
+  let totalSalesCount = 0;
+  let totalStockValuation = 0;
+  let totalNearExpiryValuation = 0;
+
+  const stores: ChainStoreSummary[] = storesList.map((st) => {
+    const rev = revenueMap.get(st.id) || 0;
+    const cogs = cogsMap.get(st.id) || 0;
+    const margin = rev - cogs;
+    const marginPct = rev > 0 ? (margin / rev) * 100 : 0;
+    const count = salesCountMap.get(st.id) || 0;
+    const stockVal = stockValMap.get(st.id) || 0;
+    const nearExpVal = nearExpiryValMap.get(st.id) || 0;
+    const stockedCount = stockedMedsPerStore.get(st.id)?.size || 0;
+    const oos = Math.max(0, totalCatalogMeds - stockedCount);
+
+    totalChainRevenue += rev;
+    totalChainCogs += cogs;
+    totalSalesCount += count;
+    totalStockValuation += stockVal;
+    totalNearExpiryValuation += nearExpVal;
+
+    return {
+      storeId: st.id,
+      storeName: st.name,
+      storeCode: st.code,
+      storeCity: st.city,
+      totalRevenuePaise: rev,
+      totalCogsPaise: cogs,
+      grossMarginPaise: margin,
+      grossMarginPercent: Math.round(marginPct * 100) / 100,
+      salesCount: count,
+      stockValuationPaise: stockVal,
+      nearExpiryValuationPaise: nearExpVal,
+      outOfStockSkus: oos,
+    };
+  });
+
+  // Sort stores descending by revenue
+  stores.sort((a, b) => b.totalRevenuePaise - a.totalRevenuePaise);
+
+  const chainMargin = totalChainRevenue - totalChainCogs;
+  const chainMarginPct = totalChainRevenue > 0 ? (chainMargin / totalChainRevenue) * 100 : 0;
+
+  // 7. Monthly trend (last 6 months)
+  const monthlyTrendMap = new Map<string, { revenue: number; cogs: number }>();
+  for (let i = 5; i >= 0; i--) {
+    const mStr = format(subMonths(today, i), "yyyy-MM");
+    monthlyTrendMap.set(mStr, { revenue: 0, cogs: 0 });
+  }
+
+  for (const s of sales) {
+    const mStr = format(new Date(s.createdAt), "yyyy-MM");
+    const entry = monthlyTrendMap.get(mStr);
+    if (entry) {
+      entry.revenue += s.totalAmount || 0;
+    }
+  }
+
+  const monthlyTrend = Array.from(monthlyTrendMap.entries()).map(([month, data]) => ({
+    month,
+    revenuePaise: data.revenue,
+    marginPaise: data.revenue - data.cogs,
+  }));
+
+  const periodLabel = dateRange.from && dateRange.to
+    ? `${dateRange.from} to ${dateRange.to}`
+    : "All Time";
+
+  return {
+    periodLabel,
+    totalChainRevenuePaise: totalChainRevenue,
+    totalChainCogsPaise: totalChainCogs,
+    chainGrossMarginPaise: chainMargin,
+    chainGrossMarginPercent: Math.round(chainMarginPct * 100) / 100,
+    totalSalesCount,
+    totalStockValuationPaise: totalStockValuation,
+    totalNearExpiryValuationPaise: totalNearExpiryValuation,
+    totalOutOfStockSkus: Math.max(...stores.map((s) => s.outOfStockSkus), 0),
+    stores,
+    monthlyTrend,
   };
 }

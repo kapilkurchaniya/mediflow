@@ -18,6 +18,12 @@ export const metadata = {
   title: "Order Details — MediFlow",
 };
 
+interface OrderItem {
+  name?: string;
+  qty?: number;
+  rate?: number;
+}
+
 export default async function OrderDetailPage({
   params,
 }: {
@@ -30,7 +36,7 @@ export default async function OrderDetailPage({
     notFound();
   }
 
-  const items = Array.isArray(order.items) ? order.items : [];
+  const items = (Array.isArray(order.items) ? order.items : []) as OrderItem[];
 
   return (
     <div className="page space-y-6 max-w-4xl">
@@ -101,7 +107,7 @@ export default async function OrderDetailPage({
               </tr>
             </thead>
             <tbody>
-              {items.map((it: any, idx: number) => {
+              {items.map((it, idx: number) => {
                 const lineTotal = (it.qty || 1) * (it.rate || 0);
                 return (
                   <tr key={idx}>

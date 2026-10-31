@@ -21,6 +21,26 @@ export const metadata = {
 
 const REPORT_CATEGORIES = [
   {
+    category: "Multi-Store & Chain Intelligence",
+    desc: "Consolidated performance, store ranking, gross margins, and cross-branch inventory health.",
+    reports: [
+      {
+        href: "/dashboard/reports/chain",
+        title: "Chain Overview & Branch Performance",
+        desc: "Consolidated revenue, store ranking, margin comparisons, and near-expiry exposure.",
+        icon: BarChart3,
+        badge: "Chain Owner",
+      },
+      {
+        href: "/dashboard/reports/expiry-redistribution",
+        title: "Expiry Redistribution Suggestions",
+        desc: "Detect near-expiry batches in slow branches and reallocate to high-velocity stores before expiration.",
+        icon: TrendingUp,
+        badge: "Optimization",
+      },
+    ],
+  },
+  {
     category: "Financial Statements",
     desc: "Statutory statements posted automatically via double-entry principles.",
     reports: [

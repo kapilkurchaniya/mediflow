@@ -1,14 +1,18 @@
 "use client";
 
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
-import { Calendar } from "lucide-react";
+import { Calendar, Building2 } from "lucide-react";
 
 export function GstPeriodSelector({
   month,
   year,
+  selectedGstin,
+  availableGstins,
 }: {
   month: number;
   year: number;
+  selectedGstin?: string;
+  availableGstins?: Array<{ gstin: string; label: string }>;
 }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -39,34 +43,66 @@ export function GstPeriodSelector({
     router.push(`${pathname}?${params.toString()}`);
   }
 
+  function handleGstinChange(newGstin: string) {
+    const params = new URLSearchParams(searchParams.toString());
+    if (newGstin) {
+      params.set("gstin", newGstin);
+    } else {
+      params.delete("gstin");
+    }
+    router.push(`${pathname}?${params.toString()}`);
+  }
+
   return (
-    <div className="flex items-center gap-2 bg-white/80 backdrop-blur-md px-3 py-1.5 rounded-lg border border-ink-200/60 shadow-xs">
-      <Calendar className="h-4 w-4 text-ink-500 shrink-0" />
-      <span className="text-xs font-semibold uppercase tracking-wider text-ink-500 mr-1">Period:</span>
-      <select
-        value={month}
-        onChange={(e) => handleChange(Number(e.target.value), year)}
-        className="text-xs font-semibold text-ink-900 bg-transparent border-0 focus:ring-0 cursor-pointer py-1 pr-6"
-        aria-label="GST Filing Month"
-      >
-        {months.map((m) => (
-          <option key={m.value} value={m.value}>
-            {m.label}
-          </option>
-        ))}
-      </select>
-      <select
-        value={year}
-        onChange={(e) => handleChange(month, Number(e.target.value))}
-        className="text-xs font-semibold text-ink-900 bg-transparent border-0 focus:ring-0 cursor-pointer py-1 pr-6"
-        aria-label="GST Filing Year"
-      >
-        {years.map((y) => (
-          <option key={y} value={y}>
-            {y}
-          </option>
-        ))}
-      </select>
+    <div className="flex flex-wrap items-center gap-2">
+      <div className="flex items-center gap-2 bg-white/80 backdrop-blur-md px-3 py-1.5 rounded-lg border border-ink-200/60 shadow-xs">
+        <Calendar className="h-4 w-4 text-ink-500 shrink-0" />
+        <span className="text-xs font-semibold uppercase tracking-wider text-ink-500 mr-1">Period:</span>
+        <select
+          value={month}
+          onChange={(e) => handleChange(Number(e.target.value), year)}
+          className="text-xs font-semibold text-ink-900 bg-transparent border-0 focus:ring-0 cursor-pointer py-1 pr-6"
+          aria-label="GST Filing Month"
+        >
+          {months.map((m) => (
+            <option key={m.value} value={m.value}>
+              {m.label}
+            </option>
+          ))}
+        </select>
+        <select
+          value={year}
+          onChange={(e) => handleChange(month, Number(e.target.value))}
+          className="text-xs font-semibold text-ink-900 bg-transparent border-0 focus:ring-0 cursor-pointer py-1 pr-6"
+          aria-label="GST Filing Year"
+        >
+          {years.map((y) => (
+            <option key={y} value={y}>
+              {y}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      {availableGstins && availableGstins.length > 0 && (
+        <div className="flex items-center gap-2 bg-white/80 backdrop-blur-md px-3 py-1.5 rounded-lg border border-ink-200/60 shadow-xs">
+          <Building2 className="h-4 w-4 text-ink-500 shrink-0" />
+          <span className="text-xs font-semibold uppercase tracking-wider text-ink-500 mr-1">GSTIN:</span>
+          <select
+            value={selectedGstin || ""}
+            onChange={(e) => handleGstinChange(e.target.value)}
+            className="text-xs font-semibold text-ink-900 bg-transparent border-0 focus:ring-0 cursor-pointer py-1 pr-6"
+            aria-label="GSTIN Filter"
+          >
+            <option value="">All GSTINs (Consolidated)</option>
+            {availableGstins.map((g) => (
+              <option key={g.gstin} value={g.gstin}>
+                {g.label}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
     </div>
   );
 }
