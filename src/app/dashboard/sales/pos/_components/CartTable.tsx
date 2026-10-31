@@ -40,11 +40,13 @@ export function CartTable({
     skippedBatches: SearchResultBatch[];
   } | null>(null);
 
+  const todayStr = new Date().toISOString().slice(0, 10);
+
   const handleBatchSelect = (line: PosCartLine, newBatchId: string) => {
     if (newBatchId === line.batchId) return;
     const chosen = line.availableBatches?.find((b) => b.id === newBatchId);
     if (!chosen) return;
-    const overrideCheck = isFefoOverride(chosen, line.availableBatches ?? []);
+    const overrideCheck = isFefoOverride(chosen, line.availableBatches ?? [], todayStr);
     if (overrideCheck.isOverride) {
       setPendingOverride({ line, targetBatch: chosen, skippedBatches: overrideCheck.skippedBatches });
     } else {
@@ -112,7 +114,7 @@ export function CartTable({
                     gstRateBp: line.gstRateBp,
                   });
                   const fefoPreview = line.autoFefo && line.availableBatches && line.availableBatches.length > 0
-                    ? computeFefoPreview(line.availableBatches, lineCalc.baseQty)
+                    ? computeFefoPreview(line.availableBatches, lineCalc.baseQty, todayStr)
                     : null;
                   const availableStock = line.autoFefo
                     ? (fefoPreview?.totalAvailable ?? line.totalAvailableStock ?? line.qtyOnHand)

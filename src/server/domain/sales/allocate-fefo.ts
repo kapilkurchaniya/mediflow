@@ -1,4 +1,4 @@
-import { and, asc, eq, gt, lt } from "drizzle-orm";
+import { and, asc, eq, gt, lt, or } from "drizzle-orm";
 import * as schema from "@/server/db/schema";
 import type { DbOrTx } from "@/server/db";
 import { DomainError } from "@/server/errors";
@@ -62,25 +62,31 @@ export async function allocateFefoBatches(
         .select({
           batch: schema.batches,
           medicine: schema.medicines,
-          manufacturer: schema.manufacturers.name,
         })
         .from(schema.batches)
         .innerJoin(schema.medicines, eq(schema.batches.medicineId, schema.medicines.id))
-        .leftJoin(schema.manufacturers, eq(schema.medicines.manufacturerId, schema.manufacturers.id))
         .where(
           and(
             eq(schema.batches.id, line.batchId),
             eq(schema.batches.tenantId, ctx.tenantId),
             eq(schema.batches.storeId, ctx.storeId),
           ),
-        );
+        )
+        .for("update");
 
       if (!batchRecord) {
         throw new DomainError("BATCH_NOT_FOUND", `Batch ${line.batchId} not found`);
       }
       explicitBatch = batchRecord.batch;
       medicine = batchRecord.medicine;
-      manufacturerName = batchRecord.manufacturer ?? null;
+
+      if (medicine.manufacturerId) {
+        const [mfg] = await tx
+          .select({ name: schema.manufacturers.name })
+          .from(schema.manufacturers)
+          .where(eq(schema.manufacturers.id, medicine.manufacturerId));
+        manufacturerName = mfg?.name ?? null;
+      }
     } else if (line.medicineId) {
       const [medRecord] = await tx
         .select({
@@ -147,6 +153,7 @@ export async function allocateFefoBatches(
       }
 
       // Check if an earlier valid batch with stock was skipped (FEFO Override audit)
+      // Evaluates complete deterministic tuple: (expiryDate, createdAt, id) under transactional row locks
       const earlierBatches = await tx
         .select({
           id: schema.batches.id,
@@ -163,10 +170,22 @@ export async function allocateFefoBatches(
             eq(schema.batches.status, "active"),
             gt(schema.batches.qtyOnHand, 0),
             gt(schema.batches.expiryDate, options.todayStr),
-            lt(schema.batches.expiryDate, explicitBatch.expiryDate),
+            or(
+              lt(schema.batches.expiryDate, explicitBatch.expiryDate),
+              and(
+                eq(schema.batches.expiryDate, explicitBatch.expiryDate),
+                lt(schema.batches.createdAt, explicitBatch.createdAt),
+              ),
+              and(
+                eq(schema.batches.expiryDate, explicitBatch.expiryDate),
+                eq(schema.batches.createdAt, explicitBatch.createdAt),
+                lt(schema.batches.id, explicitBatch.id),
+              ),
+            ),
           ),
         )
-        .orderBy(asc(schema.batches.expiryDate), asc(schema.batches.createdAt), asc(schema.batches.id));
+        .orderBy(asc(schema.batches.expiryDate), asc(schema.batches.createdAt), asc(schema.batches.id))
+        .for("update");
 
       const isOverride = earlierBatches.length > 0;
       allocatedStockMap.set(explicitBatch.id, previouslyAllocated + baseQty);

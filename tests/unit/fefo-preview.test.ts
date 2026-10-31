@@ -1,7 +1,30 @@
 import { describe, it, expect } from "vitest";
-import { computeFefoPreview, isFefoOverride, FEFO_OVERRIDE_REASONS } from "@/lib/fefo";
+import { computeFefoPreview, isFefoOverride, isFefoEarlier, FEFO_OVERRIDE_REASONS } from "@/lib/fefo";
 
 describe("FEFO Utilities", () => {
+  describe("isFefoEarlier", () => {
+    it("orders by expiryDate when expiry dates differ", () => {
+      const a = { id: "z", expiryDate: "2026-06-01" };
+      const b = { id: "a", expiryDate: "2026-12-01" };
+      expect(isFefoEarlier(a, b)).toBe(true);
+      expect(isFefoEarlier(b, a)).toBe(false);
+    });
+
+    it("orders by createdAt when expiry dates are identical", () => {
+      const a = { id: "z", expiryDate: "2027-01-01", createdAt: "2026-01-01T00:00:00.000Z" };
+      const b = { id: "a", expiryDate: "2027-01-01", createdAt: "2026-02-01T00:00:00.000Z" };
+      expect(isFefoEarlier(a, b)).toBe(true);
+      expect(isFefoEarlier(b, a)).toBe(false);
+    });
+
+    it("orders by id when both expiryDate and createdAt are identical", () => {
+      const a = { id: "BATCH-A", expiryDate: "2027-01-01", createdAt: "2026-01-01T00:00:00.000Z" };
+      const b = { id: "BATCH-B", expiryDate: "2027-01-01", createdAt: "2026-01-01T00:00:00.000Z" };
+      expect(isFefoEarlier(a, b)).toBe(true);
+      expect(isFefoEarlier(b, a)).toBe(false);
+    });
+  });
+
   describe("computeFefoPreview", () => {
     it("allocates entirely from single earliest batch when stock is sufficient", () => {
       const batches = [
@@ -73,6 +96,20 @@ describe("FEFO Utilities", () => {
       const res = computeFefoPreview(batches, 5, "2026-01-01");
       expect(res.slices[0].batchId).toBe("b1");
     });
+
+    it("handles zero, negative, or invalid requested quantities gracefully", () => {
+      const batches = [
+        { id: "b1", batchNo: "BATCH-1", expiryDate: "2026-12-01", qtyOnHand: 10 },
+      ];
+
+      const zeroRes = computeFefoPreview(batches, 0, "2026-01-01");
+      expect(zeroRes.slices).toHaveLength(0);
+      expect(zeroRes.hasShortage).toBe(false);
+
+      const negRes = computeFefoPreview(batches, -5, "2026-01-01");
+      expect(negRes.slices).toHaveLength(0);
+      expect(negRes.hasShortage).toBe(false);
+    });
   });
 
   describe("isFefoOverride", () => {
@@ -114,6 +151,24 @@ describe("FEFO Utilities", () => {
       const res = isFefoOverride(batchesWithExpired[1], batchesWithExpired, "2026-01-01");
       expect(res.isOverride).toBe(false);
       expect(res.skippedBatches).toHaveLength(0);
+    });
+
+    it("detects override between batches with identical expiry date using createdAt", () => {
+      const sameExpiryBatches = [
+        { id: "b-earlier", batchNo: "SAME-1", expiryDate: "2027-01-01", qtyOnHand: 10, status: "active", createdAt: "2026-01-01T00:00:00Z" },
+        { id: "b-later", batchNo: "SAME-2", expiryDate: "2027-01-01", qtyOnHand: 10, status: "active", createdAt: "2026-02-01T00:00:00Z" },
+      ];
+
+      // Selecting b-later skips b-earlier
+      const laterRes = isFefoOverride(sameExpiryBatches[1], sameExpiryBatches, "2026-01-01");
+      expect(laterRes.isOverride).toBe(true);
+      expect(laterRes.skippedBatches).toHaveLength(1);
+      expect(laterRes.skippedBatches[0].id).toBe("b-earlier");
+
+      // Selecting b-earlier does NOT skip any batch
+      const earlierRes = isFefoOverride(sameExpiryBatches[0], sameExpiryBatches, "2026-01-01");
+      expect(earlierRes.isOverride).toBe(false);
+      expect(earlierRes.skippedBatches).toHaveLength(0);
     });
   });
 

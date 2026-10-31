@@ -999,7 +999,7 @@ describe("createSale: split tender, change and credit (A2.2)", () => {
 
         const sameExpiry = new Date(Date.now() + 100 * 86400000).toISOString().slice(0, 10);
 
-        // Created earlier
+        // Created earlier (explicit 60s offset to guarantee distinct timestamp)
         const batchFirst = await makeBatch(t.db, {
           tenantId: tenant.id,
           storeId: store.id,
@@ -1007,6 +1007,7 @@ describe("createSale: split tender, change and credit (A2.2)", () => {
           batchNo: "DOLO-1ST",
           expiryDate: sameExpiry,
           qtyOnHand: 5,
+          createdAt: new Date(Date.now() - 60000),
         });
 
         // Created later
@@ -1017,6 +1018,7 @@ describe("createSale: split tender, change and credit (A2.2)", () => {
           batchNo: "DOLO-2ND",
           expiryDate: sameExpiry,
           qtyOnHand: 10,
+          createdAt: new Date(),
         });
 
         const w = { tenant, store, user, medicine };
@@ -1043,6 +1045,74 @@ describe("createSale: split tender, change and credit (A2.2)", () => {
 
         const [b2] = await t.db.select().from(schema.batches).where(eq(schema.batches.id, batchSecond.id));
         expect(b2.qtyOnHand).toBe(10);
+      });
+
+      it("logs a fefo_override audit entry when selecting a later-created batch having identical expiry date", async () => {
+        const tenant = await makeTenant(t.db);
+        const store = await makeStore(t.db, tenant.id);
+        const user = await makeUser(t.db);
+        const maker = (await t.db.insert(schema.manufacturers).values({ tenantId: tenant.id, name: "Alkem" }).returning())[0];
+        const medicine = await makeMedicine(t.db, tenant.id, {
+          name: "Pan 40",
+          unitsPerPack: 10,
+          manufacturerId: maker.id,
+        });
+
+        const sameExpiry = new Date(Date.now() + 120 * 86400000).toISOString().slice(0, 10);
+
+        const firstBatch = await makeBatch(t.db, {
+          tenantId: tenant.id,
+          storeId: store.id,
+          medicineId: medicine.id,
+          batchNo: "PAN-SAME-1",
+          expiryDate: sameExpiry,
+          qtyOnHand: 10,
+          createdAt: new Date(Date.now() - 60000),
+        });
+
+        const secondBatch = await makeBatch(t.db, {
+          tenantId: tenant.id,
+          storeId: store.id,
+          medicineId: medicine.id,
+          batchNo: "PAN-SAME-2",
+          expiryDate: sameExpiry,
+          qtyOnHand: 10,
+          createdAt: new Date(),
+        });
+
+        const w = { tenant, store, user, medicine };
+
+        // Explicitly select secondBatch, skipping firstBatch which has the same expiry but was created earlier
+        const res = await t.db.transaction((tx) =>
+          createSale(
+            tx,
+            ctxFor(w),
+            SaleInput.parse({
+              lines: [{ batchId: secondBatch.id, qty: 2, discountBp: 0, overrideReason: "Customer picked specific box from shelf" }],
+              payments: [{ method: "cash", amount: 20000 }],
+            }),
+            { source: "pos" },
+          ),
+        );
+
+        expect(res.saleId).toBeTruthy();
+
+        // Verify fefo_override audit log is recorded
+        const auditRows = await t.db
+          .select()
+          .from(schema.auditLogs)
+          .where(
+            and(
+              eq(schema.auditLogs.entityId, res.saleId),
+              eq(schema.auditLogs.action, "fefo_override"),
+            ),
+          );
+
+        expect(auditRows).toHaveLength(1);
+        const details = auditRows[0].newValue as Record<string, unknown>;
+        expect(details.selectedBatchNo).toBe("PAN-SAME-2");
+        expect(Array.isArray(details.skippedBatches)).toBe(true);
+        expect((details.skippedBatches as Array<{ batchNo: string }>)[0].batchNo).toBe("PAN-SAME-1");
       });
     });
   });

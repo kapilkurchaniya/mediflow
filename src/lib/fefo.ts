@@ -13,13 +13,16 @@ export const FEFO_OVERRIDE_REASONS = [
 
 export type FefoOverrideReasonCode = (typeof FEFO_OVERRIDE_REASONS)[number]["code"];
 
-export interface FefoBatchCandidate {
+export interface FefoComparableBatch {
   id: string;
-  batchNo: string;
   expiryDate: string;
+  createdAt?: string | Date | null;
+}
+
+export interface FefoBatchCandidate extends FefoComparableBatch {
+  batchNo: string;
   qtyOnHand: number;
   status?: string;
-  createdAt?: string | Date;
 }
 
 export interface FefoSlice {
@@ -38,19 +41,39 @@ export interface FefoPreviewResult {
 }
 
 /**
- * Checks whether selecting a specific batch skips earlier-expiring active batches that have stock.
+ * Deterministic FEFO comparator implementing the contract:
+ * expiryDate ASC -> createdAt ASC -> id ASC
  */
-export function isFefoOverride<T extends { id: string; expiryDate: string; qtyOnHand: number; status?: string }>(
-  chosenBatch: { id: string; expiryDate: string },
+export function isFefoEarlier(a: FefoComparableBatch, b: FefoComparableBatch): boolean {
+  if (a.expiryDate !== b.expiryDate) {
+    return a.expiryDate < b.expiryDate;
+  }
+  const aTime = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+  const bTime = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+  const safeATime = Number.isNaN(aTime) ? 0 : aTime;
+  const safeBTime = Number.isNaN(bTime) ? 0 : bTime;
+  if (safeATime !== safeBTime) {
+    return safeATime < safeBTime;
+  }
+  return a.id.localeCompare(b.id) < 0;
+}
+
+/**
+ * Checks whether selecting a specific batch skips earlier-expiring active batches that have stock.
+ * Evaluates the full deterministic FEFO tuple: expiryDate ASC -> createdAt ASC -> id ASC.
+ */
+export function isFefoOverride<T extends { id: string; expiryDate: string; qtyOnHand: number; status?: string; createdAt?: string | Date | null }>(
+  chosenBatch: { id: string; expiryDate: string; createdAt?: string | Date | null },
   availableBatches: T[],
-  todayStr?: string
+  todayStr: string
 ): { isOverride: boolean; skippedBatches: T[] } {
   const skippedBatches = availableBatches.filter((b) => {
     if (b.id === chosenBatch.id) return false;
-    if (b.qtyOnHand <= 0) return false;
+    const qty = typeof b.qtyOnHand === "number" && !Number.isNaN(b.qtyOnHand) ? b.qtyOnHand : 0;
+    if (qty <= 0) return false;
     if (b.status && b.status !== "active") return false;
-    if (todayStr && b.expiryDate <= todayStr) return false;
-    return b.expiryDate < chosenBatch.expiryDate;
+    if (b.expiryDate <= todayStr) return false;
+    return isFefoEarlier(b, chosenBatch);
   });
 
   return {
@@ -65,36 +88,43 @@ export function isFefoOverride<T extends { id: string; expiryDate: string; qtyOn
 export function computeFefoPreview(
   batches: FefoBatchCandidate[],
   requestedQty: number,
-  todayStr?: string
+  todayStr: string
 ): FefoPreviewResult {
+  const safeReqQty = Math.max(0, Math.floor(Number(requestedQty) || 0));
+
   const eligible = batches
     .filter((b) => {
-      if (b.qtyOnHand <= 0) return false;
+      const qty = typeof b.qtyOnHand === "number" && !Number.isNaN(b.qtyOnHand) ? b.qtyOnHand : 0;
+      if (qty <= 0) return false;
       if (b.status && b.status !== "active") return false;
-      if (todayStr && b.expiryDate <= todayStr) return false;
+      if (b.expiryDate <= todayStr) return false;
       return true;
     })
     .sort((a, b) => {
       if (a.expiryDate !== b.expiryDate) {
         return a.expiryDate.localeCompare(b.expiryDate);
       }
-      const aCreated = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-      const bCreated = b.createdAt ? new Date(b.createdAt).getTime() : 0;
-      if (aCreated !== bCreated) {
-        return aCreated - bCreated;
+      const aTime = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+      const bTime = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+      const safeATime = Number.isNaN(aTime) ? 0 : aTime;
+      const safeBTime = Number.isNaN(bTime) ? 0 : bTime;
+      if (safeATime !== safeBTime) {
+        return safeATime - safeBTime;
       }
       return a.id.localeCompare(b.id);
     });
 
-  const totalAvailable = eligible.reduce((sum, b) => sum + b.qtyOnHand, 0);
-  const hasShortage = totalAvailable < requestedQty;
+  const totalAvailable = eligible.reduce((sum, b) => sum + Math.max(0, b.qtyOnHand || 0), 0);
+  const hasShortage = totalAvailable < safeReqQty;
 
   const slices: FefoSlice[] = [];
-  let remaining = requestedQty;
+  let remaining = safeReqQty;
 
   for (const b of eligible) {
     if (remaining <= 0) break;
-    const take = Math.min(remaining, b.qtyOnHand);
+    const avail = Math.max(0, b.qtyOnHand || 0);
+    const take = Math.min(remaining, avail);
+    if (take <= 0) continue;
     slices.push({
       batchId: b.id,
       batchNo: b.batchNo,
