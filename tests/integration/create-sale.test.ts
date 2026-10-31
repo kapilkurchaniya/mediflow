@@ -999,7 +999,7 @@ describe("createSale: split tender, change and credit (A2.2)", () => {
 
         const sameExpiry = new Date(Date.now() + 100 * 86400000).toISOString().slice(0, 10);
 
-        // Created earlier
+        // Created earlier (explicit 60s offset to guarantee distinct timestamp)
         const batchFirst = await makeBatch(t.db, {
           tenantId: tenant.id,
           storeId: store.id,
@@ -1007,6 +1007,7 @@ describe("createSale: split tender, change and credit (A2.2)", () => {
           batchNo: "DOLO-1ST",
           expiryDate: sameExpiry,
           qtyOnHand: 5,
+          createdAt: new Date(Date.now() - 60000),
         });
 
         // Created later
@@ -1017,6 +1018,7 @@ describe("createSale: split tender, change and credit (A2.2)", () => {
           batchNo: "DOLO-2ND",
           expiryDate: sameExpiry,
           qtyOnHand: 10,
+          createdAt: new Date(),
         });
 
         const w = { tenant, store, user, medicine };
@@ -1065,6 +1067,7 @@ describe("createSale: split tender, change and credit (A2.2)", () => {
           batchNo: "PAN-SAME-1",
           expiryDate: sameExpiry,
           qtyOnHand: 10,
+          createdAt: new Date(Date.now() - 60000),
         });
 
         const secondBatch = await makeBatch(t.db, {
@@ -1074,6 +1077,7 @@ describe("createSale: split tender, change and credit (A2.2)", () => {
           batchNo: "PAN-SAME-2",
           expiryDate: sameExpiry,
           qtyOnHand: 10,
+          createdAt: new Date(),
         });
 
         const w = { tenant, store, user, medicine };
