@@ -23,7 +23,7 @@ export default async function SaleDetailPage({
 
   if (!data) return notFound();
 
-  const { sale, items, customer, store, returns = [] } = data;
+  const { sale, items, customer, store, returns = [], payments = [] } = data;
   const isCancelled = sale.status === "cancelled";
   const isPaid = !sale.creditAmount || sale.creditAmount <= 0;
   const isPartial = !isPaid && (sale.paidAmount ?? 0) > 0;
@@ -164,6 +164,18 @@ export default async function SaleDetailPage({
               </span>
             ) : null}
           </div>
+          {payments.length > 0 && (
+            <div className="pt-2 border-t border-ink-150 flex flex-wrap gap-1.5 text-xs" data-testid="split-payments">
+              {payments.map((p) => (
+                <span
+                  key={p.id}
+                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-ink-100 text-ink-700 font-mono text-[11px]"
+                >
+                  <span className="uppercase font-bold">{p.method}:</span> {formatINR(p.amount ?? 0)}
+                </span>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 

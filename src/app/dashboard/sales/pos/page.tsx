@@ -116,6 +116,10 @@ export default function POSPage() {
 
   usePosShortcuts({
     onFocusSearch: () => searchInputRef.current?.focus(),
+    onResetSale: () => {
+      dispatch({ type: "RESET_SALE" });
+      searchInputRef.current?.focus();
+    },
     onOpenSubstitutes: () => {
       const itemWithGen = state.cart.find((c) => c.genericName);
       if (itemWithGen?.genericName) setSubstituteGeneric(itemWithGen.genericName);
@@ -147,7 +151,7 @@ export default function POSPage() {
             <button type="button" onClick={() => dispatch({ type: "SET_SOUND_ENABLED", payload: !state.soundEnabled })} className="btn btn-secondary btn-icon" title="Toggle audio">{state.soundEnabled ? <Volume2 className="h-4 w-4 text-brand-600" /> : <VolumeX className="h-4 w-4 text-ink-400" />}</button>
             <button type="button" onClick={() => setIsParkOpen(true)} disabled={state.cart.length === 0} className="btn btn-secondary text-xs" title="Park current bill (F6)"><BookmarkCheck className="h-3.5 w-3.5 mr-1 text-amber-600" /> Hold (F6)</button>
             <button type="button" onClick={() => setIsHeldListOpen(true)} className="btn btn-secondary text-xs relative" title="View parked bills (F7)"><Layers className="h-3.5 w-3.5 mr-1 text-brand-600" /> Parked ({heldCount}) [F7]</button>
-            <button type="button" onClick={() => { if (confirm("Reset bill?")) { dispatch({ type: "RESET_SALE" }); searchInputRef.current?.focus(); } }} className="btn btn-secondary text-xs"><RotateCcw className="h-3.5 w-3.5 mr-1" /> Clear</button>
+            <button type="button" onClick={() => { dispatch({ type: "RESET_SALE" }); searchInputRef.current?.focus(); }} className="btn btn-secondary text-xs" title="New bill (F2)"><RotateCcw className="h-3.5 w-3.5 mr-1" /> Clear (F2)</button>
             <Link href="/dashboard/sales/register" className={`btn btn-secondary text-xs flex items-center gap-1.5 ${activeShift ? "text-emerald-700 bg-emerald-50" : requireShift ? "text-amber-800 bg-amber-50 font-bold" : "text-ink-600"}`}>{activeShift ? <><span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" /> Register Open</> : <><Lock className="h-3.5 w-3.5 text-amber-600" /> Register Closed</>}</Link>
           </div>
         </div>

@@ -390,7 +390,11 @@ export async function getSaleById(id: string) {
     .from(schema.saleReturns)
     .where(eq(schema.saleReturns.saleId, id))
     .orderBy(desc(schema.saleReturns.createdAt));
-  return { sale, items, customer, store, tenant, gstDoc: gstDoc || null, returns };
+  const payments = await db
+    .select()
+    .from(schema.salePayments)
+    .where(eq(schema.salePayments.saleId, id));
+  return { sale, items, customer, store, tenant, gstDoc: gstDoc || null, returns, payments };
 }
 
 export async function createSaleReturnAction(input: ReturnSaleInput) {

@@ -4,6 +4,7 @@ import { useEffect } from "react";
 
 export interface ShortcutHandlers {
   onFocusSearch?: () => void;
+  onResetSale?: () => void;
   onOpenSubstitutes?: () => void;
   onOpenRegister?: () => void;
   onHoldBill?: () => void;
@@ -17,15 +18,28 @@ export interface ShortcutHandlers {
 export function usePosShortcuts(handlers: ShortcutHandlers) {
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
-      // Function keys F2-F10 are reserved for counter operations
+      // Function keys F2-F10 and / are reserved for counter operations
       switch (e.key) {
         case "F2":
           e.preventDefault();
-          handlers.onFocusSearch?.();
+          if (handlers.onResetSale) {
+            handlers.onResetSale();
+          } else {
+            handlers.onFocusSearch?.();
+          }
           break;
         case "F3":
           e.preventDefault();
-          handlers.onOpenSubstitutes?.();
+          handlers.onFocusSearch?.();
+          break;
+        case "/":
+          if (
+            document.activeElement?.tagName !== "INPUT" &&
+            document.activeElement?.tagName !== "TEXTAREA"
+          ) {
+            e.preventDefault();
+            handlers.onFocusSearch?.();
+          }
           break;
         case "F4":
           e.preventDefault();

@@ -94,7 +94,7 @@ export function PaymentPanel({
         {/* Bill Total Banner */}
         <div className="bg-ink-50 rounded-xl p-3 flex items-center justify-between">
           <span className="text-xs font-semibold text-ink-600">Net Payable Amount</span>
-          <span className="text-xl font-bold font-mono text-ink-900">{formatINR(totalPaise)}</span>
+          <span className="text-xl font-bold font-mono text-ink-900" data-testid="net-payable-amount">{formatINR(totalPaise)}</span>
         </div>
 
         {/* Loyalty Points Redemption (Task A2.7) */}
@@ -155,6 +155,7 @@ export function PaymentPanel({
               type="number"
               step="any"
               min="0"
+              aria-label="Cash tender amount"
               value={splitPayments.cash}
               onChange={(e) => onUpdateSplit({ cash: e.target.value })}
               placeholder="0.00"
@@ -181,6 +182,7 @@ export function PaymentPanel({
               type="number"
               step="any"
               min="0"
+              aria-label="UPI tender amount"
               value={splitPayments.upi}
               onChange={(e) => onUpdateSplit({ upi: e.target.value })}
               placeholder="0.00"
@@ -206,6 +208,7 @@ export function PaymentPanel({
               type="number"
               step="any"
               min="0"
+              aria-label="Card tender amount"
               value={splitPayments.card}
               onChange={(e) => onUpdateSplit({ card: e.target.value })}
               placeholder="0.00"
