@@ -83,6 +83,9 @@ jobs:
       DATABASE_URL: postgres://mediflow@localhost:5432/mediflow_test
       NEXT_TELEMETRY_DISABLED: "1"
       CI: "1"
+      APP_ENCRYPTION_KEY: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
+      CRON_SECRET: "ci-test-cron-secret"
+      SKIP_ENV_VALIDATION: "1"
     steps:
       - uses: actions/checkout@v4
 

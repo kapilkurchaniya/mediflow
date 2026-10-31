@@ -39,6 +39,11 @@ export default defineConfig({
     timeout: 180 * 1000,
     env: {
       PORT,
+      APP_ENCRYPTION_KEY:
+        process.env.APP_ENCRYPTION_KEY ||
+        "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+      CRON_SECRET: process.env.CRON_SECRET || "ci-test-cron-secret",
+      SKIP_ENV_VALIDATION: "1",
     },
   },
 });
