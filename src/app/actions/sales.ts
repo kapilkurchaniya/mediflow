@@ -1,7 +1,7 @@
 "use server";
 
 import { db, schema } from "@/server/db";
-import { eq, and, desc, gt, gte, lte, ilike, or, sql, inArray, ne } from "drizzle-orm";
+import { eq, and, asc, desc, gt, gte, lte, ilike, or, sql, inArray, ne } from "drizzle-orm";
 import { checkPermission, requirePermission } from "@/server/rbac";
 import { revalidatePath } from "next/cache";
 import { format } from "date-fns";
@@ -97,7 +97,7 @@ export async function searchPosItems(query: string) {
         inArray(schema.batches.medicineId, medicineIds)
       )
     )
-    .orderBy(schema.batches.expiryDate);
+    .orderBy(asc(schema.batches.expiryDate), asc(schema.batches.createdAt), asc(schema.batches.id));
 
   // Group batches by medicine
   const results = medicines.map(({ medicine, rackCode, rackName }) => {
@@ -152,7 +152,7 @@ export async function findSubstitutes(genericName: string, excludeMedicineId?: s
         inArray(schema.batches.medicineId, medicineIds)
       )
     )
-    .orderBy(schema.batches.expiryDate);
+    .orderBy(asc(schema.batches.expiryDate), asc(schema.batches.createdAt), asc(schema.batches.id));
 
   return medicines
     .map((med) => {

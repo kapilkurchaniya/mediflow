@@ -122,6 +122,7 @@ export function posCartReducer(state: PosState, action: PosAction): PosState {
 
     case "UPDATE_LINE_BATCH": {
       const { oldBatchId, newBatch, reason } = action.payload;
+      const isOverride = Boolean(reason);
       const nextCart = state.cart.map((line) => {
         if (line.batchId !== oldBatchId) return line;
         return {
@@ -132,9 +133,9 @@ export function posCartReducer(state: PosState, action: PosAction): PosState {
           mrp: newBatch.mrp,
           saleRate: newBatch.saleRate ?? newBatch.mrp,
           qtyOnHand: newBatch.qtyOnHand,
-          autoFefo: false,
-          overrideBatch: true,
-          overrideReason: reason || "Manual selection at POS counter",
+          autoFefo: !isOverride,
+          overrideBatch: isOverride,
+          overrideReason: reason,
         };
       });
       return { ...state, cart: nextCart };

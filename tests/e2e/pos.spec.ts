@@ -6,7 +6,7 @@ import * as schema from "../../src/server/db/schema";
 
 const testDbUrl =
   process.env.DATABASE_URL ||
-  "postgres://mediflow@localhost:5432/mediflow_test";
+  "postgres://mediflow:mediflow@localhost:5433/mediflow_test";
 const pool = new Pool({ connectionString: testDbUrl });
 const db = drizzle(pool, { schema });
 
@@ -217,6 +217,7 @@ test.describe("POS Counter E2E Smoke & Hardening Tests", () => {
     });
 
     // 1. Verify F8 opens modal & Escape dismisses modal
+    await searchInput.focus();
     await page.keyboard.press("F8");
     await expect(modalHeading).toBeVisible({ timeout: 5000 });
 
