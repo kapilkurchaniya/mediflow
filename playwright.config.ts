@@ -39,6 +39,9 @@ export default defineConfig({
     timeout: 180 * 1000,
     env: {
       PORT,
+      DATABASE_URL:
+        process.env.DATABASE_URL ||
+        "postgres://mediflow:mediflow@localhost:5433/mediflow_test",
       ALLOW_E2E_DB_RESET: "1",
       APP_ENCRYPTION_KEY:
         process.env.APP_ENCRYPTION_KEY ||

@@ -925,6 +925,125 @@ describe("createSale: split tender, change and credit (A2.2)", () => {
         expect(Array.isArray(details.skippedBatches)).toBe(true);
         expect((details.skippedBatches as Array<{ batchNo: string }>)[0].batchNo).toBe("LOS-NEAR");
       });
+
+      it("does NOT log an override audit entry when explicitly selecting the earliest batch", async () => {
+        const tenant = await makeTenant(t.db);
+        const store = await makeStore(t.db, tenant.id);
+        const user = await makeUser(t.db);
+        const maker = (await t.db.insert(schema.manufacturers).values({ tenantId: tenant.id, name: "Cipla" }).returning())[0];
+        const medicine = await makeMedicine(t.db, tenant.id, {
+          name: "Telma 40",
+          unitsPerPack: 10,
+          manufacturerId: maker.id,
+        });
+
+        const nearBatch = await makeBatch(t.db, {
+          tenantId: tenant.id,
+          storeId: store.id,
+          medicineId: medicine.id,
+          batchNo: "TEL-EARLY",
+          expiryDate: new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10),
+          qtyOnHand: 10,
+        });
+
+        await makeBatch(t.db, {
+          tenantId: tenant.id,
+          storeId: store.id,
+          medicineId: medicine.id,
+          batchNo: "TEL-LATER",
+          expiryDate: new Date(Date.now() + 180 * 86400000).toISOString().slice(0, 10),
+          qtyOnHand: 10,
+        });
+
+        const w = { tenant, store, user, medicine };
+
+        // Explicitly selecting the earliest batch
+        const res = await t.db.transaction((tx) =>
+          createSale(
+            tx,
+            ctxFor(w),
+            SaleInput.parse({
+              lines: [{ batchId: nearBatch.id, qty: 2, discountBp: 0 }],
+              payments: [{ method: "cash", amount: 20000 }],
+            }),
+            { source: "pos" },
+          ),
+        );
+
+        expect(res.saleId).toBeTruthy();
+
+        // Verify NO fefo_override audit log is recorded
+        const auditRows = await t.db
+          .select()
+          .from(schema.auditLogs)
+          .where(
+            and(
+              eq(schema.auditLogs.entityId, res.saleId),
+              eq(schema.auditLogs.action, "fefo_override"),
+            ),
+          );
+
+        expect(auditRows).toHaveLength(0);
+      });
+
+      it("deterministically tie-breaks batches having identical expiry dates using createdAt and id", async () => {
+        const tenant = await makeTenant(t.db);
+        const store = await makeStore(t.db, tenant.id);
+        const user = await makeUser(t.db);
+        const maker = (await t.db.insert(schema.manufacturers).values({ tenantId: tenant.id, name: "Sun" }).returning())[0];
+        const medicine = await makeMedicine(t.db, tenant.id, {
+          name: "Dolo 650",
+          unitsPerPack: 15,
+          manufacturerId: maker.id,
+        });
+
+        const sameExpiry = new Date(Date.now() + 100 * 86400000).toISOString().slice(0, 10);
+
+        // Created earlier
+        const batchFirst = await makeBatch(t.db, {
+          tenantId: tenant.id,
+          storeId: store.id,
+          medicineId: medicine.id,
+          batchNo: "DOLO-1ST",
+          expiryDate: sameExpiry,
+          qtyOnHand: 5,
+        });
+
+        // Created later
+        const batchSecond = await makeBatch(t.db, {
+          tenantId: tenant.id,
+          storeId: store.id,
+          medicineId: medicine.id,
+          batchNo: "DOLO-2ND",
+          expiryDate: sameExpiry,
+          qtyOnHand: 10,
+        });
+
+        const w = { tenant, store, user, medicine };
+
+        // Sell 3 units with auto-FEFO (should pick batchFirst)
+        const res = await t.db.transaction((tx) =>
+          createSale(
+            tx,
+            ctxFor(w),
+            SaleInput.parse({
+              lines: [{ medicineId: medicine.id, qty: 3, discountBp: 0 }],
+              payments: [{ method: "cash", amount: 15000 }],
+            }),
+            { source: "pos" },
+          ),
+        );
+
+        const items = await t.db.select().from(schema.saleItems).where(eq(schema.saleItems.saleId, res.saleId));
+        expect(items).toHaveLength(1);
+        expect(items[0].batchId).toBe(batchFirst.id);
+
+        const [b1] = await t.db.select().from(schema.batches).where(eq(schema.batches.id, batchFirst.id));
+        expect(b1.qtyOnHand).toBe(2);
+
+        const [b2] = await t.db.select().from(schema.batches).where(eq(schema.batches.id, batchSecond.id));
+        expect(b2.qtyOnHand).toBe(10);
+      });
     });
   });
 });

@@ -1,19 +1,17 @@
 "use client";
 
-import { ShoppingCart, Trash2, AlertTriangle, ShieldAlert, Sparkles, Tag } from "lucide-react";
+import { useState } from "react";
+import { ShoppingCart, Trash2, AlertTriangle, ShieldAlert, Sparkles, Tag, Zap } from "lucide-react";
 import { formatINR } from "@/lib/format";
 import { computeSaleLine } from "@/lib/money";
+import { computeFefoPreview, isFefoOverride } from "@/lib/fefo";
+import { FefoOverrideModal } from "./FefoOverrideModal";
 import type { PosCartLine } from "../_state/types";
 import type { SearchResultBatch } from "../_data/posData";
 
 interface CartTableProps {
   cart: PosCartLine[];
-  revalidationAlert?: {
-    hasIssues: boolean;
-    hasStockShortage: boolean;
-    hasExpiredBatches: boolean;
-    message: string;
-  } | null;
+  revalidationAlert?: { hasIssues: boolean; hasStockShortage: boolean; hasExpiredBatches: boolean; message: string } | null;
   rxWarning: boolean;
   controlledItems: PosCartLine[];
   onUpdatePackQty: (batchId: string, packQty: number) => void;
@@ -36,19 +34,33 @@ export function CartTable({
   onRemoveLine,
   onOpenSubstitutes,
 }: CartTableProps) {
+  const [pendingOverride, setPendingOverride] = useState<{
+    line: PosCartLine;
+    targetBatch: SearchResultBatch;
+    skippedBatches: SearchResultBatch[];
+  } | null>(null);
+
+  const handleBatchSelect = (line: PosCartLine, newBatchId: string) => {
+    if (newBatchId === line.batchId) return;
+    const chosen = line.availableBatches?.find((b) => b.id === newBatchId);
+    if (!chosen) return;
+    const overrideCheck = isFefoOverride(chosen, line.availableBatches ?? []);
+    if (overrideCheck.isOverride) {
+      setPendingOverride({ line, targetBatch: chosen, skippedBatches: overrideCheck.skippedBatches });
+    } else {
+      onUpdateBatch(line.batchId, chosen);
+    }
+  };
+
   return (
     <div className="flex-1 flex flex-col min-h-0 space-y-2">
-      {/* Revalidation Alert for Resumed Held Bills */}
       {revalidationAlert && (
         <div className="bg-amber-50 border border-amber-300 rounded-xl p-3 flex items-start gap-2.5 text-xs text-amber-900 shadow-xs">
           <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
-          <div className="flex-1">
-            <span className="font-bold">Parked Cart Revalidation Alert:</span> {revalidationAlert.message}
-          </div>
+          <div className="flex-1"><span className="font-bold">Parked Cart Revalidation Alert:</span> {revalidationAlert.message}</div>
         </div>
       )}
 
-      {/* Drug Warnings */}
       {(rxWarning || controlledItems.length > 0) && (
         <div className="flex gap-2 text-xs">
           {rxWarning && (
@@ -60,25 +72,18 @@ export function CartTable({
           {controlledItems.length > 0 && (
             <div className="flex-1 bg-rose-50/70 border border-rose-200 rounded-lg px-2.5 py-1.5 flex items-center gap-1.5 text-rose-800">
               <ShieldAlert className="h-3.5 w-3.5 text-rose-600 shrink-0" />
-              <span>
-                Schedule {controlledItems.map((i) => i.schedule).join(", ")} items present. Prescriber & patient details required.
-              </span>
+              <span>Schedule {controlledItems.map((i) => i.schedule).join(", ")} items present. Prescriber & patient details required.</span>
             </div>
           )}
         </div>
       )}
 
-      {/* Cart Items Table */}
       <div className="card flex-1 overflow-hidden flex flex-col shadow-xs">
         {cart.length === 0 ? (
           <div className="flex-1 flex flex-col items-center justify-center text-center p-8 text-ink-400">
-            <div className="w-14 h-14 rounded-2xl bg-ink-100 flex items-center justify-center mb-3">
-              <ShoppingCart className="h-7 w-7 text-ink-300" />
-            </div>
+            <div className="w-14 h-14 rounded-2xl bg-ink-100 flex items-center justify-center mb-3"><ShoppingCart className="h-7 w-7 text-ink-300" /></div>
             <p className="font-semibold text-ink-700 text-sm">Cart is empty</p>
-            <p className="text-xs text-ink-400 mt-1 max-w-xs">
-              Press <kbd className="px-1.5 py-0.5 rounded bg-ink-200 font-mono text-[11px] font-bold">F2</kbd> to search medicines or scan a product barcode.
-            </p>
+            <p className="text-xs text-ink-400 mt-1 max-w-xs">Press <kbd className="px-1.5 py-0.5 rounded bg-ink-200 font-mono text-[11px] font-bold">F2</kbd> to search medicines or scan a product barcode.</p>
           </div>
         ) : (
           <div className="flex-1 overflow-y-auto">
@@ -106,8 +111,13 @@ export function CartTable({
                     discountBp: line.discountBp,
                     gstRateBp: line.gstRateBp,
                   });
-                  const lineTotalPaise = lineCalc.total;
-                  const isStockShortage = line.qtyOnHand < lineCalc.baseQty;
+                  const fefoPreview = line.autoFefo && line.availableBatches && line.availableBatches.length > 0
+                    ? computeFefoPreview(line.availableBatches, lineCalc.baseQty)
+                    : null;
+                  const availableStock = line.autoFefo
+                    ? (fefoPreview?.totalAvailable ?? line.totalAvailableStock ?? line.qtyOnHand)
+                    : line.qtyOnHand;
+                  const isStockShortage = availableStock < lineCalc.baseQty;
 
                   return (
                     <tr key={line.batchId} className={isStockShortage ? "bg-rose-50/50" : undefined}>
@@ -115,56 +125,42 @@ export function CartTable({
                       <td>
                         <div className="flex items-center gap-1.5 flex-wrap">
                           <span className="font-semibold text-ink-900 text-sm">{line.medicineName}</span>
-                          {line.schedule && (
-                            <span className="badge badge-neutral !text-[10px] font-mono">
-                              Sched {line.schedule}
-                            </span>
-                          )}
-                          {line.schemeText && (
-                            <span className="badge badge-brand !text-[10px] flex items-center gap-0.5 font-mono">
-                              <Tag className="w-2.5 h-2.5 inline" /> {line.schemeText}
-                            </span>
-                          )}
+                          {line.schedule && <span className="badge badge-neutral !text-[10px] font-mono">Sched {line.schedule}</span>}
+                          {line.schemeText && <span className="badge badge-brand !text-[10px] flex items-center gap-0.5 font-mono"><Tag className="w-2.5 h-2.5 inline" /> {line.schemeText}</span>}
                         </div>
                         <div className="text-[11.5px] text-ink-500 font-mono flex items-center gap-2">
                           <span>{line.genericName || "—"}</span>
                           {line.genericName && (
-                            <button
-                              type="button"
-                              onClick={() => onOpenSubstitutes(line.genericName!)}
-                              className="text-brand-600 hover:text-brand-800 text-[11px] underline inline-flex items-center gap-0.5"
-                            >
+                            <button type="button" onClick={() => onOpenSubstitutes(line.genericName!)} className="text-brand-600 hover:text-brand-800 text-[11px] underline inline-flex items-center gap-0.5">
                               <Sparkles className="w-2.5 h-2.5" /> Alt
                             </button>
                           )}
                         </div>
+                        {fefoPreview?.isSplit && !isStockShortage && (
+                          <div className="inline-flex items-center gap-1 text-[10.5px] font-mono font-medium text-emerald-800 bg-emerald-50 border border-emerald-200 rounded px-1.5 py-0.5 mt-1 max-w-fit">
+                            <Zap className="w-2.5 h-2.5 text-emerald-600 shrink-0" />
+                            <span>Auto-FEFO: {fefoPreview.summaryText}</span>
+                          </div>
+                        )}
+                        {line.overrideBatch && line.overrideReason && (
+                          <div className="inline-flex items-center gap-1 text-[10px] font-mono text-amber-800 bg-amber-50 border border-amber-200 rounded px-1.5 py-0.5 mt-1 max-w-fit" title={line.overrideReason}>
+                            <span>Override: {line.overrideReason}</span>
+                          </div>
+                        )}
                       </td>
                       <td>
                         <div className="flex items-center gap-1">
                           {line.availableBatches && line.availableBatches.length > 1 ? (
-                            <select
-                              value={line.batchId}
-                              onChange={(e) => {
-                                const chosen = line.availableBatches?.find((b) => b.id === e.target.value);
-                                if (chosen) onUpdateBatch(line.batchId, chosen);
-                              }}
-                              className="select !py-0.5 !px-1.5 !text-[11px] !font-mono font-semibold"
-                            >
+                            <select value={line.batchId} onChange={(e) => handleBatchSelect(line, e.target.value)} className="select !py-0.5 !px-1.5 !text-[11px] !font-mono font-semibold">
                               {line.availableBatches.map((b) => (
-                                <option key={b.id} value={b.id}>
-                                  {b.batchNo} (Exp {b.expiryDate}, Stk: {b.qtyOnHand})
-                                </option>
+                                <option key={b.id} value={b.id}>{b.batchNo} (Exp {b.expiryDate}, Stk: {b.qtyOnHand})</option>
                               ))}
                             </select>
                           ) : (
-                            <span className="font-mono text-xs font-semibold text-ink-800">
-                              {line.batchNo}
-                            </span>
+                            <span className="font-mono text-xs font-semibold text-ink-800">{line.batchNo}</span>
                           )}
                         </div>
-                        <div className="text-[11px] text-ink-500 font-mono">
-                          Exp: {line.expiryDate} · Stk: {line.qtyOnHand}
-                        </div>
+                        <div className="text-[11px] text-ink-500 font-mono">Exp: {line.expiryDate} · Stk: {line.qtyOnHand}</div>
                       </td>
                       <td className="text-center">
                         <input
@@ -186,26 +182,18 @@ export function CartTable({
                               className="input !py-1 !px-2 text-center font-mono font-bold text-xs w-20"
                               placeholder="0"
                             />
-                            <span className="text-[9.5px] text-ink-400 font-mono mt-0.5">
-                              (1 {line.packUnit} = {line.unitsPerPack})
-                            </span>
+                            <span className="text-[9.5px] text-ink-400 font-mono mt-0.5">(1 {line.packUnit} = {line.unitsPerPack})</span>
                           </div>
                         ) : (
                           <span className="text-ink-300 text-xs">—</span>
                         )}
                       </td>
                       <td className="text-right">
-                        <span className="font-mono text-xs font-semibold text-ink-800">
-                          {formatINR(line.saleRate ?? line.mrp)}
-                        </span>
+                        <span className="font-mono text-xs font-semibold text-ink-800">{formatINR(line.saleRate ?? line.mrp)}</span>
                         {line.unitsPerPack > 1 && (
-                          <div className="text-[10px] text-brand-700 font-mono font-medium">
-                            {formatINR(Math.round((line.saleRate ?? line.mrp) / line.unitsPerPack))}/{line.looseUnit}
-                          </div>
+                          <div className="text-[10px] text-brand-700 font-mono font-medium">{formatINR(Math.round((line.saleRate ?? line.mrp) / line.unitsPerPack))}/{line.looseUnit}</div>
                         )}
-                        <div className="text-[10px] text-ink-400 font-mono">
-                          GST {line.gstRateBp / 100}%
-                        </div>
+                        <div className="text-[10px] text-ink-400 font-mono">GST {line.gstRateBp / 100}%</div>
                       </td>
                       <td className="text-center">
                         <input
@@ -222,17 +210,10 @@ export function CartTable({
                         />
                       </td>
                       <td className="text-right">
-                        <span className="font-mono font-bold text-xs text-ink-900">
-                          {formatINR(lineTotalPaise)}
-                        </span>
+                        <span className="font-mono font-bold text-xs text-ink-900">{formatINR(lineCalc.total)}</span>
                       </td>
                       <td className="text-center">
-                        <button
-                          type="button"
-                          onClick={() => onRemoveLine(line.batchId)}
-                          className="btn btn-ghost btn-icon !h-7 !w-7 text-ink-400 hover:text-rose-600"
-                          title="Remove item"
-                        >
+                        <button type="button" onClick={() => onRemoveLine(line.batchId)} className="btn btn-ghost btn-icon !h-7 !w-7 text-ink-400 hover:text-rose-600" title="Remove item">
                           <Trash2 className="h-3.5 w-3.5" />
                         </button>
                       </td>
@@ -244,6 +225,21 @@ export function CartTable({
           </div>
         )}
       </div>
+
+      {pendingOverride && (
+        <FefoOverrideModal
+          key={`${pendingOverride.line.batchId}-${pendingOverride.targetBatch.id}`}
+          isOpen={true}
+          medicineName={pendingOverride.line.medicineName}
+          targetBatch={pendingOverride.targetBatch}
+          skippedBatches={pendingOverride.skippedBatches}
+          onConfirm={(reason) => {
+            onUpdateBatch(pendingOverride.line.batchId, pendingOverride.targetBatch, reason);
+            setPendingOverride(null);
+          }}
+          onCancel={() => setPendingOverride(null)}
+        />
+      )}
     </div>
   );
 }

@@ -166,7 +166,7 @@ export async function allocateFefoBatches(
             lt(schema.batches.expiryDate, explicitBatch.expiryDate),
           ),
         )
-        .orderBy(asc(schema.batches.expiryDate));
+        .orderBy(asc(schema.batches.expiryDate), asc(schema.batches.createdAt), asc(schema.batches.id));
 
       const isOverride = earlierBatches.length > 0;
       allocatedStockMap.set(explicitBatch.id, previouslyAllocated + baseQty);
@@ -201,7 +201,7 @@ export async function allocateFefoBatches(
             gt(schema.batches.qtyOnHand, 0),
           ),
         )
-        .orderBy(asc(schema.batches.expiryDate), asc(schema.batches.createdAt))
+        .orderBy(asc(schema.batches.expiryDate), asc(schema.batches.createdAt), asc(schema.batches.id))
         .for("update");
 
       const totalAvailable = candidateBatches.reduce((acc, b) => {
