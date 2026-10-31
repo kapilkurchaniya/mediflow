@@ -309,11 +309,56 @@ describe("createSale: refusals change nothing", () => {
     expect(await s.stock()).toBe(10);
   });
 
-  it("loyalty point redemption is not available yet, and 'credit' is not a payment method", async () => {
+  it("loyalty point redemption requires a customer and valid points, and 'credit' is not a payment method", async () => {
     const s = await scene();
-    await expect(s.sell({ redeemPoints: 5 })).rejects.toThrow(/not available yet/);
+    await expect(s.sell({ redeemPoints: 5 })).rejects.toThrow(/Select a customer to redeem loyalty points/);
     await expect(s.sell({ payments: [{ method: "credit", amount: 10000 }] })).rejects.toThrow(/Leave the unpaid part empty/);
     expect(await s.sales()).toHaveLength(0);
+  });
+
+  it("redeems loyalty points at counter, applies discount, and logs loyalty transaction", async () => {
+    const s = await scene();
+    const customer = await makeCustomer(t.db, s.w.tenant.id, { phone: "9876543210" });
+    // Enable loyalty program for tenant
+    await t.db.insert(schema.loyaltyConfigs).values({
+      tenantId: s.w.tenant.id,
+      pointsPerRupee: 1,
+      redemptionValuePaise: 100, // 1 point = ₹1
+      minRedemptionPoints: 10,
+      isActive: true,
+    });
+    // Give customer 50 points
+    await t.db
+      .update(schema.customers)
+      .set({ loyaltyPoints: 50 })
+      .where(eq(schema.customers.id, customer.id));
+
+    // Bill 1 unit (MRP 10000 paise = ₹100). Redeem 20 points (= ₹20). Net payable = ₹80 (8000 paise).
+    const res = await s.sell({
+      customerId: customer.id,
+      lines: [{ batchId: s.batch.id, qty: 1, discountBp: 0 }],
+      payments: [{ method: "cash", amount: 8000 }],
+      redeemPoints: 20,
+    });
+
+    expect(res.total).toBe(8000);
+
+    // Customer balance should now be 50 - 20 = 30 points
+    const [cust] = await t.db
+      .select({ points: schema.customers.loyaltyPoints })
+      .from(schema.customers)
+      .where(eq(schema.customers.id, customer.id));
+    expect(cust.points).toBe(30);
+
+    // Loyalty transaction should be recorded
+    const ltx = await t.db
+      .select()
+      .from(schema.loyaltyTransactions)
+      .where(and(eq(schema.loyaltyTransactions.tenantId, s.w.tenant.id), eq(schema.loyaltyTransactions.customerId, customer.id)));
+    const redeemTx = ltx.find((x) => x.type === "redeem");
+    expect(redeemTx).toBeDefined();
+    expect(redeemTx?.points).toBe(-20);
+    expect(redeemTx?.saleId).toBe(res.saleId);
   });
 
   it("the discount ceiling needs sale.discount_override", async () => {

@@ -207,7 +207,8 @@ export async function createSaleInvoice(
   complianceDetails?: ComplianceDetailsInput,
   medicalRepId?: string,
   paymentsInput?: SalePayment[],
-  heldSaleId?: string
+  heldSaleId?: string,
+  redeemPoints = 0
 ) {
   const auth = await checkPermission("sale.create");
   if (!auth.ok) return { error: auth.error };
@@ -268,7 +269,7 @@ export async function createSaleInvoice(
     })),
     billDiscountPaise: 0,
     payments,
-    redeemPoints: 0,
+    redeemPoints: Math.max(0, redeemPoints || 0),
     compliance: {
       ...complianceDetails,
       doctorName: complianceDetails?.doctorName || doctorName || undefined,
