@@ -15,6 +15,11 @@ import {
   type HoldSaleInput,
 } from "@/server/domain/sales/held";
 import { cancelSale } from "@/server/domain/sales/cancel-sale";
+import {
+  returnSale,
+  getReturnableSaleDetails,
+  type ReturnSaleInput,
+} from "@/server/domain/sales/return-sale";
 
 export async function getSales(dateFrom?: string | null, dateTo?: string | null) {
   const ctx = await requirePermission("sale.view");
@@ -379,5 +384,145 @@ export async function getSaleById(id: string) {
     .from(schema.gstDocuments)
     .where(and(eq(schema.gstDocuments.refType, "sale"), eq(schema.gstDocuments.refId, id), eq(schema.gstDocuments.tenantId, ctx.tenantId)))
     .limit(1);
-  return { sale, items, customer, store, tenant, gstDoc: gstDoc || null };
+  const returns = await db
+    .select()
+    .from(schema.saleReturns)
+    .where(eq(schema.saleReturns.saleId, id))
+    .orderBy(desc(schema.saleReturns.createdAt));
+  return { sale, items, customer, store, tenant, gstDoc: gstDoc || null, returns };
+}
+
+export async function createSaleReturnAction(input: ReturnSaleInput) {
+  const auth = await checkPermission("sale.return");
+  if (!auth.ok) return { success: false as const, error: auth.error };
+  const ctx = auth.ctx;
+
+  try {
+    const res = await db.transaction((tx) => returnSale(tx, ctx, input));
+    revalidatePath("/dashboard/sales");
+    revalidatePath(`/dashboard/sales/${input.saleId}`);
+    revalidatePath(`/dashboard/sales/${input.saleId}/return`);
+    revalidatePath("/dashboard/sales/returns");
+    revalidatePath("/dashboard/accounting");
+    revalidatePath("/dashboard/gst");
+    return { success: true as const, ...res };
+  } catch (err: unknown) {
+    return {
+      success: false as const,
+      error: (err instanceof Error ? err.message : String(err)) || "Failed to process sale return",
+    };
+  }
+}
+
+export async function getReturnableSaleAction(saleId: string) {
+  const ctx = await requirePermission("sale.view");
+  try {
+    const details = await getReturnableSaleDetails(db, ctx, saleId);
+    return { success: true as const, data: details };
+  } catch (err: unknown) {
+    return {
+      success: false as const,
+      error: (err instanceof Error ? err.message : String(err)) || "Failed to load sale return details",
+    };
+  }
+}
+
+export async function getSaleReturnsList(dateFrom?: string | null, dateTo?: string | null) {
+  const ctx = await requirePermission("sale.view");
+
+  const conditions = [
+    eq(schema.saleReturns.tenantId, ctx.tenantId),
+    eq(schema.saleReturns.storeId, ctx.storeId),
+  ];
+
+  if (dateFrom) {
+    conditions.push(gte(schema.saleReturns.createdAt, new Date(dateFrom + "T00:00:00")));
+  }
+  if (dateTo) {
+    conditions.push(lte(schema.saleReturns.createdAt, new Date(dateTo + "T23:59:59.999")));
+  }
+
+  const returns = await db
+    .select({
+      saleReturn: schema.saleReturns,
+      sale: schema.sales,
+      user: schema.users,
+    })
+    .from(schema.saleReturns)
+    .innerJoin(schema.sales, eq(schema.saleReturns.saleId, schema.sales.id))
+    .leftJoin(schema.users, eq(schema.saleReturns.createdBy, schema.users.id))
+    .where(and(...conditions))
+    .orderBy(desc(schema.saleReturns.createdAt));
+
+  return returns;
+}
+
+export async function getSaleReturnById(id: string) {
+  const ctx = await requirePermission("sale.view");
+
+  const [returnRow] = await db
+    .select({
+      saleReturn: schema.saleReturns,
+      sale: schema.sales,
+      user: schema.users,
+    })
+    .from(schema.saleReturns)
+    .innerJoin(schema.sales, eq(schema.saleReturns.saleId, schema.sales.id))
+    .leftJoin(schema.users, eq(schema.saleReturns.createdBy, schema.users.id))
+    .where(and(eq(schema.saleReturns.id, id), eq(schema.saleReturns.tenantId, ctx.tenantId)))
+    .limit(1);
+
+  if (!returnRow) return null;
+
+  const items = await db
+    .select({
+      returnItem: schema.saleReturnItems,
+      saleItem: schema.saleItems,
+    })
+    .from(schema.saleReturnItems)
+    .innerJoin(schema.saleItems, eq(schema.saleReturnItems.saleItemId, schema.saleItems.id))
+    .where(eq(schema.saleReturnItems.returnId, id));
+
+  const [customer] = returnRow.sale.customerId
+    ? await db
+        .select()
+        .from(schema.customers)
+        .where(eq(schema.customers.id, returnRow.sale.customerId))
+        .limit(1)
+    : [null];
+
+  const [store] = await db
+    .select()
+    .from(schema.stores)
+    .where(eq(schema.stores.id, returnRow.saleReturn.storeId))
+    .limit(1);
+
+  const [tenant] = await db
+    .select()
+    .from(schema.tenants)
+    .where(eq(schema.tenants.id, returnRow.saleReturn.tenantId))
+    .limit(1);
+
+  const [gstDoc] = await db
+    .select()
+    .from(schema.gstDocuments)
+    .where(
+      and(
+        eq(schema.gstDocuments.refType, "return"),
+        eq(schema.gstDocuments.refId, id),
+        eq(schema.gstDocuments.tenantId, ctx.tenantId),
+      ),
+    )
+    .limit(1);
+
+  return {
+    saleReturn: returnRow.saleReturn,
+    sale: returnRow.sale,
+    user: returnRow.user,
+    items,
+    customer,
+    store,
+    tenant,
+    gstDoc: gstDoc || null,
+  };
 }
