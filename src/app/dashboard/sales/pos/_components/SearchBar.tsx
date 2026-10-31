@@ -93,7 +93,7 @@ export function SearchBar({
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           className="input pl-10 pr-24 py-2.5 text-[15px] font-medium"
-          placeholder="F2: Search medicine, generic composition (e.g. Paracetamol) or scan barcode..."
+          placeholder="F3 / : Search medicine, generic composition (e.g. Paracetamol) or scan barcode..."
           autoComplete="off"
         />
         <button
