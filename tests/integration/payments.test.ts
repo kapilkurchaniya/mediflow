@@ -20,7 +20,15 @@ vi.mock("@/server/auth", () => ({
 vi.mock("next/cache", () => ({ revalidatePath: () => {} }));
 
 import { getCustomersWithDue, getOpenBills, recordReceipt } from "@/app/actions/payments";
-import { listCustomersWithDue, listOpenBills, postPayment, type PostPaymentInput } from "@/server/domain/payments";
+import {
+  getBillAllocations,
+  getPaymentAllocations,
+  listCustomersWithDue,
+  listOpenBills,
+  postPayment,
+  type PostPaymentInput,
+} from "@/server/domain/payments";
+import { recordSupplierPayment } from "@/server/domain/suppliers";
 import type { AuthCtx } from "@/server/rbac";
 
 let t: Awaited<ReturnType<typeof createTestDb>>;
@@ -98,10 +106,34 @@ describe("postPayment: a customer receipt", () => {
     expect(lines.find((l) => l.key === "cash")).toMatchObject({ debit: 50000, credit: 0 });
     expect(lines.find((l) => l.key === "debtors")).toMatchObject({ debit: 0, credit: 50000, partyType: "customer" });
 
+    // Verify payment_allocations row persistence
+    const allocs = await getPaymentAllocations(t.db, s.tenant.id, res.paymentId);
+    expect(allocs).toHaveLength(1);
+    expect(allocs[0]).toMatchObject({
+      refType: "sale",
+      refId: bill.id,
+      amount: 50000,
+    });
+
+    const billAllocs = await getBillAllocations(t.db, s.tenant.id, "sale", bill.id);
+    expect(billAllocs).toHaveLength(1);
+    expect(billAllocs[0]).toMatchObject({
+      paymentNo: res.paymentNo,
+      amount: 50000,
+    });
+
     const second = await s.pay({ amount: 30000, allocations: [{ refType: "sale", refId: bill.id, amount: 30000 }] });
     expect(second.paymentNo).toMatch(/000002$/);
     expect(await s.sale(bill.id)).toMatchObject({ paidAmount: 80000, creditAmount: 0 });
     expect(await listOpenBills(t.db, s.tenant.id, s.store.id, s.customer.id)).toHaveLength(0);
+
+    const secondAllocs = await getPaymentAllocations(t.db, s.tenant.id, second.paymentId);
+    expect(secondAllocs).toHaveLength(1);
+    expect(secondAllocs[0]).toMatchObject({
+      refType: "sale",
+      refId: bill.id,
+      amount: 30000,
+    });
   });
 
   it("UPI, card and bank go to the bank account, cash to cash", async () => {
@@ -117,9 +149,14 @@ describe("postPayment: a customer receipt", () => {
     const s = await scene();
     const a = await s.creditSale(10000);
     const b = await s.creditSale(20000);
-    await s.pay({ amount: 25000, allocations: [{ refType: "sale", refId: a.id, amount: 10000 }, { refType: "sale", refId: b.id, amount: 15000 }] });
+    const r = await s.pay({ amount: 25000, allocations: [{ refType: "sale", refId: a.id, amount: 10000 }, { refType: "sale", refId: b.id, amount: 15000 }] });
     expect(await s.sale(a.id)).toMatchObject({ creditAmount: 0 });
     expect(await s.sale(b.id)).toMatchObject({ creditAmount: 5000, paidAmount: 15000 });
+
+    const allocs = await getPaymentAllocations(t.db, s.tenant.id, r.paymentId);
+    expect(allocs).toHaveLength(2);
+    expect(allocs.find((x) => x.refId === a.id)?.amount).toBe(10000);
+    expect(allocs.find((x) => x.refId === b.id)?.amount).toBe(15000);
   });
 
   it("with no allocation the money stays on the customer's account (advance)", async () => {
@@ -128,6 +165,10 @@ describe("postPayment: a customer receipt", () => {
     const r = await s.pay({ amount: 5000 });
     expect(await s.sale(bill.id)).toMatchObject({ creditAmount: 10000 });
     expect((await s.journal(r.paymentId)).find((l) => l.key === "debtors")).toMatchObject({ credit: 5000 });
+
+    // An advance has no bill allocations
+    const allocs = await getPaymentAllocations(t.db, s.tenant.id, r.paymentId);
+    expect(allocs).toHaveLength(0);
   });
 
   it("an audit row is written", async () => {
@@ -210,6 +251,57 @@ describe("postPayment: paying suppliers and expenses (🤝 Lane B)", () => {
     const lines = await s.journal(r.paymentId);
     expect(lines.find((l) => l.key === "creditors")).toMatchObject({ debit: 500000, credit: 0, partyType: "supplier" });
     expect(lines.find((l) => l.key === "bank")).toMatchObject({ debit: 0, credit: 500000 });
+
+    // Verify payment_allocations row persistence for purchase
+    const allocs = await getPaymentAllocations(t.db, s.tenant.id, r.paymentId);
+    expect(allocs).toHaveLength(1);
+    expect(allocs[0]).toMatchObject({
+      refType: "purchase",
+      refId: purchase.id,
+      amount: 500000,
+    });
+  });
+
+  it("recordSupplierPayment delegates to postPayment, persists allocation and updates purchase paidAmount", async () => {
+    const s = await scene();
+    const { supplier, purchase } = await withPurchase(s, 400000);
+    const p = await t.db.transaction((tx) =>
+      recordSupplierPayment(tx, s.ctx, {
+        supplierId: supplier.id,
+        amount: 250000,
+        method: "upi",
+        paymentDate: today,
+        reference: "UPI-SUP-1",
+        purchaseId: purchase.id,
+      })
+    );
+
+    expect(p.paymentNo).toMatch(/^PAY\//);
+    const [updatedPur] = await t.db.select().from(schema.purchases).where(eq(schema.purchases.id, purchase.id));
+    expect(updatedPur.paidAmount).toBe(250000);
+
+    const allocs = await getPaymentAllocations(t.db, s.tenant.id, p.id);
+    expect(allocs).toHaveLength(1);
+    expect(allocs[0]).toMatchObject({
+      refType: "purchase",
+      refId: purchase.id,
+      amount: 250000,
+    });
+
+    const lines = await s.journal(p.id);
+    expect(lines.find((l) => l.key === "creditors")).toMatchObject({ debit: 250000, credit: 0, partyType: "supplier" });
+    expect(lines.find((l) => l.key === "bank")).toMatchObject({ debit: 0, credit: 250000 });
+  });
+
+  it("enforces ON DELETE RESTRICT on payments when allocations exist", async () => {
+    const s = await scene();
+    const bill = await s.creditSale(20000);
+    const res = await s.pay({ amount: 10000, allocations: [{ refType: "sale", refId: bill.id, amount: 10000 }] });
+
+    // Attempting to delete payment directly must fail due to foreign key RESTRICT constraint
+    await expect(
+      t.db.delete(schema.payments).where(eq(schema.payments.id, res.paymentId))
+    ).rejects.toThrow();
   });
 
   it("cannot pay more than is owed on the purchase", async () => {

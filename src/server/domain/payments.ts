@@ -119,8 +119,9 @@ export async function postPayment(tx: Tx, ctx: AuthCtx, input: PostPaymentInput)
     partyName = acc.name;
   }
 
-  // ── Lock and check the bills being settled ──────────────────────────────────────────────────────
-  for (const a of allocations) {
+  // ── Lock and check the bills being settled (in deterministic ID order) ──────────────
+  const sortedAllocations = [...allocations].sort((a, b) => a.refId.localeCompare(b.refId));
+  for (const a of sortedAllocations) {
     if (a.refType === "sale") {
       const [sale] = await tx
         .select({ invoiceNo: schema.sales.invoiceNo, credit: schema.sales.creditAmount })
@@ -217,8 +218,20 @@ export async function postPayment(tx: Tx, ctx: AuthCtx, input: PostPaymentInput)
   );
   await tx.update(schema.payments).set({ journalEntryId: entry.id }).where(eq(schema.payments.id, payment.id));
 
-  // ── Settle the bills ────────────────────────────────────────────────────────────────────────────
-  for (const a of allocations) {
+  // ── Persist bill allocations & settle bills ────────────────────────────────────────────────
+  if (sortedAllocations.length > 0) {
+    await tx.insert(schema.paymentAllocations).values(
+      sortedAllocations.map((a) => ({
+        tenantId: ctx.tenantId,
+        paymentId: payment.id,
+        refType: a.refType,
+        refId: a.refId,
+        amount: a.amount,
+      })),
+    );
+  }
+
+  for (const a of sortedAllocations) {
     if (a.refType === "sale") {
       await tx
         .update(schema.sales)
@@ -246,11 +259,71 @@ export async function postPayment(tx: Tx, ctx: AuthCtx, input: PostPaymentInput)
       party: partyName,
       method: input.method,
       amount: input.amount,
-      billsSettled: allocations.length,
+      allocatedAmount: allocated,
+      unallocatedAmount: input.amount - allocated,
+      billsSettled: sortedAllocations.length,
     },
   });
 
   return { paymentId: payment.id, paymentNo };
+}
+
+/** Allocations made by a specific payment, with invoice / bill details. */
+export async function getPaymentAllocations(
+  database: DbOrTx,
+  tenantId: string,
+  paymentId: string,
+) {
+  return database
+    .select({
+      id: schema.paymentAllocations.id,
+      paymentId: schema.paymentAllocations.paymentId,
+      refType: schema.paymentAllocations.refType,
+      refId: schema.paymentAllocations.refId,
+      amount: schema.paymentAllocations.amount,
+      createdAt: schema.paymentAllocations.createdAt,
+    })
+    .from(schema.paymentAllocations)
+    .where(
+      and(
+        eq(schema.paymentAllocations.tenantId, tenantId),
+        eq(schema.paymentAllocations.paymentId, paymentId),
+      ),
+    )
+    .orderBy(schema.paymentAllocations.createdAt);
+}
+
+/** All payment allocations applied against a specific bill (sale or purchase). */
+export async function getBillAllocations(
+  database: DbOrTx,
+  tenantId: string,
+  refType: "sale" | "purchase",
+  refId: string,
+) {
+  return database
+    .select({
+      id: schema.paymentAllocations.id,
+      paymentId: schema.paymentAllocations.paymentId,
+      paymentNo: schema.payments.paymentNo,
+      paymentDate: schema.payments.paymentDate,
+      method: schema.payments.method,
+      reference: schema.payments.reference,
+      amount: schema.paymentAllocations.amount,
+      createdAt: schema.paymentAllocations.createdAt,
+    })
+    .from(schema.paymentAllocations)
+    .innerJoin(
+      schema.payments,
+      eq(schema.paymentAllocations.paymentId, schema.payments.id),
+    )
+    .where(
+      and(
+        eq(schema.paymentAllocations.tenantId, tenantId),
+        eq(schema.paymentAllocations.refType, refType),
+        eq(schema.paymentAllocations.refId, refId),
+      ),
+    )
+    .orderBy(schema.paymentAllocations.createdAt);
 }
 
 /** Customers who still owe money on completed bills of this store, biggest balance first. */
@@ -302,8 +375,14 @@ export async function listOpenBills(database: DbOrTx, tenantId: string, storeId:
 }
 
 /** Latest receipts (direction "in") or payments (direction "out") of this store. */
-export async function listRecentPayments(database: DbOrTx, tenantId: string, storeId: string, direction: "in" | "out", limit = 20) {
-  return database
+export async function listRecentPayments(
+  database: DbOrTx,
+  tenantId: string,
+  storeId: string,
+  direction: "in" | "out",
+  limit = 20,
+) {
+  const rows = await database
     .select({
       id: schema.payments.id,
       paymentNo: schema.payments.paymentNo,
@@ -311,10 +390,26 @@ export async function listRecentPayments(database: DbOrTx, tenantId: string, sto
       method: schema.payments.method,
       amount: schema.payments.amount,
       reference: schema.payments.reference,
-      partyName: schema.customers.name,
+      partyType: schema.payments.partyType,
+      partyId: schema.payments.partyId,
+      customerName: schema.customers.name,
+      supplierName: schema.suppliers.name,
     })
     .from(schema.payments)
-    .leftJoin(schema.customers, eq(schema.payments.partyId, schema.customers.id))
+    .leftJoin(
+      schema.customers,
+      and(
+        eq(schema.payments.partyId, schema.customers.id),
+        eq(schema.payments.partyType, "customer"),
+      ),
+    )
+    .leftJoin(
+      schema.suppliers,
+      and(
+        eq(schema.payments.partyId, schema.suppliers.id),
+        eq(schema.payments.partyType, "supplier"),
+      ),
+    )
     .where(
       and(
         eq(schema.payments.tenantId, tenantId),
@@ -324,4 +419,19 @@ export async function listRecentPayments(database: DbOrTx, tenantId: string, sto
     )
     .orderBy(desc(schema.payments.createdAt))
     .limit(limit);
+
+  return rows.map((r) => ({
+    id: r.id,
+    paymentNo: r.paymentNo,
+    paymentDate: r.paymentDate,
+    method: r.method,
+    amount: r.amount,
+    reference: r.reference,
+    partyName:
+      r.partyType === "customer"
+        ? r.customerName
+        : r.partyType === "supplier"
+        ? r.supplierName
+        : "Expense",
+  }));
 }

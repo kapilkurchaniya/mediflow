@@ -143,7 +143,7 @@ export function ReceiptsClient({ customers, recent }: { customers: Customer[]; r
                         <td className="text-right">{formatINR(b.due)}</td>
                         <td className="text-right whitespace-nowrap">
                           <input
-                            className="input !w-28 text-right"
+                            className="input !w-28 text-right font-mono"
                             inputMode="decimal"
                             placeholder="0.00"
                             aria-label={`Amount received for ${b.invoiceNo}`}
@@ -151,6 +151,11 @@ export function ReceiptsClient({ customers, recent }: { customers: Customer[]; r
                             onChange={(e) => setAmounts((a) => ({ ...a, [b.id]: e.target.value }))}
                           />
                           <button type="button" className="btn btn-ghost btn-sm ml-1" onClick={() => payInFull(b)}>Full</button>
+                          {toPaise(amounts[b.id] ?? "") > 0 && (
+                            <div className="text-[11px] text-ink-500 font-mono mt-0.5">
+                              Bal: {formatINR(Math.max(0, (b.due ?? 0) - toPaise(amounts[b.id] ?? "")))}
+                            </div>
+                          )}
                         </td>
                       </tr>
                     ))}
@@ -180,6 +185,19 @@ export function ReceiptsClient({ customers, recent }: { customers: Customer[]; r
               </label>
 
               {error && <div className="rounded-lg border border-red-200 bg-red-50 p-2.5 text-[12.5px] text-red-700">{error}</div>}
+
+              <div className="rounded-lg bg-ink-50 border border-ink-150 p-3 space-y-1 text-xs">
+                <div className="flex justify-between text-ink-600">
+                  <span>Total Allocated:</span>
+                  <span className="font-mono font-bold text-ink-900">{formatINR(total)}</span>
+                </div>
+                <div className="flex justify-between text-ink-600">
+                  <span>Customer Balance After Receipt:</span>
+                  <span className="font-mono font-bold text-emerald-700">
+                    {formatINR(Math.max(0, customer.due - total))}
+                  </span>
+                </div>
+              </div>
 
               <button type="button" className="btn btn-primary" disabled={pending || total === 0} onClick={submit}>
                 {pending ? "Saving…" : `Record receipt of ${formatINR(total)}`}
