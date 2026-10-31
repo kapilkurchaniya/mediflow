@@ -50,13 +50,8 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
-      - name: "Lint (strict - paths that are already clean must stay clean)"
+      - name: Lint (blocking - 0 errors allowed)
         run: npm run lint:strict
-
-      - name: Lint (whole repo, informational)
-        # TODO(Phase 0 · A0.6): delete this step and the strict list once every path is clean.
-        continue-on-error: true
-        run: npm run lint
 
       - name: Tests (unit + integration)
         run: npm test
