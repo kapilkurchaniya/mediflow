@@ -465,7 +465,28 @@ $$\text{Expected Cash} = \text{Opening Float} + \text{Cash Sales} + \text{Cash R
 - **Z-Report Printout:** Automatically opens the official closing audit slip containing opening float, net sales, expected cash, counted actual cash, variance, cashier signature block, and manager approval line.
 - The shift is permanently locked and stamped in the immutable audit log.
 
-> **Not available yet:** using loyalty points as a bill discount (A2.7). See [chapter 19](#19-not-available-yet).
+### 5.10 Modular POS Counter & Loyalty Points Redemption
+
+MediFlow's point-of-sale interface provides lightning-fast counter operations built for dual ergonomics: 100% keyboard-drivable for veteran Marg ERP pharmacists, and 100% mouse-friendly with visual controls, buttons, and tooltips for new staff.
+
+#### 1. Dual Ergonomics & Counter Shortcuts
+- **F2 (Search & Focus):** Jumps cursor directly to the medicine search input. Type brand name, generic composition, or scan product barcodes.
+- **F3 (Substitutes Finder):** Opens therapeutically equivalent salt alternatives when an item is out of stock or price-sensitive.
+- **F4 (Cash Register):** Checks shift status or opens the drawer management screen.
+- **F6 (Hold Bill):** Parks the active cart to serve another customer waiting in queue.
+- **F7 (Parked Bills):** Opens the parked bills list with age indicators and stock revalidation alerts.
+- **F8 (Payment & Split Tender):** Opens the settlement panel to split across Cash, UPI, Card, and Credit.
+- **F9 (Promise Order):** Logs customer demand for out-of-stock items for immediate purchase replenishment.
+- **F10 (Finalize Bill):** Completes checkout and generates thermal receipt.
+- **Mouse Navigation:** Every single feature has prominent buttons, visual badges, and tooltips for staff who prefer using a mouse.
+
+#### 2. Customer Loyalty Points Redemption
+When a customer has accumulated loyalty reward points:
+1. Select the customer in the **Customer & Loyalty** picker.
+2. The picker immediately surfaces their verified live redeemable points balance and monetary rupee value (e.g. `⭐ 50 Pts (₹50)`).
+3. In the payment panel (**F8** or click **Split Tender**), enter the number of points to redeem or click **Redeem Max**.
+4. MediFlow automatically deducts the loyalty discount from the bill total, verifies customer balance using row-level locking (`SELECT ... FOR UPDATE`), updates the customer balance, and stamps an immutable `redeem` loyalty transaction linked to the completed invoice.
+5. If the bill is ever cancelled or returned, MediFlow automatically restores the customer's redeemed loyalty points.
 
 ---
 
@@ -1003,7 +1024,7 @@ These are planned but **cannot be used today**. If you can't find a button for t
 
 | Area | Planned feature |
 |---|---|
-| Billing | Using loyalty points as a discount (A2.7); offline counter billing (Tauri desktop app in Phase 4) |
+| Billing | Offline counter billing with IndexedDB sync (Tauri desktop app in Phase 4) |
 | Stock | Stock adjustments and write-offs; transfers between branches; warehouse; physical stock count; reorder suggestions |
 | Buying | Automated reorder suggestions based on sales velocity (Purchase orders, supplier debit notes, and supplier ledger payments are available) |
 | People & security | Password reset by email; custom roles (you choose from the 7 built-in ones); sending invitations by email (you copy the link yourself); removing a person for good (you suspend instead) |

@@ -5,6 +5,7 @@ import { eq, ilike, and, desc, or } from "drizzle-orm";
 import { requirePermission } from "@/server/rbac";
 import { revalidatePath } from "next/cache";
 import { extractStateCodeFromGstin } from "@/server/domain/gst";
+import { LoyaltyService } from "@/server/domain/loyalty";
 
 export async function getCustomers(searchQuery?: string, limit = 50) {
   const ctx = await requirePermission("customer.view");
@@ -133,4 +134,10 @@ export async function updateCustomer(id: string, formData: FormData) {
   } catch (err: unknown) {
     return { error: (err instanceof Error ? err.message : String(err)) || "Failed to update customer" };
   }
+}
+
+export async function getCustomerRedeemablePoints(customerId: string) {
+  const ctx = await requirePermission("customer.view");
+  if (!customerId?.trim()) return { points: 0, valuePaise: 0 };
+  return LoyaltyService.getRedeemable(db, ctx.tenantId, customerId.trim());
 }

@@ -109,8 +109,23 @@ export async function createSale(
   if (tendered.some((p) => !(MONEY_METHODS as readonly string[]).includes(p.method))) {
     throw new DomainError("INVALID_PAYMENT", "Leave the unpaid part empty: it becomes credit on the customer's account.");
   }
+
+  const saleId = crypto.randomUUID();
+  let loyaltyDiscountPaise = 0;
   if (input.redeemPoints > 0) {
-    throw new DomainError("REDEEM_NOT_AVAILABLE", "Redeeming loyalty points at the counter is not available yet.");
+    if (!input.customerId) {
+      throw new DomainError("CUSTOMER_REQUIRED", "Select a customer to redeem loyalty points.");
+    }
+    try {
+      const redemption = await LoyaltyService.redeemPoints(tx, {
+        tenantId: ctx.tenantId,
+        customerId: input.customerId,
+        points: input.redeemPoints,
+      });
+      loyaltyDiscountPaise = redemption.valuePaise;
+    } catch (e) {
+      throw new DomainError("LOYALTY_REDEMPTION_FAILED", e instanceof Error ? e.message : "Failed to redeem loyalty points.");
+    }
   }
 
   // Optional per-pharmacy discount ceiling (tenants.settings.maxDiscountBp, basis points; unset = no limit).
@@ -228,7 +243,8 @@ export async function createSale(
       }).isInterState
     : false;
 
-  const totals = computeSaleTotals(lineInputs, isInterState, input.billDiscountPaise);
+  const totalDiscount = (input.billDiscountPaise || 0) + loyaltyDiscountPaise;
+  const totals = computeSaleTotals(lineInputs, isInterState, totalDiscount);
 
   // ── 5b. Payments: split tender, credit and change ───────────────────────────────────────────────
   const tenderedTotal = tendered.reduce((s, p) => s + p.amount, 0);
@@ -283,6 +299,7 @@ export async function createSale(
   const [sale] = await tx
     .insert(schema.sales)
     .values({
+      id: saleId,
       tenantId: ctx.tenantId,
       storeId: ctx.storeId,
       invoiceNo,
@@ -315,6 +332,20 @@ export async function createSale(
       createdBy: ctx.userId,
     })
     .returning({ id: schema.sales.id });
+
+  if (input.redeemPoints > 0 && input.customerId) {
+    await tx
+      .update(schema.loyaltyTransactions)
+      .set({ saleId: sale.id })
+      .where(
+        and(
+          eq(schema.loyaltyTransactions.tenantId, ctx.tenantId),
+          eq(schema.loyaltyTransactions.customerId, input.customerId),
+          sql`${schema.loyaltyTransactions.saleId} IS NULL`,
+          eq(schema.loyaltyTransactions.type, "redeem")
+        )
+      );
+  }
 
   // ── 6b. Clean up resumed held bill if completing a parked cart (A2.3) ────────
   if (input.heldSaleId) {
