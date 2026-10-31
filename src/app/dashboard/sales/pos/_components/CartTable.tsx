@@ -2,6 +2,7 @@
 
 import { ShoppingCart, Trash2, AlertTriangle, ShieldAlert, Sparkles, Tag } from "lucide-react";
 import { formatINR } from "@/lib/format";
+import { computeSaleLine } from "@/lib/money";
 import type { PosCartLine } from "../_state/types";
 import type { SearchResultBatch } from "../_data/posData";
 
@@ -97,11 +98,16 @@ export function CartTable({
               </thead>
               <tbody>
                 {cart.map((line, idx) => {
-                  const unitRate = (line.saleRate ?? line.mrp) / line.unitsPerPack;
-                  const grossPaise = Math.round(line.qty * unitRate);
-                  const discountPaise = Math.round((grossPaise * line.discountBp) / 10000);
-                  const lineTotalPaise = grossPaise - discountPaise;
-                  const isStockShortage = line.qtyOnHand < line.qty;
+                  const lineCalc = computeSaleLine({
+                    packQty: line.packQty,
+                    looseQty: line.looseQty,
+                    unitsPerPack: line.unitsPerPack,
+                    rate: line.saleRate ?? line.mrp,
+                    discountBp: line.discountBp,
+                    gstRateBp: line.gstRateBp,
+                  });
+                  const lineTotalPaise = lineCalc.total;
+                  const isStockShortage = line.qtyOnHand < lineCalc.baseQty;
 
                   return (
                     <tr key={line.batchId} className={isStockShortage ? "bg-rose-50/50" : undefined}>
@@ -175,7 +181,6 @@ export function CartTable({
                             <input
                               type="number"
                               min="0"
-                              max={line.unitsPerPack - 1}
                               value={line.looseQty === 0 ? "" : line.looseQty}
                               onChange={(e) => onUpdateLooseQty(line.batchId, parseInt(e.target.value, 10) || 0)}
                               className="input !py-1 !px-2 text-center font-mono font-bold text-xs w-20"
@@ -193,6 +198,11 @@ export function CartTable({
                         <span className="font-mono text-xs font-semibold text-ink-800">
                           {formatINR(line.saleRate ?? line.mrp)}
                         </span>
+                        {line.unitsPerPack > 1 && (
+                          <div className="text-[10px] text-brand-700 font-mono font-medium">
+                            {formatINR(Math.round((line.saleRate ?? line.mrp) / line.unitsPerPack))}/{line.looseUnit}
+                          </div>
+                        )}
                         <div className="text-[10px] text-ink-400 font-mono">
                           GST {line.gstRateBp / 100}%
                         </div>

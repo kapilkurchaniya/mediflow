@@ -558,7 +558,8 @@ Full map in `.github/CODEOWNERS` and [ADR 0004](docs/adr/0004-two-lane-ownership
   ➕ `src/app/dashboard/accounting/receipts/page.tsx` (receive from customer, pick outstanding bills). Lane B builds the supplier-payment UI on top of this (B2.4).
 - **Done when:** receiving ₹500 against a credit bill reduces the customer's outstanding and the bill's `credit_amount` 🧪.
 
-#### A2.10 🤝 Pharmacy unit conversion engine (Strip & loose tablet cutting) ⏱ 1.5 days
+#### [x] A2.10 🤝 Pharmacy unit conversion engine (Strip & loose tablet cutting) ⏱ 1.5 days
+- **Progress:** completed in `lane-a/a2-10-unit-conversion`. Added `unitsPerPack`, `packUnit`, and `looseUnit` configuration and validation to catalog master data action `createMedicine` and `src/app/dashboard/inventory/new/page.tsx` with dynamic visual conversion helper (`1 Strip = 10 Tablets`). Refactored POS `CartTable.tsx` and `usePosCart.ts` to enforce single authoritative calculation source of truth via pure `computeSaleLine` with instant quantity normalization ($0 \le \text{looseQty} < \text{unitsPerPack}$) and keyboard navigation. Enhanced invoice presentation across 80mm thermal slip (`formatItemQuantityCompact`), A4 GST tax invoice (`formatItemQuantity`), and invoice details page (`/dashboard/sales/[id]`) showing explicit unit breakdowns (e.g. `3 Tablets @ ₹10.00` or `1 Strip + 4 Tablets`), effective unit rates, and pack conversion formulas. Safeguarded sale returns in `return-sale.ts` with immutable snapshot preservation and cumulative proportional rounding to eliminate rounding drift across repeated partial returns. Verified with 10 unit tests in `tests/unit/unit-conversion.test.ts`, integration tests in `tests/integration/medicine-packaging.test.ts`, `tests/integration/create-sale.test.ts`, and `tests/integration/return-sale.test.ts`.
 - **Why:** In Indian retail pharmacies, customers routinely purchase loose tablets or partial strips (e.g., 3 tablets from a 10-tablet strip). Selling only full strips is a blocker for any chemist migrating from Marg.
 - **Files:** ✏️ `schema/catalog.ts` (numeric `units_per_pack`, `loose_unit`, `pack_unit`), ✏️ `src/server/domain/sales/create-sale.ts`, ✏️ `src/app/dashboard/sales/pos/*` (loose quantity input).
 - **How:**
@@ -1016,7 +1017,7 @@ Tick items in PRs. One line per task, in the same order as above.
 
 **Phase 0** — A: [x] A0.1 [x] A0.2 [x] A0.3 [x] A0.4 [x] A0.5 [x] A0.6 [x] A0.7 · B: [x] B0.1 [x] B0.2 [x] B0.3 [x] B0.4 [x] B0.5 [x] B0.6 [x] B0.7 [x] B0.8
 **Phase 1** — A: [x] A1.1 [x] A1.2 [x] A1.3 [x] A1.4 [x] A1.5 [x] A1.6 [x] A1.7 · B: [x] B1.1 [x] B1.2 [x] B1.3 [x] B1.4 [x] B1.5 [x] B1.6 [x] B1.7
-**Phase 2** — A: [x] A2.1 [x] A2.2 [x] A2.3 [x] A2.4 [x] A2.5 [x] A2.6 [x] A2.7 [x] A2.8 [x] A2.9 [ ] A2.10 [ ] A2.11 [ ] A2.12 · B: [x] B2.1 [x] B2.2 [x] B2.3 [x] B2.4 [x] B2.5 [x] B2.6 [x] B2.7 [x] B2.8
+**Phase 2** — A: [x] A2.1 [x] A2.2 [x] A2.3 [x] A2.4 [x] A2.5 [x] A2.6 [x] A2.7 [x] A2.8 [x] A2.9 [x] A2.10 [ ] A2.11 [ ] A2.12 · B: [x] B2.1 [x] B2.2 [x] B2.3 [x] B2.4 [x] B2.5 [x] B2.6 [x] B2.7 [x] B2.8
 **Phase 3** — A: [ ] A3.1 [ ] A3.2 [ ] A3.3 [ ] A3.4 [ ] A3.5 [ ] A3.6 · B: [x] B3.1 [x] B3.2 [x] B3.3 [x] B3.4 [x] B3.5 [x] B3.6 [x] B3.7
 **Phase 4** — A: [ ] A4.1 [ ] A4.2 [ ] A4.3 [ ] A4.4 [ ] A4.5 [ ] A4.6 [ ] A4.7 [ ] A4.8 [ ] A4.9 · B: [ ] B4.1 [ ] B4.2 [ ] B4.3 [ ] B4.4 [ ] B4.5 [ ] B4.6
 **Phase 5** — A: [ ] A5.1 [ ] A5.2 [ ] A5.3 [ ] A5.4 [ ] A5.5 [ ] A5.6 [ ] A5.7 · B: [ ] B5.1 [ ] B5.2 [ ] B5.3 [ ] B5.4 [ ] B5.5 [ ] B5.6 [ ] B5.7

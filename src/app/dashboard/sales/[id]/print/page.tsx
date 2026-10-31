@@ -4,7 +4,7 @@ import { format } from "date-fns";
 import { ArrowLeft, Printer, Receipt, AlertCircle } from "lucide-react";
 import Link from "next/link";
 import PrintButton from "./PrintButton";
-import { formatINR } from "@/lib/format";
+import { formatINR, formatItemQuantity, formatItemQuantityCompact } from "@/lib/format";
 import { requirePagePermission } from "@/server/rbac";
 
 export default async function PrintInvoicePage({
@@ -119,19 +119,29 @@ export default async function PrintInvoicePage({
               </tr>
             </thead>
             <tbody className="divide-y divide-dotted divide-gray-400">
-              {items.map((item, idx) => (
-                <tr key={idx}>
-                  <td className="py-1">
-                    <div className="font-bold truncate max-w-[120px]">{item.medicineName}</div>
-                    <div className="text-[9px] text-gray-700">
-                      B:{item.batchNo} E:{item.expiryDate?.slice(0, 7)}
-                    </div>
-                  </td>
-                  <td className="py-1 text-center font-bold">{item.qty}</td>
-                  <td className="py-1 text-right num">₹{(item.rate / 100).toFixed(2)}</td>
-                  <td className="py-1 text-right font-bold num">₹{(item.totalAmount / 100).toFixed(2)}</td>
-                </tr>
-              ))}
+              {items.map((item, idx) => {
+                const upp = Math.max(1, item.unitsPerPack ?? 1);
+                const isLooseOnly = upp > 1 && (item.packQty === 0 || (!item.packQty && item.qty < upp));
+                const unitRatePaise = isLooseOnly ? Math.round(item.rate / upp) : item.rate;
+                return (
+                  <tr key={idx}>
+                    <td className="py-1">
+                      <div className="font-bold truncate max-w-[120px]">{item.medicineName}</div>
+                      <div className="text-[9px] text-gray-700">
+                        B:{item.batchNo} E:{item.expiryDate?.slice(0, 7)}
+                      </div>
+                    </td>
+                    <td className="py-1 text-center font-bold">
+                      {formatItemQuantityCompact(item)}
+                    </td>
+                    <td className="py-1 text-right num">
+                      ₹{(unitRatePaise / 100).toFixed(2)}
+                      {isLooseOnly ? <span className="block text-[8px] text-gray-600">/{item.looseUnit?.slice(0, 3) || "tab"}</span> : null}
+                    </td>
+                    <td className="py-1 text-right font-bold num">₹{(item.totalAmount / 100).toFixed(2)}</td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
 
@@ -250,19 +260,40 @@ export default async function PrintInvoicePage({
                 </tr>
               </thead>
               <tbody className="divide-y divide-ink-150">
-                {items.map((item, idx) => (
-                  <tr key={idx} className="hover:bg-ink-50">
-                    <td className="py-2.5 px-3 text-ink-400">{idx + 1}</td>
-                    <td className="py-2.5 px-3 font-semibold text-ink-900">{item.medicineName}</td>
-                    <td className="py-2.5 px-3 font-mono text-ink-700">{item.batchNo}</td>
-                    <td className="py-2.5 px-3 text-center num text-ink-600">{item.expiryDate}</td>
-                    <td className="py-2.5 px-3 text-center font-bold num">{item.qty}</td>
-                    <td className="py-2.5 px-3 text-right num text-ink-600">{formatINR(item.mrp)}</td>
-                    <td className="py-2.5 px-3 text-right num text-ink-700">{formatINR(item.rate)}</td>
-                    <td className="py-2.5 px-3 text-center num text-ink-600">{(item.gstRateBp ?? 0) / 100}%</td>
-                    <td className="py-2.5 px-3 text-right font-bold text-ink-900 num">{formatINR(item.totalAmount)}</td>
-                  </tr>
-                ))}
+                {items.map((item, idx) => {
+                  const upp = Math.max(1, item.unitsPerPack ?? 1);
+                  const isLooseOnly = upp > 1 && (item.packQty === 0 || (!item.packQty && item.qty < upp));
+                  const unitRatePaise = isLooseOnly ? Math.round(item.rate / upp) : item.rate;
+                  return (
+                    <tr key={idx} className="hover:bg-ink-50">
+                      <td className="py-2.5 px-3 text-ink-400">{idx + 1}</td>
+                      <td className="py-2.5 px-3">
+                        <span className="font-semibold text-ink-900">{item.medicineName}</span>
+                        {upp > 1 && (
+                          <div className="text-[10px] text-ink-500 font-mono">
+                            1 {item.packUnit} = {item.unitsPerPack} {item.looseUnit}s
+                          </div>
+                        )}
+                      </td>
+                      <td className="py-2.5 px-3 font-mono text-ink-700">{item.batchNo}</td>
+                      <td className="py-2.5 px-3 text-center num text-ink-600">{item.expiryDate}</td>
+                      <td className="py-2.5 px-3 text-center font-bold num text-ink-900">
+                        {formatItemQuantity(item)}
+                      </td>
+                      <td className="py-2.5 px-3 text-right num text-ink-600">{formatINR(item.mrp)}</td>
+                      <td className="py-2.5 px-3 text-right num text-ink-700">
+                        {formatINR(unitRatePaise)}
+                        {isLooseOnly ? (
+                          <span className="text-[10px] text-ink-500 block">/{item.looseUnit}</span>
+                        ) : (
+                          <span className="text-[10px] text-ink-500 block">/{item.packUnit}</span>
+                        )}
+                      </td>
+                      <td className="py-2.5 px-3 text-center num text-ink-600">{(item.gstRateBp ?? 0) / 100}%</td>
+                      <td className="py-2.5 px-3 text-right font-bold text-ink-900 num">{formatINR(item.totalAmount)}</td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

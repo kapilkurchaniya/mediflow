@@ -3,7 +3,7 @@ import { z } from "zod";
 import { schema, type DbOrTx, type Tx } from "@/server/db";
 import type { AuthCtx } from "@/server/rbac";
 import { DomainError } from "@/server/errors";
-import { computeSaleLine } from "@/lib/money";
+import { computeSaleLine, taxFromInclusive } from "@/lib/money";
 import { recordStockMovement } from "@/server/domain/stock";
 import { nextDocNumber } from "@/server/domain/sequence";
 import { postSaleReturnJournalEntry } from "@/server/domain/accounting";
@@ -295,29 +295,23 @@ export async function returnSale(
       );
     }
 
-    // Recompute line amounts using original snapshots
-    const lineCalc = computeSaleLine(
-      {
-        qty: returnBaseQty,
-        rate: saleItem.rate ?? 0,
-        discountBp: saleItem.discountBp ?? 0,
-        gstRateBp: saleItem.gstRateBp,
-        unitsPerPack: upp,
-      },
-      sale.isInterState,
-    );
+    // Cumulative proportional rounding using original snapshots to prevent rounding drift on repeated returns
+    const cumTotalRefunded = Math.round((saleItem.totalAmount * (currentReturned + returnBaseQty)) / saleItem.qty);
+    const cumPreviouslyRefunded = Math.round((saleItem.totalAmount * currentReturned) / saleItem.qty);
+    const lineTotal = cumTotalRefunded - cumPreviouslyRefunded;
+    const taxSplit = taxFromInclusive(lineTotal, saleItem.gstRateBp, sale.isInterState);
 
     returningLines.push({
       saleItem,
       returnBaseQty,
       returnPackQty,
       returnLooseQty,
-      taxable: lineCalc.taxable,
-      cgst: lineCalc.cgst,
-      sgst: lineCalc.sgst,
-      igst: lineCalc.igst,
-      tax: lineCalc.cgst + lineCalc.sgst + lineCalc.igst,
-      total: lineCalc.total,
+      taxable: taxSplit.taxable,
+      cgst: taxSplit.cgst,
+      sgst: taxSplit.sgst,
+      igst: taxSplit.igst,
+      tax: taxSplit.tax,
+      total: lineTotal,
     });
   }
 
