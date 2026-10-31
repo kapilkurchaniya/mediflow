@@ -14,6 +14,7 @@ import {
   discardHeldSale,
   type HoldSaleInput,
 } from "@/server/domain/sales/held";
+import { cancelSale } from "@/server/domain/sales/cancel-sale";
 
 export async function getSales(dateFrom?: string | null, dateTo?: string | null) {
   const ctx = await requirePermission("sale.view");
@@ -342,6 +343,26 @@ export async function discardHeldSaleAction(heldSaleId: string, reason?: string)
     return { success: true as const };
   } catch (err: unknown) {
     return { success: false as const, error: (err instanceof Error ? err.message : String(err)) || "Failed to discard held bill" };
+  }
+}
+
+export async function cancelSaleAction(saleId: string, reason: string) {
+  const auth = await checkPermission("sale.cancel");
+  if (!auth.ok) return { success: false as const, error: auth.error };
+  const ctx = auth.ctx;
+
+  try {
+    const res = await db.transaction((tx) => cancelSale(tx, ctx, { saleId, reason }));
+    revalidatePath("/dashboard/sales");
+    revalidatePath(`/dashboard/sales/${saleId}`);
+    revalidatePath("/dashboard/accounting");
+    revalidatePath("/dashboard/gst");
+    return { success: true as const, ...res };
+  } catch (err: unknown) {
+    return {
+      success: false as const,
+      error: (err instanceof Error ? err.message : String(err)) || "Failed to cancel sale invoice",
+    };
   }
 }
 
