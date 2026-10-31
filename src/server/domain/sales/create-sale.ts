@@ -43,7 +43,7 @@ export async function createSale(
   tx: Tx,
   ctx: AuthCtx,
   input: SaleInput,
-  opts: CreateSaleOptions,
+  opts: CreateSaleOptions = { source: "pos" },
 ): Promise<CreateSaleResult> {
   const now = opts.now ?? new Date();
   const todayStr = format(now, "yyyy-MM-dd");
@@ -126,6 +126,28 @@ export async function createSale(
       "DISCOUNT_OVER_LIMIT",
       `Discounts above ${maxDiscountBp / 100}% need a manager's approval (permission "sale.discount_override").`,
     );
+  }
+
+  // Enforce cash register shift constraint when requireShift is turned on (ROADMAP A2.6)
+  if (tenantRow?.settings?.requireShift === true) {
+    const [activeShift] = await tx
+      .select({ id: schema.cashSessions.id })
+      .from(schema.cashSessions)
+      .where(
+        and(
+          eq(schema.cashSessions.tenantId, ctx.tenantId),
+          eq(schema.cashSessions.storeId, ctx.storeId),
+          eq(schema.cashSessions.status, "open"),
+        ),
+      )
+      .limit(1);
+
+    if (!activeShift) {
+      throw new DomainError(
+        "SHIFT_REQUIRED",
+        "An open cash register shift is required to complete sales. Please open a register shift first.",
+      );
+    }
   }
 
   // ── 2. Store and customer (both scoped to the tenant) ────────────────────────────────────────────
