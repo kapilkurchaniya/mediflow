@@ -5,7 +5,14 @@ import { revalidatePath } from "next/cache";
 import { db } from "@/server/db";
 import { protectedAction } from "@/server/action";
 import { requirePermission } from "@/server/rbac";
-import { listCustomersWithDue, listOpenBills, listRecentPayments, postPayment } from "@/server/domain/payments";
+import {
+  getBillAllocations,
+  getPaymentAllocations,
+  listCustomersWithDue,
+  listOpenBills,
+  listRecentPayments,
+  postPayment,
+} from "@/server/domain/payments";
 
 const uuid = z.string().uuid();
 
@@ -56,4 +63,17 @@ export async function getOpenBills(customerId: string) {
 export async function getRecentReceipts() {
   const ctx = await requirePermission("accounting.post");
   return listRecentPayments(db, ctx.tenantId, ctx.storeId, "in");
+}
+
+export async function getPaymentAllocationsAction(paymentId: string) {
+  const ctx = await requirePermission("accounting.post");
+  return getPaymentAllocations(db, ctx.tenantId, uuid.parse(paymentId));
+}
+
+export async function getBillAllocationsAction(
+  refType: "sale" | "purchase",
+  refId: string,
+) {
+  const ctx = await requirePermission("accounting.post");
+  return getBillAllocations(db, ctx.tenantId, refType, uuid.parse(refId));
 }

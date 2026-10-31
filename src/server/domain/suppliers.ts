@@ -4,6 +4,7 @@ import { DomainError } from "@/server/errors";
 import { writeAudit } from "@/server/audit";
 import { nextDocNumber } from "@/server/domain/sequence";
 import { getOrSeedAccounts } from "@/server/domain/accounting";
+import { postPayment } from "@/server/domain/payments";
 import type { AuthCtx } from "@/server/rbac";
 import { z } from "zod";
 
@@ -327,6 +328,7 @@ export async function getOpenSupplierInvoices(
 
 /**
  * Records a payment to a supplier and posts the accounting journal entry (B2.4).
+ * Delegates to postPayment (A2.9) as the single authoritative voucher service.
  * Debit: Supplier Creditors (decreases accounts payable)
  * Credit: Cash / Bank (asset reduction)
  */
@@ -335,93 +337,31 @@ export async function recordSupplierPayment(
   ctx: AuthCtx,
   input: RecordSupplierPaymentInput
 ) {
-  const [supplier] = await tx
+  const allocations = input.purchaseId
+    ? [{ refType: "purchase" as const, refId: input.purchaseId, amount: input.amount }]
+    : undefined;
+
+  const result = await postPayment(tx, ctx, {
+    direction: "out",
+    partyType: "supplier",
+    partyId: input.supplierId,
+    method: input.method,
+    amount: input.amount,
+    reference: input.reference,
+    paymentDate: input.paymentDate,
+    note: input.note,
+    allocations,
+  });
+
+  const [payment] = await tx
     .select()
-    .from(schema.suppliers)
-    .where(and(eq(schema.suppliers.id, input.supplierId), eq(schema.suppliers.tenantId, ctx.tenantId)))
+    .from(schema.payments)
+    .where(eq(schema.payments.id, result.paymentId))
     .limit(1);
 
-  if (!supplier) {
-    throw new DomainError("SUPPLIER_NOT_FOUND", "Supplier not found");
+  if (!payment) {
+    throw new DomainError("PAYMENT_FAILED", "Failed to retrieve persisted payment record.");
   }
-
-  const accounts = await getOrSeedAccounts(tx, ctx.tenantId);
-  const paymentNo = await nextDocNumber(tx, ctx.tenantId, ctx.storeId, "payment", "PAY");
-  const jvNo = await nextDocNumber(tx, ctx.tenantId, ctx.storeId, "journal", "JV");
-
-  // Determine Credit Account (Cash or Bank)
-  const creditAccountId = input.method === "cash" ? accounts.cash : accounts.bank;
-
-  // 1. Create balanced double-entry journal entry
-  const [entry] = await tx
-    .insert(schema.journalEntries)
-    .values({
-      tenantId: ctx.tenantId,
-      storeId: ctx.storeId,
-      entryNo: jvNo,
-      entryDate: input.paymentDate,
-      narration: `Payment to ${supplier.name} via ${input.method.toUpperCase()} (${paymentNo})`,
-      refType: "payment",
-      createdBy: ctx.userId,
-    })
-    .returning({ id: schema.journalEntries.id });
-
-  // Debit: Creditors (Supplier)
-  // Credit: Cash / Bank
-  const lines = [
-    {
-      tenantId: ctx.tenantId,
-      entryId: entry.id,
-      accountId: accounts.creditors,
-      debit: input.amount,
-      credit: 0,
-      partyType: "supplier",
-      partyId: supplier.id,
-    },
-    {
-      tenantId: ctx.tenantId,
-      entryId: entry.id,
-      accountId: creditAccountId,
-      debit: 0,
-      credit: input.amount,
-    },
-  ];
-
-  await tx.insert(schema.journalLines).values(lines);
-
-  // 2. Insert into payments table
-  const [payment] = await tx
-    .insert(schema.payments)
-    .values({
-      tenantId: ctx.tenantId,
-      storeId: ctx.storeId,
-      paymentNo,
-      direction: "out",
-      partyType: "supplier",
-      partyId: supplier.id,
-      method: input.method,
-      amount: input.amount,
-      reference: input.reference ?? null,
-      paymentDate: input.paymentDate,
-      note: input.note ?? null,
-      journalEntryId: entry.id,
-      createdBy: ctx.userId,
-    })
-    .returning();
-
-  // 3. Write Audit Log
-  await writeAudit(tx, ctx, {
-    action: "create",
-    entityType: "payment",
-    entityId: payment.id,
-    newValue: {
-      paymentNo,
-      supplierId: supplier.id,
-      amount: input.amount,
-      method: input.method,
-      reference: input.reference,
-    },
-  });
 
   return payment;
 }
