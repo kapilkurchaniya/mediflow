@@ -11,29 +11,13 @@ import bcrypt from "bcryptjs";
 import * as schema from "../src/server/db/schema";
 import { seedSystemRoles } from "../src/server/roles";
 import { recordStockMovement } from "../src/server/domain/stock";
+import { validateE2EDatabaseUrl } from "./seed-e2e-guard";
 
 async function main() {
   const url = process.env.DATABASE_URL;
-  if (!url) {
-    throw new Error("DATABASE_URL environment variable is required.");
-  }
 
-  const parsed = new URL(url);
-  const host = parsed.hostname;
-  const dbName = parsed.pathname.replace(/^\//, "");
-
-  // 1. Safety Guard: Enforce localhost and dedicated test DB name
-  if (!["localhost", "127.0.0.1", "::1", "[::1]"].includes(host)) {
-    throw new Error(
-      `SAFETY VIOLATION: Refusing to reset non-local database (host: "${host}"). E2E tests only run against localhost.`
-    );
-  }
-
-  if (!dbName.toLowerCase().includes("test")) {
-    throw new Error(
-      `SAFETY VIOLATION: Refusing to reset database "${dbName}". E2E seed requires the database name to contain "test" (e.g. "mediflow_test").`
-    );
-  }
+  // 1. Strict Safety Guard: Enforce localhost, mediflow_test DB, and ALLOW_E2E_DB_RESET=1
+  const { host, dbName } = validateE2EDatabaseUrl(url);
 
   console.log(`[E2E Seed] Target test database verified: ${dbName}@${host}`);
 

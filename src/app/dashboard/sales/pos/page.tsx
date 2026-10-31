@@ -129,7 +129,7 @@ export default function POSPage() {
     onListHeldBills: () => setIsHeldListOpen(true),
     onOpenPaymentModal: () => setIsPaymentOpen(true),
     onOpenPromiseModal: () => setPromiseMedicine({ id: "", name: "" }),
-    onCompleteSale: () => handleCompleteSale(),
+    onCompleteSale: () => handleCompleteSale(isPaymentOpen ? "split" : state.paymentMethod),
     onEscape: () => {
       setIsPaymentOpen(false);
       setIsParkOpen(false);

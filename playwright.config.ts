@@ -39,6 +39,7 @@ export default defineConfig({
     timeout: 180 * 1000,
     env: {
       PORT,
+      ALLOW_E2E_DB_RESET: "1",
       APP_ENCRYPTION_KEY:
         process.env.APP_ENCRYPTION_KEY ||
         "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
