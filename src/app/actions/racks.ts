@@ -42,7 +42,7 @@ export async function getRacks() {
       description: schema.racks.description,
       isActive: schema.racks.isActive,
       createdAt: schema.racks.createdAt,
-      medicineCount: sql<number>`count(distinct coalesce(${schema.storeMedicineSettings.medicineId}, ${schema.medicines.id}))::int`,
+      medicineCount: sql<number>`count(distinct ${schema.storeMedicineSettings.medicineId})::int`,
     })
     .from(schema.racks)
     .leftJoin(
@@ -51,13 +51,6 @@ export async function getRacks() {
         eq(schema.racks.id, schema.storeMedicineSettings.rackId),
         eq(schema.storeMedicineSettings.storeId, ctx.storeId),
         eq(schema.storeMedicineSettings.tenantId, ctx.tenantId),
-      ),
-    )
-    .leftJoin(
-      schema.medicines,
-      and(
-        eq(schema.racks.id, schema.medicines.rackId),
-        eq(schema.medicines.tenantId, ctx.tenantId),
       ),
     )
     .where(and(eq(schema.racks.tenantId, ctx.tenantId), eq(schema.racks.storeId, ctx.storeId)))
@@ -144,11 +137,6 @@ export const deleteRack = protectedAction("medicine.manage")
             eq(schema.storeMedicineSettings.storeId, ctx.storeId),
           ),
         );
-      // Legacy fallback: unlink medicines.rackId if pointing to this rack
-      await tx
-        .update(schema.medicines)
-        .set({ rackId: null })
-        .where(and(eq(schema.medicines.rackId, id), eq(schema.medicines.tenantId, ctx.tenantId)));
       await tx
         .delete(schema.racks)
         .where(and(eq(schema.racks.id, id), eq(schema.racks.tenantId, ctx.tenantId), eq(schema.racks.storeId, ctx.storeId)));
@@ -164,12 +152,6 @@ export const assignMedicineToRack = protectedAction("medicine.manage")
   .action(async ({ parsedInput: { medicineId, rackId }, ctx }) => {
     await db.transaction(async (tx) => {
       await updateStoreMedicineSettings(tx, ctx, ctx.storeId, medicineId, { rackId });
-
-      // Maintain legacy medicines.rackId for backwards compatibility
-      await tx
-        .update(schema.medicines)
-        .set({ rackId })
-        .where(and(eq(schema.medicines.id, medicineId), eq(schema.medicines.tenantId, ctx.tenantId)));
     });
 
     revalidatePath("/dashboard/inventory");

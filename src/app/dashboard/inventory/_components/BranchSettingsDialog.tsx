@@ -73,6 +73,12 @@ export function BranchSettingsDialog({
         ? Math.round(parseFloat(salePriceOverride) * 100)
         : null;
 
+      if (parsedReorder !== null && parsedMaxStock !== null && parsedReorder > parsedMaxStock) {
+        setError("Reorder level cannot exceed maximum stock.");
+        setSaving(false);
+        return;
+      }
+
       const res = await updateStoreMedicineSettingsAction({
         medicineId: medicine.id,
         settings: {

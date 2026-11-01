@@ -44,13 +44,15 @@ export const updateStoreMedicineSettingsAction = protectedAction("medicine.manag
   )
   .action(async ({ parsedInput: { storeId, medicineId, settings }, ctx }) => {
     const targetStoreId = storeId ?? ctx.storeId;
-    const updated = await updateStoreMedicineSettings(
-      db,
-      ctx,
-      targetStoreId,
-      medicineId,
-      settings,
-    );
+    const updated = await db.transaction(async (tx) => {
+      return updateStoreMedicineSettings(
+        tx,
+        ctx,
+        targetStoreId,
+        medicineId,
+        settings,
+      );
+    });
 
     revalidatePath("/dashboard/inventory");
     revalidatePath("/dashboard/sales/pos");

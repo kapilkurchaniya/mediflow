@@ -7,7 +7,7 @@
  * Contract:
  * - Lane B Task B3.2 (Reorder engine) depends on `getStoreMedicineSettings`.
  */
-import { and, eq, inArray, sql } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
 import { schema, type DbOrTx } from "@/server/db";
 import { assertPermission, type AuthCtx } from "@/server/rbac";
@@ -25,6 +25,10 @@ export interface EffectiveStoreMedicineSettings {
   rackName: string | null;
   salePrice: number; // in paise
   salePriceSource: "store_override" | "catalog_default";
+  hasReorderOverride: boolean;
+  hasMaxStockOverride: boolean;
+  hasRackOverride: boolean;
+  hasSalePriceOverride: boolean;
   hasStoreOverrides: boolean;
 }
 
@@ -86,10 +90,7 @@ export async function getStoreMedicineSettings(
     .leftJoin(
       schema.racks,
       and(
-        eq(
-          schema.racks.id,
-          sql`COALESCE(${schema.storeMedicineSettings.rackId}, ${schema.medicines.rackId})`,
-        ),
+        eq(schema.racks.id, schema.storeMedicineSettings.rackId),
         eq(schema.racks.storeId, storeId),
         eq(schema.racks.tenantId, ctx.tenantId),
       ),
@@ -104,7 +105,7 @@ export async function getStoreMedicineSettings(
   for (const row of rows) {
     const hasReorderOverride = row.overrideReorderLevel !== null && row.overrideReorderLevel !== undefined;
     const hasMaxStockOverride = row.overrideMaxStock !== null && row.overrideMaxStock !== undefined;
-    const hasPriceOverride = row.overrideSalePrice !== null && row.overrideSalePrice !== undefined;
+    const hasSalePriceOverride = row.overrideSalePrice !== null && row.overrideSalePrice !== undefined;
     const hasRackOverride = row.overrideRackId !== null && row.overrideRackId !== undefined;
 
     const reorderLevel = hasReorderOverride
@@ -115,16 +116,15 @@ export async function getStoreMedicineSettings(
       ? (row.overrideMaxStock as number)
       : (row.catalogMaxStock ?? 100);
 
-    const salePrice = hasPriceOverride
+    const salePrice = hasSalePriceOverride
       ? (row.overrideSalePrice as number)
       : (row.catalogSalePrice ?? 0);
 
-    const salePriceSource = hasPriceOverride ? "store_override" : "catalog_default";
+    const salePriceSource = hasSalePriceOverride ? "store_override" : "catalog_default";
 
-    // Resolved rack: if store override exists, use it (can be null). Otherwise, use joined rack id if it matches store.
-    const rackId = hasRackOverride
-      ? (row.overrideRackId as string)
-      : (row.rackId ?? null);
+    // Resolved rack: store_medicine_settings is the sole source of truth for branch rack.
+    // If not set or explicitly null, the medicine has no rack in this store.
+    const rackId = row.rackId ?? null;
 
     result.set(row.medicineId, {
       tenantId: row.tenantId,
@@ -137,7 +137,11 @@ export async function getStoreMedicineSettings(
       rackName: row.rackName ?? null,
       salePrice,
       salePriceSource,
-      hasStoreOverrides: hasReorderOverride || hasMaxStockOverride || hasPriceOverride || hasRackOverride,
+      hasReorderOverride,
+      hasMaxStockOverride,
+      hasRackOverride,
+      hasSalePriceOverride,
+      hasStoreOverrides: hasReorderOverride || hasMaxStockOverride || hasSalePriceOverride || hasRackOverride,
     });
   }
 
@@ -211,6 +215,15 @@ export async function updateStoreMedicineSettings(
         eq(schema.storeMedicineSettings.tenantId, ctx.tenantId),
       ),
     );
+
+  // 4b. Validate threshold consistency
+  const effectiveReorder = parsed.reorderLevel !== undefined ? parsed.reorderLevel : existingSettings?.reorderLevel;
+  const effectiveMax = parsed.maxStock !== undefined ? parsed.maxStock : existingSettings?.maxStock;
+  if (effectiveReorder !== null && effectiveReorder !== undefined && effectiveMax !== null && effectiveMax !== undefined) {
+    if (effectiveReorder > effectiveMax) {
+      throw new DomainError("INVALID_THRESHOLDS", "Reorder level cannot exceed maximum stock.");
+    }
+  }
 
   // 5. Upsert settings row
   await tx

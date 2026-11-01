@@ -1,7 +1,7 @@
 "use server";
 
 import { db, schema } from "@/server/db";
-import { eq, and, desc, ilike, or, sql } from "drizzle-orm";
+import { eq, and, desc, ilike, or } from "drizzle-orm";
 import { requirePermission, checkPermission } from "@/server/rbac";
 import { writeAudit } from "@/server/audit";
 import { DEFAULT_GST_RATE_BP, isValidGstRateBp } from "@/lib/regulatory";
@@ -109,10 +109,7 @@ export async function getMedicines(searchQuery?: string, limit = 100, offset = 0
     .leftJoin(
       schema.racks,
       and(
-        eq(
-          schema.racks.id,
-          sql`COALESCE(${schema.storeMedicineSettings.rackId}, ${schema.medicines.rackId})`,
-        ),
+        eq(schema.racks.id, schema.storeMedicineSettings.rackId),
         eq(schema.racks.storeId, ctx.storeId),
         eq(schema.racks.tenantId, ctx.tenantId),
       ),
@@ -183,7 +180,7 @@ export async function createMedicine(formData: FormData) {
       genericName: genericName || null,
       manufacturerId: manufacturerId || null,
       categoryId: categoryId || null,
-      rackId: rackId?.trim() || null,
+      rackId: null,
       unit: packUnit,
       unitsPerPack,
       packUnit,
@@ -223,8 +220,6 @@ export async function createMedicine(formData: FormData) {
         storeId: ctx.storeId,
         medicineId: created.id,
         rackId: rackId.trim(),
-        reorderLevel: 10,
-        maxStock: 100,
       });
     }
     });

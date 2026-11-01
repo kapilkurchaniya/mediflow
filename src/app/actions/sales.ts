@@ -78,10 +78,7 @@ export async function searchPosItems(query: string) {
     .leftJoin(
       schema.racks,
       and(
-        eq(
-          schema.racks.id,
-          sql`COALESCE(${schema.storeMedicineSettings.rackId}, ${schema.medicines.rackId})`,
-        ),
+        eq(schema.racks.id, schema.storeMedicineSettings.rackId),
         eq(schema.racks.storeId, ctx.storeId),
         eq(schema.racks.tenantId, ctx.tenantId),
       ),
