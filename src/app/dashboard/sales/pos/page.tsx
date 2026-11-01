@@ -23,7 +23,7 @@ export default function POSPage() {
   const router = useRouter();
   const searchInputRef = useRef<HTMLInputElement>(null);
   const { state, dispatch, totals, loyaltyDiscountPaise, rxWarning, controlledItems, playSound } = usePosCart();
-  const { toggleCalculator, setShortcutsOpen } = useShell();
+  const { toggleCalculator, setShortcutsOpen, calculatorOpen, shortcutsOpen } = useShell();
 
   const [activeShift, setActiveShift] = useState<CurrentShiftStats | null>(null);
   const [requireShift, setRequireShift] = useState(false);
@@ -141,6 +141,7 @@ export default function POSPage() {
       setSubstituteGeneric(null);
       setPromiseMedicine(null);
     },
+    isModalOpen: isPaymentOpen || isParkOpen || isHeldListOpen || shortcutsOpen || calculatorOpen || Boolean(substituteGeneric) || Boolean(promiseMedicine),
   });
 
   return (

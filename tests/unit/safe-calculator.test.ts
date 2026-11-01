@@ -36,8 +36,16 @@ describe("evaluateMathExpression", () => {
     expect(evaluateMathExpression("100 - 10%").result).toBe(90);
     // 500 + 18% GST = 590
     expect(evaluateMathExpression("500 + 18%").result).toBe(590);
+    // 250 + 18% = 295
+    expect(evaluateMathExpression("250 + 18%").result).toBe(295);
+    // 250 - 18% = 205
+    expect(evaluateMathExpression("250 - 18%").result).toBe(205);
     // 200 * 5% = 10
     expect(evaluateMathExpression("200 * 5%").result).toBe(10);
+    // 500 / 50% = 1000
+    expect(evaluateMathExpression("500 / 50%").result).toBe(1000);
+    // 100 / 10% = 1000
+    expect(evaluateMathExpression("100 / 10%").result).toBe(1000);
     // Standalone 25% = 0.25
     expect(evaluateMathExpression("25%").result).toBe(0.25);
   });
@@ -64,6 +72,10 @@ describe("evaluateMathExpression", () => {
     expect(evaluateMathExpression("10 + 20)").success).toBe(false);
     expect(evaluateMathExpression("10 + + 20").success).toBe(false);
     expect(evaluateMathExpression("10 +").success).toBe(false);
+    expect(evaluateMathExpression("10%%").success).toBe(false);
+    expect(evaluateMathExpression("10%+").success).toBe(false);
+    expect(evaluateMathExpression("10+%").success).toBe(false);
+    expect(evaluateMathExpression("10*/2").success).toBe(false);
   });
 
   it("rejects unauthorized characters without code execution", () => {

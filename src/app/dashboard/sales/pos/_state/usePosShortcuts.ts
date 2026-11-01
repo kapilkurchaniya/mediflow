@@ -15,15 +15,18 @@ export interface ShortcutHandlers {
   onOpenCalculator?: () => void;
   onOpenShortcutsCheatSheet?: () => void;
   onEscape?: () => void;
+  isModalOpen?: boolean;
 }
 
 export function usePosShortcuts(handlers: ShortcutHandlers) {
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
+      const activeEl = document.activeElement;
       const isInput =
-        document.activeElement?.tagName === "INPUT" ||
-        document.activeElement?.tagName === "TEXTAREA" ||
-        document.activeElement?.tagName === "SELECT";
+        activeEl?.tagName === "INPUT" ||
+        activeEl?.tagName === "TEXTAREA" ||
+        activeEl?.tagName === "SELECT";
+      const isModalActive = Boolean(handlers.isModalOpen);
 
       // Ctrl + F1 -> Shortcut Cheat Sheet
       if (e.ctrlKey && (e.key === "F1" || e.key === "f1")) {
@@ -32,11 +35,24 @@ export function usePosShortcuts(handlers: ShortcutHandlers) {
         return;
       }
 
+      // If a modal is open, only allow Escape or F12 (calculator toggle) to prevent hijacking dialog inputs
+      if (isModalActive) {
+        if (e.key === "Escape") {
+          handlers.onEscape?.();
+        } else if (e.key === "F12") {
+          e.preventDefault();
+          handlers.onOpenCalculator?.();
+        }
+        return;
+      }
+
       // Function keys F2-F12, Insert, End, and / are reserved for Marg counter operations
       switch (e.key) {
         case "Insert":
-          e.preventDefault();
-          handlers.onFocusSearch?.();
+          if (!isInput) {
+            e.preventDefault();
+            handlers.onFocusSearch?.();
+          }
           break;
         case "End":
           // Classic Marg ERP bill save
