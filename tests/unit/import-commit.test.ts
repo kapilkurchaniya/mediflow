@@ -1,7 +1,138 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { commitImportJob } from "@/server/domain/import/commit";
 import type { DbOrTx } from "@/server/db";
+
+interface MockJob {
+  id: string;
+  tenantId: string;
+  entity: string;
+  source: string;
+  status: string;
+  storeId?: string;
+  totals: {
+    rows: number;
+    valid: number;
+    errors: number;
+    created: number;
+    updated: number;
+    skipped: number;
+  };
+}
+
+interface MockMedicineNormalized {
+  name: string;
+  packaging: string;
+  unitsPerPack: number;
+  hsn: string;
+  gstRateBp: number;
+  mrpPaise: number;
+  saleRatePaise: number;
+  purchaseCostPaise: number;
+  schedule: string;
+  barcode: string;
+}
+
+interface MockBatchNormalized {
+  medicineCodeOrName: string;
+  batchNo: string;
+  expiryDate: string;
+  openingQty: number;
+  closingQty: number;
+  mrpPaise: number;
+  purchaseRatePaise: number;
+  saleRatePaise: number;
+}
+
+interface MockCustomerNormalized {
+  name: string;
+  mobile: string;
+  address: string;
+  creditLimitPaise: number;
+  openingBalancePaise: number;
+}
+
+interface MockStagedRow<T = unknown> {
+  id: string;
+  rowNo: number;
+  status: string;
+  targetEntityId: string | null;
+  errors: unknown[];
+  normalized: T;
+}
+
+interface InsertedMedicineRecord {
+  name?: string;
+  mrp?: number;
+  [key: string]: unknown;
+}
+
+interface InsertedBatchRecord {
+  batchNo?: string;
+  purchaseRate?: number;
+  [key: string]: unknown;
+}
+
+interface InsertedMovementRecord {
+  type?: string;
+  qtyChange?: number;
+  unitCost?: number;
+  [key: string]: unknown;
+}
+
+interface InsertedCustomerRecord {
+  name?: string;
+  phone?: string;
+  creditLimit?: number;
+  openingBalance?: number;
+  [key: string]: unknown;
+}
+
+interface UpdatedJobRowPayload {
+  status?: string;
+  targetId?: string;
+  [key: string]: unknown;
+}
+
+interface MockTx {
+  select: () => {
+    from: (table?: unknown) => {
+      where: (clause?: unknown) => {
+        limit: (n?: number) => unknown[];
+        for?: (mode?: string) => unknown[];
+      };
+    };
+  };
+  insert: (table?: unknown) => {
+    values: (vals: Record<string, unknown>) => {
+      returning: () => unknown[];
+    };
+  };
+  update: (table?: unknown) => {
+    set: (updates: Record<string, unknown>) => {
+      where: (clause?: unknown) => unknown[];
+    };
+  };
+}
+
+interface MockDb {
+  select: () => {
+    from: (table?: unknown) => {
+      where: (clause?: unknown) => {
+        limit: (n?: number) => unknown[];
+        orderBy?: () => unknown[];
+      };
+    };
+  };
+  update: () => {
+    set: (updates?: unknown) => {
+      where: (clause?: unknown) => unknown[];
+    };
+  };
+  insert: () => {
+    values: (vals?: unknown) => unknown[];
+  };
+  transaction: (cb: (tx: MockTx) => Promise<unknown>) => Promise<unknown>;
+}
 
 describe("Import Commit Engine (Task B4.4)", () => {
   const tenantId = "tenant-test-123";
@@ -14,7 +145,7 @@ describe("Import Commit Engine (Task B4.4)", () => {
 
   it("commits valid medicine rows into medicines master", async () => {
     const jobId = "job-med-1";
-    const jobMock = {
+    const jobMock: MockJob = {
       id: jobId,
       tenantId,
       entity: "medicines",
@@ -23,7 +154,7 @@ describe("Import Commit Engine (Task B4.4)", () => {
       totals: { rows: 2, valid: 2, errors: 0, created: 0, updated: 0, skipped: 0 },
     };
 
-    const stagedRows = [
+    const stagedRows: MockStagedRow<MockMedicineNormalized>[] = [
       {
         id: "row-1",
         rowNo: 1,
@@ -45,17 +176,14 @@ describe("Import Commit Engine (Task B4.4)", () => {
       },
     ];
 
-    const updatedJobRows: any[] = [];
-    const insertedMedicines: any[] = [];
+    const updatedJobRows: UpdatedJobRowPayload[] = [];
+    const insertedMedicines: InsertedMedicineRecord[] = [];
 
-    const mockDb: any = {
+    const mockDb: MockDb = {
       select: vi.fn().mockReturnValue({
-        from: vi.fn().mockImplementation((table: any) => ({
-          where: vi.fn().mockImplementation((cond: any) => ({
-            limit: vi.fn().mockImplementation(() => {
-              // getImportJob query
-              return [jobMock];
-            }),
+        from: vi.fn().mockImplementation(() => ({
+          where: vi.fn().mockImplementation(() => ({
+            limit: vi.fn().mockImplementation(() => [jobMock]),
             orderBy: vi.fn().mockReturnValue(stagedRows),
           })),
         })),
@@ -68,8 +196,8 @@ describe("Import Commit Engine (Task B4.4)", () => {
       insert: vi.fn().mockReturnValue({
         values: vi.fn().mockReturnValue([]),
       }),
-      transaction: vi.fn().mockImplementation(async (cb: (tx: any) => Promise<any>) => {
-        const txMock: any = {
+      transaction: vi.fn().mockImplementation(async (cb: (tx: MockTx) => Promise<unknown>) => {
+        const txMock: MockTx = {
           select: vi.fn().mockReturnValue({
             from: vi.fn().mockReturnValue({
               where: vi.fn().mockReturnValue({
@@ -78,16 +206,16 @@ describe("Import Commit Engine (Task B4.4)", () => {
             }),
           }),
           insert: vi.fn().mockReturnValue({
-            values: vi.fn().mockImplementation((vals: any) => {
-              insertedMedicines.push(vals);
+            values: vi.fn().mockImplementation((vals: Record<string, unknown>) => {
+              insertedMedicines.push(vals as InsertedMedicineRecord);
               return {
                 returning: vi.fn().mockReturnValue([{ id: "med-new-1" }]),
               };
             }),
           }),
           update: vi.fn().mockReturnValue({
-            set: vi.fn().mockImplementation((updates: any) => {
-              updatedJobRows.push(updates);
+            set: vi.fn().mockImplementation((updates: Record<string, unknown>) => {
+              updatedJobRows.push(updates as UpdatedJobRowPayload);
               return {
                 where: vi.fn().mockReturnValue([]),
               };
@@ -116,7 +244,7 @@ describe("Import Commit Engine (Task B4.4)", () => {
 
   it("commits batch rows and triggers opening stock movements", async () => {
     const jobId = "job-batch-1";
-    const jobMock = {
+    const jobMock: MockJob = {
       id: jobId,
       tenantId,
       storeId,
@@ -126,7 +254,7 @@ describe("Import Commit Engine (Task B4.4)", () => {
       totals: { rows: 1, valid: 1, errors: 0, created: 0, updated: 0, skipped: 0 },
     };
 
-    const stagedRows = [
+    const stagedRows: MockStagedRow<MockBatchNormalized>[] = [
       {
         id: "row-b1",
         rowNo: 1,
@@ -146,10 +274,10 @@ describe("Import Commit Engine (Task B4.4)", () => {
       },
     ];
 
-    const insertedBatches: any[] = [];
-    const insertedMovements: any[] = [];
+    const insertedBatches: InsertedBatchRecord[] = [];
+    const insertedMovements: InsertedMovementRecord[] = [];
 
-    const mockDb: any = {
+    const mockDb: MockDb = {
       select: vi.fn().mockReturnValue({
         from: vi.fn().mockReturnValue({
           where: vi.fn().mockReturnValue({
@@ -166,9 +294,9 @@ describe("Import Commit Engine (Task B4.4)", () => {
       insert: vi.fn().mockReturnValue({
         values: vi.fn().mockReturnValue([]),
       }),
-      transaction: vi.fn().mockImplementation(async (cb: (tx: any) => Promise<any>) => {
+      transaction: vi.fn().mockImplementation(async (cb: (tx: MockTx) => Promise<unknown>) => {
         let selectCount = 0;
-        const txMock: any = {
+        const txMock: MockTx = {
           select: vi.fn().mockReturnValue({
             from: vi.fn().mockReturnValue({
               where: vi.fn().mockImplementation(() => {
@@ -185,14 +313,14 @@ describe("Import Commit Engine (Task B4.4)", () => {
               }),
             }),
           }),
-          insert: vi.fn().mockImplementation((table: any) => ({
-            values: vi.fn().mockImplementation((vals: any) => {
+          insert: vi.fn().mockImplementation(() => ({
+            values: vi.fn().mockImplementation((vals: Record<string, unknown>) => {
               if (vals.batchNo) {
-                insertedBatches.push(vals);
+                insertedBatches.push(vals as InsertedBatchRecord);
                 return { returning: vi.fn().mockReturnValue([{ id: "batch-new-1" }]) };
               }
               // stockMovements
-              insertedMovements.push(vals);
+              insertedMovements.push(vals as InsertedMovementRecord);
               return { returning: vi.fn().mockReturnValue([]) };
             }),
           })),
@@ -228,7 +356,7 @@ describe("Import Commit Engine (Task B4.4)", () => {
 
   it("commits customer and supplier rows", async () => {
     const jobId = "job-cust-1";
-    const jobMock = {
+    const jobMock: MockJob = {
       id: jobId,
       tenantId,
       entity: "customers",
@@ -237,7 +365,7 @@ describe("Import Commit Engine (Task B4.4)", () => {
       totals: { rows: 1, valid: 1, errors: 0, created: 0, updated: 0, skipped: 0 },
     };
 
-    const stagedRows = [
+    const stagedRows: MockStagedRow<MockCustomerNormalized>[] = [
       {
         id: "row-c1",
         rowNo: 1,
@@ -254,9 +382,9 @@ describe("Import Commit Engine (Task B4.4)", () => {
       },
     ];
 
-    const insertedCustomers: any[] = [];
+    const insertedCustomers: InsertedCustomerRecord[] = [];
 
-    const mockDb: any = {
+    const mockDb: MockDb = {
       select: vi.fn().mockReturnValue({
         from: vi.fn().mockReturnValue({
           where: vi.fn().mockReturnValue({
@@ -273,8 +401,8 @@ describe("Import Commit Engine (Task B4.4)", () => {
       insert: vi.fn().mockReturnValue({
         values: vi.fn().mockReturnValue([]),
       }),
-      transaction: vi.fn().mockImplementation(async (cb: (tx: any) => Promise<any>) => {
-        const txMock: any = {
+      transaction: vi.fn().mockImplementation(async (cb: (tx: MockTx) => Promise<unknown>) => {
+        const txMock: MockTx = {
           select: vi.fn().mockReturnValue({
             from: vi.fn().mockReturnValue({
               where: vi.fn().mockReturnValue({
@@ -283,8 +411,8 @@ describe("Import Commit Engine (Task B4.4)", () => {
             }),
           }),
           insert: vi.fn().mockReturnValue({
-            values: vi.fn().mockImplementation((vals: any) => {
-              insertedCustomers.push(vals);
+            values: vi.fn().mockImplementation((vals: Record<string, unknown>) => {
+              insertedCustomers.push(vals as InsertedCustomerRecord);
               return { returning: vi.fn().mockReturnValue([{ id: "cust-new-1" }]) };
             }),
           }),
@@ -316,7 +444,7 @@ describe("Import Commit Engine (Task B4.4)", () => {
 
   it("is idempotent: re-committing already-done job returns immediately without changes", async () => {
     const jobId = "job-done-1";
-    const jobMock = {
+    const jobMock: MockJob = {
       id: jobId,
       tenantId,
       entity: "medicines",
@@ -325,7 +453,7 @@ describe("Import Commit Engine (Task B4.4)", () => {
       totals: { rows: 10, valid: 10, errors: 0, created: 10, updated: 0, skipped: 0 },
     };
 
-    const mockDb: any = {
+    const mockDb: MockDb = {
       select: vi.fn().mockReturnValue({
         from: vi.fn().mockReturnValue({
           where: vi.fn().mockReturnValue({
@@ -333,8 +461,14 @@ describe("Import Commit Engine (Task B4.4)", () => {
           }),
         }),
       }),
-      update: vi.fn(),
-      insert: vi.fn(),
+      update: vi.fn().mockReturnValue({
+        set: vi.fn().mockReturnValue({
+          where: vi.fn().mockReturnValue([]),
+        }),
+      }),
+      insert: vi.fn().mockReturnValue({
+        values: vi.fn().mockReturnValue([]),
+      }),
       transaction: vi.fn(),
     };
 

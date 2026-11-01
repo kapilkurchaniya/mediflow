@@ -1,6 +1,13 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": "nextjs",
+  "git": {
+    "deploymentEnabled": {
+      "main": true,
+      "master": true,
+      "*": false
+    }
+  },
   "crons": [
     {
       "path": "/api/cron/reminders",

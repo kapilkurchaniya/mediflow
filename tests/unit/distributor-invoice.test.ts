@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { describe, it, expect, vi } from "vitest";
 import fs from "fs";
 import path from "path";
@@ -129,7 +128,7 @@ NEW MEDICINE UNKNOWN,NM001,11/27,10'S,10,0,50.00,70.00,0.0,12,300490,89099999999
       },
     ];
 
-    const mockDb: any = {
+    const mockDb = {
       select: vi.fn().mockReturnValue({
         from: vi.fn().mockReturnValue({
           where: vi.fn().mockResolvedValue(mockMedicines),
@@ -159,8 +158,8 @@ NEW MEDICINE UNKNOWN,NM001,11/27,10'S,10,0,50.00,70.00,0.0,12,300490,89099999999
   });
 
   it("quick-creates minimal medicines for unmatched items", async () => {
-    const createdInDb: any[] = [];
-    const mockDb: any = {
+    const createdInDb: Record<string, unknown>[] = [];
+    const mockDb = {
       select: vi.fn().mockReturnValue({
         from: vi.fn().mockReturnValue({
           where: vi.fn().mockReturnValue({
@@ -169,7 +168,7 @@ NEW MEDICINE UNKNOWN,NM001,11/27,10'S,10,0,50.00,70.00,0.0,12,300490,89099999999
         }),
       }),
       insert: vi.fn().mockReturnValue({
-        values: vi.fn().mockImplementation((vals: any) => {
+        values: vi.fn().mockImplementation((vals: Record<string, unknown>) => {
           const med = { id: `auto-med-${createdInDb.length + 1}`, ...vals };
           createdInDb.push(med);
           return {
