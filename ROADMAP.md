@@ -829,10 +829,10 @@ Full map in `.github/CODEOWNERS` and [ADR 0004](docs/adr/0004-two-lane-ownership
 
 ### Lane B · Phase 4
 
-#### B4.1 Import data model & domain ⏱ 2 days
+#### [x] B4.1 Import data model & domain ⏱ 2 days
 - **Files:** ➕ `src/server/db/schema/import.ts` (`import_jobs`, `import_job_rows`; docs/12) + `index.ts` line 🔀; migration. ➕ `src/server/domain/import/index.ts` (`createJob`, `addRows(jobId, rows[])`, `validateJob`, `commitJob`).
 
-#### B4.2 Presets & normalisers ⏱ 3 days (needs B0.8 samples)
+#### [x] B4.2 Presets & normalisers ⏱ 3 days (needs B0.8 samples)
 - **Files:** ➕ `src/server/domain/import/normalize.ts` (dates `DD/MM/YYYY`, `MM/YY` → end of month; money "₹1,234.50" → paise; GST "12%" → 1200 with the GST 2.0 conversion offer; phone → 10 digits; GSTIN uppercase and validation; schedule text "H1", "Sch H" → enum), ➕ `match.ts` (medicine matching: barcode → normalised name + pack + manufacturer, with trigram `similarity()` > 0.6 as a "possible match"), ➕ `presets/marg.ts`, `presets/gofrugal.ts`, `presets/generic.ts` (header synonym maps built **from the real samples**), ➕ `tests/unit/import-normalize.test.ts`, ➕ `tests/fixtures/marg-items.synthetic.csv` (synthetic data only, no real customer data).
 
 #### B4.3 Import wizard UI ⏱ 3 days
