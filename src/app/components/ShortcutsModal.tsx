@@ -54,6 +54,7 @@ const SHORTCUT_GROUPS: ShortcutGroup[] = [
     icon: <Search className="h-4 w-4 text-sky-600" />,
     shortcuts: [
       { key: "Ctrl/Cmd + K", label: "Open global command palette" },
+      { key: "Ctrl + Shift + S", label: "Switch branch or warehouse location" },
       { key: "Ctrl + B", label: "Toggle sidebar collapse" },
       { key: "Ctrl + F1 / ?", label: "Open keyboard shortcuts cheat sheet" },
       { key: "Ctrl + J", label: "Open/close MediFlow AI assistant" },

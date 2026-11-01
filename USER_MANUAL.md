@@ -206,6 +206,7 @@ Do these once, in this order.
 
 **Top bar**
 - **Breadcrumbs** (e.g. *Home › Settings › Racks*) show where you are.
+- **Branch / Warehouse Switcher (Ctrl + Shift + S)**: Displays the active branch name, store code, and operating kind (`Retail` vs `Warehouse`). Click or press **Ctrl + Shift + S** to quickly switch branches with instant search.
 - **Search or jump to… (⌘K / Ctrl + K)** opens the command palette (see below).
 - **⌨ icon** (or press **?**) shows all keyboard shortcuts.
 - **🔔 bell** shows alerts: *Near Expiry Alert*, *Low Stock Warning*, and a reminder that the day's sales register is ready to reconcile. *View all inventory alerts* takes you to the stock pages.
@@ -944,6 +945,7 @@ It answers from your live data. If it hasn't been set up with an AI key, it will
 | Where | Keys | What they do | macOS Equivalent |
 |---|---|---|---|
 | Anywhere | **Ctrl/⌘ + K** | Search or jump to any page | `Cmd + K` |
+| Anywhere | **Ctrl + Shift + S** | Switch branch or warehouse | `Cmd + Shift + S` |
 | Anywhere | **Ctrl + B** | Collapse / expand the left menu | `Cmd + B` / `Ctrl + B` |
 | Anywhere | **?** or **Ctrl + F1** | Show Marg ERP & system shortcuts cheat sheet | `?` or `Cmd + ?` |
 | Anywhere | **Ctrl + J** | Open / close the AI assistant | `Cmd + J` |
@@ -1001,6 +1003,7 @@ If your pharmacy staff is accustomed to Marg ERP 9+ or Marg Books, here is how t
 | **Mid-Shift Snapshot (X-Report)** | Till summary | **`Alt + P`** | Real-time audit snapshot without closing shift |
 | **Save & Print Receipt** | `End` / `Ctrl + W` / `F10`| **`End`** / **`F10`** | Traditional Marg `End` key prints invoice in 1 press |
 | **Counter Calculator** | `F12` / `Alt + F12` | **`F12`** / **`Alt + F12`** | Integrated safe arithmetic calculator with copy to bill |
+| **Switch Branch / Location** | Company / branch menu | **`Ctrl + Shift + S`** | Instant branch switcher with search across retail branches and warehouses |
 | **Global ERP Navigation** | `Alt + P/M/I/L` | **`Alt + P/M/I/L`** | One-key jump to Purchases, Register, Inventory & Ledgers |
 | **Barcode Scanner** | Fast scan mode | **Automatic** | High-speed hardware buffer (<45ms) auto-adds scanned packs |
 | **Help / Cheat Sheet** | `Ctrl + F1` / `Alt + F1` | **`Ctrl + F1`** / **`?`** | Instant on-screen cheat sheet |

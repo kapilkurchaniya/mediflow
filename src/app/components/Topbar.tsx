@@ -14,6 +14,7 @@ import {
 import { LogoMark } from "./ui";
 import { useShell } from "./ShellContext";
 import { NotificationsPopover } from "./NotificationsPopover";
+import { StoreSwitcher } from "./StoreSwitcher";
 
 const LABELS: Record<string, string> = {
   dashboard: "Overview",

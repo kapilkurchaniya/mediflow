@@ -193,3 +193,31 @@ export const defaultPosDataSource: PosDataSource = {
     );
   },
 };
+
+export function mapHeldItemsToCartLines(items: ResumeHeldSaleResult["payload"]["items"]) {
+  return items.map((it) => {
+    const upp = it.unitsPerPack || 1;
+    const packQty = it.packQty || 0;
+    const looseQty = it.looseQty || 0;
+    return {
+      batchId: it.batchId,
+      medicineId: it.medicineId,
+      medicineName: it.medicineName,
+      genericName: it.genericName,
+      batchNo: it.batchNo,
+      expiryDate: it.expiryDate,
+      qty: packQty * upp + looseQty,
+      packQty,
+      looseQty,
+      unitsPerPack: upp,
+      packUnit: it.packUnit || "strip",
+      looseUnit: it.looseUnit || "tablet",
+      qtyOnHand: 0,
+      mrp: it.mrp,
+      saleRate: it.rate,
+      discountBp: it.discountBp || 0,
+      gstRateBp: it.gstRateBp,
+      autoFefo: Boolean(it.isAutoFefo),
+    };
+  });
+}

@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useSyncExternalStore, useRef } from "react";
 import { usePathname, useRouter } from "next/navigation";
+import type { AllowedStoreItem } from "@/server/domain/stores";
 
 function subscribeOnline(callback: () => void) {
   window.addEventListener("online", callback);
@@ -46,11 +47,17 @@ interface ShellContextType {
   notificationsOpen: boolean;
   setNotificationsOpen: (open: boolean) => void;
 
+  // Store switcher modal state (Ctrl+Shift+S)
+  storeSwitcherOpen: boolean;
+  setStoreSwitcherOpen: (open: boolean) => void;
+
   // Network connection state
   isOnline: boolean;
 
   // Contextual info
   storeName: string;
+  currentStore: AllowedStoreItem | null;
+  allowedStores: AllowedStoreItem[];
   userName: string;
   userEmail: string;
   /** Permissions of the signed-in user; the sidebar and command palette hide what they may not use. */
@@ -64,12 +71,16 @@ const STORAGE_KEY_COLLAPSED = "mediflow:sidebar-collapsed";
 export function ShellProvider({
   children,
   storeName,
+  currentStore = null,
+  allowedStores = [],
   userName,
   userEmail,
   permissions,
 }: {
   children: React.ReactNode;
   storeName: string;
+  currentStore?: AllowedStoreItem | null;
+  allowedStores?: AllowedStoreItem[];
   userName: string;
   userEmail: string;
   permissions: readonly string[];
@@ -91,6 +102,7 @@ export function ShellProvider({
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const [calculatorOpen, setCalculatorOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [storeSwitcherOpen, setStoreSwitcherOpen] = useState(false);
   const isOnline = useSyncExternalStore(subscribeOnline, getOnlineSnapshot, getServerSnapshot);
 
   const toggleCalculator = useCallback(() => setCalculatorOpen((o) => !o), []);
@@ -142,9 +154,16 @@ export function ShellProvider({
       }
 
       // Ctrl+B -> Toggle Sidebar Collapse
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "b") {
+      if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === "b") {
         e.preventDefault();
         toggleCollapsed();
+        return;
+      }
+
+      // Ctrl+Shift+S -> Open Store Switcher
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === "s") {
+        e.preventDefault();
+        setStoreSwitcherOpen((o) => !o);
         return;
       }
 
@@ -198,13 +217,14 @@ export function ShellProvider({
         if (shortcutsOpen) setShortcutsOpen(false);
         if (calculatorOpen) setCalculatorOpen(false);
         if (notificationsOpen) setNotificationsOpen(false);
+        if (storeSwitcherOpen) setStoreSwitcherOpen(false);
         if (mobileOpen) setMobileOpen(false);
       }
     };
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [commandOpen, shortcutsOpen, calculatorOpen, notificationsOpen, mobileOpen, toggleCollapsed, router]);
+  }, [commandOpen, shortcutsOpen, calculatorOpen, notificationsOpen, storeSwitcherOpen, mobileOpen, toggleCollapsed, router]);
 
   return (
     <ShellContext.Provider
@@ -224,8 +244,12 @@ export function ShellProvider({
         toggleCalculator,
         notificationsOpen,
         setNotificationsOpen,
+        storeSwitcherOpen,
+        setStoreSwitcherOpen,
         isOnline,
         storeName,
+        currentStore,
+        allowedStores,
         userName,
         userEmail,
         permissions: permissionSet,

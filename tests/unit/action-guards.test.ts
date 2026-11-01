@@ -17,6 +17,8 @@ const PUBLIC_BY_DESIGN: Record<string, string> = {
   acceptInviteAction: "public: a new person accepts an invitation; the one-time token in the link is the credential",
   changePasswordAction: "any signed-in user changes their OWN password (requires sign-in and the current password, no permission)",
   createExternalOrderForTenant: "server-only helper called by /api/v1/orders after API-key auth",
+  switchStoreAction: "any signed-in user switches their active store (enforces membership storeIds and store.switch_any)",
+  getAllowedStoresAction: "any signed-in user retrieves their permitted active stores",
 };
 
 const KNOWN_UNGUARDED: Record<string, string> = {
