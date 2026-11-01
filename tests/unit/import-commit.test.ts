@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { commitImportJob } from "@/server/domain/import/commit";
 import type { DbOrTx } from "@/server/db";
