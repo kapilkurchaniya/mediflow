@@ -1,5 +1,5 @@
 import { getSales } from "@/app/actions/sales";
-import { Plus, Receipt, Printer, Eye } from "lucide-react";
+import { Plus, Receipt, Printer, Eye, RotateCcw, Banknote } from "lucide-react";
 import Link from "next/link";
 import { format } from "date-fns";
 import { PageHeader, SearchForm, EmptyState, Avatar } from "@/app/components/ui";
@@ -35,6 +35,12 @@ export default async function SalesPage({
         description="Every bill raised from this store, with payment status."
         actions={
           <>
+            <Link href="/dashboard/sales/register" className="btn btn-secondary">
+              <Banknote className="h-4 w-4 mr-1 text-emerald-600" /> Cash register
+            </Link>
+            <Link href="/dashboard/sales/returns" className="btn btn-secondary">
+              <RotateCcw className="h-4 w-4 mr-1 text-amber-600" /> Credit notes
+            </Link>
             <ExportButton
               endpoint="/api/export/sales"
               from={dateRange.from}

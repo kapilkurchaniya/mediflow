@@ -46,6 +46,9 @@ export default function NewMedicinePage() {
   const [racks, setRacks] = useState<{ id: string; code: string; name: string }[]>([]);
   const [newCatName, setNewCatName] = useState("");
   const [newMfgName, setNewMfgName] = useState("");
+  const [packUnit, setPackUnit] = useState("strip");
+  const [unitsPerPack, setUnitsPerPack] = useState("10");
+  const [looseUnit, setLooseUnit] = useState("tablet");
 
   useEffect(() => {
     // Load categories, manufacturers, and racks on mount
@@ -151,9 +154,25 @@ export default function NewMedicinePage() {
             </Field>
           </FormSection>
 
-          <FormSection title="Packaging & compliance" description="Unit of sale, barcode and scheduling under the Drugs & Cosmetics Act.">
-            <Field label="Unit" htmlFor="unit">
-              <select id="unit" name="unit" className="input">
+          <FormSection title="Packaging & compliance" description="Unit of sale, conversion factor for loose tablet cutting, and drug schedules.">
+            <Field label="Pack unit" htmlFor="packUnit" hint="Whole selling package unit.">
+              <select
+                id="packUnit"
+                name="packUnit"
+                className="input"
+                value={packUnit}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setPackUnit(val);
+                  if (val === "strip") {
+                    setLooseUnit("tablet");
+                    if (unitsPerPack === "1") setUnitsPerPack("10");
+                  } else if (val === "bottle" || val === "vial" || val === "tube") {
+                    setLooseUnit("piece");
+                    setUnitsPerPack("1");
+                  }
+                }}
+              >
                 <option value="strip">Strip</option>
                 <option value="bottle">Bottle</option>
                 <option value="pack">Pack</option>
@@ -163,7 +182,42 @@ export default function NewMedicinePage() {
                 <option value="piece">Piece</option>
               </select>
             </Field>
-            <Field label="Pack size" htmlFor="packSize">
+
+            <Field label="Units per pack" htmlFor="unitsPerPack" hint="Number of loose items per pack (e.g. 10 tablets).">
+              <input
+                id="unitsPerPack"
+                name="unitsPerPack"
+                type="number"
+                min="1"
+                step="1"
+                className="input font-mono font-bold"
+                value={unitsPerPack}
+                onChange={(e) => setUnitsPerPack(e.target.value)}
+                placeholder="10"
+              />
+            </Field>
+
+            <Field label="Loose unit" htmlFor="looseUnit" hint="Individual cutting/dispensing unit.">
+              <input
+                id="looseUnit"
+                name="looseUnit"
+                className="input"
+                value={looseUnit}
+                onChange={(e) => setLooseUnit(e.target.value)}
+                placeholder="tablet"
+              />
+            </Field>
+
+            {parseInt(unitsPerPack, 10) > 1 && (
+              <div className="sm:col-span-2 rounded-lg bg-brand-50 border border-brand-200 p-3 text-xs text-brand-900 flex items-center justify-between">
+                <span className="font-semibold">Strip Cutting Conversion:</span>
+                <span className="font-mono font-bold text-brand-800">
+                  1 {packUnit.charAt(0).toUpperCase() + packUnit.slice(1)} = {unitsPerPack} {looseUnit.charAt(0).toUpperCase() + looseUnit.slice(1)}s
+                </span>
+              </div>
+            )}
+
+            <Field label="Pack size label" htmlFor="packSize" hint="e.g. 15 tablets, 100 ml">
               <input id="packSize" name="packSize" className="input" placeholder="15 tablets, 100 ml" />
             </Field>
             <Field label="Barcode (EAN / UPC)" htmlFor="barcode">

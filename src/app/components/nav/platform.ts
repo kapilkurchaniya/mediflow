@@ -1,4 +1,4 @@
-import { ScrollText, ShieldCheck, UserCog } from "lucide-react";
+import { ScrollText, ShieldCheck, Store, UserCog } from "lucide-react";
 import type { NavItem } from "./types";
 
 /** Platform pages (Lane A): audit log, and later users / stores. */
@@ -29,5 +29,14 @@ export const platformNav: NavItem[] = [
     icon: ShieldCheck,
     description: "What each role may do",
     permission: "user.manage",
+  },
+  {
+    group: "directory",
+    order: 62,
+    href: "/dashboard/settings/stores",
+    label: "Stores & Warehouses",
+    icon: Store,
+    description: "Manage pharmacy branches and distribution hubs",
+    permission: "store.manage",
   },
 ];

@@ -7,6 +7,8 @@ import { AIAssistant } from "@/app/components/AIAssistant";
 import { ShellProvider, useShell } from "@/app/components/ShellContext";
 import { CommandPalette } from "@/app/components/CommandPalette";
 import { ShortcutsModal } from "@/app/components/ShortcutsModal";
+import { CounterCalculator } from "@/app/components/CounterCalculator";
+import type { AllowedStoreItem } from "@/server/domain/stores";
 import clsx from "clsx";
 
 interface DashboardShellProps {
@@ -14,6 +16,8 @@ interface DashboardShellProps {
   userName: string;
   userEmail: string;
   storeName: string;
+  currentStore?: AllowedStoreItem | null;
+  allowedStores?: AllowedStoreItem[];
   permissions: readonly string[];
 }
 
@@ -24,7 +28,7 @@ function DashboardShellContent({
   storeName,
 }: DashboardShellProps) {
   const pathname = usePathname();
-  const { mobileOpen, setMobileOpen } = useShell();
+  const { mobileOpen, setMobileOpen, calculatorOpen, setCalculatorOpen } = useShell();
 
   const isPrintMode = pathname?.endsWith("/print") || pathname?.includes("/print");
   const isPosTerminal = pathname === "/dashboard/sales/pos";
@@ -116,6 +120,12 @@ function DashboardShellContent({
 
       {/* Keyboard Shortcuts Cheat Sheet Modal */}
       <ShortcutsModal />
+
+      {/* Floating Counter Calculator (F12 / Alt+F12) */}
+      <CounterCalculator
+        isOpen={calculatorOpen}
+        onClose={() => setCalculatorOpen(false)}
+      />
     </div>
   );
 }
@@ -124,6 +134,8 @@ export function DashboardShell(props: DashboardShellProps) {
   return (
     <ShellProvider
       storeName={props.storeName}
+      currentStore={props.currentStore}
+      allowedStores={props.allowedStores}
       userName={props.userName}
       userEmail={props.userEmail}
       permissions={props.permissions}

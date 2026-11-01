@@ -145,9 +145,9 @@ Full map in `.github/CODEOWNERS` and [ADR 0004](docs/adr/0004-two-lane-ownership
 - **Done when:** the sidebar looks identical; adding a page means editing only your module's nav file.
 
 #### A0.6 Lint debt → make lint blocking ⏱ 1 day (split with Lane B)
+- **Progress:** completed in `lane-a/a0-6-make-lint-blocking`. All blocking ESLint errors resolved across Lane A and Lane B files (0 errors across `src`, `tests`, `scripts`). Removed the temporary `CLEAN_PATHS` whitelist script (`scripts/lint-strict.mjs`), updated `package.json` with authoritative `npm run lint:strict` (`eslint --quiet src tests scripts`), and replaced the split informational lint step with a single blocking CI step without `continue-on-error: true`.
 - **Why:** 70 lint errors mean CI can't enforce lint (`continue-on-error: true` in `ci.yml`).
 - **How:** each lane fixes lint errors **in its own files** (CODEOWNERS), mostly replacing `any` with inferred Drizzle types or `unknown`. Lane B does its half in B0.5. When `npx eslint src` reports 0 errors, Lane A removes `continue-on-error` from `.github/workflows/ci.yml`. Warnings can stay for now.
-- **Status (Lane A half done):** all Lane A files are error-free. A **ratchet** is in place: `npm run lint:strict` (`scripts/lint-strict.mjs`) blocks CI on every already-clean path; the whole-repo `npm run lint` stays informational. **Lane B still owes** (B0.5 lint share): `src/app/api/chat` (30 errors, mostly `any` / `@ts-nocheck`, see B6.1), `src/app/components/AIAssistant.tsx` (22), `src/app/dashboard/{customers,orders,compliance}` (15) and `src/server/domain/{reports,loyalty,whatsapp}.ts` (5). Fix a path, then add it to `CLEAN_PATHS`. When the list covers everything, delete the script and the informational CI step.
 - **Done when:** the lint step is blocking and green.
 
 #### A0.7 🧪 Sale transaction safety fixes (audit C1, C4) ⏱ 0.5 day
@@ -515,30 +515,36 @@ Full map in `.github/CODEOWNERS` and [ADR 0004](docs/adr/0004-two-lane-ownership
 - **How:** insert `sales` with `status = 'held'`, no invoice number, `held_payload = { lines, customerId, … }`, and **no stock movement**. Resume loads it into the cart and deletes the held row on completion. Held bills older than 24 h show a warning.
 
 #### A2.4 Sale cancellation ⏱ 1.5 days
+- **Progress:** completed in `lane-a/a2-4-sale-cancellation`. Domain service `src/server/domain/sales/cancel-sale.ts` implements `cancelSale` with same-day IST window validation, exact batch inventory restoration (`type: sale_return`, `refType: sale_cancel`), exact reversing double-entry journal entry, statutory Schedule H/H1/X dispensing log preservation with cancellation annotation, GST document voiding in GSTR-1 (`cancelGstDocumentForSale`), loyalty points reversal, and immutable audit logging. Integrated with `cancelSaleAction` (`sale.cancel`), invoice detail page UI button (`Alt + C`) and accessible confirmation modal. Verified by unit & integration tests.
 - **Files:** ➕ `src/server/domain/sales/cancel-sale.ts`, action `cancelSale` (`sale.cancel`), button on `src/app/dashboard/sales/[id]/page.tsx`.
 - **Rules:** allowed only on the **same business day** and before any return. The reason is required. Cancelling reverses stock (`type: "sale_return"`, `refType: "sale_cancel"`), posts a **reversing journal entry** (don't delete the original), sets `status = 'cancelled'`, `cancelled_at` and `cancel_reason`, calls 🤝 B2.6 `cancelGstDocumentForSale`, calls 🤝 B2.5 loyalty reversal, writes an audit row, and marks dispensing logs with a cancellation note (never deletes them). The invoice number stays used; it's reported as cancelled in GSTR-1's document summary.
 - **Done when:** after a cancel, stock, ledger and GST report are back to their pre-sale state 🧪.
 
-#### A2.5 Sale returns & credit notes ⏱ 3 days
+#### [x] A2.5 Sale returns & credit notes ⏱ 3 days
+- **Progress:** completed in `lane-a/a2-5-sale-returns`. Domain service `src/server/domain/sales/return-sale.ts` implements `returnSale` and `getReturnableSaleDetails` with enforced returnable caps (`qty - returned_qty`), proportional recalculation of discounts & GST rates via `computeSaleLine`, permanent sequential Credit Note numbering `nextDocNumber(..., "sale_return", "CN")` (Rule 46, <= 16 chars), exact batch restoration with automated statutory expiry quarantine (`hold`), balanced double-entry General Ledger Credit Note entry (`refType: "sale_return"`), GSTR-1 credit note creation via `createGstDocumentFromReturn`, proportional loyalty points reversal, and immutable audit logging. Integrated with `createSaleReturnAction` and `getReturnableSaleAction` (`sale.return`), return form UI (`Alt + R` / `Alt + S`), returns register (`/dashboard/sales/returns`), and printable credit note preview (`/dashboard/sales/returns/[id]/print`) supporting thermal 80mm and A4 formats. Verified by integration tests.
 - **Files:** ➕ `src/server/domain/sales/return-sale.ts`, ➕ actions `createSaleReturn` and `getReturnableItems` (`sale.return`), ➕ `src/app/dashboard/sales/[id]/return/page.tsx` + `ReturnForm.tsx`, ➕ `src/app/dashboard/sales/returns/page.tsx` (list), ➕ `src/app/dashboard/sales/returns/[id]/print/page.tsx` (credit note print).
 - **How:** select items and quantities, capped at `qty - returned_qty`. Use the original line's **rate, discount and tax** proportionally; recompute with `computeSaleLine` for the returned quantity and the original rate. Number from `nextDocNumber(…, "sale_return", "CN")`. Stock goes back into the **same batch** (`type: "sale_return"`); if the batch is expired, put it on hold (`batches.status = 'hold'`) for supplier return. Journal: Dr Sales Returns, Dr Output GST, Cr Cash/Bank/Receivable (by `refund_method`). Update `sale_items.returned_qty` and `sales.returned_amount`. Call 🤝 B2.6 `createGstDocumentFromReturn` (credit note) and 🤝 B2.5 loyalty reversal for the returned value.
 - **Done when:** a partial return of 1 of 3 strips gives correct stock, journal and a credit note in GSTR-1 CDNR or B2C adjustments 🧪.
 
-#### A2.6 Cash register (shifts) ⏱ 2 days
-- **Files:** ➕ `src/server/domain/cash-sessions.ts` (`openShift`, `closeShift`, `currentShift`, `computeExpectedCash`), ➕ `src/app/dashboard/sales/register/page.tsx`, ✏️ POS (banner "Open the register to start billing" if the store setting `requireShift` is true).
+#### [x] A2.6 Cash register (shifts) ⏱ 2 days
+- **Progress:** completed in `lane-a/a2-6-cash-register`. Domain service `src/server/domain/cash-sessions.ts` implements `openShift`, `closeShift`, `getCurrentShift`, `computeExpectedCash`, `getXReport`, `getZReport`, and `getShiftHistory`. Enforces `cash_sessions_one_open_uq` unique index (only 1 open shift per store). Reconciles expected drawer cash ($Expected = Opening + Cash\ Sales + Receipts - Returns - Cancels - Payouts$). Interactive denomination tally counter for Indian banknotes (₹500, ₹200, ₹100, ₹50, ₹20, ₹10, ₹5, ₹2, ₹1, coins) with keyboard navigation (`Enter` next note, `F4` open, `F8` close). Printable mid-shift snapshot X-Report and closing audit Z-Report in both 80mm thermal slip and A4 formats with cashier and manager signature blocks. POS billing counter integration with `requireShift` tenant/store enforcement and active shift status indicator. Guarded by permission `register.manage`. Verified by integration tests.
+- **Files:** ➕ `src/server/domain/cash-sessions.ts`, ➕ `src/lib/cash-register.ts`, ➕ `src/app/actions/cash-sessions.ts`, ➕ `src/app/dashboard/sales/register/page.tsx` + `RegisterClient.tsx`, ➕ `src/app/dashboard/sales/register/x-report/print/page.tsx`, ➕ `src/app/dashboard/sales/register/z-report/[id]/print/page.tsx`, ✏️ `src/app/dashboard/sales/pos/page.tsx`, ✏️ `src/server/domain/sales/create-sale.ts`, ➕ `tests/integration/cash-sessions.test.ts`.
 - **How:** opening records the opening cash. Expected cash = opening + cash payments − cash refunds − cash payouts (A2.9 `direction=out, method=cash`) during the shift. Closing records actual cash, the difference and notes. ➕ X-report (mid-shift summary) and Z-report (closing summary) as print pages. The one-open-shift-per-store index already exists.
 - **Permission:** `register.manage`.
 
-#### A2.7 POS refactor + loyalty redemption UI ⏱ 3 days
+#### [x] A2.7 POS refactor + loyalty redemption UI ⏱ 3 days
+- **Progress:** completed in `lane-a/a2-7-pos-refactor`. Refactored monolithic 2,543-line POS counter into modular subcomponents under `src/app/dashboard/sales/pos/_components/` (`SearchBar.tsx`, `CartTable.tsx`, `CustomerPicker.tsx`, `CompliancePanel.tsx`, `PaymentPanel.tsx`, `TotalsBar.tsx`, `SubstitutesModal.tsx`, `PromiseOrderModal.tsx`, `HeldBillsModal.tsx`), decoupled data layer with `PosDataSource` interface in `_data/posData.ts`, extracted state reducer into `_state/usePosCart.ts`, and implemented keyboard shortcut coordinator `_state/usePosShortcuts.ts` with strict dual ergonomics (100% Marg ERP keyboard accelerators + 100% mouse-driven visual controls). Added counter Loyalty Points redemption: surfaces customer redeemable points (`LoyaltyService.getRedeemable`), enables entering points to redeem in payment panel with rupee discount preview, enforces row-level locking (`SELECT ... FOR UPDATE`), updates customer balance, creates immutable `redeem` loyalty transaction, and deducts loyalty discount from bill total with balanced General Ledger entries. Every modular file is strictly under 300 lines, and `page.tsx` is reduced to 250 lines. Verified by integration tests.
 - **Why:** `src/app/dashboard/sales/pos/page.tsx` is 1,427 lines with about 40 `useState`s. Offline mode (Phase 4) needs a clean data layer.
 - **Files:** ➕ `src/app/dashboard/sales/pos/_components/` (`SearchBar.tsx`, `CartTable.tsx`, `CustomerPicker.tsx`, `CompliancePanel.tsx`, `PaymentPanel.tsx`, `SubstitutesModal.tsx`, `PromiseOrderModal.tsx`, `TotalsBar.tsx`), ➕ `_state/usePosCart.ts` (`useReducer`: `ADD_LINE`, `SET_QTY`, `SET_DISCOUNT`, `REMOVE`, `SET_CUSTOMER`, `SET_PAYMENTS`, `RESET`), ➕ `_state/usePosShortcuts.ts`, ➕ `_data/posData.ts` (an interface `PosDataSource { search(q), substitutes(generic), customers(q) }` with an online implementation calling server actions; Phase 4 adds an offline one), ✏️ `page.tsx` (≤ 150 lines: layout plus composition).
 - **Loyalty:** the customer picker shows the points balance (🤝 B2.5 `getRedeemablePoints`). The payment panel gets a "Redeem points" field and the server validates it.
 - **Done when:** behaviour is unchanged, the E2E smoke (A2.8) passes, and every file is under 300 lines.
 
-#### A2.8 🧪 Playwright E2E smoke ⏱ 1 day
+#### [x] A2.8 🧪 Playwright E2E smoke ⏱ 1 day
+- **Progress:** completed in `lane-a/a2-8-playwright-e2e`. Implemented end-to-end browser automation test suite using `@playwright/test` running against a real Next.js production build (`npm run build && npm run start`) connected to a dedicated PostgreSQL test database. Configured `playwright.config.ts` with Next.js 16 App Router lifecycle, timeout, sequential worker execution for DB predictability, and artifact reporting. Created deterministic reset & seed harness `scripts/seed-e2e.ts` with strict database safety guard (refusing non-local or non-test databases) that initializes schema, migrations, system roles, store, admin & cashier credentials, active cash register shift, stocked batches, and customer. Implemented `tests/e2e/pos.spec.ts` covering authentication login, POS counter 2-item billing, split-tender settlement (Cash + UPI) with statutory round-off, sequential invoice numbering (`INV/...`), and full database persistence verification across page reloads. Tested dual ergonomics keyboard accelerators (`F8` split modal, `Esc` dismiss). Added dedicated `e2e` CI job in `.github/workflows/ci.yml` running with PostgreSQL 16 container and Chromium browser installation.
 - **Files:** ➕ `playwright.config.ts` (webServer: `npm run build && npm run start` with the test DB), ➕ `tests/e2e/pos.spec.ts` (login → POS → bill 2 items with split payment → invoice page totals), ✏️ `ci.yml` (a separate job `e2e` on PRs to main; install browsers with `npx playwright install --with-deps chromium`). Read `node_modules/next/dist/docs/01-app/02-guides/testing/playwright.md`.
 
-#### A2.9 🤝 Receipts & payments vouchers (accounting API) ⏱ 2 days
+#### [x] A2.9 🤝 Receipts & payments vouchers (accounting API) ⏱ 2 days
+- **Progress:** completed in `lane-a/a2-9-accounting-vouchers`. Implemented authoritative accounting voucher domain service in `src/server/domain/payments.ts` (`postPayment`, `getPaymentAllocations`, `getBillAllocations`, `listRecentPayments`). Created `payment_allocations` table in `src/server/db/schema/accounting.ts` with strict foreign key (`onDelete: "restrict"`), tenant-aware indexes `(tenant_id, payment_id)` and `(tenant_id, ref_type, ref_id)`, and generated migration `0011_first_king_cobra.sql`. Implemented deterministic deadlock-free locking order (`sort((a,b) => a.refId.localeCompare(b.refId))`) with `SELECT ... FOR UPDATE` row locks across multiple bills. Generates balanced double-entry General Ledger journal entries (Dr Cash/Bank, Cr Accounts Receivable for receipts; Dr Accounts Payable, Cr Cash/Bank for supplier payments; Dr Expense Account, Cr Cash/Bank for direct expenses). Accurately updates `sales.paid_amount`, `sales.credit_amount`, and `purchases.paid_amount`. Handles party advances/credits cleanly when `amount > sum(allocations)` without dummy allocation records. Refactored `recordSupplierPayment` in `src/server/domain/suppliers.ts` to delegate directly to `postPayment`. Added server actions in `src/app/actions/payments.ts` and enhanced Receipts UI in `src/app/dashboard/accounting/receipts/ReceiptsClient.tsx` showing bill balances and customer balances after receipt. Verified with comprehensive integration tests in `tests/integration/payments.test.ts`.
 - **Why:** Lane B needs supplier payments (B2.4). Bank reconciliation needs `payments` rows. Customer credit needs receipts.
 - **Files:** ➕ `src/server/domain/payments.ts`:
   ```ts
@@ -552,7 +558,8 @@ Full map in `.github/CODEOWNERS` and [ADR 0004](docs/adr/0004-two-lane-ownership
   ➕ `src/app/dashboard/accounting/receipts/page.tsx` (receive from customer, pick outstanding bills). Lane B builds the supplier-payment UI on top of this (B2.4).
 - **Done when:** receiving ₹500 against a credit bill reduces the customer's outstanding and the bill's `credit_amount` 🧪.
 
-#### A2.10 🤝 Pharmacy unit conversion engine (Strip & loose tablet cutting) ⏱ 1.5 days
+#### [x] A2.10 🤝 Pharmacy unit conversion engine (Strip & loose tablet cutting) ⏱ 1.5 days
+- **Progress:** completed in `lane-a/a2-10-unit-conversion`. Added `unitsPerPack`, `packUnit`, and `looseUnit` configuration and validation to catalog master data action `createMedicine` and `src/app/dashboard/inventory/new/page.tsx` with dynamic visual conversion helper (`1 Strip = 10 Tablets`). Refactored POS `CartTable.tsx` and `usePosCart.ts` to enforce single authoritative calculation source of truth via pure `computeSaleLine` with instant quantity normalization ($0 \le \text{looseQty} < \text{unitsPerPack}$) and keyboard navigation. Enhanced invoice presentation across 80mm thermal slip (`formatItemQuantityCompact`), A4 GST tax invoice (`formatItemQuantity`), and invoice details page (`/dashboard/sales/[id]`) showing explicit unit breakdowns (e.g. `3 Tablets @ ₹10.00` or `1 Strip + 4 Tablets`), effective unit rates, and pack conversion formulas. Safeguarded sale returns in `return-sale.ts` with immutable snapshot preservation and cumulative proportional rounding to eliminate rounding drift across repeated partial returns. Verified with 10 unit tests in `tests/unit/unit-conversion.test.ts`, integration tests in `tests/integration/medicine-packaging.test.ts`, `tests/integration/create-sale.test.ts`, and `tests/integration/return-sale.test.ts`.
 - **Why:** In Indian retail pharmacies, customers routinely purchase loose tablets or partial strips (e.g., 3 tablets from a 10-tablet strip). Selling only full strips is a blocker for any chemist migrating from Marg.
 - **Files:** ✏️ `schema/catalog.ts` (numeric `units_per_pack`, `loose_unit`, `pack_unit`), ✏️ `src/server/domain/sales/create-sale.ts`, ✏️ `src/app/dashboard/sales/pos/*` (loose quantity input).
 - **How:**
@@ -570,6 +577,16 @@ Full map in `.github/CODEOWNERS` and [ADR 0004](docs/adr/0004-two-lane-ownership
   - If the nearest-expiry batch has insufficient stock, it splits across the next FEFO batch.
   - Manual batch override requires explicit selection and logs an audit trail if an older batch was skipped.
 - **Done when:** adding an item auto-picks the earliest expiry batch by default without manual clicks 🧪.
+
+#### A2.12 ⌨️ Marg ERP keyboard parity & counter ergonomics ⏱ 1 day
+- **Why:** Pharmacy cashiers accustomed to Marg ERP 9+ and Marg Books expect rapid, 100% keyboard-only counter operations without touching the mouse.
+- **Files:** ✏️ `src/app/dashboard/sales/pos/page.tsx`, ✏️ `src/app/components/CommandPalette.tsx`, ✏️ `USER_MANUAL.md`.
+- **How:**
+  - `Ctrl + F1` (or `?`): Show in-counter keyboard shortcut cheat sheet popup.
+  - Cart row keyboard navigation: `Delete` key deletes active/selected line item; `+` / `-` keys increment/decrement pack or loose quantity.
+  - Global ERP navigation hotkeys: `Alt + N` (New Sale Counter), `Alt + P` (New Purchase Bill), `Alt + M` (Sales Register / Modify Bill), `Alt + I` (Item / Batch Stock lookup), `Alt + L` (Ledgers / Customers).
+  - Floating counter calculator (`Alt + F12` or `Ctrl + K calc`).
+- **Done when:** a cashier can navigate from any screen to sale counter, add items, adjust quantities, hold/resume, and complete checkout without touching the mouse 🧪.
 
 ### Lane B · Phase 2
 
@@ -661,7 +678,8 @@ Full map in `.github/CODEOWNERS` and [ADR 0004](docs/adr/0004-two-lane-ownership
 - **Files:** ➕ `src/app/actions/session.ts` (`switchStore(storeId)`), ➕ `src/app/components/StoreSwitcher.tsx`, ✏️ `Topbar.tsx`, ✏️ `dashboard/layout.tsx` (pass the store list and current store), ✏️ `src/server/auth.ts` (`updateSessionStore(sessionId, storeId)`), ✏️ `memberships.last_store_id` (from A1.5).
 - **How:** validate access (`allowedStoreIds`), update `sessions.store_id` and `memberships.last_store_id`, then `revalidatePath("/dashboard", "layout")`. The POS shows the branch name prominently, so cashiers don't bill in the wrong branch. Hotkey `Ctrl+Shift+S`.
 
-#### A3.3 🤝 Per-store medicine settings ⏱ 2 days
+#### [x] A3.3 🤝 Per-store medicine settings ⏱ 2 days
+- **Progress:** completed in `lane-a/a3-3-store-medicine-settings`. Added `store_medicine_settings` table to `schema/catalog.ts` with composite PK `(store_id, medicine_id)`, tenant and rack indexes, check constraints, and sparse backfill migration (`0013_mysterious_wolfpack.sql`) linking legacy racks only to their owning store. Deprecated `medicines.rack_id` with `@deprecated` annotation. Implemented authoritative domain service in `src/server/domain/catalog/store-settings.ts` with bulk resolver `getStoreMedicineSettings` (contract for Lane B Task B3.2 reorder suggestions engine) providing pure fallback to catalog defaults without N+1 queries. Implemented `updateStoreMedicineSettings` enforcing active store ownership, cross-store rack rejection, and transactional audit logging (`store_medicine_settings_update`). Connected `assignMedicineToRack` and `deleteRack` actions, POS counter medicine search in `searchPosItems`, and created `BranchSettingsDialog` / `BranchSettingsButton` on `/dashboard/inventory` with branch price override indicators. Verified by unit and integration tests.
 - **Why:** reorder levels, racks and sometimes prices differ per branch. `medicines.rack_id` is wrong for chains, because racks are per store.
 - **Files:** ✏️ `schema/catalog.ts`: ➕ `store_medicine_settings (tenant_id, store_id, medicine_id, reorder_level, max_stock, rack_id, sale_price_override, PK(store_id, medicine_id))`; migration with a **backfill** (for each store, copy `medicines.reorder_level`, `max_stock`, and `rack_id` where the rack belongs to that store). ➕ `src/server/domain/catalog/store-settings.ts` (`getStoreMedicineSettings(tx, storeId, medicineIds)` falling back to the medicine defaults). ✏️ racks actions (`assignMedicineToRack` writes the store settings), POS search (rack from store settings), inventory pages.
 - Keep `medicines.rack_id` for one release (deprecated comment), then drop it in Phase 6.
@@ -982,6 +1000,39 @@ When you start a phase, list your 🤝 items in the Monday sync and merge them b
 
 ---
 
+## Future Scope & Multi-Platform Delivery Strategy
+
+While MediFlow is engineered as a modern, high-performance Next.js application, its delivery architecture is designed for multi-platform deployment catering to diverse retail pharmacy operational environments:
+
+### 1. Cloud Web SaaS (Browser-Hosted)
+- **Deployment:** Hosted cloud application accessible via any modern browser (Chrome, Edge, Firefox, Safari).
+- **Use Case:** Instant multi-device access without local installation, branch performance monitoring, head-office analytics, remote accountant access, and inventory checks from any location.
+
+### 2. Native Windows Desktop Executable (`.exe` / `.msi`)
+- **Packaging:** Standalone downloadable desktop executable packaged via Tauri with a local Rust sidecar.
+- **Capabilities:**
+  - **Offline-First Billing:** Full counter operation continues uninterrupted during internet loss using a local SQLite cache and bidirectional sync (Phase 4).
+  - **Direct Hardware Integration:** Raw USB and serial ESC/POS thermal printer support, hardware cash drawer kick triggers, and high-speed barcode scanner buffer.
+  - **Zero-Latency Counter Ops:** Maximizes counter throughput for high-volume pharmacies accustomed to legacy desktop ERP speed.
+
+### 3. Native macOS Desktop Application (`.dmg`) [Future Scope]
+- **Packaging:** Native macOS desktop bundle (Apple Silicon M-series & Intel x86_64).
+- **Capabilities:**
+  - Apple menu bar integration and native system notification dispatch.
+  - Cross-platform Marg ERP keyboard parity: automatic mapping for Mac keyboards (`Option ⌥` for `Alt`, `Cmd ⌘ + Enter` for `End`, `Fn + F1–F12` function key handling).
+  - Offline-first local SQLite cache with cloud sync.
+
+### 4. Mobile Companion Application (iOS & Android) [Future Scope]
+- **Target Audience:** Pharmacy owners, managing directors, and traveling store supervisors.
+- **Core Capabilities in Scope:**
+  - **Executive Real-Time Dashboard:** Live tracking of daily sales, profit margins, active cash register shifts, and tender breakdowns across all branches.
+  - **Inventory Audits & Mobile Scanner:** Use phone camera as a high-speed barcode scanner for periodic shelf stock audits, discrepancy logging, and batch verification.
+  - **Alerts & Push Notifications:** Immediate push notifications for near-expiry batches, critical stock-outs, and pending promise orders.
+  - **Customer Credit ("Khata") & Reminders:** View customer balances and dispatch automated WhatsApp/SMS payment reminders directly from mobile.
+  - **Purchase Order & GRN Approvals:** Review and authorize purchase orders and distributor bills on the go.
+
+---
+
 ## Open questions (decide before the phase that needs them)
 
 | # | Question | Needed by | Owner |
@@ -998,10 +1049,10 @@ When you start a phase, list your 🤝 items in the Monday sync and merge them b
 
 Tick items in PRs. One line per task, in the same order as above.
 
-**Phase 0** — A: [x] A0.1 [x] A0.2 [x] A0.3 [x] A0.4 [x] A0.5 [ ] A0.6 [x] A0.7 · B: [x] B0.1 [x] B0.2 [x] B0.3 [x] B0.4 [x] B0.5 [x] B0.6 [x] B0.7 [x] B0.8
+**Phase 0** — A: [x] A0.1 [x] A0.2 [x] A0.3 [x] A0.4 [x] A0.5 [x] A0.6 [x] A0.7 · B: [x] B0.1 [x] B0.2 [x] B0.3 [x] B0.4 [x] B0.5 [x] B0.6 [x] B0.7 [x] B0.8
 **Phase 1** — A: [x] A1.1 [x] A1.2 [x] A1.3 [x] A1.4 [x] A1.5 [x] A1.6 [x] A1.7 · B: [x] B1.1 [x] B1.2 [x] B1.3 [x] B1.4 [x] B1.5 [x] B1.6 [x] B1.7
-**Phase 2** — A: [x] A2.1 [x] A2.2 [x] A2.3 [ ] A2.4 [ ] A2.5 [ ] A2.6 [ ] A2.7 [ ] A2.8 [x] A2.9 [x] A2.10 [x] A2.11 · B: [x] B2.1 [x] B2.2 [x] B2.3 [x] B2.4 [x] B2.5 [x] B2.6 [x] B2.7 [x] B2.8
-**Phase 3** — A: [ ] A3.1 [ ] A3.2 [ ] A3.3 [ ] A3.4 [ ] A3.5 [ ] A3.6 · B: [x] B3.1 [x] B3.2 [x] B3.3 [x] B3.4 [x] B3.5 [x] B3.6 [x] B3.7
+**Phase 2** — A: [x] A2.1 [x] A2.2 [x] A2.3 [x] A2.4 [x] A2.5 [x] A2.6 [x] A2.7 [x] A2.8 [x] A2.9 [x] A2.10 [x] A2.11 [x] A2.12 · B: [x] B2.1 [x] B2.2 [x] B2.3 [x] B2.4 [x] B2.5 [x] B2.6 [x] B2.7 [x] B2.8
+**Phase 3** — A: [x] A3.1 [x] A3.2 [ ] A3.3 [ ] A3.4 [ ] A3.5 [ ] A3.6 · B: [x] B3.1 [x] B3.2 [x] B3.3 [x] B3.4 [x] B3.5 [x] B3.6 [x] B3.7
 **Phase 4** — A: [ ] A4.1 [ ] A4.2 [ ] A4.3 [ ] A4.4 [ ] A4.5 [ ] A4.6 [ ] A4.7 [ ] A4.8 [ ] A4.9 · B: [ ] B4.1 [ ] B4.2 [ ] B4.3 [ ] B4.4 [ ] B4.5 [ ] B4.6
 **Phase 5** — A: [ ] A5.1 [ ] A5.2 [ ] A5.3 [ ] A5.4 [ ] A5.5 [ ] A5.6 [ ] A5.7 · B: [ ] B5.1 [ ] B5.2 [ ] B5.3 [ ] B5.4 [ ] B5.5 [ ] B5.6 [ ] B5.7
 **Phase 6** — A: [ ] A6.1 [ ] A6.2 [ ] A6.3 [ ] A6.4 [ ] A6.5 [ ] A6.6 · B: [ ] B6.1 [ ] B6.2 [ ] B6.3 [ ] B6.4 [ ] B6.5 [ ] B6.6

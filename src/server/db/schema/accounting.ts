@@ -90,3 +90,23 @@ export const payments = pgTable(
   },
   (t) => [index("payments_party_idx").on(t.partyType, t.partyId)],
 );
+
+/** Bill-wise allocations linking receipts and payments to specific sales or purchases. */
+export const paymentAllocations = pgTable(
+  "payment_allocations",
+  {
+    id: id(),
+    tenantId: tenantId(),
+    paymentId: uuid("payment_id")
+      .notNull()
+      .references(() => payments.id, { onDelete: "restrict" }),
+    refType: text("ref_type").notNull(), // 'sale' | 'purchase'
+    refId: uuid("ref_id").notNull(),
+    amount: money("amount").notNull(), // positive integer paise
+    createdAt: createdAt(),
+  },
+  (t) => [
+    index("payment_alloc_tenant_payment_idx").on(t.tenantId, t.paymentId),
+    index("payment_alloc_tenant_ref_idx").on(t.tenantId, t.refType, t.refId),
+  ],
+);

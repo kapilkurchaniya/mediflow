@@ -20,3 +20,11 @@ export class ForbiddenError extends DomainError {
     this.name = "ForbiddenError";
   }
 }
+
+/** The requested entity does not exist or does not belong to this tenant. */
+export class NotFoundError extends DomainError {
+  constructor(message: string = "Resource not found") {
+    super("NOT_FOUND", message);
+    this.name = "NotFoundError";
+  }
+}

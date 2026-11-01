@@ -1,7 +1,7 @@
 "use server";
 
 import { db, schema } from "@/server/db";
-import { eq, and, desc, gt, gte, lte, ilike, or, sql, inArray, ne } from "drizzle-orm";
+import { eq, and, asc, desc, gt, gte, lte, ilike, or, sql, inArray, ne } from "drizzle-orm";
 import { checkPermission, requirePermission } from "@/server/rbac";
 import { revalidatePath } from "next/cache";
 import { format } from "date-fns";
@@ -14,6 +14,12 @@ import {
   discardHeldSale,
   type HoldSaleInput,
 } from "@/server/domain/sales/held";
+import { cancelSale } from "@/server/domain/sales/cancel-sale";
+import {
+  returnSale,
+  getReturnableSaleDetails,
+  type ReturnSaleInput,
+} from "@/server/domain/sales/return-sale";
 
 export async function getSales(dateFrom?: string | null, dateTo?: string | null) {
   const ctx = await requirePermission("sale.view");
@@ -58,9 +64,25 @@ export async function searchPosItems(query: string) {
       medicine: schema.medicines,
       rackCode: schema.racks.code,
       rackName: schema.racks.name,
+      overridePrice: schema.storeMedicineSettings.salePriceOverride,
     })
     .from(schema.medicines)
-    .leftJoin(schema.racks, eq(schema.medicines.rackId, schema.racks.id))
+    .leftJoin(
+      schema.storeMedicineSettings,
+      and(
+        eq(schema.storeMedicineSettings.medicineId, schema.medicines.id),
+        eq(schema.storeMedicineSettings.storeId, ctx.storeId),
+        eq(schema.storeMedicineSettings.tenantId, ctx.tenantId),
+      ),
+    )
+    .leftJoin(
+      schema.racks,
+      and(
+        eq(schema.racks.id, schema.storeMedicineSettings.rackId),
+        eq(schema.racks.storeId, ctx.storeId),
+        eq(schema.racks.tenantId, ctx.tenantId),
+      ),
+    )
     .where(
       and(
         eq(schema.medicines.tenantId, ctx.tenantId),
@@ -68,9 +90,9 @@ export async function searchPosItems(query: string) {
         or(
           ilike(schema.medicines.name, `%${lowerQuery}%`),
           ilike(schema.medicines.barcode, `%${lowerQuery}%`),
-          ilike(schema.medicines.genericName, `%${lowerQuery}%`)
-        )
-      )
+          ilike(schema.medicines.genericName, `%${lowerQuery}%`),
+        ),
+      ),
     )
     .limit(25);
 
@@ -88,19 +110,20 @@ export async function searchPosItems(query: string) {
         eq(schema.batches.storeId, ctx.storeId),
         gt(schema.batches.qtyOnHand, 0),
         gt(schema.batches.expiryDate, todayStr),
-        inArray(schema.batches.medicineId, medicineIds)
-      )
+        inArray(schema.batches.medicineId, medicineIds),
+      ),
     )
-    .orderBy(schema.batches.expiryDate);
+    .orderBy(asc(schema.batches.expiryDate), asc(schema.batches.createdAt), asc(schema.batches.id));
 
   // Group batches by medicine
-  const results = medicines.map(({ medicine, rackCode, rackName }) => {
+  const results = medicines.map(({ medicine, rackCode, rackName, overridePrice }) => {
     const medBatches = batches.filter((b) => b.medicineId === medicine.id);
     return {
       medicine: {
         ...medicine,
-        rackCode,
-        rackName,
+        rackCode: rackCode ?? null,
+        rackName: rackName ?? null,
+        salePrice: overridePrice !== null && overridePrice !== undefined ? overridePrice : medicine.salePrice,
       },
       batches: medBatches,
     };
@@ -146,7 +169,7 @@ export async function findSubstitutes(genericName: string, excludeMedicineId?: s
         inArray(schema.batches.medicineId, medicineIds)
       )
     )
-    .orderBy(schema.batches.expiryDate);
+    .orderBy(asc(schema.batches.expiryDate), asc(schema.batches.createdAt), asc(schema.batches.id));
 
   return medicines
     .map((med) => {
@@ -201,7 +224,8 @@ export async function createSaleInvoice(
   complianceDetails?: ComplianceDetailsInput,
   medicalRepId?: string,
   paymentsInput?: SalePayment[],
-  heldSaleId?: string
+  heldSaleId?: string,
+  redeemPoints = 0
 ) {
   const auth = await checkPermission("sale.create");
   if (!auth.ok) return { error: auth.error };
@@ -262,7 +286,7 @@ export async function createSaleInvoice(
     })),
     billDiscountPaise: 0,
     payments,
-    redeemPoints: 0,
+    redeemPoints: Math.max(0, redeemPoints || 0),
     compliance: {
       ...complianceDetails,
       doctorName: complianceDetails?.doctorName || doctorName || undefined,
@@ -345,6 +369,26 @@ export async function discardHeldSaleAction(heldSaleId: string, reason?: string)
   }
 }
 
+export async function cancelSaleAction(saleId: string, reason: string) {
+  const auth = await checkPermission("sale.cancel");
+  if (!auth.ok) return { success: false as const, error: auth.error };
+  const ctx = auth.ctx;
+
+  try {
+    const res = await db.transaction((tx) => cancelSale(tx, ctx, { saleId, reason }));
+    revalidatePath("/dashboard/sales");
+    revalidatePath(`/dashboard/sales/${saleId}`);
+    revalidatePath("/dashboard/accounting");
+    revalidatePath("/dashboard/gst");
+    return { success: true as const, ...res };
+  } catch (err: unknown) {
+    return {
+      success: false as const,
+      error: (err instanceof Error ? err.message : String(err)) || "Failed to cancel sale invoice",
+    };
+  }
+}
+
 export async function getSaleById(id: string) {
   const ctx = await requirePermission("sale.view");
   const [sale] = await db.select().from(schema.sales).where(and(eq(schema.sales.id, id), eq(schema.sales.tenantId, ctx.tenantId)));
@@ -358,5 +402,149 @@ export async function getSaleById(id: string) {
     .from(schema.gstDocuments)
     .where(and(eq(schema.gstDocuments.refType, "sale"), eq(schema.gstDocuments.refId, id), eq(schema.gstDocuments.tenantId, ctx.tenantId)))
     .limit(1);
-  return { sale, items, customer, store, tenant, gstDoc: gstDoc || null };
+  const returns = await db
+    .select()
+    .from(schema.saleReturns)
+    .where(eq(schema.saleReturns.saleId, id))
+    .orderBy(desc(schema.saleReturns.createdAt));
+  const payments = await db
+    .select()
+    .from(schema.salePayments)
+    .where(eq(schema.salePayments.saleId, id));
+  return { sale, items, customer, store, tenant, gstDoc: gstDoc || null, returns, payments };
+}
+
+export async function createSaleReturnAction(input: ReturnSaleInput) {
+  const auth = await checkPermission("sale.return");
+  if (!auth.ok) return { success: false as const, error: auth.error };
+  const ctx = auth.ctx;
+
+  try {
+    const res = await db.transaction((tx) => returnSale(tx, ctx, input));
+    revalidatePath("/dashboard/sales");
+    revalidatePath(`/dashboard/sales/${input.saleId}`);
+    revalidatePath(`/dashboard/sales/${input.saleId}/return`);
+    revalidatePath("/dashboard/sales/returns");
+    revalidatePath("/dashboard/accounting");
+    revalidatePath("/dashboard/gst");
+    return { success: true as const, ...res };
+  } catch (err: unknown) {
+    return {
+      success: false as const,
+      error: (err instanceof Error ? err.message : String(err)) || "Failed to process sale return",
+    };
+  }
+}
+
+export async function getReturnableSaleAction(saleId: string) {
+  const ctx = await requirePermission("sale.view");
+  try {
+    const details = await getReturnableSaleDetails(db, ctx, saleId);
+    return { success: true as const, data: details };
+  } catch (err: unknown) {
+    return {
+      success: false as const,
+      error: (err instanceof Error ? err.message : String(err)) || "Failed to load sale return details",
+    };
+  }
+}
+
+export async function getSaleReturnsList(dateFrom?: string | null, dateTo?: string | null) {
+  const ctx = await requirePermission("sale.view");
+
+  const conditions = [
+    eq(schema.saleReturns.tenantId, ctx.tenantId),
+    eq(schema.saleReturns.storeId, ctx.storeId),
+  ];
+
+  if (dateFrom) {
+    conditions.push(gte(schema.saleReturns.createdAt, new Date(dateFrom + "T00:00:00")));
+  }
+  if (dateTo) {
+    conditions.push(lte(schema.saleReturns.createdAt, new Date(dateTo + "T23:59:59.999")));
+  }
+
+  const returns = await db
+    .select({
+      saleReturn: schema.saleReturns,
+      sale: schema.sales,
+      user: schema.users,
+    })
+    .from(schema.saleReturns)
+    .innerJoin(schema.sales, eq(schema.saleReturns.saleId, schema.sales.id))
+    .leftJoin(schema.users, eq(schema.saleReturns.createdBy, schema.users.id))
+    .where(and(...conditions))
+    .orderBy(desc(schema.saleReturns.createdAt));
+
+  return returns;
+}
+
+export async function getSaleReturnById(id: string) {
+  const ctx = await requirePermission("sale.view");
+
+  const [returnRow] = await db
+    .select({
+      saleReturn: schema.saleReturns,
+      sale: schema.sales,
+      user: schema.users,
+    })
+    .from(schema.saleReturns)
+    .innerJoin(schema.sales, eq(schema.saleReturns.saleId, schema.sales.id))
+    .leftJoin(schema.users, eq(schema.saleReturns.createdBy, schema.users.id))
+    .where(and(eq(schema.saleReturns.id, id), eq(schema.saleReturns.tenantId, ctx.tenantId)))
+    .limit(1);
+
+  if (!returnRow) return null;
+
+  const items = await db
+    .select({
+      returnItem: schema.saleReturnItems,
+      saleItem: schema.saleItems,
+    })
+    .from(schema.saleReturnItems)
+    .innerJoin(schema.saleItems, eq(schema.saleReturnItems.saleItemId, schema.saleItems.id))
+    .where(eq(schema.saleReturnItems.returnId, id));
+
+  const [customer] = returnRow.sale.customerId
+    ? await db
+        .select()
+        .from(schema.customers)
+        .where(eq(schema.customers.id, returnRow.sale.customerId))
+        .limit(1)
+    : [null];
+
+  const [store] = await db
+    .select()
+    .from(schema.stores)
+    .where(eq(schema.stores.id, returnRow.saleReturn.storeId))
+    .limit(1);
+
+  const [tenant] = await db
+    .select()
+    .from(schema.tenants)
+    .where(eq(schema.tenants.id, returnRow.saleReturn.tenantId))
+    .limit(1);
+
+  const [gstDoc] = await db
+    .select()
+    .from(schema.gstDocuments)
+    .where(
+      and(
+        eq(schema.gstDocuments.refType, "return"),
+        eq(schema.gstDocuments.refId, id),
+        eq(schema.gstDocuments.tenantId, ctx.tenantId),
+      ),
+    )
+    .limit(1);
+
+  return {
+    saleReturn: returnRow.saleReturn,
+    sale: returnRow.sale,
+    user: returnRow.user,
+    items,
+    customer,
+    store,
+    tenant,
+    gstDoc: gstDoc || null,
+  };
 }

@@ -6,6 +6,7 @@ import {
   Search,
   Sparkles,
   Keyboard,
+  Calculator,
   Sidebar as SidebarIcon,
   X,
   ArrowRight,
@@ -31,6 +32,7 @@ export function CommandPalette() {
     setCommandOpen,
     toggleCollapsed,
     setShortcutsOpen,
+    setCalculatorOpen,
     permissions,
   } = useShell();
   const router = useRouter();
@@ -73,6 +75,18 @@ export function CommandPalette() {
         },
       },
       {
+        id: "act-calculator",
+        category: "Quick Actions",
+        label: "Open Counter Calculator",
+        description: "Fast in-counter math & percentages (calc)",
+        icon: Calculator,
+        shortcut: "F12",
+        action: () => {
+          setCommandOpen(false);
+          setCalculatorOpen(true);
+        },
+      },
+      {
         id: "act-shortcuts",
         category: "Quick Actions",
         label: "Keyboard shortcuts cheat sheet",
@@ -101,7 +115,7 @@ export function CommandPalette() {
         },
       },
     ],
-    [router, setCommandOpen, toggleCollapsed, setShortcutsOpen, permissions]
+    [router, setCommandOpen, toggleCollapsed, setShortcutsOpen, setCalculatorOpen, permissions]
   );
 
   const filteredItems = useMemo(() => {

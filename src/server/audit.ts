@@ -12,7 +12,9 @@ export type AuditAction =
   | "permission_change"
   | "bulk_update"
   | "discount_override"
-  | "fefo_override";
+  | "fefo_override"
+  | "store_switch"
+  | "store_medicine_settings_update";
 
 export interface WriteAuditParams {
   action: AuditAction;

@@ -1,4 +1,4 @@
-import { and, asc, eq, gt, lt } from "drizzle-orm";
+import { and, asc, eq, gt, lt, or } from "drizzle-orm";
 import * as schema from "@/server/db/schema";
 import type { DbOrTx } from "@/server/db";
 import { DomainError } from "@/server/errors";
@@ -42,6 +42,8 @@ export interface FefoAllocationOptions {
  * When an explicit batch is chosen manually by the counter cashier, verifies whether earlier-expiring
  * batches with stock were skipped, flagging an audited FEFO override.
  */
+const clampMrp = (rate: number, mrp: number | null) => (mrp && mrp > 0 ? Math.min(rate, mrp) : rate);
+
 export async function allocateFefoBatches(
   tx: DbOrTx,
   ctx: Pick<AuthCtx, "tenantId" | "storeId">,
@@ -59,34 +61,34 @@ export async function allocateFefoBatches(
     // 1. Resolve medicine and explicit batch (if specified)
     if (line.batchId) {
       const [batchRecord] = await tx
-        .select({
-          batch: schema.batches,
-          medicine: schema.medicines,
-          manufacturer: schema.manufacturers.name,
-        })
+        .select({ batch: schema.batches, medicine: schema.medicines })
         .from(schema.batches)
         .innerJoin(schema.medicines, eq(schema.batches.medicineId, schema.medicines.id))
-        .leftJoin(schema.manufacturers, eq(schema.medicines.manufacturerId, schema.manufacturers.id))
         .where(
           and(
             eq(schema.batches.id, line.batchId),
             eq(schema.batches.tenantId, ctx.tenantId),
             eq(schema.batches.storeId, ctx.storeId),
           ),
-        );
+        )
+        .for("update");
 
       if (!batchRecord) {
         throw new DomainError("BATCH_NOT_FOUND", `Batch ${line.batchId} not found`);
       }
       explicitBatch = batchRecord.batch;
       medicine = batchRecord.medicine;
-      manufacturerName = batchRecord.manufacturer ?? null;
+
+      if (medicine.manufacturerId) {
+        const [mfg] = await tx
+          .select({ name: schema.manufacturers.name })
+          .from(schema.manufacturers)
+          .where(eq(schema.manufacturers.id, medicine.manufacturerId));
+        manufacturerName = mfg?.name ?? null;
+      }
     } else if (line.medicineId) {
       const [medRecord] = await tx
-        .select({
-          medicine: schema.medicines,
-          manufacturer: schema.manufacturers.name,
-        })
+        .select({ medicine: schema.medicines, manufacturer: schema.manufacturers.name })
         .from(schema.medicines)
         .leftJoin(schema.manufacturers, eq(schema.medicines.manufacturerId, schema.manufacturers.id))
         .where(
@@ -147,6 +149,7 @@ export async function allocateFefoBatches(
       }
 
       // Check if an earlier valid batch with stock was skipped (FEFO Override audit)
+      // Evaluates complete deterministic tuple: (expiryDate, createdAt, id) under transactional row locks
       const earlierBatches = await tx
         .select({
           id: schema.batches.id,
@@ -163,14 +166,26 @@ export async function allocateFefoBatches(
             eq(schema.batches.status, "active"),
             gt(schema.batches.qtyOnHand, 0),
             gt(schema.batches.expiryDate, options.todayStr),
-            lt(schema.batches.expiryDate, explicitBatch.expiryDate),
+            or(
+              lt(schema.batches.expiryDate, explicitBatch.expiryDate),
+              and(
+                eq(schema.batches.expiryDate, explicitBatch.expiryDate),
+                lt(schema.batches.createdAt, explicitBatch.createdAt),
+              ),
+              and(
+                eq(schema.batches.expiryDate, explicitBatch.expiryDate),
+                eq(schema.batches.createdAt, explicitBatch.createdAt),
+                lt(schema.batches.id, explicitBatch.id),
+              ),
+            ),
           ),
         )
-        .orderBy(asc(schema.batches.expiryDate));
+        .orderBy(asc(schema.batches.expiryDate), asc(schema.batches.createdAt), asc(schema.batches.id))
+        .for("update");
 
       const isOverride = earlierBatches.length > 0;
       allocatedStockMap.set(explicitBatch.id, previouslyAllocated + baseQty);
-      const saleRate = explicitBatch.saleRate ?? explicitBatch.mrp ?? 0;
+      const saleRate = clampMrp(explicitBatch.saleRate ?? explicitBatch.mrp ?? 0, explicitBatch.mrp);
 
       allocatedLines.push({
         batch: explicitBatch,
@@ -201,7 +216,7 @@ export async function allocateFefoBatches(
             gt(schema.batches.qtyOnHand, 0),
           ),
         )
-        .orderBy(asc(schema.batches.expiryDate), asc(schema.batches.createdAt))
+        .orderBy(asc(schema.batches.expiryDate), asc(schema.batches.createdAt), asc(schema.batches.id))
         .for("update");
 
       const totalAvailable = candidateBatches.reduce((acc, b) => {
@@ -231,7 +246,7 @@ export async function allocateFefoBatches(
 
         const slicePackQty = Math.floor(take / upp);
         const sliceLooseQty = take % upp;
-        const saleRate = b.saleRate ?? b.mrp ?? 0;
+        const saleRate = clampMrp(b.saleRate ?? b.mrp ?? 0, b.mrp);
 
         allocatedLines.push({
           batch: b,
@@ -259,7 +274,7 @@ export async function allocateFefoBatches(
         allocatedStockMap.set(fallbackBatch.id, used + remaining);
         const slicePackQty = Math.floor(remaining / upp);
         const sliceLooseQty = remaining % upp;
-        const saleRate = fallbackBatch.saleRate ?? fallbackBatch.mrp ?? 0;
+        const saleRate = clampMrp(fallbackBatch.saleRate ?? fallbackBatch.mrp ?? 0, fallbackBatch.mrp);
 
         allocatedLines.push({
           batch: fallbackBatch,

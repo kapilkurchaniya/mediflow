@@ -1,7 +1,8 @@
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useSyncExternalStore, useRef } from "react";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import type { AllowedStoreItem } from "@/server/domain/stores";
 
 function subscribeOnline(callback: () => void) {
   window.addEventListener("online", callback);
@@ -37,15 +38,26 @@ interface ShellContextType {
   shortcutsOpen: boolean;
   setShortcutsOpen: (open: boolean) => void;
 
+  // Floating counter calculator state (F12 / Alt+F12)
+  calculatorOpen: boolean;
+  setCalculatorOpen: (open: boolean) => void;
+  toggleCalculator: () => void;
+
   // Notifications popover state
   notificationsOpen: boolean;
   setNotificationsOpen: (open: boolean) => void;
+
+  // Store switcher modal state (Ctrl+Shift+S)
+  storeSwitcherOpen: boolean;
+  setStoreSwitcherOpen: (open: boolean) => void;
 
   // Network connection state
   isOnline: boolean;
 
   // Contextual info
   storeName: string;
+  currentStore: AllowedStoreItem | null;
+  allowedStores: AllowedStoreItem[];
   userName: string;
   userEmail: string;
   /** Permissions of the signed-in user; the sidebar and command palette hide what they may not use. */
@@ -59,18 +71,23 @@ const STORAGE_KEY_COLLAPSED = "mediflow:sidebar-collapsed";
 export function ShellProvider({
   children,
   storeName,
+  currentStore = null,
+  allowedStores = [],
   userName,
   userEmail,
   permissions,
 }: {
   children: React.ReactNode;
   storeName: string;
+  currentStore?: AllowedStoreItem | null;
+  allowedStores?: AllowedStoreItem[];
   userName: string;
   userEmail: string;
   permissions: readonly string[];
 }) {
   const permissionSet = React.useMemo(() => new Set(permissions), [permissions]);
   const pathname = usePathname();
+  const router = useRouter();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [collapsed, setCollapsedState] = useState(() => {
     if (typeof window === "undefined") return false;
@@ -83,8 +100,12 @@ export function ShellProvider({
   });
   const [commandOpen, setCommandOpen] = useState(false);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
+  const [calculatorOpen, setCalculatorOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [storeSwitcherOpen, setStoreSwitcherOpen] = useState(false);
   const isOnline = useSyncExternalStore(subscribeOnline, getOnlineSnapshot, getServerSnapshot);
+
+  const toggleCalculator = useCallback(() => setCalculatorOpen((o) => !o), []);
 
   const setCollapsed = useCallback((val: boolean) => {
     setCollapsedState(val);
@@ -133,31 +154,77 @@ export function ShellProvider({
       }
 
       // Ctrl+B -> Toggle Sidebar Collapse
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "b") {
+      if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === "b") {
         e.preventDefault();
         toggleCollapsed();
         return;
       }
 
-      // '?' key (Shift + /) -> Shortcuts cheat sheet
-      if (!isInput && e.key === "?" && !e.ctrlKey && !e.metaKey) {
+      // Ctrl+Shift+S -> Open Store Switcher
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === "s") {
+        e.preventDefault();
+        setStoreSwitcherOpen((o) => !o);
+        return;
+      }
+
+      // '?' key (Shift + /) or Ctrl + F1 -> Shortcuts cheat sheet
+      if ((!isInput && e.key === "?" && !e.ctrlKey && !e.metaKey) || (e.ctrlKey && (e.key === "F1" || e.key === "f1"))) {
         e.preventDefault();
         setShortcutsOpen((o) => !o);
         return;
+      }
+
+      // F12 or Alt + F12 -> Floating Counter Calculator
+      if (e.key === "F12" || (e.altKey && e.key === "F12")) {
+        e.preventDefault();
+        setCalculatorOpen((o) => !o);
+        return;
+      }
+
+      // Alt + [Key] -> Global ERP Hotkeys
+      if (e.altKey && !e.ctrlKey && !e.metaKey) {
+        const k = e.key.toLowerCase();
+        if (k === "n") {
+          e.preventDefault();
+          router.push("/dashboard/sales/pos");
+          return;
+        }
+        if (k === "p") {
+          e.preventDefault();
+          router.push("/dashboard/purchasing/bills/new");
+          return;
+        }
+        if (k === "m") {
+          e.preventDefault();
+          router.push("/dashboard/sales/register");
+          return;
+        }
+        if (k === "i") {
+          e.preventDefault();
+          router.push("/dashboard/inventory");
+          return;
+        }
+        if (k === "l") {
+          e.preventDefault();
+          router.push("/dashboard/crm/customers");
+          return;
+        }
       }
 
       // Escape -> close any open modal
       if (e.key === "Escape") {
         if (commandOpen) setCommandOpen(false);
         if (shortcutsOpen) setShortcutsOpen(false);
+        if (calculatorOpen) setCalculatorOpen(false);
         if (notificationsOpen) setNotificationsOpen(false);
+        if (storeSwitcherOpen) setStoreSwitcherOpen(false);
         if (mobileOpen) setMobileOpen(false);
       }
     };
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [commandOpen, shortcutsOpen, notificationsOpen, mobileOpen, toggleCollapsed]);
+  }, [commandOpen, shortcutsOpen, calculatorOpen, notificationsOpen, storeSwitcherOpen, mobileOpen, toggleCollapsed, router]);
 
   return (
     <ShellContext.Provider
@@ -172,10 +239,17 @@ export function ShellProvider({
         setCommandOpen,
         shortcutsOpen,
         setShortcutsOpen,
+        calculatorOpen,
+        setCalculatorOpen,
+        toggleCalculator,
         notificationsOpen,
         setNotificationsOpen,
+        storeSwitcherOpen,
+        setStoreSwitcherOpen,
         isOnline,
         storeName,
+        currentStore,
+        allowedStores,
         userName,
         userEmail,
         permissions: permissionSet,

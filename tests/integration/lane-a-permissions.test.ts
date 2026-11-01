@@ -20,7 +20,7 @@ vi.mock("next/cache", () => ({ revalidatePath: () => {} }));
 import { getAccounts, getJournalLines, getTrialBalance } from "@/app/actions/accounting";
 import { createCategory, createManufacturer, createMedicine, getCategories, getManufacturers, getMedicines } from "@/app/actions/inventory";
 import { getRacks } from "@/app/actions/racks";
-import { createSaleInvoice, findSubstitutes, getSaleById, getSales, searchPosItems } from "@/app/actions/sales";
+import { cancelSaleAction, createSaleInvoice, findSubstitutes, getSaleById, getSales, searchPosItems } from "@/app/actions/sales";
 import { getStoreSettings, updateStoreSettings } from "@/app/actions/settings";
 import { addOpeningStock, adjustBatchStock, getBatches } from "@/app/actions/stock";
 import { getAuditFilterOptions, getAuditLogs } from "@/app/actions/audit";
@@ -64,6 +64,7 @@ const CASES: Case[] = [
   { name: "searchPosItems", permission: "sale.create", kind: "read", call: () => searchPosItems("para") },
   { name: "findSubstitutes", permission: "sale.create", kind: "read", call: () => findSubstitutes("paracetamol") },
   { name: "createSaleInvoice", permission: "sale.create", kind: "form", call: () => createSaleInvoice(undefined, "", [], "cash", 0) },
+  { name: "cancelSaleAction", permission: "sale.cancel", kind: "form", call: () => cancelSaleAction("00000000-0000-0000-0000-000000000000", "Cancelled by customer") },
   // Accounting
   { name: "getAccounts", permission: "accounting.view", kind: "read", call: () => getAccounts() },
   { name: "getJournalLines", permission: "accounting.view", kind: "read", call: () => getJournalLines() },

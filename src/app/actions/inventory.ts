@@ -93,11 +93,27 @@ export async function getMedicines(searchQuery?: string, limit = 100, offset = 0
       manufacturer: schema.manufacturers,
       category: schema.categories,
       rack: schema.racks,
+      branchSettings: schema.storeMedicineSettings,
     })
     .from(schema.medicines)
     .leftJoin(schema.manufacturers, eq(schema.medicines.manufacturerId, schema.manufacturers.id))
     .leftJoin(schema.categories, eq(schema.medicines.categoryId, schema.categories.id))
-    .leftJoin(schema.racks, eq(schema.medicines.rackId, schema.racks.id))
+    .leftJoin(
+      schema.storeMedicineSettings,
+      and(
+        eq(schema.storeMedicineSettings.medicineId, schema.medicines.id),
+        eq(schema.storeMedicineSettings.storeId, ctx.storeId),
+        eq(schema.storeMedicineSettings.tenantId, ctx.tenantId),
+      ),
+    )
+    .leftJoin(
+      schema.racks,
+      and(
+        eq(schema.racks.id, schema.storeMedicineSettings.rackId),
+        eq(schema.racks.storeId, ctx.storeId),
+        eq(schema.racks.tenantId, ctx.tenantId),
+      ),
+    )
     .where(and(...conditions))
     .orderBy(desc(schema.medicines.createdAt))
     .limit(limit)
@@ -126,6 +142,19 @@ export async function createMedicine(formData: FormData) {
   const rxRequired = formData.get("rxRequired") === "on";
   const schedule = formData.get("schedule") as string;
 
+  const rawUnitsPerPack = formData.get("unitsPerPack");
+  let unitsPerPack = 1;
+  if (rawUnitsPerPack !== null && rawUnitsPerPack !== "") {
+    const parsedUpp = Number(rawUnitsPerPack);
+    if (!Number.isInteger(parsedUpp) || parsedUpp < 1 || !Number.isSafeInteger(parsedUpp)) {
+      return { error: "Units per pack must be a whole number of at least 1." };
+    }
+    unitsPerPack = parsedUpp;
+  }
+
+  const packUnit = ((formData.get("packUnit") as string) || unit || "strip").trim().toLowerCase();
+  const looseUnit = ((formData.get("looseUnit") as string) || "tablet").trim().toLowerCase();
+
   if (!name) return { error: "Name is required" };
 
   // Parse decimals to integers (basis points / paise)
@@ -151,8 +180,11 @@ export async function createMedicine(formData: FormData) {
       genericName: genericName || null,
       manufacturerId: manufacturerId || null,
       categoryId: categoryId || null,
-      rackId: rackId?.trim() || null,
-      unit,
+      rackId: null,
+      unit: packUnit,
+      unitsPerPack,
+      packUnit,
+      looseUnit,
       packSize: packSize || null,
       barcode: barcode || null,
       hsn: hsn || null,
@@ -168,8 +200,28 @@ export async function createMedicine(formData: FormData) {
       action: "create",
       entityType: "medicine",
       entityId: created.id,
-      newValue: { name, mrp, salePrice, gstRateBp, hsn: hsn || null, schedule: schedule || "none", rxRequired },
+      newValue: {
+        name,
+        mrp,
+        salePrice,
+        gstRateBp,
+        hsn: hsn || null,
+        schedule: schedule || "none",
+        rxRequired,
+        unitsPerPack,
+        packUnit,
+        looseUnit,
+      },
     });
+
+    if (rackId?.trim()) {
+      await tx.insert(schema.storeMedicineSettings).values({
+        tenantId: ctx.tenantId,
+        storeId: ctx.storeId,
+        medicineId: created.id,
+        rackId: rackId.trim(),
+      });
+    }
     });
 
     revalidatePath("/dashboard/inventory");

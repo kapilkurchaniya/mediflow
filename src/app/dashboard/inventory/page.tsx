@@ -1,9 +1,11 @@
 import { getMedicines } from "@/app/actions/inventory";
+import { getRacks } from "@/app/actions/racks";
 import { Plus, Pill, Upload } from "lucide-react";
 import Link from "next/link";
 import { PageHeader, SearchForm, EmptyState } from "@/app/components/ui";
 import { formatINR, formatNumber } from "@/lib/format";
 import { requirePagePermission } from "@/server/rbac";
+import { BranchSettingsButton } from "./_components/BranchSettingsButton";
 
 export const metadata = { title: "Item master" };
 
@@ -14,7 +16,7 @@ export default async function InventoryPage({
 }) {
   await requirePagePermission("medicine.view");
   const { q } = await searchParams;
-  const items = await getMedicines(q);
+  const [items, racks] = await Promise.all([getMedicines(q), getRacks()]);
   const rxCount = items.filter((i) => i.medicine.rxRequired).length;
 
   return (
@@ -54,10 +56,11 @@ export default async function InventoryPage({
                   <th className="text-right">MRP</th>
                   <th className="text-right">Sale price</th>
                   <th className="text-right">Status</th>
+                  <th className="w-10 text-right">Branch</th>
                 </tr>
               </thead>
               <tbody>
-                {items.map(({ medicine, manufacturer, category, rack }) => (
+                {items.map(({ medicine, manufacturer, category, rack, branchSettings }) => (
                   <tr key={medicine.id}>
                     <td className="max-w-[320px]">
                       <div className="flex items-center gap-2">
@@ -89,12 +92,28 @@ export default async function InventoryPage({
                     </td>
                     <td className="text-right num text-ink-900 font-medium">{formatINR(medicine.mrp)}</td>
                     <td className="text-right num text-ink-600">
-                      {medicine.salePrice && medicine.salePrice !== medicine.mrp ? formatINR(medicine.salePrice) : "—"}
+                      {branchSettings?.salePriceOverride ? (
+                        <div>
+                          <span className="font-medium text-ink-900">{formatINR(branchSettings.salePriceOverride)}</span>
+                          <span className="block text-[10px] text-amber-700 font-medium">Branch override</span>
+                        </div>
+                      ) : medicine.salePrice && medicine.salePrice !== medicine.mrp ? (
+                        formatINR(medicine.salePrice)
+                      ) : (
+                        "—"
+                      )}
                     </td>
                     <td className="text-right">
                       <span className={`badge badge-dot ${medicine.isActive ? "badge-success" : "badge-neutral"}`}>
                         {medicine.isActive ? "Active" : "Inactive"}
                       </span>
+                    </td>
+                    <td className="text-right">
+                      <BranchSettingsButton
+                        medicine={medicine}
+                        branchSettings={branchSettings}
+                        racks={racks}
+                      />
                     </td>
                   </tr>
                 ))}

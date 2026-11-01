@@ -309,11 +309,56 @@ describe("createSale: refusals change nothing", () => {
     expect(await s.stock()).toBe(10);
   });
 
-  it("loyalty point redemption is not available yet, and 'credit' is not a payment method", async () => {
+  it("loyalty point redemption requires a customer and valid points, and 'credit' is not a payment method", async () => {
     const s = await scene();
-    await expect(s.sell({ redeemPoints: 5 })).rejects.toThrow(/not available yet/);
+    await expect(s.sell({ redeemPoints: 5 })).rejects.toThrow(/Select a customer to redeem loyalty points/);
     await expect(s.sell({ payments: [{ method: "credit", amount: 10000 }] })).rejects.toThrow(/Leave the unpaid part empty/);
     expect(await s.sales()).toHaveLength(0);
+  });
+
+  it("redeems loyalty points at counter, applies discount, and logs loyalty transaction", async () => {
+    const s = await scene();
+    const customer = await makeCustomer(t.db, s.w.tenant.id, { phone: "9876543210" });
+    // Enable loyalty program for tenant
+    await t.db.insert(schema.loyaltyConfigs).values({
+      tenantId: s.w.tenant.id,
+      pointsPerRupee: 1,
+      redemptionValuePaise: 100, // 1 point = ₹1
+      minRedemptionPoints: 10,
+      isActive: true,
+    });
+    // Give customer 50 points
+    await t.db
+      .update(schema.customers)
+      .set({ loyaltyPoints: 50 })
+      .where(eq(schema.customers.id, customer.id));
+
+    // Bill 1 unit (MRP 10000 paise = ₹100). Redeem 20 points (= ₹20). Net payable = ₹80 (8000 paise).
+    const res = await s.sell({
+      customerId: customer.id,
+      lines: [{ batchId: s.batch.id, qty: 1, discountBp: 0 }],
+      payments: [{ method: "cash", amount: 8000 }],
+      redeemPoints: 20,
+    });
+
+    expect(res.total).toBe(8000);
+
+    // Customer balance should now be 50 - 20 = 30 points
+    const [cust] = await t.db
+      .select({ points: schema.customers.loyaltyPoints })
+      .from(schema.customers)
+      .where(eq(schema.customers.id, customer.id));
+    expect(cust.points).toBe(30);
+
+    // Loyalty transaction should be recorded
+    const ltx = await t.db
+      .select()
+      .from(schema.loyaltyTransactions)
+      .where(and(eq(schema.loyaltyTransactions.tenantId, s.w.tenant.id), eq(schema.loyaltyTransactions.customerId, customer.id)));
+    const redeemTx = ltx.find((x) => x.type === "redeem");
+    expect(redeemTx).toBeDefined();
+    expect(redeemTx?.points).toBe(-20);
+    expect(redeemTx?.saleId).toBe(res.saleId);
   });
 
   it("the discount ceiling needs sale.discount_override", async () => {
@@ -582,6 +627,56 @@ describe("createSale: split tender, change and credit (A2.2)", () => {
       expect(updatedBatch.qtyOnHand).toBe(86);
     });
 
+    it("historical snapshot isolation: changing medicine unitsPerPack later does not alter historical sale items or past invoices", async () => {
+      const tenant = await makeTenant(t.db);
+      const store = await makeStore(t.db, tenant.id);
+      const user = await makeUser(t.db);
+      const maker = (await t.db.insert(schema.manufacturers).values({ tenantId: tenant.id, name: "Acme Pharma" }).returning())[0];
+      const medicine = await makeMedicine(t.db, tenant.id, {
+        name: "Historical Med 10",
+        unitsPerPack: 10,
+        packUnit: "strip",
+        looseUnit: "tablet",
+        manufacturerId: maker.id,
+      });
+      const batch = await makeBatch(t.db, {
+        tenantId: tenant.id,
+        storeId: store.id,
+        medicineId: medicine.id,
+        qtyOnHand: 50,
+        mrp: 10000,
+        saleRate: 10000,
+      });
+      const w = { tenant, store, user, medicine };
+
+      // Complete a sale of 1 strip + 4 loose (14 base units @ ₹140.00)
+      const res = await t.db.transaction((tx) =>
+        createSale(
+          tx,
+          ctxFor(w),
+          SaleInput.parse({
+            lines: [{ batchId: batch.id, packQty: 1, looseQty: 4, discountBp: 0 }],
+            payments: [{ method: "cash", amount: 14000 }],
+          }),
+          { source: "pos" },
+        ),
+      );
+
+      // Later, the pharmacy updates the master catalog conversion factor to 15 tablets/strip
+      await t.db
+        .update(schema.medicines)
+        .set({ unitsPerPack: 15 })
+        .where(eq(schema.medicines.id, medicine.id));
+
+      // The historical sale item must strictly preserve original snapshot: unitsPerPack=10, packQty=1, looseQty=4, qty=14
+      const [item] = await t.db.select().from(schema.saleItems).where(eq(schema.saleItems.saleId, res.saleId));
+      expect(item.unitsPerPack).toBe(10);
+      expect(item.packQty).toBe(1);
+      expect(item.looseQty).toBe(4);
+      expect(item.qty).toBe(14);
+      expect(item.totalAmount).toBe(14000);
+    });
+
     describe("auto-FEFO batch allocation (A2.11)", () => {
       it("auto-picks the earliest expiry batch by default when medicineId is passed", async () => {
         const tenant = await makeTenant(t.db);
@@ -829,6 +924,195 @@ describe("createSale: split tender, change and credit (A2.2)", () => {
         expect(details.selectedBatchNo).toBe("LOS-FAR");
         expect(Array.isArray(details.skippedBatches)).toBe(true);
         expect((details.skippedBatches as Array<{ batchNo: string }>)[0].batchNo).toBe("LOS-NEAR");
+      });
+
+      it("does NOT log an override audit entry when explicitly selecting the earliest batch", async () => {
+        const tenant = await makeTenant(t.db);
+        const store = await makeStore(t.db, tenant.id);
+        const user = await makeUser(t.db);
+        const maker = (await t.db.insert(schema.manufacturers).values({ tenantId: tenant.id, name: "Cipla" }).returning())[0];
+        const medicine = await makeMedicine(t.db, tenant.id, {
+          name: "Telma 40",
+          unitsPerPack: 10,
+          manufacturerId: maker.id,
+        });
+
+        const nearBatch = await makeBatch(t.db, {
+          tenantId: tenant.id,
+          storeId: store.id,
+          medicineId: medicine.id,
+          batchNo: "TEL-EARLY",
+          expiryDate: new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10),
+          qtyOnHand: 10,
+        });
+
+        await makeBatch(t.db, {
+          tenantId: tenant.id,
+          storeId: store.id,
+          medicineId: medicine.id,
+          batchNo: "TEL-LATER",
+          expiryDate: new Date(Date.now() + 180 * 86400000).toISOString().slice(0, 10),
+          qtyOnHand: 10,
+        });
+
+        const w = { tenant, store, user, medicine };
+
+        // Explicitly selecting the earliest batch
+        const res = await t.db.transaction((tx) =>
+          createSale(
+            tx,
+            ctxFor(w),
+            SaleInput.parse({
+              lines: [{ batchId: nearBatch.id, qty: 2, discountBp: 0 }],
+              payments: [{ method: "cash", amount: 20000 }],
+            }),
+            { source: "pos" },
+          ),
+        );
+
+        expect(res.saleId).toBeTruthy();
+
+        // Verify NO fefo_override audit log is recorded
+        const auditRows = await t.db
+          .select()
+          .from(schema.auditLogs)
+          .where(
+            and(
+              eq(schema.auditLogs.entityId, res.saleId),
+              eq(schema.auditLogs.action, "fefo_override"),
+            ),
+          );
+
+        expect(auditRows).toHaveLength(0);
+      });
+
+      it("deterministically tie-breaks batches having identical expiry dates using createdAt and id", async () => {
+        const tenant = await makeTenant(t.db);
+        const store = await makeStore(t.db, tenant.id);
+        const user = await makeUser(t.db);
+        const maker = (await t.db.insert(schema.manufacturers).values({ tenantId: tenant.id, name: "Sun" }).returning())[0];
+        const medicine = await makeMedicine(t.db, tenant.id, {
+          name: "Dolo 650",
+          unitsPerPack: 15,
+          manufacturerId: maker.id,
+        });
+
+        const sameExpiry = new Date(Date.now() + 100 * 86400000).toISOString().slice(0, 10);
+
+        // Created earlier (explicit 60s offset to guarantee distinct timestamp)
+        const batchFirst = await makeBatch(t.db, {
+          tenantId: tenant.id,
+          storeId: store.id,
+          medicineId: medicine.id,
+          batchNo: "DOLO-1ST",
+          expiryDate: sameExpiry,
+          qtyOnHand: 5,
+          createdAt: new Date(Date.now() - 60000),
+        });
+
+        // Created later
+        const batchSecond = await makeBatch(t.db, {
+          tenantId: tenant.id,
+          storeId: store.id,
+          medicineId: medicine.id,
+          batchNo: "DOLO-2ND",
+          expiryDate: sameExpiry,
+          qtyOnHand: 10,
+          createdAt: new Date(),
+        });
+
+        const w = { tenant, store, user, medicine };
+
+        // Sell 3 units with auto-FEFO (should pick batchFirst)
+        const res = await t.db.transaction((tx) =>
+          createSale(
+            tx,
+            ctxFor(w),
+            SaleInput.parse({
+              lines: [{ medicineId: medicine.id, qty: 3, discountBp: 0 }],
+              payments: [{ method: "cash", amount: 15000 }],
+            }),
+            { source: "pos" },
+          ),
+        );
+
+        const items = await t.db.select().from(schema.saleItems).where(eq(schema.saleItems.saleId, res.saleId));
+        expect(items).toHaveLength(1);
+        expect(items[0].batchId).toBe(batchFirst.id);
+
+        const [b1] = await t.db.select().from(schema.batches).where(eq(schema.batches.id, batchFirst.id));
+        expect(b1.qtyOnHand).toBe(2);
+
+        const [b2] = await t.db.select().from(schema.batches).where(eq(schema.batches.id, batchSecond.id));
+        expect(b2.qtyOnHand).toBe(10);
+      });
+
+      it("logs a fefo_override audit entry when selecting a later-created batch having identical expiry date", async () => {
+        const tenant = await makeTenant(t.db);
+        const store = await makeStore(t.db, tenant.id);
+        const user = await makeUser(t.db);
+        const maker = (await t.db.insert(schema.manufacturers).values({ tenantId: tenant.id, name: "Alkem" }).returning())[0];
+        const medicine = await makeMedicine(t.db, tenant.id, {
+          name: "Pan 40",
+          unitsPerPack: 10,
+          manufacturerId: maker.id,
+        });
+
+        const sameExpiry = new Date(Date.now() + 120 * 86400000).toISOString().slice(0, 10);
+
+        const firstBatch = await makeBatch(t.db, {
+          tenantId: tenant.id,
+          storeId: store.id,
+          medicineId: medicine.id,
+          batchNo: "PAN-SAME-1",
+          expiryDate: sameExpiry,
+          qtyOnHand: 10,
+          createdAt: new Date(Date.now() - 60000),
+        });
+
+        const secondBatch = await makeBatch(t.db, {
+          tenantId: tenant.id,
+          storeId: store.id,
+          medicineId: medicine.id,
+          batchNo: "PAN-SAME-2",
+          expiryDate: sameExpiry,
+          qtyOnHand: 10,
+          createdAt: new Date(),
+        });
+
+        const w = { tenant, store, user, medicine };
+
+        // Explicitly select secondBatch, skipping firstBatch which has the same expiry but was created earlier
+        const res = await t.db.transaction((tx) =>
+          createSale(
+            tx,
+            ctxFor(w),
+            SaleInput.parse({
+              lines: [{ batchId: secondBatch.id, qty: 2, discountBp: 0, overrideReason: "Customer picked specific box from shelf" }],
+              payments: [{ method: "cash", amount: 20000 }],
+            }),
+            { source: "pos" },
+          ),
+        );
+
+        expect(res.saleId).toBeTruthy();
+
+        // Verify fefo_override audit log is recorded
+        const auditRows = await t.db
+          .select()
+          .from(schema.auditLogs)
+          .where(
+            and(
+              eq(schema.auditLogs.entityId, res.saleId),
+              eq(schema.auditLogs.action, "fefo_override"),
+            ),
+          );
+
+        expect(auditRows).toHaveLength(1);
+        const details = auditRows[0].newValue as Record<string, unknown>;
+        expect(details.selectedBatchNo).toBe("PAN-SAME-2");
+        expect(Array.isArray(details.skippedBatches)).toBe(true);
+        expect((details.skippedBatches as Array<{ batchNo: string }>)[0].batchNo).toBe("PAN-SAME-1");
       });
     });
   });

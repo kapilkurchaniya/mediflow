@@ -3,6 +3,7 @@ import { sql } from "drizzle-orm";
 import {
   bigserial,
   boolean,
+  check,
   date,
   index,
   integer,
@@ -51,6 +52,21 @@ export const users = pgTable(
   (t) => [uniqueIndex("users_email_uq").on(sql`lower(${t.email})`)],
 );
 
+export type StoreKind = "retail" | "warehouse";
+
+export interface StoreSettings {
+  requireShift?: boolean;
+  maxDiscountBp?: number;
+  printFormat?: "thermal_80mm" | "thermal_58mm" | "a4";
+  defaultPaymentMethod?: "cash" | "upi" | "card" | "credit";
+}
+
+export const DEFAULT_STORE_SETTINGS: StoreSettings = {
+  requireShift: false,
+  printFormat: "thermal_80mm",
+  defaultPaymentMethod: "cash",
+};
+
 export const stores = pgTable(
   "stores",
   {
@@ -58,6 +74,7 @@ export const stores = pgTable(
     tenantId: tenantId(),
     name: text("name").notNull(),
     code: text("code").notNull(),
+    kind: text("kind").$type<StoreKind>().notNull().default("retail"),
     address: text("address"),
     city: text("city"),
     stateCode: text("state_code").notNull(),
@@ -69,9 +86,13 @@ export const stores = pgTable(
     fssaiNo: text("fssai_no"),
     invoicePrefix: text("invoice_prefix").notNull().default("INV"),
     isActive: boolean("is_active").notNull().default(true),
+    settings: jsonb("settings").$type<StoreSettings>().notNull().default(DEFAULT_STORE_SETTINGS),
     createdAt: createdAt(),
   },
-  (t) => [uniqueIndex("stores_tenant_code_uq").on(t.tenantId, t.code)],
+  (t) => [
+    uniqueIndex("stores_tenant_code_uq").on(t.tenantId, t.code),
+    check("stores_kind_check", sql`${t.kind} IN ('retail', 'warehouse')`),
+  ],
 );
 
 export const sessions = pgTable(

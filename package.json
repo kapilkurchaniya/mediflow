@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "lint:strict": "node scripts/lint-strict.mjs",
+    "lint:strict": "eslint --quiet src tests scripts",
     "typecheck": "tsc --noEmit",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx src/server/db/migrate.ts",
@@ -16,6 +16,7 @@
     "db:seed-users": "tsx scripts/seed-test-users.ts",
     "db:reset": "tsx scripts/reset-db.ts",
     "test": "vitest run --passWithNoTests",
+    "test:e2e": "playwright test",
     "hooks:install": "git config core.hooksPath .githooks",
     "prepare": "git config core.hooksPath .githooks || true"
   },
@@ -43,6 +44,7 @@
     "zod": "^4.6.5"
   },
   "devDependencies": {
+    "@playwright/test": "^1.64.1",
     "@tailwindcss/postcss": "^4",
     "@types/bcryptjs": "^2.4.6",
     "@types/node": "^24.19.1",
