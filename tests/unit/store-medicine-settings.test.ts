@@ -7,7 +7,7 @@ import {
   updateStoreMedicineSettings,
   updateStoreMedicineSettingsSchema,
 } from "@/server/domain/catalog/store-settings";
-import { DomainError, ForbiddenError, NotFoundError } from "@/server/errors";
+import { ForbiddenError, NotFoundError } from "@/server/errors";
 
 function createMockQuery<T>(result: T) {
   const query = {
@@ -135,6 +135,10 @@ describe("Store Medicine Settings Unit Tests (Task A3.3)", () => {
       expect(setting?.salePriceSource).toBe("catalog_default");
       expect(setting?.rackId).toBeNull();
       expect(setting?.hasStoreOverrides).toBe(false);
+      expect(setting?.hasReorderOverride).toBe(false);
+      expect(setting?.hasMaxStockOverride).toBe(false);
+      expect(setting?.hasRackOverride).toBe(false);
+      expect(setting?.hasSalePriceOverride).toBe(false);
     });
 
     it("applies store overrides over catalog defaults", async () => {
@@ -170,6 +174,10 @@ describe("Store Medicine Settings Unit Tests (Task A3.3)", () => {
       expect(setting?.rackId).toBe(rackAId);
       expect(setting?.rackCode).toBe("R1-S1");
       expect(setting?.hasStoreOverrides).toBe(true);
+      expect(setting?.hasReorderOverride).toBe(true);
+      expect(setting?.hasMaxStockOverride).toBe(true);
+      expect(setting?.hasRackOverride).toBe(true);
+      expect(setting?.hasSalePriceOverride).toBe(true);
     });
 
     it("correctly handles 0 as a valid override value without falling back to catalog", async () => {
@@ -202,6 +210,10 @@ describe("Store Medicine Settings Unit Tests (Task A3.3)", () => {
       expect(setting?.salePrice).toBe(0);
       expect(setting?.salePriceSource).toBe("store_override");
       expect(setting?.hasStoreOverrides).toBe(true);
+      expect(setting?.hasReorderOverride).toBe(true);
+      expect(setting?.hasMaxStockOverride).toBe(true);
+      expect(setting?.hasRackOverride).toBe(false);
+      expect(setting?.hasSalePriceOverride).toBe(true);
     });
   });
 
@@ -257,6 +269,24 @@ describe("Store Medicine Settings Unit Tests (Task A3.3)", () => {
       await expect(
         updateStoreMedicineSettings(mockTx, ctx, storeAId, medicineId, { rackId: rackBId }),
       ).rejects.toBeInstanceOf(NotFoundError);
+    });
+
+    it("throws DomainError('INVALID_THRESHOLDS') if reorder level exceeds maximum stock", async () => {
+      const ctx = createMockCtx();
+
+      let queryCallCount = 0;
+      const mockSelect = () => {
+        queryCallCount++;
+        if (queryCallCount === 1) return createMockQuery([{ id: storeAId, isActive: true }]);
+        if (queryCallCount === 2) return createMockQuery([{ id: medicineId }]);
+        return createMockQuery([]);
+      };
+
+      const mockTx = { select: mockSelect } as unknown as DbOrTx;
+
+      await expect(
+        updateStoreMedicineSettings(mockTx, ctx, storeAId, medicineId, { reorderLevel: 50, maxStock: 20 }),
+      ).rejects.toThrow("Reorder level cannot exceed maximum stock.");
     });
   });
 });

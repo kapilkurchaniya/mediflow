@@ -99,6 +99,13 @@
       "when": 1793530418847,
       "tag": "0013_mysterious_wolfpack",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1793534000000,
+      "tag": "0014_hardening_store_settings",
+      "breakpoints": true
     }
   ]
 }

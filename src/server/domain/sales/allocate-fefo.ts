@@ -42,6 +42,8 @@ export interface FefoAllocationOptions {
  * When an explicit batch is chosen manually by the counter cashier, verifies whether earlier-expiring
  * batches with stock were skipped, flagging an audited FEFO override.
  */
+const clampMrp = (rate: number, mrp: number | null) => (mrp && mrp > 0 ? Math.min(rate, mrp) : rate);
+
 export async function allocateFefoBatches(
   tx: DbOrTx,
   ctx: Pick<AuthCtx, "tenantId" | "storeId">,
@@ -59,10 +61,7 @@ export async function allocateFefoBatches(
     // 1. Resolve medicine and explicit batch (if specified)
     if (line.batchId) {
       const [batchRecord] = await tx
-        .select({
-          batch: schema.batches,
-          medicine: schema.medicines,
-        })
+        .select({ batch: schema.batches, medicine: schema.medicines })
         .from(schema.batches)
         .innerJoin(schema.medicines, eq(schema.batches.medicineId, schema.medicines.id))
         .where(
@@ -89,10 +88,7 @@ export async function allocateFefoBatches(
       }
     } else if (line.medicineId) {
       const [medRecord] = await tx
-        .select({
-          medicine: schema.medicines,
-          manufacturer: schema.manufacturers.name,
-        })
+        .select({ medicine: schema.medicines, manufacturer: schema.manufacturers.name })
         .from(schema.medicines)
         .leftJoin(schema.manufacturers, eq(schema.medicines.manufacturerId, schema.manufacturers.id))
         .where(
@@ -189,7 +185,7 @@ export async function allocateFefoBatches(
 
       const isOverride = earlierBatches.length > 0;
       allocatedStockMap.set(explicitBatch.id, previouslyAllocated + baseQty);
-      const saleRate = explicitBatch.saleRate ?? explicitBatch.mrp ?? 0;
+      const saleRate = clampMrp(explicitBatch.saleRate ?? explicitBatch.mrp ?? 0, explicitBatch.mrp);
 
       allocatedLines.push({
         batch: explicitBatch,
@@ -250,7 +246,7 @@ export async function allocateFefoBatches(
 
         const slicePackQty = Math.floor(take / upp);
         const sliceLooseQty = take % upp;
-        const saleRate = b.saleRate ?? b.mrp ?? 0;
+        const saleRate = clampMrp(b.saleRate ?? b.mrp ?? 0, b.mrp);
 
         allocatedLines.push({
           batch: b,
@@ -278,7 +274,7 @@ export async function allocateFefoBatches(
         allocatedStockMap.set(fallbackBatch.id, used + remaining);
         const slicePackQty = Math.floor(remaining / upp);
         const sliceLooseQty = remaining % upp;
-        const saleRate = fallbackBatch.saleRate ?? fallbackBatch.mrp ?? 0;
+        const saleRate = clampMrp(fallbackBatch.saleRate ?? fallbackBatch.mrp ?? 0, fallbackBatch.mrp);
 
         allocatedLines.push({
           batch: fallbackBatch,

@@ -10,6 +10,17 @@ const testDbUrl =
 const pool = new Pool({ connectionString: testDbUrl });
 const db = drizzle(pool, { schema });
 
+test.beforeAll(async () => {
+  await db
+    .update(schema.batches)
+    .set({ qtyOnHand: 100 })
+    .where(eq(schema.batches.batchNo, "B-PARA-001"));
+  await db
+    .update(schema.batches)
+    .set({ qtyOnHand: 100 })
+    .where(eq(schema.batches.batchNo, "B-DOLO-001"));
+});
+
 test.afterAll(async () => {
   await pool.end();
 });

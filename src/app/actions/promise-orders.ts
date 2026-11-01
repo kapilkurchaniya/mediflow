@@ -1,7 +1,7 @@
 "use server";
 
 import { db, schema } from "@/server/db";
-import { eq, and, desc, sql } from "drizzle-orm";
+import { eq, and, desc } from "drizzle-orm";
 import { requireAuth } from "@/server/auth";
 import { revalidatePath } from "next/cache";
 
@@ -36,7 +36,22 @@ export async function getPromiseOrders(filters?: { status?: string }) {
     })
     .from(schema.promiseOrders)
     .leftJoin(schema.medicines, eq(schema.promiseOrders.medicineId, schema.medicines.id))
-    .leftJoin(schema.racks, eq(schema.medicines.rackId, schema.racks.id))
+    .leftJoin(
+      schema.storeMedicineSettings,
+      and(
+        eq(schema.storeMedicineSettings.medicineId, schema.promiseOrders.medicineId),
+        eq(schema.storeMedicineSettings.storeId, schema.promiseOrders.storeId),
+        eq(schema.storeMedicineSettings.tenantId, schema.promiseOrders.tenantId),
+      ),
+    )
+    .leftJoin(
+      schema.racks,
+      and(
+        eq(schema.racks.id, schema.storeMedicineSettings.rackId),
+        eq(schema.racks.storeId, schema.promiseOrders.storeId),
+        eq(schema.racks.tenantId, schema.promiseOrders.tenantId),
+      ),
+    )
     .where(and(...conditions))
     .orderBy(desc(schema.promiseOrders.createdAt));
 
