@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { describe, it, expect, vi } from "vitest";
 import {
   createImportJob,
@@ -9,6 +8,16 @@ import {
   detectPresetAndMapping,
 } from "@/server/domain/import";
 import type { DbOrTx } from "@/server/db";
+
+interface StagedImportRow {
+  id?: string;
+  jobId?: string;
+  rowNo?: number;
+  status?: string;
+  raw: Record<string, string>;
+  normalized?: Record<string, unknown>;
+  errors?: unknown[];
+}
 
 describe("Import Scale & Integration Invariant Test Suite (Task B4.5)", () => {
   const tenantId = "tenant-scale-test";
@@ -55,15 +64,21 @@ describe("Import Scale & Integration Invariant Test Suite (Task B4.5)", () => {
     expect(batchRows.length).toBe(3000);
 
     // In-memory mock database tracking table state
-    const stagingJobs: Map<string, any> = new Map();
-    const stagingJobRows: Map<string, any[]> = new Map();
-    const createdMedicines: Map<string, any> = new Map();
-    const createdBatches: Map<string, any> = new Map();
-    const recordedStockMovements: any[] = [];
+    const stagingJobs: Map<string, Record<string, unknown>> = new Map();
+    const stagingJobRows: Map<string, StagedImportRow[]> = new Map();
+    const createdMedicines: Map<string, Record<string, unknown>> = new Map();
+    const createdBatches: Map<string, Record<string, unknown>> = new Map();
+    const recordedStockMovements: Record<string, unknown>[] = [];
     let currentActiveJobId = "";
 
-    function makeQueryBuilder(rows: any[], single: any[]) {
-      const p: any = Promise.resolve(rows);
+    function makeQueryBuilder(rows: unknown[], single: unknown[]) {
+      const p = Promise.resolve(rows) as unknown as Promise<unknown[]> & {
+        limit: (n?: number) => Promise<unknown[]>;
+        offset: () => unknown;
+        orderBy: () => Promise<unknown[]>;
+        for: () => Promise<unknown[]>;
+        [Symbol.iterator]: () => Generator<unknown, void, unknown>;
+      };
       p.limit = (n?: number) => Promise.resolve(single.slice(0, n || 1));
       p.offset = () => p;
       p.orderBy = () => Promise.resolve(rows);
@@ -74,15 +89,16 @@ describe("Import Scale & Integration Invariant Test Suite (Task B4.5)", () => {
       return p;
     }
 
-    const mockDb: any = {
-      insert: vi.fn().mockImplementation((table: any) => ({
-        values: vi.fn().mockImplementation((vals: any) => {
+    const mockDb = {
+      insert: vi.fn().mockImplementation(() => ({
+        values: vi.fn().mockImplementation((vals: unknown) => {
           if (Array.isArray(vals)) {
             // Batch rows insertion
-            if (vals.length > 0 && vals[0].jobId) {
-              const jId = vals[0].jobId;
+            const arr = vals as StagedImportRow[];
+            if (arr.length > 0 && arr[0].jobId) {
+              const jId = String(arr[0].jobId);
               const existing = stagingJobRows.get(jId) || [];
-              const rowsWithIds = vals.map((v, idx) => ({
+              const rowsWithIds = arr.map((v, idx) => ({
                 id: `staged-row-${jId}-${existing.length + idx + 1}`,
                 ...v,
               }));
@@ -94,13 +110,14 @@ describe("Import Scale & Integration Invariant Test Suite (Task B4.5)", () => {
           }
 
           // Single record insertion
-          if (vals.entity && vals.fileName) {
+          const obj = vals as Record<string, unknown>;
+          if (obj && obj.entity && obj.fileName) {
             // import_jobs
             const job = {
               id: `job-${stagingJobs.size + 1}`,
               totals: { rows: 0, valid: 0, errors: 0, created: 0, updated: 0, skipped: 0 },
               status: "pending",
-              ...vals,
+              ...obj,
             };
             stagingJobs.set(job.id, job);
             currentActiveJobId = job.id;
@@ -110,12 +127,12 @@ describe("Import Scale & Integration Invariant Test Suite (Task B4.5)", () => {
           return { returning: vi.fn().mockReturnValue([vals]) };
         }),
       })),
-      select: vi.fn().mockImplementation((fields?: any) => ({
-        from: vi.fn().mockImplementation((table: any) => ({
-          where: vi.fn().mockImplementation((_cond?: any) => {
+      select: vi.fn().mockImplementation((fields?: Record<string, unknown>) => ({
+        from: vi.fn().mockImplementation(() => ({
+          where: vi.fn().mockImplementation(() => {
             const isCount = fields && (fields.n !== undefined || fields.count !== undefined);
             const activeJob = stagingJobs.get(currentActiveJobId) || Array.from(stagingJobs.values()).pop();
-            const activeRows = activeJob ? stagingJobRows.get(activeJob.id) || [] : [];
+            const activeRows = activeJob ? stagingJobRows.get(activeJob.id as string) || [] : [];
 
             if (isCount) {
               return makeQueryBuilder(
@@ -128,8 +145,8 @@ describe("Import Scale & Integration Invariant Test Suite (Task B4.5)", () => {
           }),
         })),
       })),
-      update: vi.fn().mockImplementation((table: any) => ({
-        set: vi.fn().mockImplementation((updates: any) => ({
+      update: vi.fn().mockImplementation(() => ({
+        set: vi.fn().mockImplementation((updates: Record<string, unknown>) => ({
           where: vi.fn().mockImplementation(() => {
             // Update active job in memory
             const activeJob = stagingJobs.get(currentActiveJobId);
@@ -137,21 +154,30 @@ describe("Import Scale & Integration Invariant Test Suite (Task B4.5)", () => {
               if (updates.mapping) activeJob.mapping = updates.mapping;
               if (updates.status) activeJob.status = updates.status;
               if (updates.totals && typeof updates.totals === "object") {
-                activeJob.totals = { ...activeJob.totals, ...updates.totals };
+                activeJob.totals = {
+                  ...(activeJob.totals as Record<string, unknown>),
+                  ...(updates.totals as Record<string, unknown>),
+                };
               }
             }
-            const res: any = Promise.resolve([updates]);
+            const res = Promise.resolve([updates]) as unknown as Promise<unknown[]> & {
+              returning: () => unknown[];
+            };
             res.returning = vi.fn().mockReturnValue([updates]);
             return res;
           }),
         })),
       })),
-      transaction: vi.fn().mockImplementation(async (cb: (tx: any) => Promise<any>) => {
-        const txMock: any = {
+      transaction: vi.fn().mockImplementation(async (cb: (tx: unknown) => Promise<unknown>) => {
+        const txMock = {
           select: vi.fn().mockImplementation(() => ({
-            from: vi.fn().mockImplementation((table: any) => ({
+            from: vi.fn().mockImplementation(() => ({
               where: vi.fn().mockImplementation(() => {
-                const builder: any = Promise.resolve([]);
+                const builder = Promise.resolve([]) as unknown as Promise<unknown[]> & {
+                  limit: () => Promise<unknown[]>;
+                  for: () => Promise<unknown[]>;
+                  [Symbol.iterator]: () => Generator<unknown, void, unknown>;
+                };
                 builder.limit = vi.fn().mockReturnValue(Promise.resolve([]));
                 builder.for = vi.fn().mockReturnValue(Promise.resolve([{ id: "mock-batch", qtyOnHand: 0 }]));
                 builder[Symbol.iterator] = function* () {};
@@ -159,8 +185,8 @@ describe("Import Scale & Integration Invariant Test Suite (Task B4.5)", () => {
               }),
             })),
           })),
-          insert: vi.fn().mockImplementation((table: any) => ({
-            values: vi.fn().mockImplementation((vals: any) => {
+          insert: vi.fn().mockImplementation(() => ({
+            values: vi.fn().mockImplementation((vals: Record<string, unknown>) => {
               if (vals.unitsPerPack !== undefined) {
                 // schema.medicines
                 const id = `med-${createdMedicines.size + 1}`;
@@ -326,7 +352,10 @@ describe("Import Scale & Integration Invariant Test Suite (Task B4.5)", () => {
     expect(recordedStockMovements.length).toBe(3000);
 
     // 2. Sum of qtyChange across stock movements strictly equals sum of opening quantities
-    const totalMovementQty = recordedStockMovements.reduce((acc, m) => acc + m.qtyChange, 0);
+    const totalMovementQty = recordedStockMovements.reduce(
+      (acc, m) => acc + (Number(m.qtyChange) || 0),
+      0
+    );
     expect(totalMovementQty).toBe(totalOpeningQtyExpected);
 
     // 3. All movement types are 'opening' with refType 'import_job'
