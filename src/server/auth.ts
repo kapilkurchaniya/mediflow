@@ -1,7 +1,6 @@
 import { cookies } from "next/headers";
 import { db, schema, type DbOrTx } from "./db";
 import { eq } from "drizzle-orm";
-import { eq, sql } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
 
