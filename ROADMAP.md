@@ -999,6 +999,39 @@ When you start a phase, list your 🤝 items in the Monday sync and merge them b
 
 ---
 
+## Future Scope & Multi-Platform Delivery Strategy
+
+While MediFlow is engineered as a modern, high-performance Next.js application, its delivery architecture is designed for multi-platform deployment catering to diverse retail pharmacy operational environments:
+
+### 1. Cloud Web SaaS (Browser-Hosted)
+- **Deployment:** Hosted cloud application accessible via any modern browser (Chrome, Edge, Firefox, Safari).
+- **Use Case:** Instant multi-device access without local installation, branch performance monitoring, head-office analytics, remote accountant access, and inventory checks from any location.
+
+### 2. Native Windows Desktop Executable (`.exe` / `.msi`)
+- **Packaging:** Standalone downloadable desktop executable packaged via Tauri with a local Rust sidecar.
+- **Capabilities:**
+  - **Offline-First Billing:** Full counter operation continues uninterrupted during internet loss using a local SQLite cache and bidirectional sync (Phase 4).
+  - **Direct Hardware Integration:** Raw USB and serial ESC/POS thermal printer support, hardware cash drawer kick triggers, and high-speed barcode scanner buffer.
+  - **Zero-Latency Counter Ops:** Maximizes counter throughput for high-volume pharmacies accustomed to legacy desktop ERP speed.
+
+### 3. Native macOS Desktop Application (`.dmg`) [Future Scope]
+- **Packaging:** Native macOS desktop bundle (Apple Silicon M-series & Intel x86_64).
+- **Capabilities:**
+  - Apple menu bar integration and native system notification dispatch.
+  - Cross-platform Marg ERP keyboard parity: automatic mapping for Mac keyboards (`Option ⌥` for `Alt`, `Cmd ⌘ + Enter` for `End`, `Fn + F1–F12` function key handling).
+  - Offline-first local SQLite cache with cloud sync.
+
+### 4. Mobile Companion Application (iOS & Android) [Future Scope]
+- **Target Audience:** Pharmacy owners, managing directors, and traveling store supervisors.
+- **Core Capabilities in Scope:**
+  - **Executive Real-Time Dashboard:** Live tracking of daily sales, profit margins, active cash register shifts, and tender breakdowns across all branches.
+  - **Inventory Audits & Mobile Scanner:** Use phone camera as a high-speed barcode scanner for periodic shelf stock audits, discrepancy logging, and batch verification.
+  - **Alerts & Push Notifications:** Immediate push notifications for near-expiry batches, critical stock-outs, and pending promise orders.
+  - **Customer Credit ("Khata") & Reminders:** View customer balances and dispatch automated WhatsApp/SMS payment reminders directly from mobile.
+  - **Purchase Order & GRN Approvals:** Review and authorize purchase orders and distributor bills on the go.
+
+---
+
 ## Open questions (decide before the phase that needs them)
 
 | # | Question | Needed by | Owner |

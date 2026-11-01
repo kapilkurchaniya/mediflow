@@ -7,6 +7,7 @@ import { ArrowLeft, Volume2, VolumeX, BookmarkCheck, Layers, RotateCcw, Lock, Un
 import { defaultPosDataSource as ds } from "./_data/posData";
 import { usePosCart } from "./_state/usePosCart";
 import { usePosShortcuts } from "./_state/usePosShortcuts";
+import { useShell } from "@/app/components/ShellContext";
 import { SearchBar } from "./_components/SearchBar";
 import { CartTable } from "./_components/CartTable";
 import { CustomerPicker } from "./_components/CustomerPicker";
@@ -22,6 +23,7 @@ export default function POSPage() {
   const router = useRouter();
   const searchInputRef = useRef<HTMLInputElement>(null);
   const { state, dispatch, totals, loyaltyDiscountPaise, rxWarning, controlledItems, playSound } = usePosCart();
+  const { toggleCalculator, setShortcutsOpen } = useShell();
 
   const [activeShift, setActiveShift] = useState<CurrentShiftStats | null>(null);
   const [requireShift, setRequireShift] = useState(false);
@@ -130,6 +132,8 @@ export default function POSPage() {
     onOpenPaymentModal: () => setIsPaymentOpen(true),
     onOpenPromiseModal: () => setPromiseMedicine({ id: "", name: "" }),
     onCompleteSale: () => handleCompleteSale(isPaymentOpen ? "split" : state.paymentMethod),
+    onOpenCalculator: () => toggleCalculator(),
+    onOpenShortcutsCheatSheet: () => setShortcutsOpen(true),
     onEscape: () => {
       setIsPaymentOpen(false);
       setIsParkOpen(false);
@@ -163,8 +167,31 @@ export default function POSPage() {
           </div>
         )}
 
-        <SearchBar inputRef={searchInputRef} dataSource={ds} onSelectBatch={(m, b, all) => dispatch({ type: "ADD_LINE", payload: { medicine: m, batch: b, allBatches: all } })} onOpenSubstitutes={(gen) => setSubstituteGeneric(gen)} onOpenPromiseOrder={(med) => setPromiseMedicine(med)} playSound={playSound} />
-        <CartTable cart={state.cart} revalidationAlert={revalidationAlert} rxWarning={rxWarning} controlledItems={controlledItems} onUpdatePackQty={(batchId, pQty) => dispatch({ type: "UPDATE_LINE_PACK_QTY", payload: { batchId, packQty: pQty } })} onUpdateLooseQty={(batchId, lQty) => dispatch({ type: "UPDATE_LINE_LOOSE_QTY", payload: { batchId, looseQty: lQty } })} onUpdateDiscount={(batchId, dBp) => dispatch({ type: "UPDATE_LINE_DISCOUNT", payload: { batchId, discountBp: dBp } })} onUpdateBatch={(oldId, newB, reason) => dispatch({ type: "UPDATE_LINE_BATCH", payload: { oldBatchId: oldId, newBatch: newB, reason } })} onRemoveLine={(batchId) => dispatch({ type: "REMOVE_LINE", payload: { batchId } })} onOpenSubstitutes={(gen) => setSubstituteGeneric(gen)} />
+        <SearchBar
+          inputRef={searchInputRef}
+          dataSource={ds}
+          onSelectBatch={(m, b, all) => dispatch({ type: "ADD_LINE", payload: { medicine: m, batch: b, allBatches: all } })}
+          onOpenSubstitutes={(gen) => setSubstituteGeneric(gen)}
+          onOpenPromiseOrder={(med) => setPromiseMedicine(med)}
+          playSound={playSound}
+          onEnterCart={() => {
+            const firstRow = document.querySelector<HTMLTableRowElement>('tr[data-cart-row="true"]');
+            firstRow?.focus();
+          }}
+        />
+        <CartTable
+          cart={state.cart}
+          revalidationAlert={revalidationAlert}
+          rxWarning={rxWarning}
+          controlledItems={controlledItems}
+          onUpdatePackQty={(batchId, pQty) => dispatch({ type: "UPDATE_LINE_PACK_QTY", payload: { batchId, packQty: pQty } })}
+          onUpdateLooseQty={(batchId, lQty) => dispatch({ type: "UPDATE_LINE_LOOSE_QTY", payload: { batchId, looseQty: lQty } })}
+          onUpdateDiscount={(batchId, dBp) => dispatch({ type: "UPDATE_LINE_DISCOUNT", payload: { batchId, discountBp: dBp } })}
+          onUpdateBatch={(oldId, newB, reason) => dispatch({ type: "UPDATE_LINE_BATCH", payload: { oldBatchId: oldId, newBatch: newB, reason } })}
+          onRemoveLine={(batchId) => dispatch({ type: "REMOVE_LINE", payload: { batchId } })}
+          onOpenSubstitutes={(gen) => setSubstituteGeneric(gen)}
+          onFocusSearch={() => searchInputRef.current?.focus()}
+        />
       </div>
 
       <div className="w-80 flex flex-col space-y-3 shrink-0">

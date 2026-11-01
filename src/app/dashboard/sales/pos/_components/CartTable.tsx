@@ -6,6 +6,7 @@ import { formatINR } from "@/lib/format";
 import { computeSaleLine } from "@/lib/money";
 import { computeFefoPreview, isFefoOverride } from "@/lib/fefo";
 import { FefoOverrideModal } from "./FefoOverrideModal";
+import { useCartKeyboard } from "./useCartKeyboard";
 import type { PosCartLine } from "../_state/types";
 import type { SearchResultBatch } from "../_data/posData";
 
@@ -20,6 +21,7 @@ interface CartTableProps {
   onUpdateBatch: (oldBatchId: string, newBatch: SearchResultBatch, reason?: string) => void;
   onRemoveLine: (batchId: string) => void;
   onOpenSubstitutes: (genericName: string) => void;
+  onFocusSearch?: () => void;
 }
 
 export function CartTable({
@@ -33,12 +35,21 @@ export function CartTable({
   onUpdateBatch,
   onRemoveLine,
   onOpenSubstitutes,
+  onFocusSearch,
 }: CartTableProps) {
   const [pendingOverride, setPendingOverride] = useState<{
     line: PosCartLine;
     targetBatch: SearchResultBatch;
     skippedBatches: SearchResultBatch[];
   } | null>(null);
+
+  const { selectedRowIndex, setSelectedRowIndex, rowRefs, handleRowKeyDown } = useCartKeyboard({
+    cart,
+    onRemoveLine,
+    onUpdatePackQty,
+    onUpdateLooseQty,
+    onFocusSearch,
+  });
 
   const todayStr = new Date().toISOString().slice(0, 10);
 
@@ -122,7 +133,23 @@ export function CartTable({
                   const isStockShortage = availableStock < lineCalc.baseQty;
 
                   return (
-                    <tr key={line.batchId} className={isStockShortage ? "bg-rose-50/50" : undefined}>
+                    <tr
+                      key={line.batchId}
+                      data-cart-row="true"
+                      ref={(el) => {
+                        rowRefs.current[idx] = el;
+                      }}
+                      tabIndex={selectedRowIndex === idx ? 0 : -1}
+                      onClick={() => setSelectedRowIndex(idx)}
+                      onKeyDown={(e) => handleRowKeyDown(e, idx)}
+                      className={`transition-colors outline-none cursor-pointer ${
+                        selectedRowIndex === idx
+                          ? "bg-brand-50/50 ring-1 ring-inset ring-brand-400"
+                          : isStockShortage
+                          ? "bg-rose-50/50"
+                          : ""
+                      }`}
+                    >
                       <td className="text-ink-400 font-mono text-xs">{idx + 1}</td>
                       <td>
                         <div className="flex items-center gap-1.5 flex-wrap">
@@ -168,6 +195,7 @@ export function CartTable({
                         <input
                           type="number"
                           min="0"
+                          data-cart-input="pack"
                           value={line.packQty === 0 && line.looseQty > 0 ? "" : line.packQty}
                           onChange={(e) => onUpdatePackQty(line.batchId, parseInt(e.target.value, 10) || 0)}
                           className="input !py-1 !px-2 text-center font-mono font-bold text-xs w-20"
@@ -179,6 +207,7 @@ export function CartTable({
                             <input
                               type="number"
                               min="0"
+                              data-cart-input="loose"
                               value={line.looseQty === 0 ? "" : line.looseQty}
                               onChange={(e) => onUpdateLooseQty(line.batchId, parseInt(e.target.value, 10) || 0)}
                               className="input !py-1 !px-2 text-center font-mono font-bold text-xs w-20"
@@ -202,6 +231,7 @@ export function CartTable({
                           type="number"
                           min="0"
                           max="100"
+                          data-cart-input="discount"
                           value={line.discountBp === 0 ? "" : line.discountBp / 100}
                           onChange={(e) => {
                             const val = parseFloat(e.target.value) || 0;
