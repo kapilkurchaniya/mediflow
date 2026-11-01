@@ -19,6 +19,7 @@ import { LoyaltyService } from "@/server/domain/loyalty";
 import { enqueue } from "@/server/jobs/outbox";
 import { writeAudit } from "@/server/audit";
 import { allocateFefoBatches } from "./allocate-fefo";
+import { canStoreUsePos } from "@/server/domain/stores";
 import type { CreateSaleOptions, CreateSaleResult, SaleInput } from "./types";
 
 /** Money methods a customer can hand over. "Credit" is not a method: it is whatever is left unpaid. */
@@ -128,13 +129,36 @@ export async function createSale(
     }
   }
 
-  // Optional per-pharmacy discount ceiling (tenants.settings.maxDiscountBp, basis points; unset = no limit).
-  // Going above it needs sale.discount_override (managers/owners). A settings screen arrives in A3.1.
+  // ── 1. Store validation & capabilities ─────────────────────────────────────────
+  const [store] = await tx
+    .select({
+      kind: schema.stores.kind,
+      isActive: schema.stores.isActive,
+      settings: schema.stores.settings,
+      invoicePrefix: schema.stores.invoicePrefix,
+      stateCode: schema.stores.stateCode,
+      gstin: schema.stores.gstin,
+    })
+    .from(schema.stores)
+    .where(and(eq(schema.stores.id, ctx.storeId), eq(schema.stores.tenantId, ctx.tenantId)));
+  if (!store) throw new DomainError("STORE_NOT_FOUND", "Store not found");
+
+  if (!canStoreUsePos(store)) {
+    throw new DomainError(
+      "WAREHOUSE_POS_NOT_ALLOWED",
+      store.kind === "warehouse"
+        ? "Retail sales cannot be processed from a warehouse location."
+        : "Retail sales cannot be processed from an inactive store.",
+    );
+  }
+
+  // Optional per-pharmacy discount ceiling (store.settings.maxDiscountBp, fallback to tenants.settings.maxDiscountBp).
+  // Going above it needs sale.discount_override (managers/owners).
   const [tenantRow] = await tx
     .select({ settings: schema.tenants.settings })
     .from(schema.tenants)
     .where(eq(schema.tenants.id, ctx.tenantId));
-  const maxDiscountBp = Number(tenantRow?.settings?.maxDiscountBp);
+  const maxDiscountBp = Number(store.settings?.maxDiscountBp ?? tenantRow?.settings?.maxDiscountBp);
   const aboveLimit = Number.isFinite(maxDiscountBp) && input.lines.some((l) => l.discountBp > maxDiscountBp);
   if (aboveLimit && !can(ctx, "sale.discount_override")) {
     throw new DomainError(
@@ -143,8 +167,8 @@ export async function createSale(
     );
   }
 
-  // Enforce cash register shift constraint when requireShift is turned on (ROADMAP A2.6)
-  if (tenantRow?.settings?.requireShift === true) {
+  // Enforce cash register shift constraint when requireShift is turned on at store or tenant level (ROADMAP A2.6)
+  if (store.settings?.requireShift === true || tenantRow?.settings?.requireShift === true) {
     const [activeShift] = await tx
       .select({ id: schema.cashSessions.id })
       .from(schema.cashSessions)
@@ -165,16 +189,7 @@ export async function createSale(
     }
   }
 
-  // ── 2. Store and customer (both scoped to the tenant) ────────────────────────────────────────────
-  const [store] = await tx
-    .select({
-      invoicePrefix: schema.stores.invoicePrefix,
-      stateCode: schema.stores.stateCode,
-      gstin: schema.stores.gstin,
-    })
-    .from(schema.stores)
-    .where(and(eq(schema.stores.id, ctx.storeId), eq(schema.stores.tenantId, ctx.tenantId)));
-  if (!store) throw new DomainError("STORE_NOT_FOUND", "Store not found");
+  // ── 2. Customer (scoped to the tenant) ─────────────────────────────────────────────────────────
 
   let customer:
     | { name: string; phone: string | null; gstin: string | null; stateCode: string | null; creditLimit: number | null }
