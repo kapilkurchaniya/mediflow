@@ -835,11 +835,11 @@ Full map in `.github/CODEOWNERS` and [ADR 0004](docs/adr/0004-two-lane-ownership
 #### [x] B4.2 Presets & normalisers ⏱ 3 days (needs B0.8 samples)
 - **Files:** ➕ `src/server/domain/import/normalize.ts` (dates `DD/MM/YYYY`, `MM/YY` → end of month; money "₹1,234.50" → paise; GST "12%" → 1200 with the GST 2.0 conversion offer; phone → 10 digits; GSTIN uppercase and validation; schedule text "H1", "Sch H" → enum), ➕ `match.ts` (medicine matching: barcode → normalised name + pack + manufacturer, with trigram `similarity()` > 0.6 as a "possible match"), ➕ `presets/marg.ts`, `presets/gofrugal.ts`, `presets/generic.ts` (header synonym maps built **from the real samples**), ➕ `tests/unit/import-normalize.test.ts`, ➕ `tests/fixtures/marg-items.synthetic.csv` (synthetic data only, no real customer data).
 
-#### B4.3 Import wizard UI ⏱ 3 days
+#### [x] B4.3 Import wizard UI ⏱ 3 days
 - **Files:** ➕ `src/app/dashboard/import/page.tsx` (job list, "New import"), ➕ `ImportWizard.tsx` (steps: entity → upload → map → validate → commit), ➕ `MappingStep.tsx` (auto-mapped from the preset; dropdown per column), ➕ `ReviewStep.tsx` (error rows with inline fix or skip; ambiguous matches as "create new / match"), ➕ `src/app/dashboard/import/[jobId]/page.tsx` (progress, report, download error CSV). Parse CSV in the browser with PapaParse; for XLSX use ExcelJS (🔀 separate dependency PR; check the licence and advisories). Send 1,000-row chunks to `addRows`.
 - Permission: `settings.manage`.
 
-#### B4.4 Commit + opening balances ⏱ 2 days (🤝 Lane A)
+#### [x] B4.4 Commit + opening balances ⏱ 2 days (🤝 Lane A)
 - Opening stock → `recordStockMovement(type: "opening")`, creating batches. Opening balances of customers and suppliers → 🤝 Lane A provides `postOpeningBalance(tx, ctx, { partyType, partyId, amount, asOf })` in `src/server/domain/accounting.ts` (A writes it in week 15; it's small). Commit runs in 500-row transactions and updates the job totals. Re-runs are idempotent through `external_ref`.
 
 #### B4.5 🧪 Import integration tests ⏱ 1 day
