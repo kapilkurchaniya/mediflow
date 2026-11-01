@@ -104,6 +104,10 @@ function processPercentages(tokens: Token[]): Token[] {
   for (let i = 0; i < tokens.length; i++) {
     const t = tokens[i];
     if (t.type === "PERCENT") {
+      if (i > 0 && tokens[i - 1].type === "PERCENT") {
+        throw new Error("Consecutive percentage operators are invalid");
+      }
+
       const prevNum = result[result.length - 1];
       if (!prevNum || prevNum.type !== "NUMBER") {
         throw new Error("Invalid percentage placement");
