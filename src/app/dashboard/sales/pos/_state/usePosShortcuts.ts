@@ -15,6 +15,7 @@ export interface ShortcutHandlers {
   onOpenCalculator?: () => void;
   onOpenShortcutsCheatSheet?: () => void;
   onEscape?: () => void;
+  isModalOpen?: boolean;
 }
 
 export function usePosShortcuts(handlers: ShortcutHandlers) {
@@ -25,7 +26,7 @@ export function usePosShortcuts(handlers: ShortcutHandlers) {
         activeEl?.tagName === "INPUT" ||
         activeEl?.tagName === "TEXTAREA" ||
         activeEl?.tagName === "SELECT";
-      const isModalOpen = Boolean(document.querySelector('[role="dialog"]'));
+      const isModalActive = Boolean(handlers.isModalOpen);
 
       // Ctrl + F1 -> Shortcut Cheat Sheet
       if (e.ctrlKey && (e.key === "F1" || e.key === "f1")) {
@@ -35,7 +36,7 @@ export function usePosShortcuts(handlers: ShortcutHandlers) {
       }
 
       // If a modal is open, only allow Escape or F12 (calculator toggle) to prevent hijacking dialog inputs
-      if (isModalOpen) {
+      if (isModalActive) {
         if (e.key === "Escape") {
           handlers.onEscape?.();
         } else if (e.key === "F12") {

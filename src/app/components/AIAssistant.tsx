@@ -7,14 +7,9 @@ import {
   X,
   Send,
   Receipt,
-  Package,
   Layers,
-  Calendar,
-  AlertTriangle,
   ArrowUpRight,
-  TrendingUp,
   ShoppingBag,
-  CheckCircle2,
 } from "lucide-react";
 import clsx from "clsx";
 import { useChat } from "@ai-sdk/react";
@@ -472,7 +467,7 @@ export function AIAssistant() {
 
       {/* Panel */}
       <div
-        role="dialog"
+        role={isOpen ? "dialog" : undefined}
         aria-label="MediFlow assistant"
         className={clsx(
           "fixed bottom-4 right-4 sm:bottom-5 sm:right-5 z-50 flex flex-col w-[calc(100vw-2rem)] sm:w-[440px] max-w-[440px] h-[min(580px,calc(100vh-5.5rem))] sm:h-[620px] origin-bottom-right overflow-hidden rounded-2xl border border-ink-150 bg-white print:hidden",
