@@ -14,6 +14,10 @@ import {
   GENERIC_BATCH_MAPPINGS,
   GENERIC_PARTY_MAPPINGS,
 } from "./generic";
+import { PHARMARACK_INVOICE_MAPPINGS } from "./pharmarack";
+import { RETAILIO_INVOICE_MAPPINGS } from "./retailio";
+
+export { PHARMARACK_INVOICE_MAPPINGS, RETAILIO_INVOICE_MAPPINGS };
 
 export interface PresetMappingResult {
   detectedSource: ImportSource;
