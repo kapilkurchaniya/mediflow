@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect, type FormEvent } from "react";
+import { useState, useCallback, useEffect, useMemo, type FormEvent } from "react";
 import { Search, Sparkles, BookmarkCheck, Layers, AlertCircle } from "lucide-react";
 import { formatINR } from "@/lib/format";
 import type { PosDataSource, SearchResult, SearchResultBatch, SearchResultMedicine } from "../_data/posData";
@@ -12,6 +12,7 @@ interface SearchBarProps {
   onOpenSubstitutes: (genericName: string) => void;
   onOpenPromiseOrder: (medicine: { id: string; name: string }) => void;
   playSound: (type: "beep" | "chime") => void;
+  onEnterCart?: () => void;
 }
 
 export function SearchBar({
@@ -21,22 +22,37 @@ export function SearchBar({
   onOpenSubstitutes,
   onOpenPromiseOrder,
   playSound,
+  onEnterCart,
 }: SearchBarProps) {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SearchResult[]>([]);
+  const [highlightedIndex, setHighlightedIndex] = useState(0);
   const [isSearching, setIsSearching] = useState(false);
+
+  // Flattened selectable batches for keyboard navigation
+  const flatSelectable = useMemo(() => {
+    const list: Array<{ medicine: SearchResultMedicine; batch: SearchResultBatch; allBatches: SearchResultBatch[] }> = [];
+    for (const res of results) {
+      for (const b of res.batches) {
+        list.push({ medicine: res.medicine, batch: b, allBatches: res.batches });
+      }
+    }
+    return list;
+  }, [results]);
 
   const performSearch = useCallback(
     async (q: string) => {
       const trimmed = q.trim();
       if (!trimmed) {
         setResults([]);
+        setHighlightedIndex(0);
         return;
       }
       setIsSearching(true);
       try {
         const items = await dataSource.searchItems(trimmed);
         setResults(items);
+        setHighlightedIndex(0);
 
         // Auto-add on exact barcode match with single in-stock batch
         const isBarcode = /^\d{8,14}$/.test(trimmed);
@@ -66,6 +82,7 @@ export function SearchBar({
     const timer = setTimeout(() => {
       if (!query.trim()) {
         setResults([]);
+        setHighlightedIndex(0);
       } else {
         performSearch(query);
       }
@@ -78,7 +95,34 @@ export function SearchBar({
     playSound("beep");
     setQuery("");
     setResults([]);
+    setHighlightedIndex(0);
     inputRef.current?.focus();
+  };
+
+  const handleInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      if (flatSelectable.length > 0) {
+        setHighlightedIndex((prev) => (prev + 1) % flatSelectable.length);
+      } else if (onEnterCart) {
+        onEnterCart();
+      }
+    } else if (e.key === "ArrowUp") {
+      if (flatSelectable.length > 0) {
+        e.preventDefault();
+        setHighlightedIndex((prev) => (prev <= 0 ? flatSelectable.length - 1 : prev - 1));
+      }
+    } else if (e.key === "Enter") {
+      if (flatSelectable.length > 0 && flatSelectable[highlightedIndex]) {
+        e.preventDefault();
+        const sel = flatSelectable[highlightedIndex];
+        handleSelect(sel.medicine, sel.batch, sel.allBatches);
+      }
+    } else if (e.key === "Escape") {
+      e.preventDefault();
+      setQuery("");
+      setResults([]);
+    }
   };
 
   return (
@@ -92,8 +136,9 @@ export function SearchBar({
           type="text"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
+          onKeyDown={handleInputKeyDown}
           className="input pl-10 pr-24 py-2.5 text-[15px] font-medium"
-          placeholder="F3 / : Search medicine, generic composition (e.g. Paracetamol) or scan barcode..."
+          placeholder="Insert / F3 / : Search medicine, generic composition or scan barcode..."
           autoComplete="off"
         />
         <button
@@ -176,7 +221,11 @@ export function SearchBar({
                 return res.batches.map((batch, bIdx) => (
                   <tr
                     key={batch.id}
-                    className="cursor-pointer hover:bg-brand-50/50 transition-colors"
+                    className={`cursor-pointer transition-colors ${
+                      batch.id === flatSelectable[highlightedIndex]?.batch.id
+                        ? "bg-brand-50/90 ring-1 ring-inset ring-brand-400"
+                        : "hover:bg-brand-50/50"
+                    }`}
                     onClick={() => handleSelect(res.medicine, batch, res.batches)}
                   >
                     <td>

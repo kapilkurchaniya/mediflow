@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { X, Keyboard, ScanLine, Search, Layout, Sparkles } from "lucide-react";
+import { X, Keyboard, ScanLine, Search, Layout, Sparkles, Calculator, Navigation, ShoppingBag } from "lucide-react";
 import { useShell } from "./ShellContext";
 
 interface ShortcutGroup {
@@ -12,39 +12,51 @@ interface ShortcutGroup {
 
 const SHORTCUT_GROUPS: ShortcutGroup[] = [
   {
-    title: "Billing & Counter POS",
+    title: "Marg ERP Counter Billing",
     icon: <ScanLine className="h-4 w-4 text-brand-600" />,
     shortcuts: [
-      { key: "F2", label: "Open POS New Bill counter" },
-      { key: "/", label: "Focus medicine search input" },
-      { key: "Esc", label: "Clear search / cancel action" },
+      { key: "F2 / Alt + N", label: "New sale counter / Reset bill" },
+      { key: "Insert / F3 / /", label: "Jump to medicine search / add item" },
+      { key: "End / F10", label: "Save & finalize bill (Instant checkout)" },
+      { key: "F4", label: "Open cash register shift / Tally" },
+      { key: "F6", label: "Park (hold) active bill" },
+      { key: "F7", label: "Recall parked bills list" },
+      { key: "F8", label: "Open split tender & customer credit" },
+      { key: "F9", label: "Substitute molecule / salt finder" },
+      { key: "F12 / Alt + F12", label: "Open floating counter calculator" },
+      { key: "Esc", label: "Cancel search / close active dialog" },
     ],
   },
   {
-    title: "Navigation & Command Menu",
+    title: "Cart Row Navigation & Quantity",
+    icon: <ShoppingBag className="h-4 w-4 text-emerald-600" />,
+    shortcuts: [
+      { key: "↓ (from search)", label: "Enter cart items table" },
+      { key: "↑ / ↓", label: "Navigate cart rows (Roving cursor)" },
+      { key: "+ / -", label: "Increment / decrement active quantity" },
+      { key: "Delete", label: "Delete highlighted cart row" },
+      { key: "Tab / Enter", label: "Advance to next field (Pack → Loose)" },
+    ],
+  },
+  {
+    title: "Global ERP Navigation",
+    icon: <Navigation className="h-4 w-4 text-indigo-600" />,
+    shortcuts: [
+      { key: "Alt + N", label: "Jump to POS Billing Counter" },
+      { key: "Alt + P", label: "Jump to New Purchase Bill (GRN)" },
+      { key: "Alt + M", label: "Jump to Sales Register (Modify Bill)" },
+      { key: "Alt + I", label: "Jump to Inventory & Batch Stock" },
+      { key: "Alt + L", label: "Jump to Customer Ledgers / Accounts" },
+    ],
+  },
+  {
+    title: "System & Utilities",
     icon: <Search className="h-4 w-4 text-sky-600" />,
     shortcuts: [
-      { key: "Cmd/Ctrl + K", label: "Open global command palette" },
+      { key: "Ctrl/Cmd + K", label: "Open global command palette" },
       { key: "Ctrl + B", label: "Toggle sidebar collapse" },
-      { key: "?", label: "Open keyboard shortcuts cheat sheet" },
-      { key: "Esc", label: "Close active modal / drawer" },
-    ],
-  },
-  {
-    title: "MediFlow AI Assistant",
-    icon: <Sparkles className="h-4 w-4 text-purple-600" />,
-    shortcuts: [
+      { key: "Ctrl + F1 / ?", label: "Open keyboard shortcuts cheat sheet" },
       { key: "Ctrl + J", label: "Open/close MediFlow AI assistant" },
-      { key: "Enter", label: "Submit query to assistant" },
-    ],
-  },
-  {
-    title: "General Ergonomics",
-    icon: <Layout className="h-4 w-4 text-amber-600" />,
-    shortcuts: [
-      { key: "Tab", label: "Cycle through fields & buttons" },
-      { key: "Shift + Tab", label: "Cycle backwards" },
-      { key: "Space / Enter", label: "Activate selected control" },
     ],
   },
 ];

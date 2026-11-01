@@ -7,6 +7,7 @@ import { AIAssistant } from "@/app/components/AIAssistant";
 import { ShellProvider, useShell } from "@/app/components/ShellContext";
 import { CommandPalette } from "@/app/components/CommandPalette";
 import { ShortcutsModal } from "@/app/components/ShortcutsModal";
+import { CounterCalculator } from "@/app/components/CounterCalculator";
 import clsx from "clsx";
 
 interface DashboardShellProps {
@@ -24,7 +25,7 @@ function DashboardShellContent({
   storeName,
 }: DashboardShellProps) {
   const pathname = usePathname();
-  const { mobileOpen, setMobileOpen } = useShell();
+  const { mobileOpen, setMobileOpen, calculatorOpen, setCalculatorOpen } = useShell();
 
   const isPrintMode = pathname?.endsWith("/print") || pathname?.includes("/print");
   const isPosTerminal = pathname === "/dashboard/sales/pos";
@@ -116,6 +117,12 @@ function DashboardShellContent({
 
       {/* Keyboard Shortcuts Cheat Sheet Modal */}
       <ShortcutsModal />
+
+      {/* Floating Counter Calculator (F12 / Alt+F12) */}
+      <CounterCalculator
+        isOpen={calculatorOpen}
+        onClose={() => setCalculatorOpen(false)}
+      />
     </div>
   );
 }

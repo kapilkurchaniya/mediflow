@@ -29,7 +29,7 @@ This manual teaches you how to run your pharmacy in MediFlow: how to bill a cust
 16. [The AI assistant](#16-the-ai-assistant)
 17. [Keyboard shortcuts](#17-keyboard-shortcuts)
 18. [Common questions and error messages](#18-common-questions-and-error-messages)
-19. [Not available yet](#19-not-available-yet)
+19. [Platform architecture & future scope](#19-platform-architecture--future-scope)
 20. [Glossary](#20-glossary)
 
 ---
@@ -802,27 +802,34 @@ MediFlow keeps proper double-entry books automatically; you don't post entries b
 
 ### 13.1 Receiving money from a customer (receipts)
 
-When a customer pays an outstanding balance, record it in **Finance → Receipts** (owner, manager and accountant). This keeps the customer's balance, the bill and your books in step.
+When a customer pays an outstanding credit balance ("Khata"), record it in **Finance → Receipts** (owner, manager and accountant). This keeps the customer's balance, the individual bills, and your general ledger perfectly in step.
 
-1. **Choose the customer.** The left list shows only customers who owe you money, biggest balance first. Use the search box for a name or phone.
-2. **Settle their bills.** Their unpaid bills appear, oldest first. In **Receive now (₹)** type how much they paid against each bill, or click **Full** for one bill, or **Settle all bills in full**.
-3. Choose the **Payment method** (Cash, UPI, Card or Bank transfer), the **Date** (not in the future), an optional **Reference** (UPI id, cheque number) and a **Note**.
-4. Press **Record receipt of ₹…**. You get a receipt number such as **RCT/26-27/000001**.
+1. **Choose the customer:** The left list shows all customers with outstanding credit balances, sorted with the highest balance first. Search by customer name or phone number.
+2. **Allocate payment against bills:** The customer's unpaid invoices appear, listed oldest first. You can:
+   - Type a specific amount against individual bills in the **Receive now (₹)** box.
+   - Click **Full** to pay an individual bill completely.
+   - Click **Settle all bills in full** to distribute the total outstanding amount across all bills.
+3. **Handle Customer Advances & Overpayments:** If the customer pays more than their unpaid invoices, the remaining excess is safely recorded as an unallocated **Customer Advance / Party Credit**, automatically reducing their total outstanding debt without creating dummy invoices.
+4. **Choose payment details:** Pick the **Payment method** (Cash, UPI, Card, or Bank transfer), the **Date**, an optional **Reference** (UPI transaction ID, cheque number), and an optional **Note**.
+5. **Save voucher:** Click **Record receipt of ₹…**. MediFlow generates a sequence voucher such as **RCT/26-27/000001**, writes balanced double-entry journals (debiting *Cash on Hand* or *Bank*, and crediting *Accounts Receivable*), and updates the customer's live credit balance instantly.
 
-You can't receive more than a bill's outstanding balance. A receipt posts the accounting entry for you (cash goes to *Cash on Hand*, UPI/card/bank to *Bank / Digital Payments*) and shows under **Recent receipts** at the bottom of the page. The balance also drops in **Outstanding**.
+### 13.2 Paying suppliers (Payment vouchers)
 
-> **Note:** the billing counter cannot yet create credit bills (part-paid or unpaid), so this screen is mostly empty until that arrives. Paying a **supplier** from the screen is also not available yet.
+When paying pharmaceutical distributors and suppliers for stock purchases:
+1. Navigate to **Finance → Payments** or **Directory → Suppliers → [Supplier Profile]**.
+2. Select the distributor to view all pending Goods Received Notes (GRNs) and purchase bills.
+3. Allocate the payment amount against specific purchase bills, or record a general advance payment.
+4. Choose the disbursement method (**Bank Transfer, Cheque, UPI, or Cash**) with cheque/transaction reference.
+5. MediFlow posts double-entry journal entries (debiting *Sundry Creditors / Accounts Payable* and crediting *Bank Account* or *Cash on Hand*), and updates the distributor's running ledger and outstanding age buckets.
 
-### 13.2 Bank reconciliation
+### 13.3 Bank reconciliation
 
 **Finance → Bank reconciliation** matches your bank statement to the payments recorded in MediFlow.
 
 1. **Upload Bank Statement CSV:** choose the **Bank Name** (HDFC, ICICI, State Bank of India, Axis, or *Other / Standard CSV*), **Account Number** and **Statement Date**, then paste the statement's CSV text (date, description, debit, credit, balance).
 2. Let it **auto-match**, or link a line yourself with **Link System Payment**. You can unmatch a mistake.
 
-> Customer receipts can now be recorded (see 13.1), but paying suppliers from the screen is **not available yet**, so many lines may stay unmatched for now.
-
-> **Not available yet:** recording expenses (rent, salaries), closing a period so old entries can't change, and aged receivables with reminders.
+> **Not available yet:** recording operational overhead expenses (rent, staff salaries, electricity), closing a financial period so historical entries can't change, and automated CA audit export bundles.
 
 ---
 
@@ -934,31 +941,42 @@ It answers from your live data. If it hasn't been set up with an AI key, it will
 
 ## 17. Keyboard shortcuts
 
-| Where | Keys | What they do |
-|---|---|---|
-| Anywhere | **Ctrl/⌘ + K** | Search or jump to any page |
-| Anywhere | **Ctrl + B** | Collapse / expand the left menu |
-| Anywhere | **?** | Show this list of shortcuts |
-| Anywhere | **Ctrl + J** | Open / close the AI assistant |
-| Anywhere | **Esc** | Close a window, panel or the search results |
-| Billing | **F2** | Start a new / clear the bill |
-| Billing | **F3** (or **Ctrl+F**, or **/**) | Jump to the medicine search box |
-| Billing | **F4** | Quick-add a customer |
-| Billing | **F6** | Park (hold) the active bill |
-| Billing | **F7** | Recall (resume) parked bills |
-| Billing | **F8** | Open split-tender payment & customer credit panel |
-| Billing | **F9** | Substitute medicine / chemical salt lookup |
-| Billing | **F10** / **End** | Complete bill and print receipt |
-| Billing | **↑ / ↓**, then **Enter** | Choose a medicine from the search results |
-| Billing | Barcode scanner | Scan a pack to add it to the bill |
-| Invoice page | **Alt + C** | Cancel bill (same-day cancellation) |
-| Invoice page | **Alt + R** | Return items & issue GST Credit Note |
-| Return form | **Alt + S** / **Ctrl + Enter** | Issue and save GST Credit Note |
-| Return form | **Esc** | Cancel return & return to invoice |
-| Register screen | **F4** | Open register shift modal |
-| Register screen | **F8** | Close register shift & tally modal |
-| Register screen | **Alt + P** / **Ctrl + P** | Print mid-shift X-Report snapshot |
-| Tally counter | **Enter** | Move to next currency denomination input |
+| Where | Keys | What they do | macOS Equivalent |
+|---|---|---|---|
+| Anywhere | **Ctrl/⌘ + K** | Search or jump to any page | `Cmd + K` |
+| Anywhere | **Ctrl + B** | Collapse / expand the left menu | `Cmd + B` / `Ctrl + B` |
+| Anywhere | **?** or **Ctrl + F1** | Show Marg ERP & system shortcuts cheat sheet | `?` or `Cmd + ?` |
+| Anywhere | **Ctrl + J** | Open / close the AI assistant | `Cmd + J` |
+| Anywhere | **F12** / **Alt + F12** | Open floating counter calculator | `F12` or `Option + F12` |
+| Anywhere | **Alt + N** | Navigate to POS Billing Counter | `Option + N` |
+| Anywhere | **Alt + P** | Navigate to New Purchase GRN Bill | `Option + P` |
+| Anywhere | **Alt + M** | Navigate to Sales Register (Modify Bill) | `Option + M` |
+| Anywhere | **Alt + I** | Navigate to Inventory & Batch Stock Lookup | `Option + I` |
+| Anywhere | **Alt + L** | Navigate to Customer Ledgers & Khata | `Option + L` |
+| Anywhere | **Esc** | Close active dialog, modal, or cancel search | `Esc` |
+| Billing | **F2** | Start a new bill / clear current bill | `F2` (or `Fn + F2`) |
+| Billing | **Insert** / **F3** / **/** | Jump to medicine search box to add items | `Insert`, `F3`, or `/` |
+| Billing | **↑ / ↓** (in search) | Navigate autocomplete batches | `↑ / ↓` |
+| Billing | **Enter** (in search) | Add selected medicine/batch to cart | `Enter` |
+| Billing | **↓** (from empty search) | Enter cart table and focus active line item | `↓` |
+| Billing | **↑ / ↓** (in cart) | Navigate between cart line items (Roving cursor) | `↑ / ↓` |
+| Billing | **+** / **-** | Increment / decrement active quantity (pack/loose) | `+` / `-` |
+| Billing | **Delete** (on cart row) | Delete the selected medicine line from bill | `Delete` (on focused row) |
+| Billing | **Tab** / **Enter** | Advance to next field (Pack &rarr; Loose &rarr; Search) | `Tab` / `Enter` |
+| Billing | **F4** | Quick-add a new customer | `F4` (or `Fn + F4`) |
+| Billing | **F6** | Park (hold) the active bill | `F6` (or `Fn + F6`) |
+| Billing | **F7** | Recall (resume) parked bills list | `F7` (or `Fn + F7`) |
+| Billing | **F8** | Open split-tender payment & customer credit panel | `F8` (or `Fn + F8`) |
+| Billing | **F9** | Substitute medicine / chemical salt lookup | `F9` (or `Fn + F9`) |
+| Billing | **End** / **F10** | Complete bill and print receipt (Classic Marg key) | `End` or `Cmd + Enter` / `F10` |
+| Billing | Barcode scanner | High-speed scan to add pack to bill automatically | Automatic |
+| Invoice page | **Alt + C** | Cancel bill (same-day void) | `Option + C` |
+| Invoice page | **Alt + R** | Return items & issue GST Credit Note | `Option + R` |
+| Return form | **Alt + S** / **Ctrl + Enter** | Issue and save GST Credit Note | `Option + S` / `Cmd + Enter` |
+| Register screen | **F4** | Open register shift modal | `F4` (or `Fn + F4`) |
+| Register screen | **F8** | Close register shift & tally modal | `F8` (or `Fn + F8`) |
+| Register screen | **Alt + P** / **Ctrl + P** | Print mid-shift X-Report snapshot | `Option + P` / `Cmd + P` |
+| Tally counter | **Enter** | Move to next currency denomination input | `Enter` |
 
 ### 17.1 Marg ERP Migration Guide: Shortcut Cross-Reference
 
@@ -966,8 +984,10 @@ If your pharmacy staff is accustomed to Marg ERP 9+ or Marg Books, here is how t
 
 | Workflow / Action | Marg ERP Key | MediFlow Key | MediFlow Advantage |
 |---|---|---|---|
-| **New Sale Bill** | `Alt + N` / `F2` | **`F2`** | Clears counter and focuses search box instantly |
-| **Search Medicine / Salt** | Item list search | **`F3`** / **`Ctrl + F`** / **`/`** | Unified search across brand, generic molecule, and barcode |
+| **New Sale Bill** | `Alt + N` / `F2` | **`F2`** / **`Alt + N`** | Clears counter and focuses search box instantly |
+| **Search Medicine / Add Row** | `Insert` / Item search | **`Insert`** / **`F3`** / **`/`** | Instant search across brand, generic molecule, and barcode |
+| **Delete Cart Row** | `Delete` | **`Delete`** | Deletes highlighted row; normal text editing inside inputs |
+| **Adjust Quantity** | `+` / `-` | **`+` / `-`** | Dynamically increments pack or loose units |
 | **Batch Selection** | `Ctrl + Tab` / `Enter` | **`↑ / ↓` + `Enter`** | **Auto-FEFO**: automatically selects earliest expiring batch |
 | **Substitute / Molecule Finder** | `F7` (Books) / `F9` | **`F9`** | Compares active molecule, available stock, and price difference |
 | **Quick Customer Creation** | `F2` on ledger | **`F4`** | Adds patient in 3 seconds without losing entered items |
@@ -979,9 +999,11 @@ If your pharmacy staff is accustomed to Marg ERP 9+ or Marg Books, here is how t
 | **Cash Register / Shift Open** | Cash drawer menu | **`F4`** | Opening cash float with Indian banknote denomination tally |
 | **Close Register (Z-Report)** | Day close | **`F8`** | Reconciles expected cash against counted till with over/short variance |
 | **Mid-Shift Snapshot (X-Report)** | Till summary | **`Alt + P`** | Real-time audit snapshot without closing shift |
-| **Save & Print Receipt** | `Ctrl + W` / `End` / `F10` | **`F10`** / **`End`** | One-key thermal or A4 tax invoice print |
+| **Save & Print Receipt** | `End` / `Ctrl + W` / `F10`| **`End`** / **`F10`** | Traditional Marg `End` key prints invoice in 1 press |
+| **Counter Calculator** | `F12` / `Alt + F12` | **`F12`** / **`Alt + F12`** | Integrated safe arithmetic calculator with copy to bill |
+| **Global ERP Navigation** | `Alt + P/M/I/L` | **`Alt + P/M/I/L`** | One-key jump to Purchases, Register, Inventory & Ledgers |
 | **Barcode Scanner** | Fast scan mode | **Automatic** | High-speed hardware buffer (<45ms) auto-adds scanned packs |
-| **Help / Cheat Sheet** | `Ctrl + F1` / `Alt + F1` | **`?`** | Instant on-screen cheat sheet |
+| **Help / Cheat Sheet** | `Ctrl + F1` / `Alt + F1` | **`Ctrl + F1`** / **`?`** | Instant on-screen cheat sheet |
 
 ---
 
@@ -1018,20 +1040,69 @@ If your pharmacy staff is accustomed to Marg ERP 9+ or Marg Books, here is how t
 
 ---
 
-## 19. Not available yet
+## 19. Platform Architecture & Future Scope
 
-These are planned but **cannot be used today**. If you can't find a button for them, that's expected.
+### 19.1 Multi-Platform Deployment Strategy
 
-| Area | Planned feature |
-|---|---|
-| Billing | Offline counter billing with IndexedDB sync (Tauri desktop app in Phase 4) |
-| Stock | Stock adjustments and write-offs; transfers between branches; warehouse; physical stock count; reorder suggestions |
-| Buying | Automated reorder suggestions based on sales velocity (Purchase orders, supplier debit notes, and supplier ledger payments are available) |
-| People & security | Password reset by email; custom roles (you choose from the 7 built-in ones); sending invitations by email (you copy the link yourself); removing a person for good (you suspend instead) |
-| Multi-branch | Adding branches; switching between branches; chain-wide reports |
-| Accounts | Expenses; day-book drill-down and ledgers by party; receivables ageing with reminders; period locking; year-end closing (customer receipts are available) |
-| GST & messaging | Live e-invoice and e-way bill with the government portal; GSTR-2B / IMS matching; production WhatsApp and SMS rules; customer consent and privacy tools |
-| Setup | Import wizard for data from Marg or other software; guided onboarding; one-click inspector and CA export packs; built-in help guides |
+MediFlow provides a dual-delivery model so pharmacy owners and cashiers can use the software however best fits their business needs:
+
+```
+┌────────────────────────────────────────────────────────────────────────┐
+│                        MediFlow Architecture                           │
+├───────────────────────────────────┬────────────────────────────────────┤
+│       Cloud Web SaaS (Next.js)    │   Native Windows Executable (.exe) │
+│  • Browser-hosted (Chrome/Edge)   │  • High-speed desktop installation │
+│  • Instant access from any device │  • Offline billing with local sync │
+│  • Ideal for managers & accounts  │  • Direct USB/serial POS printers  │
+├───────────────────────────────────┴────────────────────────────────────┤
+│                       Future Scope Platforms                           │
+│  • Native macOS Desktop (.dmg) for Apple Mac hardware                  │
+│  • Mobile Companion App (iOS & Android) for on-the-go pharmacy audits  │
+└────────────────────────────────────────────────────────────────────────┘
+```
+
+1. **Cloud Web SaaS (Browser-Hosted)**
+   - Open MediFlow in any modern web browser (Google Chrome, Microsoft Edge, Mozilla Firefox, Apple Safari).
+   - Instant access from anywhere without installing or updating software.
+   - Ideal for chain owners reviewing store dashboards from home, traveling managers, and accountants filing monthly GST returns.
+
+2. **Native Windows Desktop Executable (`.exe` / `.msi`)**
+   - Packaged as a downloadable, native Windows installer.
+   - **Offline-First Billing (Phase 4):** Operates at maximum hardware speed. Even during complete internet or broadband outages, the counter bills without stopping, saving sales to a secure local database and automatically syncing back to the cloud when internet returns.
+   - **Direct POS Hardware Integration:** Communicates directly with thermal receipt printers (ESC/POS), hardware barcode scanners, cash drawers, and electronic weighing scales over USB or Serial ports without browser print-dialog delays.
+
+3. **Native macOS Desktop Application (`.dmg` / `.app`) [Future Scope]**
+   - A dedicated Apple macOS desktop package for pharmacy owners and managers operating Mac hardware (Apple Silicon M1/M2/M3/M4 & Intel).
+   - Features native macOS menu bar integration, system notifications, and built-in Marg ERP keyboard parity tailored to Mac keyboard layouts (`Option ⌥`, `Command ⌘`, `Cmd + Enter`).
+
+4. **Mobile Companion Application (iOS & Android) [Future Scope]**
+   - A dedicated mobile app for pharmacy owners, partners, and store managers.
+   - **Planned Capabilities:**
+     - **Live Store Dashboard:** Real-time counter sales, customer footfall, gross margin, and cash register float tallies.
+     - **Inventory Audits & Camera Scanner:** Use the phone camera as a barcode scanner for physical rack stocktaking and shelf counts.
+     - **Critical Alerts:** Instant push notifications for near-expiry batches, critical low-stock thresholds, and promise order arrivals.
+     - **Customer Khata & Reminders:** Review patient credit balances and send WhatsApp payment reminders directly from your phone.
+     - **Purchase & Delivery Approvals:** Approve purchase orders and distributor bills remotely.
+
+---
+
+### 19.2 Other Planned Roadmap Features
+
+These features are part of upcoming development phases and are planned for future release:
+
+| Area | Planned feature | Status |
+|---|---|---|
+| Billing | Offline counter billing with IndexedDB/SQLite sync (Phase 4) | In Roadmap |
+| Platforms | Native Windows desktop `.exe` installer (via Tauri) | In Roadmap (Phase 4) |
+| Platforms | Native macOS desktop `.dmg` application | Future Scope |
+| Platforms | Mobile companion app (iOS & Android) for store owners | Future Scope |
+| Stock | Stock adjustments and write-offs; warehouse transfers; physical stock count | In Roadmap (Phase 3) |
+| Buying | Automated reorder suggestions based on sales velocity | In Roadmap (Phase 3) |
+| People & security | Password reset by email; custom permissions; email invitation delivery | In Roadmap |
+| Multi-branch | Adding branches; branch switcher; chain-wide consolidated reports | In Roadmap (Phase 3) |
+| Accounts | Operational overhead expenses; period locking; year-end closing | In Roadmap (Phase 5) |
+| GST & messaging | Live GSP/ASP e-invoice and e-way bill with government portal; GSTR-2B matching | In Roadmap (Phase 5) |
+| Setup | Import wizard for data from Marg or other software; guided onboarding | In Roadmap (Phase 4 / 6) |
 
 ---
 
