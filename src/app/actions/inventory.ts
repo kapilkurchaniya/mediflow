@@ -1,7 +1,7 @@
 "use server";
 
 import { db, schema } from "@/server/db";
-import { eq, and, desc, ilike, or } from "drizzle-orm";
+import { eq, and, desc, ilike, or, sql } from "drizzle-orm";
 import { requirePermission, checkPermission } from "@/server/rbac";
 import { writeAudit } from "@/server/audit";
 import { DEFAULT_GST_RATE_BP, isValidGstRateBp } from "@/lib/regulatory";
@@ -93,11 +93,30 @@ export async function getMedicines(searchQuery?: string, limit = 100, offset = 0
       manufacturer: schema.manufacturers,
       category: schema.categories,
       rack: schema.racks,
+      branchSettings: schema.storeMedicineSettings,
     })
     .from(schema.medicines)
     .leftJoin(schema.manufacturers, eq(schema.medicines.manufacturerId, schema.manufacturers.id))
     .leftJoin(schema.categories, eq(schema.medicines.categoryId, schema.categories.id))
-    .leftJoin(schema.racks, eq(schema.medicines.rackId, schema.racks.id))
+    .leftJoin(
+      schema.storeMedicineSettings,
+      and(
+        eq(schema.storeMedicineSettings.medicineId, schema.medicines.id),
+        eq(schema.storeMedicineSettings.storeId, ctx.storeId),
+        eq(schema.storeMedicineSettings.tenantId, ctx.tenantId),
+      ),
+    )
+    .leftJoin(
+      schema.racks,
+      and(
+        eq(
+          schema.racks.id,
+          sql`COALESCE(${schema.storeMedicineSettings.rackId}, ${schema.medicines.rackId})`,
+        ),
+        eq(schema.racks.storeId, ctx.storeId),
+        eq(schema.racks.tenantId, ctx.tenantId),
+      ),
+    )
     .where(and(...conditions))
     .orderBy(desc(schema.medicines.createdAt))
     .limit(limit)
@@ -197,6 +216,17 @@ export async function createMedicine(formData: FormData) {
         looseUnit,
       },
     });
+
+    if (rackId?.trim()) {
+      await tx.insert(schema.storeMedicineSettings).values({
+        tenantId: ctx.tenantId,
+        storeId: ctx.storeId,
+        medicineId: created.id,
+        rackId: rackId.trim(),
+        reorderLevel: 10,
+        maxStock: 100,
+      });
+    }
     });
 
     revalidatePath("/dashboard/inventory");

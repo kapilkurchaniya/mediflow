@@ -523,11 +523,17 @@ Press **Save**. Only roles that can manage medicines (owner, manager, pharmacist
 
 ### 6.3 Finding and reading the Item master
 
-**Inventory → Item master** lists **Item, Category, Rack, Pack, HSN / GST, MRP, Sale price, Status**. Search by name, composition or barcode.
+**Inventory → Item master** lists **Item, Category, Rack, Pack, HSN / GST, MRP, Sale price, Status, Branch**. Search by name, composition or barcode.
+
+- **Branch-Specific Racks & Overrides:** In a multi-store chain, physical racks, reorder thresholds, and selling prices vary by branch. Click the **Branch Settings** (gear icon) on any item row to configure:
+  - **Store Rack / Shelf:** Physical storage bin or rack assignment for the active branch.
+  - **Reorder Level & Maximum Stock:** Custom replenishment thresholds specific to branch sales velocity (falls back to catalog master defaults if unconfigured).
+  - **Branch Price Override (₹):** Localized selling rate (e.g. airport/mall branches). Cannot exceed legal batch MRP at POS.
+- **Branch Pricing Indicator:** Items with an active branch price override display an amber **Branch override** badge under the Sale price column.
 
 ### 6.4 Racks and shelves
 
-**Inventory → Racks & shelves → Add Rack / Shelf.** Give a **Rack / Shelf Code** (e.g. *R1-S3*; saved in capitals), a **Name** (*Front Counter Shelf Top*) and an optional description. You can edit or delete a rack (you'll be asked to confirm; medicines on it become "no rack"). Codes must be unique in your store.
+**Inventory → Racks & shelves → Add Rack / Shelf.** Give a **Rack / Shelf Code** (e.g. *R1-S3*; saved in capitals), a **Name** (*Front Counter Shelf Top*) and an optional description. You can edit or delete a rack (you'll be asked to confirm; medicines on it become "no rack"). Codes must be unique in your store. Racks are store-scoped, ensuring that shelf assignments in one branch never overwrite or conflict with another branch.
 
 ### 6.5 Adding the stock you already have
 
