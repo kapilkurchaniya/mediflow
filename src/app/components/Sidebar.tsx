@@ -37,10 +37,16 @@ export function Sidebar({
   isMobile?: boolean;
 }) {
   const pathname = usePathname();
-  const { collapsed, toggleCollapsed, setMobileOpen, permissions } = useShell();
+  const {
+    collapsed,
+    toggleCollapsed,
+    setMobileOpen,
+    permissions,
+    currentStore,
+    setStoreSwitcherOpen,
+  } = useShell();
   const nav = visibleNav(permissions);
   const showSettings = !settingsItem.permission || permissions.has(settingsItem.permission);
-  const [showStoreMenu, setShowStoreMenu] = useState(false);
 
   const letters = userName
     .split(/\s+/)
@@ -98,58 +104,35 @@ export function Sidebar({
         )}
       </div>
 
-      {/* Store Switcher */}
+      {/* Store Switcher Trigger */}
       <div className="relative px-2.5 py-2">
         <button
           type="button"
-          onClick={() => setShowStoreMenu(!showStoreMenu)}
-          title={isCollapsed ? storeName : undefined}
+          onClick={() => setStoreSwitcherOpen(true)}
+          title={isCollapsed ? (currentStore?.name ?? storeName) : "Switch branch or warehouse (Ctrl+Shift+S)"}
           className={clsx(
-            "flex w-full items-center gap-2 rounded-lg border border-ink-150 bg-white px-2 py-1.5 text-left shadow-xs transition-colors hover:border-ink-300",
+            "flex w-full items-center gap-2 rounded-lg border border-ink-150 bg-white px-2 py-1.5 text-left shadow-xs transition-colors hover:border-ink-300 hover:bg-ink-50/50",
             isCollapsed && "justify-center px-1"
           )}
         >
-          <span className="grid h-7 w-7 shrink-0 place-items-center rounded-md bg-ink-900 text-[11px] font-semibold text-white">
-            {storeName.slice(0, 1).toUpperCase()}
+          <span className="grid h-7 w-7 shrink-0 place-items-center rounded-md bg-ink-900 text-[11px] font-semibold text-white uppercase">
+            {currentStore ? currentStore.code.slice(0, 2) : storeName.slice(0, 1)}
           </span>
           {!isCollapsed && (
             <>
               <span className="min-w-0 flex-1">
                 <span className="block truncate text-[12.5px] font-medium text-ink-900 leading-tight">
-                  {storeName}
+                  {currentStore?.name ?? storeName}
                 </span>
-                <span className="block text-[11px] text-ink-500">Main branch</span>
+                <span className="flex items-center gap-1.5 text-[11px] text-ink-500">
+                  <span className="capitalize">{currentStore?.kind ?? "retail"}</span>
+                  {currentStore?.code && <span>• [{currentStore.code}]</span>}
+                </span>
               </span>
               <ChevronsUpDown className="h-3.5 w-3.5 text-ink-400 shrink-0" />
             </>
           )}
         </button>
-
-        {/* Store popup info */}
-        {showStoreMenu && (
-          <div className="absolute left-2.5 right-2.5 top-full mt-1 z-30 rounded-lg border border-ink-150 bg-white p-2.5 shadow-lg text-[12.5px] animate-enter">
-            <div className="flex items-center justify-between pb-2 mb-2 border-b border-ink-100">
-              <span className="font-semibold text-ink-900">Branch Details</span>
-              <span className="badge badge-success !h-4.5 !text-[10px]">Active</span>
-            </div>
-            <div className="space-y-1.5 text-ink-600">
-              <div className="flex items-center gap-1.5 text-ink-800 font-medium">
-                <Building2 className="h-3.5 w-3.5 text-brand-600" />
-                <span className="truncate">{storeName}</span>
-                <Check className="h-3.5 w-3.5 text-brand-600 ml-auto" />
-              </div>
-              <p className="text-[11px] text-ink-500">Drug License: DL-20B/21B Active</p>
-              <p className="text-[11px] text-ink-500">GSTIN Registered: Active</p>
-            </div>
-            <button
-              type="button"
-              onClick={() => setShowStoreMenu(false)}
-              className="mt-2 w-full text-center text-[11.5px] text-brand-600 hover:text-brand-700 font-medium pt-1 border-t border-ink-100"
-            >
-              Close
-            </button>
-          </div>
-        )}
       </div>
 
       {/* Navigation Links */}

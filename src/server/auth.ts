@@ -1,5 +1,5 @@
 import { cookies } from "next/headers";
-import { db, schema } from "./db";
+import { db, schema, type DbOrTx } from "./db";
 import { eq, sql } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
@@ -90,6 +90,20 @@ export async function validateSessionToken(token: string) {
  */
 export async function invalidateSession(sessionId: string) {
   await db.delete(schema.sessions).where(eq(schema.sessions.id, sessionId));
+}
+
+/**
+ * Updates the active store on an existing session.
+ */
+export async function updateSessionStore(
+  sessionId: string,
+  storeId: string,
+  database: DbOrTx = db,
+): Promise<void> {
+  await database
+    .update(schema.sessions)
+    .set({ storeId })
+    .where(eq(schema.sessions.id, sessionId));
 }
 
 /**

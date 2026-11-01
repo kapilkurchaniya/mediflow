@@ -3,27 +3,59 @@ import { db, schema } from "@/server/db";
 import { eq } from "drizzle-orm";
 import { getAuthCtx } from "@/server/rbac";
 import { ForbiddenError } from "@/server/errors";
+import { listAllowedStores, type AllowedStoreItem } from "@/server/domain/stores";
 import { DashboardShell } from "./DashboardShell";
 
 async function getShellContext() {
   try {
     const { session, user } = await getCurrentSession();
     let storeName = "My Pharmacy";
+    let currentStore: AllowedStoreItem | null = null;
+    let allowedStores: AllowedStoreItem[] = [];
+
     if (session?.storeId) {
       const [store] = await db
-        .select({ name: schema.stores.name })
+        .select({
+          id: schema.stores.id,
+          name: schema.stores.name,
+          code: schema.stores.code,
+          kind: schema.stores.kind,
+          stateCode: schema.stores.stateCode,
+          gstin: schema.stores.gstin,
+          isActive: schema.stores.isActive,
+        })
         .from(schema.stores)
         .where(eq(schema.stores.id, session.storeId))
         .limit(1);
-      if (store?.name) storeName = store.name;
+
+      if (store) {
+        currentStore = store as AllowedStoreItem;
+        storeName = store.name;
+      }
     }
+
+    if (session?.tenantId && user?.id) {
+      allowedStores = await listAllowedStores(db, {
+        tenantId: session.tenantId,
+        userId: user.id,
+      });
+    }
+
     return {
       userName: user?.name ?? "Pharmacist",
       userEmail: user?.email ?? "",
       storeName,
+      currentStore,
+      allowedStores,
     };
   } catch {
-    return { userName: "Pharmacist", userEmail: "", storeName: "My Pharmacy" };
+    return {
+      userName: "Pharmacist",
+      userEmail: "",
+      storeName: "My Pharmacy",
+      currentStore: null,
+      allowedStores: [],
+    };
   }
 }
 
