@@ -70,23 +70,23 @@ export default async function GstReturnsPage({
         eyebrow="Government Return Filing"
         title="GST Returns Hub & Filing Worksheets"
         description={`Government portal filing worksheets and GSTR-3B auto-computation for ${currentMonthName} ${year}.${gstin ? ` (Filtered for GSTIN: ${gstin})` : ""}`}
-        actions={
-          <div className="flex flex-wrap items-center gap-2">
-            <GstPeriodSelector
-              month={month}
-              year={year}
-              selectedGstin={gstin}
-              availableGstins={availableGstins}
-            />
-            <ReturnsClientExport
-              month={month}
-              year={year}
-              gstin={gstin}
-              gstr3bSummary={gstr3bSummary}
-            />
-          </div>
-        }
       />
+
+      {/* Period & Filter Toolbar */}
+      <div className="card px-4 py-3 bg-white/80 backdrop-blur-xs flex flex-wrap items-center justify-between gap-3">
+        <GstPeriodSelector
+          month={month}
+          year={year}
+          selectedGstin={gstin}
+          availableGstins={availableGstins}
+        />
+        <ReturnsClientExport
+          month={month}
+          year={year}
+          gstin={gstin}
+          gstr3bSummary={gstr3bSummary}
+        />
+      </div>
 
       {/* Top Filing Readiness Cards */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
