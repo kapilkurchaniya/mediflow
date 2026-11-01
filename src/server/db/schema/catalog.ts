@@ -1,10 +1,12 @@
 /** Catalog / master data: manufacturers, categories, racks, medicines. (Lane A) */
 import { sql } from "drizzle-orm";
 import {
+  bigint,
   boolean,
   index,
   integer,
   pgTable,
+  primaryKey,
   text,
   uniqueIndex,
   uuid,
@@ -60,6 +62,10 @@ export const medicines = pgTable(
     looseUnit: text("loose_unit").notNull().default("tablet"),
     manufacturerId: uuid("manufacturer_id").references(() => manufacturers.id),
     categoryId: uuid("category_id").references(() => categories.id),
+    /**
+     * @deprecated Since Phase 3 (Task A3.3). Racks belong to individual stores.
+     * Use `store_medicine_settings.rack_id` instead. This column will be dropped in Phase 6.
+     */
     rackId: uuid("rack_id").references(() => racks.id),
     barcode: text("barcode"),
     hsn: text("hsn"),
@@ -83,5 +89,31 @@ export const medicines = pgTable(
   ],
 );
 
+export const storeMedicineSettings = pgTable(
+  "store_medicine_settings",
+  {
+    tenantId: tenantId(),
+    storeId: storeId(),
+    medicineId: uuid("medicine_id")
+      .notNull()
+      .references(() => medicines.id, { onDelete: "cascade" }),
+    reorderLevel: integer("reorder_level"), // nullable: null inherits medicines.reorderLevel
+    maxStock: integer("max_stock"), // nullable: null inherits medicines.maxStock
+    rackId: uuid("rack_id").references(() => racks.id, { onDelete: "set null" }),
+    salePriceOverride: bigint("sale_price_override", { mode: "number" }), // nullable: null inherits medicines.salePrice
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.storeId, t.medicineId], name: "store_medicine_settings_pk" }),
+    index("idx_sms_tenant_store").on(t.tenantId, t.storeId),
+    index("idx_sms_store_rack").on(t.storeId, t.rackId),
+  ],
+);
+
 export type Rack = typeof racks.$inferSelect;
 export type NewRack = typeof racks.$inferInsert;
+export type Medicine = typeof medicines.$inferSelect;
+export type NewMedicine = typeof medicines.$inferInsert;
+export type StoreMedicineSetting = typeof storeMedicineSettings.$inferSelect;
+export type NewStoreMedicineSetting = typeof storeMedicineSettings.$inferInsert;

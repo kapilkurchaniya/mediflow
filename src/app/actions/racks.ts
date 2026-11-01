@@ -8,6 +8,7 @@ import { protectedAction } from "@/server/action";
 import { requirePermission } from "@/server/rbac";
 import { DomainError } from "@/server/errors";
 import { isUniqueViolation } from "@/server/db/errors";
+import { updateStoreMedicineSettings } from "@/server/domain/catalog/store-settings";
 
 /**
  * Reference implementation of the action pattern (docs/06-coding-standards.md):
@@ -41,10 +42,24 @@ export async function getRacks() {
       description: schema.racks.description,
       isActive: schema.racks.isActive,
       createdAt: schema.racks.createdAt,
-      medicineCount: sql<number>`count(${schema.medicines.id})::int`,
+      medicineCount: sql<number>`count(distinct coalesce(${schema.storeMedicineSettings.medicineId}, ${schema.medicines.id}))::int`,
     })
     .from(schema.racks)
-    .leftJoin(schema.medicines, eq(schema.racks.id, schema.medicines.rackId))
+    .leftJoin(
+      schema.storeMedicineSettings,
+      and(
+        eq(schema.racks.id, schema.storeMedicineSettings.rackId),
+        eq(schema.storeMedicineSettings.storeId, ctx.storeId),
+        eq(schema.storeMedicineSettings.tenantId, ctx.tenantId),
+      ),
+    )
+    .leftJoin(
+      schema.medicines,
+      and(
+        eq(schema.racks.id, schema.medicines.rackId),
+        eq(schema.medicines.tenantId, ctx.tenantId),
+      ),
+    )
     .where(and(eq(schema.racks.tenantId, ctx.tenantId), eq(schema.racks.storeId, ctx.storeId)))
     .groupBy(schema.racks.id)
     .orderBy(schema.racks.code);
@@ -118,7 +133,18 @@ export const deleteRack = protectedAction("medicine.manage")
     await findOwnRack(ctx, id);
 
     await db.transaction(async (tx) => {
-      // Unlink the medicines in this rack first, then delete the rack
+      // Unlink the medicines in this rack for this store in store_medicine_settings
+      await tx
+        .update(schema.storeMedicineSettings)
+        .set({ rackId: null, updatedAt: new Date() })
+        .where(
+          and(
+            eq(schema.storeMedicineSettings.rackId, id),
+            eq(schema.storeMedicineSettings.tenantId, ctx.tenantId),
+            eq(schema.storeMedicineSettings.storeId, ctx.storeId),
+          ),
+        );
+      // Legacy fallback: unlink medicines.rackId if pointing to this rack
       await tx
         .update(schema.medicines)
         .set({ rackId: null })
@@ -136,14 +162,15 @@ export const deleteRack = protectedAction("medicine.manage")
 export const assignMedicineToRack = protectedAction("medicine.manage")
   .inputSchema(z.object({ medicineId: idSchema, rackId: idSchema.nullable() }))
   .action(async ({ parsedInput: { medicineId, rackId }, ctx }) => {
-    if (rackId) await findOwnRack(ctx, rackId); // previously any rack id, even another pharmacy's, was accepted
+    await db.transaction(async (tx) => {
+      await updateStoreMedicineSettings(tx, ctx, ctx.storeId, medicineId, { rackId });
 
-    const updated = await db
-      .update(schema.medicines)
-      .set({ rackId })
-      .where(and(eq(schema.medicines.id, medicineId), eq(schema.medicines.tenantId, ctx.tenantId)))
-      .returning({ id: schema.medicines.id });
-    if (updated.length === 0) throw new DomainError("NOT_FOUND", "Medicine not found.");
+      // Maintain legacy medicines.rackId for backwards compatibility
+      await tx
+        .update(schema.medicines)
+        .set({ rackId })
+        .where(and(eq(schema.medicines.id, medicineId), eq(schema.medicines.tenantId, ctx.tenantId)));
+    });
 
     revalidatePath("/dashboard/inventory");
     revalidatePath("/dashboard/sales/pos");
