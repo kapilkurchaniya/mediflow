@@ -16,3 +16,4 @@ export const RETAILIO_INVOICE_MAPPINGS: Record<string, string[]> = {
   hsn: ["HSN", "HSN_Code", "HSN Code", "HSN"],
   barcode: ["Barcode", "GTIN", "EAN", "Barcode_No", "BARCODE"],
 };
+

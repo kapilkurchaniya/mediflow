@@ -16,3 +16,4 @@ export const PHARMARACK_INVOICE_MAPPINGS: Record<string, string[]> = {
   hsn: ["HSN", "HSN Code", "HSN_CODE", "HSN/SAC", "Tariff"],
   barcode: ["Barcode", "EAN", "UPC", "Item Code", "Product Code", "BARCODE", "EAN_CODE", "GTIN"],
 };
+
