@@ -271,7 +271,7 @@ export function CustomerGroupsClient({
                 </div>
 
                 <div className="overflow-x-auto">
-                  <table className="table">
+                  <table className="data-table">
                     <thead>
                       <tr>
                         <th>Date</th>
@@ -325,7 +325,7 @@ export function CustomerGroupsClient({
       {/* Create Group Modal */}
       {showCreateGroup && (
         <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-surface rounded-xl shadow-xl border border-ink-150 w-full max-w-md overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+          <div className="bg-white rounded-xl shadow-xl border border-ink-150 w-full max-w-md overflow-hidden animate-in fade-in zoom-in-95 duration-150">
             <div className="p-4 border-b border-ink-150 bg-ink-50 flex items-center justify-between">
               <h3 className="font-semibold text-sm text-ink-900">Create Family Group</h3>
               <button
@@ -400,7 +400,7 @@ export function CustomerGroupsClient({
       {/* Add Member Modal */}
       {showAddMember && (
         <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-surface rounded-xl shadow-xl border border-ink-150 w-full max-w-md overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+          <div className="bg-white rounded-xl shadow-xl border border-ink-150 w-full max-w-md overflow-hidden animate-in fade-in zoom-in-95 duration-150">
             <div className="p-4 border-b border-ink-150 bg-ink-50 flex items-center justify-between">
               <h3 className="font-semibold text-sm text-ink-900">Add Member to Household</h3>
               <button
