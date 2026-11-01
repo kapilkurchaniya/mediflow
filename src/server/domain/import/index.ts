@@ -27,6 +27,7 @@ export * from "./types";
 export * from "./normalize";
 export * from "./presets";
 export * from "./match";
+export * from "./commit";
 
 /**
  * Creates a new import job in "uploaded" state.
