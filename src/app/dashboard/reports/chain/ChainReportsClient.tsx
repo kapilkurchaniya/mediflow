@@ -191,14 +191,15 @@ export function ChainReportsClient({
           </div>
         </div>
       }
+      kpiRowClassName="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 print:grid-cols-5"
       kpiRow={
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+        <>
           <div className="card p-4 bg-white border border-ink-100 shadow-sm rounded-xl">
             <div className="flex items-center justify-between">
               <span className="text-xs font-medium text-ink-500 uppercase tracking-wider">Chain Revenue</span>
               <DollarSign className="h-4 w-4 text-emerald-600" />
             </div>
-            <div className="mt-2 text-xl font-bold text-ink-900">
+            <div className="mt-2 text-xl font-bold text-ink-900 num font-mono whitespace-nowrap">
               {formatINR(report.totalChainRevenuePaise)}
             </div>
             <div className="mt-1 text-xs text-ink-500 flex items-center gap-1">
@@ -211,7 +212,7 @@ export function ChainReportsClient({
               <span className="text-xs font-medium text-ink-500 uppercase tracking-wider">Gross Margin</span>
               <TrendingUp className="h-4 w-4 text-teal-600" />
             </div>
-            <div className="mt-2 text-xl font-bold text-teal-700">
+            <div className="mt-2 text-xl font-bold text-teal-700 num font-mono whitespace-nowrap">
               {formatINR(report.chainGrossMarginPaise)}
             </div>
             <div className="mt-1 text-xs font-semibold text-emerald-600 flex items-center gap-0.5">
@@ -225,10 +226,10 @@ export function ChainReportsClient({
               <span className="text-xs font-medium text-ink-500 uppercase tracking-wider">Stock at Cost</span>
               <Boxes className="h-4 w-4 text-blue-600" />
             </div>
-            <div className="mt-2 text-xl font-bold text-ink-900">
+            <div className="mt-2 text-xl font-bold text-ink-900 num font-mono whitespace-nowrap">
               {formatINR(report.totalStockValuationPaise)}
             </div>
-            <div className="mt-1 text-xs text-ink-500">
+            <div className="mt-1 text-xs text-ink-500 truncate">
               Across active batches
             </div>
           </div>
@@ -238,10 +239,10 @@ export function ChainReportsClient({
               <span className="text-xs font-medium text-ink-500 uppercase tracking-wider">Near-Expiry Risk</span>
               <AlertTriangle className="h-4 w-4 text-amber-500" />
             </div>
-            <div className="mt-2 text-xl font-bold text-amber-600">
+            <div className="mt-2 text-xl font-bold text-amber-600 num font-mono whitespace-nowrap">
               {formatINR(report.totalNearExpiryValuationPaise)}
             </div>
-            <div className="mt-1 text-xs text-ink-500">
+            <div className="mt-1 text-xs text-ink-500 truncate">
               Expiring in 0–90 days
             </div>
           </div>
@@ -251,14 +252,14 @@ export function ChainReportsClient({
               <span className="text-xs font-medium text-ink-500 uppercase tracking-wider">Stock-Out SKUs</span>
               <PackageX className="h-4 w-4 text-rose-500" />
             </div>
-            <div className="mt-2 text-xl font-bold text-rose-600">
+            <div className="mt-2 text-xl font-bold text-rose-600 num font-mono whitespace-nowrap">
               {report.totalOutOfStockSkus}
             </div>
-            <div className="mt-1 text-xs text-ink-500">
+            <div className="mt-1 text-xs text-ink-500 truncate">
               Requiring replenishment
             </div>
           </div>
-        </div>
+        </>
       }
     >
       {/* Store Leaderboard & Comparison Table */}

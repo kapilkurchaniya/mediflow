@@ -57,7 +57,7 @@ export function PageHeader({
 }) {
   return (
     <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-      <div className="flex items-start gap-3 min-w-0">
+      <div className="flex items-start gap-3 min-w-0 flex-1">
         {backHref && (
           <Link
             href={backHref}

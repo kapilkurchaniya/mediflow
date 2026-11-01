@@ -63,23 +63,23 @@ export default async function GstInwardPage({
         eyebrow="Input Tax Credit (ITC / GSTR-2)"
         title="Inward Supplies & ITC Register"
         description={`Register of pharmaceutical supplier invoices, GST inwards, and claimable Input Tax Credit for ${currentMonthName} ${year}.${gstin ? ` (Filtered for GSTIN: ${gstin})` : ""}`}
-        actions={
-          <div className="flex flex-wrap items-center gap-2">
-            <GstPeriodSelector
-              month={month}
-              year={year}
-              selectedGstin={gstin}
-              availableGstins={availableGstins}
-            />
-            <Link
-              href={`/dashboard/gst/reconciliation?month=${month}&year=${year}${gstin ? `&gstin=${gstin}` : ""}`}
-              className="btn btn-primary text-xs"
-            >
-              Reconcile with Books
-            </Link>
-          </div>
-        }
       />
+
+      {/* Period & Filter Toolbar */}
+      <div className="card px-4 py-3 bg-white/80 backdrop-blur-xs flex flex-wrap items-center justify-between gap-3">
+        <GstPeriodSelector
+          month={month}
+          year={year}
+          selectedGstin={gstin}
+          availableGstins={availableGstins}
+        />
+        <Link
+          href={`/dashboard/gst/reconciliation?month=${month}&year=${year}${gstin ? `&gstin=${gstin}` : ""}`}
+          className="btn btn-primary text-xs"
+        >
+          Reconcile with Books
+        </Link>
+      </div>
 
       {/* ITC Summary Cards */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">

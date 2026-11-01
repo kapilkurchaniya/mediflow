@@ -52,23 +52,23 @@ export default async function Gstr1OutwardPage({
         eyebrow="Government Returns (GSTR-1)"
         title="Outward Supplies Statement"
         description={`Statement of outward supplies of medicines and health products for ${currentMonthName} ${year}.${gstin ? ` (Filtered for GSTIN: ${gstin})` : ""}`}
-        actions={
-          <div className="flex flex-wrap items-center gap-2">
-            <GstPeriodSelector
-              month={month}
-              year={year}
-              selectedGstin={gstin}
-              availableGstins={availableGstins}
-            />
-            <Gstr1ExportActions
-              month={month}
-              year={year}
-              b2bData={gstr1.b2b}
-              hsnData={gstr1.hsnSummary}
-            />
-          </div>
-        }
       />
+
+      {/* Period & Filter Toolbar */}
+      <div className="card px-4 py-3 bg-white/80 backdrop-blur-xs flex flex-wrap items-center justify-between gap-3">
+        <GstPeriodSelector
+          month={month}
+          year={year}
+          selectedGstin={gstin}
+          availableGstins={availableGstins}
+        />
+        <Gstr1ExportActions
+          month={month}
+          year={year}
+          b2bData={gstr1.b2b}
+          hsnData={gstr1.hsnSummary}
+        />
+      </div>
 
       {/* Outward Tax Summary Cards */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">

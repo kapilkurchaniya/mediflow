@@ -202,7 +202,7 @@ export function RemindersClient({
       {/* Table */}
       <div className="card overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="table">
+          <table className="data-table">
             <thead>
               <tr>
                 <th>Patient</th>
@@ -259,7 +259,7 @@ export function RemindersClient({
                             : r.status === "pending"
                             ? "badge-warning"
                             : r.status === "failed"
-                            ? "badge-error"
+                            ? "badge-danger"
                             : "badge-neutral"
                         )}
                       >
@@ -291,7 +291,7 @@ export function RemindersClient({
       {/* Modal */}
       {showModal && (
         <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-surface rounded-xl shadow-xl border border-ink-150 w-full max-w-lg overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+          <div className="bg-white rounded-xl shadow-xl border border-ink-150 w-full max-w-lg overflow-hidden animate-in fade-in zoom-in-95 duration-150">
             <div className="p-4 border-b border-ink-150 bg-ink-50 flex items-center justify-between">
               <h3 className="font-semibold text-sm text-ink-900">Schedule Patient Reminder</h3>
               <button

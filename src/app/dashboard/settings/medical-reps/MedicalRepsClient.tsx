@@ -140,7 +140,7 @@ export function MedicalRepsClient({ initialReps }: { initialReps: MedicalRep[] }
       {/* Add Rep Modal */}
       {showModal && (
         <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-surface rounded-xl shadow-xl border border-ink-150 w-full max-w-md overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+          <div className="bg-white rounded-xl shadow-xl border border-ink-150 w-full max-w-md overflow-hidden animate-in fade-in zoom-in-95 duration-150">
             <div className="p-4 border-b border-ink-150 bg-ink-50 flex items-center justify-between">
               <h3 className="font-semibold text-sm text-ink-900">Add Medical Representative</h3>
               <button

@@ -175,7 +175,7 @@ export function CommissionReportClient({
       {/* Table */}
       <div className="card overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="table">
+          <table className="data-table">
             <thead>
               <tr>
                 <th>Invoice & Date</th>

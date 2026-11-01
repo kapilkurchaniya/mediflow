@@ -1,6 +1,6 @@
 import { cookies } from "next/headers";
 import { db, schema, type DbOrTx } from "./db";
-import { eq, sql } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
 
@@ -44,45 +44,48 @@ export async function createSession(
   return sessionId;
 }
 
-const validateSessionQuery = db
-  .select({
-    session: schema.sessions,
-    user: schema.users,
-  })
-  .from(schema.sessions)
-  .innerJoin(schema.users, eq(schema.sessions.userId, schema.users.id))
-  .where(eq(schema.sessions.id, sql.placeholder("sessionId")))
-  .prepare("validateSessionQuery");
-
 /**
  * Validates the session token. Extends expiration if needed.
  */
 export async function validateSessionToken(token: string) {
   const sessionId = hashSessionToken(token);
 
-  const result = await validateSessionQuery.execute({ sessionId });
+  try {
+    const result = await db
+      .select({
+        session: schema.sessions,
+        user: schema.users,
+      })
+      .from(schema.sessions)
+      .innerJoin(schema.users, eq(schema.sessions.userId, schema.users.id))
+      .where(eq(schema.sessions.id, sessionId))
+      .limit(1);
 
-  if (result.length === 0) {
+    if (result.length === 0) {
+      return { session: null, user: null };
+    }
+
+    const { session, user } = result[0];
+
+    if (Date.now() >= session.expiresAt.getTime()) {
+      await db.delete(schema.sessions).where(eq(schema.sessions.id, session.id));
+      return { session: null, user: null };
+    }
+
+    // Extend session if less than 15 days left
+    if (Date.now() >= session.expiresAt.getTime() - 1000 * 60 * 60 * 24 * 15) {
+      session.expiresAt = new Date(Date.now() + 1000 * 60 * 60 * 24 * SESSION_MAX_AGE_DAYS);
+      await db
+        .update(schema.sessions)
+        .set({ expiresAt: session.expiresAt })
+        .where(eq(schema.sessions.id, session.id));
+    }
+
+    return { session, user };
+  } catch (err) {
+    console.error("[auth] Failed to validate session token:", err);
     return { session: null, user: null };
   }
-
-  const { session, user } = result[0];
-
-  if (Date.now() >= session.expiresAt.getTime()) {
-    await db.delete(schema.sessions).where(eq(schema.sessions.id, session.id));
-    return { session: null, user: null };
-  }
-
-  // Extend session if less than 15 days left
-  if (Date.now() >= session.expiresAt.getTime() - 1000 * 60 * 60 * 24 * 15) {
-    session.expiresAt = new Date(Date.now() + 1000 * 60 * 60 * 24 * SESSION_MAX_AGE_DAYS);
-    await db
-      .update(schema.sessions)
-      .set({ expiresAt: session.expiresAt })
-      .where(eq(schema.sessions.id, session.id));
-  }
-
-  return { session, user };
 }
 
 /**

@@ -13,6 +13,7 @@ interface ReportShellProps {
   backLabel?: string;
   filterBar?: React.ReactNode;
   kpiRow?: React.ReactNode;
+  kpiRowClassName?: string;
   children: React.ReactNode;
   actions?: React.ReactNode;
   onExportCsv?: () => void;
@@ -27,6 +28,7 @@ export function ReportShell({
   backLabel = "Back",
   filterBar,
   kpiRow,
+  kpiRowClassName,
   children,
   actions,
   onExportCsv,
@@ -87,7 +89,7 @@ export function ReportShell({
       )}
 
       {kpiRow && (
-        <section className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 print:grid-cols-4">
+        <section className={kpiRowClassName ?? "grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 print:grid-cols-4"}>
           {kpiRow}
         </section>
       )}
