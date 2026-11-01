@@ -3,7 +3,7 @@ import { z } from "zod";
 export const ImportEntitySchema = z.enum(["medicines", "batches", "customers", "suppliers", "doctors"]);
 export type ImportEntity = z.infer<typeof ImportEntitySchema>;
 
-export const ImportSourceSchema = z.enum(["marg", "gofrugal", "generic"]);
+export const ImportSourceSchema = z.enum(["marg", "gofrugal", "generic", "pharmarack", "retailio"]);
 export type ImportSource = z.infer<typeof ImportSourceSchema>;
 
 export const ImportJobStatusSchema = z.enum([
