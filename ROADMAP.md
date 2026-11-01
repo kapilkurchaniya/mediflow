@@ -829,23 +829,23 @@ Full map in `.github/CODEOWNERS` and [ADR 0004](docs/adr/0004-two-lane-ownership
 
 ### Lane B · Phase 4
 
-#### B4.1 Import data model & domain ⏱ 2 days
+#### [x] B4.1 Import data model & domain ⏱ 2 days
 - **Files:** ➕ `src/server/db/schema/import.ts` (`import_jobs`, `import_job_rows`; docs/12) + `index.ts` line 🔀; migration. ➕ `src/server/domain/import/index.ts` (`createJob`, `addRows(jobId, rows[])`, `validateJob`, `commitJob`).
 
-#### B4.2 Presets & normalisers ⏱ 3 days (needs B0.8 samples)
+#### [x] B4.2 Presets & normalisers ⏱ 3 days (needs B0.8 samples)
 - **Files:** ➕ `src/server/domain/import/normalize.ts` (dates `DD/MM/YYYY`, `MM/YY` → end of month; money "₹1,234.50" → paise; GST "12%" → 1200 with the GST 2.0 conversion offer; phone → 10 digits; GSTIN uppercase and validation; schedule text "H1", "Sch H" → enum), ➕ `match.ts` (medicine matching: barcode → normalised name + pack + manufacturer, with trigram `similarity()` > 0.6 as a "possible match"), ➕ `presets/marg.ts`, `presets/gofrugal.ts`, `presets/generic.ts` (header synonym maps built **from the real samples**), ➕ `tests/unit/import-normalize.test.ts`, ➕ `tests/fixtures/marg-items.synthetic.csv` (synthetic data only, no real customer data).
 
-#### B4.3 Import wizard UI ⏱ 3 days
+#### [x] B4.3 Import wizard UI ⏱ 3 days
 - **Files:** ➕ `src/app/dashboard/import/page.tsx` (job list, "New import"), ➕ `ImportWizard.tsx` (steps: entity → upload → map → validate → commit), ➕ `MappingStep.tsx` (auto-mapped from the preset; dropdown per column), ➕ `ReviewStep.tsx` (error rows with inline fix or skip; ambiguous matches as "create new / match"), ➕ `src/app/dashboard/import/[jobId]/page.tsx` (progress, report, download error CSV). Parse CSV in the browser with PapaParse; for XLSX use ExcelJS (🔀 separate dependency PR; check the licence and advisories). Send 1,000-row chunks to `addRows`.
 - Permission: `settings.manage`.
 
-#### B4.4 Commit + opening balances ⏱ 2 days (🤝 Lane A)
+#### [x] B4.4 Commit + opening balances ⏱ 2 days (🤝 Lane A)
 - Opening stock → `recordStockMovement(type: "opening")`, creating batches. Opening balances of customers and suppliers → 🤝 Lane A provides `postOpeningBalance(tx, ctx, { partyType, partyId, amount, asOf })` in `src/server/domain/accounting.ts` (A writes it in week 15; it's small). Commit runs in 500-row transactions and updates the job totals. Re-runs are idempotent through `external_ref`.
 
-#### B4.5 🧪 Import integration tests ⏱ 1 day
+#### [x] B4.5 🧪 Import integration tests ⏱ 1 day
 - A synthetic 2,000-item file plus 3,000 batches imports in under 2 minutes locally. A re-run creates nothing new. The stock ledger and trial balance are consistent afterwards.
 
-#### B4.6 🤝 Distributor electronic bill import (Pharmarack, Retailio, Marg CSV) ⏱ 2 days
+#### [x] B4.6 🤝 Distributor electronic bill import (Pharmarack, Retailio, Marg CSV) ⏱ 2 days
 - **Why:** Distributors supply retail pharmacies with electronic invoices (CSV/EDI). Typing 50 lines manually wastes hours daily and introduces batch/expiry typos.
 - **Files:** ➕ `src/server/domain/import/presets/pharmarack.ts`, `presets/retailio.ts`, ✏️ `src/app/dashboard/purchases/new/page.tsx` ("Import distributor bill" button).
 - **How:**
@@ -1053,7 +1053,7 @@ Tick items in PRs. One line per task, in the same order as above.
 **Phase 1** — A: [x] A1.1 [x] A1.2 [x] A1.3 [x] A1.4 [x] A1.5 [x] A1.6 [x] A1.7 · B: [x] B1.1 [x] B1.2 [x] B1.3 [x] B1.4 [x] B1.5 [x] B1.6 [x] B1.7
 **Phase 2** — A: [x] A2.1 [x] A2.2 [x] A2.3 [x] A2.4 [x] A2.5 [x] A2.6 [x] A2.7 [x] A2.8 [x] A2.9 [x] A2.10 [x] A2.11 [x] A2.12 · B: [x] B2.1 [x] B2.2 [x] B2.3 [x] B2.4 [x] B2.5 [x] B2.6 [x] B2.7 [x] B2.8
 **Phase 3** — A: [x] A3.1 [x] A3.2 [ ] A3.3 [ ] A3.4 [ ] A3.5 [ ] A3.6 · B: [x] B3.1 [x] B3.2 [x] B3.3 [x] B3.4 [x] B3.5 [x] B3.6 [x] B3.7
-**Phase 4** — A: [ ] A4.1 [ ] A4.2 [ ] A4.3 [ ] A4.4 [ ] A4.5 [ ] A4.6 [ ] A4.7 [ ] A4.8 [ ] A4.9 · B: [ ] B4.1 [ ] B4.2 [ ] B4.3 [ ] B4.4 [ ] B4.5 [ ] B4.6
+**Phase 4** — A: [ ] A4.1 [ ] A4.2 [ ] A4.3 [ ] A4.4 [ ] A4.5 [ ] A4.6 [ ] A4.7 [ ] A4.8 [ ] A4.9 · B: [x] B4.1 [x] B4.2 [x] B4.3 [x] B4.4 [x] B4.5 [x] B4.6
 **Phase 5** — A: [ ] A5.1 [ ] A5.2 [ ] A5.3 [ ] A5.4 [ ] A5.5 [ ] A5.6 [ ] A5.7 · B: [ ] B5.1 [ ] B5.2 [ ] B5.3 [ ] B5.4 [ ] B5.5 [ ] B5.6 [ ] B5.7
 **Phase 6** — A: [ ] A6.1 [ ] A6.2 [ ] A6.3 [ ] A6.4 [ ] A6.5 [ ] A6.6 · B: [ ] B6.1 [ ] B6.2 [ ] B6.3 [ ] B6.4 [ ] B6.5 [ ] B6.6
 

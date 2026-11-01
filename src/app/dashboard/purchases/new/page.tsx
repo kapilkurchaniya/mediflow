@@ -7,11 +7,12 @@ import { createPurchaseInvoice, PurchaseItemInput } from "@/app/actions/purchase
 import { getSuppliers } from "@/app/actions/suppliers";
 import { getMedicines } from "@/app/actions/inventory";
 import { getPurchaseOrder } from "@/app/actions/purchase-orders";
-import { Save, Plus, Trash2, FileText, Truck, AlertCircle, ClipboardList, Layers } from "lucide-react";
+import { Save, Plus, Trash2, FileText, Truck, AlertCircle, ClipboardList, Layers, FileSpreadsheet } from "lucide-react";
 import { PageHeader } from "@/app/components/ui";
 import { formatINR } from "@/lib/format";
 import { computePurchaseTotals } from "@/lib/money";
 import { DEFAULT_GST_RATE_BP, isValidGstRateBp, type GstRateBp } from "@/lib/regulatory";
+import { ImportDistributorBillModal } from "./ImportDistributorBillModal";
 
 function NewPurchaseForm() {
   const searchParams = useSearchParams();
@@ -33,6 +34,7 @@ function NewPurchaseForm() {
   const [invoiceDate, setInvoiceDate] = useState(new Date().toISOString().split("T")[0]);
 
   const [items, setItems] = useState<PurchaseItemInput[]>([]);
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
 
   useEffect(() => {
     getSuppliers().then(setSuppliers);
@@ -241,14 +243,24 @@ function NewPurchaseForm() {
               <h3 className="card-title text-[14px]">Invoice Items & Batches</h3>
               <p className="card-description">Enter batch details, quantities, cost rates, and GST.</p>
             </div>
-            <button
-              type="button"
-              onClick={handleAddItem}
-              className="btn btn-secondary text-xs"
-            >
-              <Plus className="h-3.5 w-3.5 mr-1" />
-              Add Row
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setIsImportModalOpen(true)}
+                className="btn btn-secondary text-xs flex items-center gap-1.5 border-brand-300 dark:border-brand-700 text-brand-700 dark:text-brand-300 hover:bg-brand-50/50"
+              >
+                <FileSpreadsheet className="h-3.5 w-3.5 text-brand-600 dark:text-brand-400" />
+                Import Distributor Bill (CSV)
+              </button>
+              <button
+                type="button"
+                onClick={handleAddItem}
+                className="btn btn-secondary text-xs"
+              >
+                <Plus className="h-3.5 w-3.5 mr-1" />
+                Add Row
+              </button>
+            </div>
           </div>
 
           <div className="overflow-x-auto">
@@ -512,6 +524,14 @@ function NewPurchaseForm() {
           </div>
         </div>
       </form>
+
+      <ImportDistributorBillModal
+        isOpen={isImportModalOpen}
+        onClose={() => setIsImportModalOpen(false)}
+        onImport={(importedItems) => {
+          setItems(importedItems);
+        }}
+      />
     </div>
   );
 }

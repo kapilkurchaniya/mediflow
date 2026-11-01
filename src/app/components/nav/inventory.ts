@@ -8,5 +8,5 @@ export const inventoryNav: NavItem[] = [
   { group: "inventory", order: 25, href: "/dashboard/inventory/quarantine", label: "Quarantine & expiry dump", icon: ShieldAlert, description: "Isolate expired stock & distributor debit claims", permission: "inventory.view" },
   { group: "inventory", order: 26, href: "/dashboard/inventory/stocktake", label: "Physical stocktake", icon: ClipboardCheck, description: "Shelf counts & rack audit sessions", permission: "inventory.view" },
   { group: "inventory", order: 30, href: "/dashboard/settings/racks", label: "Racks & shelves", icon: Layers, permission: "medicine.manage" },
-  { group: "inventory", order: 50, href: "/dashboard/inventory/import", label: "Bulk import", icon: Upload, description: "Upload medicine stock via CSV/Excel", permission: "inventory.adjust" },
+  { group: "inventory", order: 50, href: "/dashboard/import", label: "Data import & migration", icon: Upload, description: "Import Marg ERP & CSV datasets", permission: "settings.manage" },
 ];
