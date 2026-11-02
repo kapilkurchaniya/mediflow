@@ -1,6 +1,9 @@
 import Link from "next/link";
 import { ArrowLeft, Search, type LucideIcon } from "lucide-react";
 import clsx from "clsx";
+import { SearchInput } from "./SearchInput";
+
+export { SearchInput };
 
 /* -------------------------------------------------------------------------- */
 /* Brand mark                                                                 */
@@ -185,17 +188,7 @@ export function SearchForm({
 }) {
   return (
     <div className="flex flex-col gap-3 border-b border-ink-150 px-4 py-3 sm:flex-row sm:items-center">
-      <form method="GET" className="relative flex-1 max-w-md" role="search">
-        <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-400" />
-        <input
-          type="search"
-          name="q"
-          defaultValue={defaultValue}
-          placeholder={placeholder}
-          className="input pl-8"
-          aria-label={placeholder}
-        />
-      </form>
+      <SearchInput defaultValue={defaultValue} placeholder={placeholder} />
       {children && <div className="flex items-center gap-2 sm:ml-auto">{children}</div>}
     </div>
   );
@@ -283,5 +276,23 @@ export function Avatar({ name, size = "md" }: { name: string; size?: "sm" | "md"
     >
       {letters || "—"}
     </span>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/* Table wrapper with horizontal scroll cues                                  */
+/* -------------------------------------------------------------------------- */
+
+export function TableWrapper({
+  children,
+  className,
+}: {
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <div className={clsx("table-scroll-container", className)}>
+      {children}
+    </div>
   );
 }

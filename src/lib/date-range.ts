@@ -61,6 +61,50 @@ export function resolveDateRange(opts: {
 }
 
 /**
+ * Resolves date range specifically for forward-looking expiry dates.
+ */
+export function resolveExpiryDateRange(opts: {
+  range?: string | null;
+  from?: string | null;
+  to?: string | null;
+}): DateRange {
+  const { range, from, to } = opts;
+
+  if (range === "custom" || (!range && (from || to))) {
+    return { from: from || null, to: to || null };
+  }
+
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = now.getMonth();
+  const d = now.getDate();
+
+  function fmt(dt: Date) {
+    return dt.toISOString().split("T")[0];
+  }
+
+  const todayStr = fmt(now);
+
+  switch (range) {
+    case "expired":
+      return { from: null, to: fmt(new Date(y, m, d - 1)) };
+    case "30d":
+      return { from: todayStr, to: fmt(new Date(y, m, d + 30)) };
+    case "60d":
+      return { from: todayStr, to: fmt(new Date(y, m, d + 60)) };
+    case "90d":
+      return { from: todayStr, to: fmt(new Date(y, m, d + 90)) };
+    case "180d":
+      return { from: todayStr, to: fmt(new Date(y, m, d + 180)) };
+    case "year":
+      return { from: todayStr, to: fmt(new Date(y, 11, 31)) };
+    case "all":
+    default:
+      return { from: null, to: null };
+  }
+}
+
+/**
  * Resolves a natural language period to a DateRange for AI tool use.
  */
 export function resolveAIPeriod(period: string): DateRange {

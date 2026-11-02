@@ -98,6 +98,7 @@ export function RegisterClient({
   const [closeDenoms, setCloseDenoms] = useState<Record<string, number>>({});
   const [closeNotes, setCloseNotes] = useState("");
   const [closeUseDenomTally, setCloseUseDenomTally] = useState(true);
+  const [supervisorPin, setSupervisorPin] = useState("");
 
   // Shift duration elapsed live ticker
   const [durationString, setDurationString] = useState("");
@@ -220,12 +221,14 @@ export function RegisterClient({
         actualCash: effectiveClosePaise,
         notes: closeNotes.trim() || undefined,
         denominations: closeUseDenomTally ? closeDenoms : undefined,
+        supervisorPin: supervisorPin.trim() || undefined,
       };
       const res = await closeShiftAction(payload);
       if (!res.ok) {
         setActionError(res.error);
       } else {
         setIsCloseModalOpen(false);
+        setSupervisorPin("");
         router.push(`/dashboard/sales/register/z-report/${res.session.id}/print`);
       }
     });
@@ -1080,6 +1083,32 @@ export function RegisterClient({
                 </div>
               </div>
 
+              {/* Supervisor Authorization Guard for Discrepancy > ₹500 */}
+              {Math.abs(closeDifferencePaise) > 50000 && (
+                <div className="p-3.5 rounded-xl border border-amber-300 bg-amber-50/80 text-amber-950 space-y-2">
+                  <div className="flex items-center gap-2 text-xs font-bold text-amber-900">
+                    <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+                    <span>Supervisor Authorization Required (Variance &gt; ₹500)</span>
+                  </div>
+                  <p className="text-[11.5px] text-amber-800 leading-relaxed">
+                    Drawer variance is {formatINR(Math.abs(closeDifferencePaise))} ({closeDifferencePaise < 0 ? "shortage" : "overage"}). A manager or supervisor PIN is required to authorize and close this shift.
+                  </p>
+                  <div className="pt-1">
+                    <label className="block text-[10px] font-bold text-amber-900 uppercase tracking-wider mb-1">
+                      Supervisor / Manager PIN
+                    </label>
+                    <input
+                      type="password"
+                      maxLength={8}
+                      value={supervisorPin}
+                      onChange={(e) => setSupervisorPin(e.target.value)}
+                      placeholder="Enter 4-digit supervisor PIN"
+                      className="w-full px-3 py-2 text-sm font-mono tracking-widest rounded-lg border border-amber-300 bg-white focus:outline-none focus:ring-2 focus:ring-amber-500"
+                    />
+                  </div>
+                </div>
+              )}
+
               {/* Optional Notes */}
               <div>
                 <label className="block text-xs font-semibold text-ink-700 uppercase tracking-wider mb-1">
@@ -1106,11 +1135,15 @@ export function RegisterClient({
               </button>
               <button
                 type="button"
-                disabled={isPending}
+                disabled={isPending || (Math.abs(closeDifferencePaise) > 50000 && supervisorPin.trim().length < 4)}
                 onClick={handleCloseShift}
-                className="btn btn-primary bg-rose-600 hover:bg-rose-700 text-white text-xs py-2 px-5 flex items-center gap-2"
+                className="btn btn-primary bg-rose-600 hover:bg-rose-700 text-white text-xs py-2 px-5 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {isPending ? "Closing..." : "Confirm & Lock Shift (Z-Report)"}
+                {isPending
+                  ? "Closing..."
+                  : Math.abs(closeDifferencePaise) > 50000 && supervisorPin.trim().length < 4
+                  ? "Supervisor PIN Required"
+                  : "Confirm & Lock Shift (Z-Report)"}
               </button>
             </div>
           </div>

@@ -1,7 +1,7 @@
 "use server";
 
 import { db, schema } from "@/server/db";
-import { eq, and, desc, ilike, or } from "drizzle-orm";
+import { eq, and, desc, ilike, or, sql } from "drizzle-orm";
 import { requirePermission, checkPermission } from "@/server/rbac";
 import { writeAudit } from "@/server/audit";
 import { DEFAULT_GST_RATE_BP, isValidGstRateBp } from "@/lib/regulatory";
@@ -71,7 +71,30 @@ export async function createManufacturer(name: string) {
 
 // --- Medicines ---
 
-export async function getMedicines(searchQuery?: string, limit = 100, offset = 0) {
+export async function getMedicinesCount(searchQuery?: string): Promise<number> {
+  const ctx = await requirePermission("medicine.view");
+  const conditions = [eq(schema.medicines.tenantId, ctx.tenantId)];
+
+  if (searchQuery?.trim()) {
+    const q = `%${searchQuery.trim().toLowerCase()}%`;
+    conditions.push(
+      or(
+        ilike(schema.medicines.name, q),
+        ilike(schema.medicines.genericName, q),
+        ilike(schema.medicines.barcode, q)
+      )!
+    );
+  }
+
+  const [row] = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(schema.medicines)
+    .where(and(...conditions));
+
+  return row?.count ?? 0;
+}
+
+export async function getMedicines(searchQuery?: string, limit = 50, offset = 0) {
   const ctx = await requirePermission("medicine.view");
 
   const conditions = [eq(schema.medicines.tenantId, ctx.tenantId)];

@@ -96,7 +96,8 @@ export function PosHeader({
             type="button"
             onClick={onToggleSound}
             className="btn btn-secondary btn-icon"
-            title="Toggle audio"
+            title={soundEnabled ? "Audio On — Click to mute scan chime" : "Audio Muted — Click to enable scan chime"}
+            aria-label={soundEnabled ? "Mute scan chime" : "Enable scan chime"}
           >
             {soundEnabled ? (
               <Volume2 className="h-4 w-4 text-brand-600" />

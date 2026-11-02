@@ -29,6 +29,18 @@ export async function processInventoryImport(rows: ImportRow[]) {
       let processed = 0;
 
       for (const row of rows) {
+        if (!row.medicineName || !row.medicineName.trim()) continue;
+
+        // Sanitize all numeric fields to prevent NaN, null, or negative values from failing Postgres queries
+        const cleanMrp = Number.isFinite(row.mrp) && row.mrp >= 0 ? Math.round(row.mrp) : 0;
+        let cleanPurchaseRate = Number.isFinite(row.purchaseRate) && row.purchaseRate >= 0 ? Math.round(row.purchaseRate) : 0;
+        // If purchase rate was not provided or 0, fallback to standard Indian pharma PTR (80% of MRP)
+        if (cleanPurchaseRate === 0 && cleanMrp > 0) {
+          cleanPurchaseRate = Math.round(cleanMrp * 0.8);
+        }
+        const cleanSaleRate = Number.isFinite(row.saleRate) && row.saleRate > 0 ? Math.round(row.saleRate) : cleanMrp;
+        const cleanQty = Number.isFinite(row.qty) && row.qty >= 0 ? Math.round(row.qty) : 0;
+
         // 1. Resolve or Create Medicine
         let medicineId: string;
         
@@ -39,7 +51,7 @@ export async function processInventoryImport(rows: ImportRow[]) {
           .where(
             and(
               eq(schema.medicines.tenantId, session.tenantId),
-              sql`lower(${schema.medicines.name}) = lower(${row.medicineName})`
+              sql`lower(${schema.medicines.name}) = lower(${row.medicineName.trim()})`
             )
           );
 
@@ -49,28 +61,30 @@ export async function processInventoryImport(rows: ImportRow[]) {
           // Create new medicine
           // 1.5 Resolve Manufacturer and Category
           let manufacturerId: string | null = null;
-          if (row.manufacturer && row.manufacturer !== "Unknown") {
+          if (row.manufacturer && row.manufacturer !== "Unknown" && row.manufacturer.trim().length > 0) {
+            const trimmedMfg = row.manufacturer.trim();
             const [m] = await tx.select().from(schema.manufacturers)
-              .where(and(eq(schema.manufacturers.tenantId, session.tenantId), sql`lower(${schema.manufacturers.name}) = lower(${row.manufacturer})`));
+              .where(and(eq(schema.manufacturers.tenantId, session.tenantId), sql`lower(${schema.manufacturers.name}) = lower(${trimmedMfg})`));
             if (m) {
               manufacturerId = m.id;
             } else {
               const [newM] = await tx.insert(schema.manufacturers)
-                .values({ tenantId: session.tenantId, name: row.manufacturer })
+                .values({ tenantId: session.tenantId, name: trimmedMfg })
                 .returning({ id: schema.manufacturers.id });
               manufacturerId = newM.id;
             }
           }
 
           let categoryId: string | null = null;
-          if (row.category && row.category !== "General") {
+          if (row.category && row.category !== "General" && row.category.trim().length > 0) {
+            const trimmedCat = row.category.trim();
             const [c] = await tx.select().from(schema.categories)
-              .where(and(eq(schema.categories.tenantId, session.tenantId), sql`lower(${schema.categories.name}) = lower(${row.category})`));
+              .where(and(eq(schema.categories.tenantId, session.tenantId), sql`lower(${schema.categories.name}) = lower(${trimmedCat})`));
             if (c) {
               categoryId = c.id;
             } else {
               const [newC] = await tx.insert(schema.categories)
-                .values({ tenantId: session.tenantId, name: row.category })
+                .values({ tenantId: session.tenantId, name: trimmedCat })
                 .returning({ id: schema.categories.id });
               categoryId = newC.id;
             }
@@ -78,18 +92,19 @@ export async function processInventoryImport(rows: ImportRow[]) {
 
           const [newMed] = await tx.insert(schema.medicines).values({
             tenantId: session.tenantId,
-            name: row.medicineName,
+            name: row.medicineName.trim(),
             manufacturerId,
             categoryId,
-            mrp: row.mrp,
-            purchasePrice: row.purchaseRate,
-            salePrice: row.saleRate,
+            mrp: cleanMrp,
+            purchasePrice: cleanPurchaseRate,
+            salePrice: cleanSaleRate,
           }).returning({ id: schema.medicines.id });
           medicineId = newMed.id;
         }
 
         // 2. Resolve or Create Batch
         let batchId: string;
+        const cleanBatchNo = (row.batchNo || "DEFAULT").trim();
 
         const [existingBatch] = await tx
           .select({ id: schema.batches.id, qtyOnHand: schema.batches.qtyOnHand })
@@ -98,7 +113,7 @@ export async function processInventoryImport(rows: ImportRow[]) {
             and(
               eq(schema.batches.storeId, session.storeId),
               eq(schema.batches.medicineId, medicineId),
-              eq(schema.batches.batchNo, row.batchNo)
+              eq(schema.batches.batchNo, cleanBatchNo)
             )
           );
 
@@ -106,7 +121,7 @@ export async function processInventoryImport(rows: ImportRow[]) {
           batchId = existingBatch.id;
           
           // Only add stock if quantity is provided
-          if (row.qty > 0) {
+          if (cleanQty > 0) {
             // Update physical stock through domain
             await recordStockMovement({
               tx,
@@ -115,8 +130,8 @@ export async function processInventoryImport(rows: ImportRow[]) {
               medicineId,
               batchId,
               type: "opening", // using opening balance for import
-              qtyChange: row.qty,
-              unitCost: row.purchaseRate,
+              qtyChange: cleanQty,
+              unitCost: cleanPurchaseRate,
               note: "Bulk CSV Import",
               userId: user.id
             });
@@ -127,28 +142,28 @@ export async function processInventoryImport(rows: ImportRow[]) {
             tenantId: session.tenantId,
             storeId: session.storeId,
             medicineId,
-            batchNo: row.batchNo,
+            batchNo: cleanBatchNo,
             expiryDate: row.expiryDate,
             mfgDate: row.mfgDate || null,
-            mrp: row.mrp,
-            purchaseRate: row.purchaseRate,
-            saleRate: row.saleRate,
-            qtyOnHand: row.qty // Initial insert sets it directly
+            mrp: cleanMrp,
+            purchaseRate: cleanPurchaseRate,
+            saleRate: cleanSaleRate,
+            qtyOnHand: cleanQty // Initial insert sets it directly
           }).returning({ id: schema.batches.id });
           
           batchId = newBatch.id;
 
           // Record initial ledger entry
-          if (row.qty > 0) {
+          if (cleanQty > 0) {
             await tx.insert(schema.stockMovements).values({
               tenantId: session.tenantId,
               storeId: session.storeId,
               medicineId,
               batchId,
               type: "opening",
-              qtyChange: row.qty,
-              balanceAfter: row.qty,
-              unitCost: row.purchaseRate,
+              qtyChange: cleanQty,
+              balanceAfter: cleanQty,
+              unitCost: cleanPurchaseRate,
               note: "Bulk CSV Import Initial Stock",
               userId: user.id
             });
@@ -162,6 +177,9 @@ export async function processInventoryImport(rows: ImportRow[]) {
     });
 
     revalidatePath("/dashboard/inventory");
+    revalidatePath("/dashboard/inventory/batches");
+    revalidatePath("/dashboard/inventory", "layout");
+    revalidatePath("/dashboard");
     return { success: true, count: importCount };
   } catch (error: unknown) {
     console.error("Import error:", error);

@@ -87,10 +87,24 @@ export async function addOpeningStock(formData: FormData) {
     await db.transaction(async (tx) => {
       // The medicine must belong to this pharmacy (never trust an id from the browser)
       const [medicine] = await tx
-        .select({ id: schema.medicines.id })
+        .select({
+          id: schema.medicines.id,
+          purchasePrice: schema.medicines.purchasePrice,
+          mrp: schema.medicines.mrp,
+        })
         .from(schema.medicines)
         .where(and(eq(schema.medicines.id, medicineId), eq(schema.medicines.tenantId, ctx.tenantId)));
       if (!medicine) throw new Error("Medicine not found");
+
+      // If purchase rate was not provided, fallback to medicine master or estimated 80% MRP
+      const finalPurchaseRate =
+        purchaseRate > 0
+          ? purchaseRate
+          : medicine.purchasePrice > 0
+            ? medicine.purchasePrice
+            : mrp > 0
+              ? Math.round(mrp * 0.8)
+              : 0;
 
       // Check if batch already exists
       const existingBatch = await tx
@@ -120,7 +134,7 @@ export async function addOpeningStock(formData: FormData) {
             medicineId,
             batchNo,
             expiryDate,
-            purchaseRate,
+            purchaseRate: finalPurchaseRate,
             mrp,
             saleRate,
             qtyOnHand: 0,
@@ -140,7 +154,7 @@ export async function addOpeningStock(formData: FormData) {
         medicineId,
         type: "opening",
         qtyChange: qty,
-        unitCost: purchaseRate,
+        unitCost: finalPurchaseRate,
         note: "Opening stock entry",
         userId: ctx.userId,
       });
@@ -225,8 +239,153 @@ export async function adjustBatchStock(formData: FormData) {
     });
 
     revalidatePath("/dashboard/inventory/batches");
+    revalidatePath("/dashboard/inventory", "layout");
+    revalidatePath("/dashboard");
     return { success: true };
   } catch (err: unknown) {
     return { error: (err instanceof Error ? err.message : String(err)) || "Failed to adjust stock" };
+  }
+}
+
+const updateBatchSchema = z.object({
+  batchId: z.string().min(1, "Batch ID is required"),
+  batchNo: z.string().min(1, "Batch number is required"),
+  expiryDate: z.string().min(1, "Expiry date is required"),
+  purchaseRate: z.coerce.number().min(0, "Purchase rate must be non-negative"),
+  mrp: z.coerce.number().min(0, "MRP must be non-negative"),
+  saleRate: z.coerce.number().min(0, "Sale rate must be non-negative").optional().default(0),
+});
+
+export async function updateBatch(formData: FormData) {
+  const auth = await checkPermission("inventory.adjust");
+  if (!auth.ok) return { error: auth.error };
+  const ctx = auth.ctx;
+
+  const parsed = updateBatchSchema.safeParse(Object.fromEntries(formData.entries()));
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0].message };
+  }
+
+  const { batchId, batchNo, expiryDate } = parsed.data;
+  const purchaseRate = Math.round(parsed.data.purchaseRate * 100);
+  const mrp = Math.round(parsed.data.mrp * 100);
+  const saleRate = parsed.data.saleRate ? Math.round(parsed.data.saleRate * 100) : mrp;
+
+  try {
+    await db.transaction(async (tx) => {
+      const [existing] = await tx
+        .select()
+        .from(schema.batches)
+        .where(
+          and(
+            eq(schema.batches.id, batchId),
+            eq(schema.batches.tenantId, ctx.tenantId),
+            eq(schema.batches.storeId, ctx.storeId)
+          )
+        )
+        .limit(1);
+
+      if (!existing) throw new Error("Batch not found");
+
+      await tx
+        .update(schema.batches)
+        .set({
+          batchNo: batchNo.trim().toUpperCase(),
+          expiryDate,
+          purchaseRate,
+          mrp,
+          saleRate,
+        })
+        .where(eq(schema.batches.id, batchId));
+
+      // If the medicine's master purchasePrice or mrp is 0, update it as well
+      await tx
+        .update(schema.medicines)
+        .set({
+          purchasePrice: purchaseRate > 0 ? purchaseRate : undefined,
+          mrp: mrp > 0 ? mrp : undefined,
+          salePrice: saleRate > 0 ? saleRate : undefined,
+        })
+        .where(
+          and(
+            eq(schema.medicines.id, existing.medicineId),
+            eq(schema.medicines.tenantId, ctx.tenantId),
+            sql`${schema.medicines.purchasePrice} = 0 OR ${schema.medicines.mrp} = 0`
+          )
+        );
+
+      await writeAudit(tx, ctx, {
+        action: "stock_adjust",
+        entityType: "batch",
+        entityId: batchId,
+        oldValue: {
+          batchNo: existing.batchNo,
+          expiryDate: existing.expiryDate,
+          purchaseRate: existing.purchaseRate,
+          mrp: existing.mrp,
+        },
+        newValue: { batchNo, expiryDate, purchaseRate, mrp, saleRate },
+        reason: "User updated batch details",
+      });
+    });
+
+    revalidatePath("/dashboard/inventory/batches");
+    revalidatePath("/dashboard/inventory", "layout");
+    revalidatePath("/dashboard");
+    return { success: true };
+  } catch (err: unknown) {
+    return { error: (err instanceof Error ? err.message : String(err)) || "Failed to update batch" };
+  }
+}
+
+export async function backfillZeroPurchaseRates() {
+  const auth = await checkPermission("inventory.adjust");
+  if (!auth.ok) return { error: auth.error };
+  const ctx = auth.ctx;
+
+  try {
+    const zeroBatches = await db
+      .select({
+        batchId: schema.batches.id,
+        batchMrp: schema.batches.mrp,
+        medPurchasePrice: schema.medicines.purchasePrice,
+        medMrp: schema.medicines.mrp,
+      })
+      .from(schema.batches)
+      .innerJoin(schema.medicines, eq(schema.batches.medicineId, schema.medicines.id))
+      .where(
+        and(
+          eq(schema.batches.tenantId, ctx.tenantId),
+          eq(schema.batches.storeId, ctx.storeId),
+          eq(schema.batches.purchaseRate, 0)
+        )
+      );
+
+    let updatedCount = 0;
+    for (const b of zeroBatches) {
+      const estPtr =
+        b.medPurchasePrice > 0
+          ? b.medPurchasePrice
+          : b.batchMrp > 0
+            ? Math.round(b.batchMrp * 0.8)
+            : b.medMrp > 0
+              ? Math.round(b.medMrp * 0.8)
+              : 0;
+
+      if (estPtr > 0) {
+        await db
+          .update(schema.batches)
+          .set({ purchaseRate: estPtr })
+          .where(eq(schema.batches.id, b.batchId));
+        updatedCount++;
+      }
+    }
+
+    revalidatePath("/dashboard/inventory/batches");
+    revalidatePath("/dashboard/inventory", "layout");
+    revalidatePath("/dashboard");
+    return { success: true, count: updatedCount };
+  } catch (err: unknown) {
+    return { error: (err instanceof Error ? err.message : String(err)) || "Failed to backfill purchase rates" };
   }
 }

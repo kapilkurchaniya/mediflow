@@ -9,6 +9,9 @@ export function playCounterSound(type: "beep" | "chime", enabled = true) {
     const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
     if (!AudioCtx) return;
     const ctx = new AudioCtx();
+    if (ctx.state === "suspended") {
+      void ctx.resume();
+    }
 
     if (type === "beep") {
       const osc = ctx.createOscillator();

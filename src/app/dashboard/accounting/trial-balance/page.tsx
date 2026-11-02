@@ -3,7 +3,7 @@ import { getTrialBalanceReport } from "@/app/actions/reports";
 import { resolveDateRange } from "@/lib/date-range";
 import { DateRangeFilter } from "@/app/components/DateRangeFilter";
 import { ReportShell } from "@/app/components/ReportShell";
-import { StatCard, EmptyState } from "@/app/components/ui";
+import { StatCard, EmptyState, TableWrapper } from "@/app/components/ui";
 import { formatINR } from "@/lib/format";
 import { Scale, CheckCircle2, AlertTriangle, ArrowRightLeft } from "lucide-react";
 import { requirePagePermission } from "@/server/rbac";
@@ -93,8 +93,8 @@ export default async function TrialBalancePage({
             compact
           />
         ) : (
-          <div className="overflow-x-auto">
-            <table className="data-table">
+          <TableWrapper>
+            <table className="data-table data-table-sticky min-w-[850px]">
               <thead>
                 <tr>
                   <th className="w-20">Code</th>
@@ -164,7 +164,7 @@ export default async function TrialBalancePage({
                 </tr>
               </tfoot>
             </table>
-          </div>
+          </TableWrapper>
         )}
       </div>
     </ReportShell>

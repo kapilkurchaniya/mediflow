@@ -1,6 +1,5 @@
-import { notFound } from "next/navigation";
 import { format } from "date-fns";
-import { ArrowLeft, Printer, Receipt, FileText } from "lucide-react";
+import { ArrowLeft, Printer, Receipt, FileText, AlertCircle, ScanLine } from "lucide-react";
 import Link from "next/link";
 import { requirePagePermission } from "@/server/rbac";
 import { getXReport } from "@/server/domain/cash-sessions";
@@ -19,11 +18,41 @@ export default async function PrintXReportPage({
   const { format: printFormat, sessionId } = await searchParams;
   const isThermal = printFormat !== "a4"; // default to 80mm thermal for register reports
 
-  let report;
+  let report: Awaited<ReturnType<typeof getXReport>> | null = null;
   try {
     report = await getXReport(db, ctx, sessionId);
   } catch {
-    return notFound();
+    report = null;
+  }
+
+  if (!report) {
+    return (
+      <div className="min-h-screen bg-ink-50 py-12 px-4 flex flex-col items-center justify-center font-sans">
+        <div className="max-w-md w-full bg-white rounded-2xl border border-ink-200 p-8 shadow-card text-center space-y-4">
+          <div className="w-14 h-14 rounded-2xl bg-amber-50 text-amber-600 border border-amber-200 flex items-center justify-center mx-auto">
+            <AlertCircle className="w-7 h-7" />
+          </div>
+          <h2 className="text-xl font-bold text-ink-900">No Active Cash Register Shift</h2>
+          <p className="text-sm text-ink-600 leading-relaxed">
+            An X-Report (mid-shift snapshot) can only be generated while a register shift is actively open. There is currently no open shift for this counter.
+          </p>
+          <div className="pt-2 flex flex-col sm:flex-row gap-3 justify-center">
+            <Link
+              href="/dashboard/sales/register"
+              className="btn btn-primary justify-center shadow-xs"
+            >
+              <ScanLine className="w-4 h-4 mr-1.5" /> Go to Cash Register
+            </Link>
+            <Link
+              href="/dashboard"
+              className="btn btn-secondary justify-center"
+            >
+              Back to Overview
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   const { store, shift, cashDrawer, tenders, transactionCounts, generatedAt } = report;
@@ -83,7 +112,7 @@ export default async function PrintXReportPage({
         /* ──────────────── 80mm Thermal POS X-Report Format ──────────────── */
         <div
           id="report-printable"
-          className="max-w-[80mm] mx-auto bg-white p-4 shadow-xl border border-ink-200 print:shadow-none print:border-none print:p-0 print:m-0 font-mono text-[11px] leading-tight text-black"
+          className="max-w-[80mm] mx-auto bg-white p-4 shadow-xl border border-ink-200 print:shadow-none print:border-none print:p-0 print:m-0 font-mono text-[11px] leading-tight text-black thermal-slip"
         >
           {/* Store Header */}
           <div className="text-center pb-2 border-b border-black">

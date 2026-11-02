@@ -1,12 +1,13 @@
 import { getSaleById } from "@/app/actions/sales";
 import { notFound } from "next/navigation";
 import { format } from "date-fns";
-import { Printer, Receipt, User, Stethoscope, AlertOctagon, RotateCcw, FileText, ChevronRight } from "lucide-react";
+import { Printer, Receipt, User, Stethoscope, AlertOctagon, RotateCcw, FileText, ChevronRight, MessageSquare } from "lucide-react";
 import Link from "next/link";
 import { PageHeader } from "@/app/components/ui";
 import { formatINR, formatItemQuantity } from "@/lib/format";
 import { can, requirePagePermission } from "@/server/rbac";
 import { getIndianBusinessDate } from "@/server/domain/sales/cancel-sale";
+import { buildWhatsAppDirectUrl, buildInvoiceWhatsAppMessage } from "@/lib/whatsapp";
 import { CancelSaleButton } from "./CancelSaleButton";
 import { ReturnSaleButton } from "./ReturnSaleButton";
 
@@ -35,6 +36,21 @@ export default async function SaleDetailPage({
   const hasReturns = (sale.returnedAmount ?? 0) > 0 || items.some((item) => (item.returnedQty ?? 0) > 0);
   const availableReturnUnits = items.reduce((sum, item) => sum + Math.max(0, item.qty - (item.returnedQty ?? 0)), 0);
 
+  const customerPhone = customer?.phone || sale.customerPhone;
+  const whatsappUrl = customerPhone
+    ? buildWhatsAppDirectUrl(
+        customerPhone,
+        buildInvoiceWhatsAppMessage({
+          customerName: customer?.name || sale.customerName,
+          storeName: store?.name || "MediFlow Pharmacy",
+          invoiceNo: sale.invoiceNo,
+          totalINR: formatINR(sale.totalAmount || 0),
+          dateStr: format(saleDate, "dd MMM yyyy"),
+          itemCount: items.length,
+        }),
+      )
+    : null;
+
   return (
     <div className="page space-y-6">
       <PageHeader
@@ -54,6 +70,17 @@ export default async function SaleDetailPage({
                 canCancel={canCancel}
                 hasReturns={hasReturns}
               />
+            )}
+            {whatsappUrl && (
+              <a
+                href={whatsappUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="btn btn-secondary text-emerald-700 hover:text-emerald-800 hover:bg-emerald-50 border-emerald-200"
+                title="Send digital receipt directly to customer's WhatsApp"
+              >
+                <MessageSquare className="h-4 w-4 mr-1.5 text-emerald-600" /> WhatsApp Receipt
+              </a>
             )}
             <Link
               href={`/dashboard/sales/${sale.id}/print?format=thermal`}

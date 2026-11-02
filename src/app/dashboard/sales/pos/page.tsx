@@ -14,6 +14,7 @@ import { CustomerPicker } from "./_components/CustomerPicker";
 import { CompliancePanel } from "./_components/CompliancePanel";
 import { PaymentPanel } from "./_components/PaymentPanel";
 import { TotalsBar } from "./_components/TotalsBar";
+import { formatINR } from "@/lib/format";
 import { SubstitutesModal } from "./_components/SubstitutesModal";
 import { PromiseOrderModal } from "./_components/PromiseOrderModal";
 import { HeldBillsModal } from "./_components/HeldBillsModal";
@@ -172,7 +173,7 @@ export default function POSPage() {
   });
 
   return (
-    <div className="flex h-[calc(100vh-4rem)] p-4 gap-4 overflow-hidden bg-ink-50/50">
+    <div className="flex flex-col lg:flex-row h-auto lg:h-[calc(100vh-4rem)] p-3 lg:p-4 gap-4 overflow-y-auto lg:overflow-hidden pb-24 lg:pb-4 bg-ink-50/50">
       <div className="flex-1 flex flex-col space-y-3 min-w-0">
         <PosHeader
           currentStore={currentStore}
@@ -215,10 +216,41 @@ export default function POSPage() {
         />
       </div>
 
-      <div className="w-80 flex flex-col space-y-3 shrink-0">
+      <div className="w-full lg:w-80 flex flex-col space-y-3 shrink-0">
         <CustomerPicker customer={state.customer} dataSource={ds} onSelectCustomer={(c) => dispatch({ type: "SET_CUSTOMER", payload: c })} onCustomerRedeemableLoaded={(pts, val) => dispatch({ type: "SET_CUSTOMER_REDEEMABLE", payload: { redeemablePoints: pts, redeemableValuePaise: val } })} />
         <CompliancePanel compliance={state.compliance} hasControlledItems={controlledItems.length > 0} dataSource={ds} onChange={(patch) => dispatch({ type: "SET_COMPLIANCE", payload: patch })} />
         <TotalsBar totals={totals} loyaltyDiscountPaise={loyaltyDiscountPaise} itemCount={state.cart.length} paymentMethod={state.paymentMethod} isSubmitting={isSubmitting} canBill={!requireShift || Boolean(activeShift)} onSetPaymentMethod={(m) => dispatch({ type: "SET_PAYMENT_METHOD", payload: m })} onOpenSplitModal={() => setIsPaymentOpen(true)} onCompleteSale={() => handleCompleteSale()} />
+      </div>
+
+      {/* Mobile & Tablet Fixed Bottom Tender Bar */}
+      <div className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-md border-t border-ink-200 px-4 py-3 shadow-pop flex items-center justify-between">
+        <div className="flex flex-col">
+          <span className="text-[11px] font-medium text-ink-500 uppercase tracking-wider">
+            {state.cart.length} {state.cart.length === 1 ? "item" : "items"}
+          </span>
+          <span className="text-lg font-bold font-mono text-ink-950">
+            {formatINR(totals.total / 100)}
+          </span>
+        </div>
+        <div className="flex items-center gap-2">
+          {state.cart.length > 0 && (
+            <button
+              type="button"
+              onClick={() => setIsParkOpen(true)}
+              className="btn btn-secondary px-3 py-2 text-xs font-semibold"
+            >
+              Hold
+            </button>
+          )}
+          <button
+            type="button"
+            disabled={state.cart.length === 0 || isSubmitting || (requireShift && !activeShift)}
+            onClick={() => setIsPaymentOpen(true)}
+            className="btn btn-primary px-4 py-2 text-xs sm:text-sm font-bold shadow-md active:scale-95 flex items-center gap-1.5"
+          >
+            {isSubmitting ? "Processing..." : "Tender & Pay (F8)"}
+          </button>
+        </div>
       </div>
 
       <PaymentPanel isOpen={isPaymentOpen} totalPaise={totals.total} splitPayments={state.splitPayments} customer={state.customer} redeemPoints={state.redeemPoints} isSubmitting={isSubmitting} errorMsg={submitError} onUpdateSplit={(p) => dispatch({ type: "SET_SPLIT_PAYMENTS", payload: p })} onUpdateRedeemPoints={(pts) => dispatch({ type: "SET_REDEEM_POINTS", payload: pts })} onSubmit={() => handleCompleteSale("split")} onClose={() => setIsPaymentOpen(false)} />

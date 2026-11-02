@@ -1,11 +1,12 @@
 import { getSaleById } from "@/app/actions/sales";
 import { notFound } from "next/navigation";
 import { format } from "date-fns";
-import { ArrowLeft, Printer, Receipt, AlertCircle } from "lucide-react";
+import { ArrowLeft, Printer, Receipt, AlertCircle, MessageSquare } from "lucide-react";
 import Link from "next/link";
 import PrintButton from "./PrintButton";
 import { formatINR, formatItemQuantity, formatItemQuantityCompact } from "@/lib/format";
 import { requirePagePermission } from "@/server/rbac";
+import { buildWhatsAppDirectUrl, buildInvoiceWhatsAppMessage } from "@/lib/whatsapp";
 
 export default async function PrintInvoicePage({
   params,
@@ -23,6 +24,21 @@ export default async function PrintInvoicePage({
   if (!data) return notFound();
 
   const { sale, items, customer, store, tenant, gstDoc } = data;
+
+  const customerPhone = customer?.phone || sale.customerPhone;
+  const whatsappUrl = customerPhone
+    ? buildWhatsAppDirectUrl(
+        customerPhone,
+        buildInvoiceWhatsAppMessage({
+          customerName: customer?.name || sale.customerName,
+          storeName: store?.name || tenant?.name || "MediFlow Pharmacy",
+          invoiceNo: sale.invoiceNo,
+          totalINR: formatINR(sale.totalAmount || 0),
+          dateStr: format(new Date(sale.completedAt ?? sale.createdAt!), "dd MMM yyyy"),
+          itemCount: items.length,
+        }),
+      )
+    : null;
 
   return (
     <div className="min-h-screen bg-ink-100 py-6 px-4 font-sans text-ink-900 print:bg-white print:p-0 print:m-0 print:min-h-0">
@@ -72,14 +88,27 @@ export default async function PrintInvoicePage({
           </Link>
         </div>
 
-        <PrintButton />
+        <div className="flex items-center gap-2">
+          {whatsappUrl && (
+            <a
+              href={whatsappUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="btn btn-secondary text-xs flex items-center gap-1.5 text-emerald-700 hover:text-emerald-800 hover:bg-emerald-50 border-emerald-200"
+              title="Send digital receipt directly to customer's WhatsApp"
+            >
+              <MessageSquare className="w-3.5 h-3.5 text-emerald-600" /> Share WhatsApp
+            </a>
+          )}
+          <PrintButton />
+        </div>
       </div>
 
       {isThermal ? (
         /* ──────────────── 80mm Thermal POS Slip Format ──────────────── */
         <div
           id="invoice-printable"
-          className="max-w-[80mm] mx-auto bg-white p-4 shadow-xl border border-ink-200 print:shadow-none print:border-none print:p-0 print:m-0 font-mono text-[11px] leading-tight text-black"
+          className="max-w-[80mm] mx-auto bg-white p-4 shadow-xl border border-ink-200 print:shadow-none print:border-none print:p-0 print:m-0 font-mono text-[11px] leading-tight text-black thermal-slip"
         >
           {/* Pharmacy Header */}
           <div className="text-center pb-2 border-b border-dashed border-black">

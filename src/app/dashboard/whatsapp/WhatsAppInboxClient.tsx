@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { MessageSquare, Send, CheckCheck, Clock, User, Phone, Search, RefreshCw, AlertCircle } from "lucide-react";
 import { sendManualWhatsAppMessage } from "@/app/actions/whatsapp";
+import { buildWhatsAppDirectUrl } from "@/lib/whatsapp";
 import clsx from "clsx";
 
 interface MessageItem {
@@ -186,9 +187,19 @@ export function WhatsAppInboxClient({
                   <h3 className="font-semibold text-[13.5px] text-ink-900">
                     {activeConversation?.customerName || `+${selectedPhone}`}
                   </h3>
-                  <span className="text-[11.5px] text-ink-500">WhatsApp Business Active</span>
+                  <span className="text-[11.5px] text-ink-500">WhatsApp Patient Channel</span>
                 </div>
               </div>
+
+              <a
+                href={buildWhatsAppDirectUrl(selectedPhone, newText || "Hello from MediFlow Pharmacy")}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="btn btn-secondary btn-sm text-xs flex items-center gap-1.5 text-emerald-700 hover:text-emerald-800 hover:bg-emerald-50 border-emerald-200"
+                title="Open directly in WhatsApp Web or Mobile App"
+              >
+                <MessageSquare className="w-3.5 h-3.5 text-emerald-600" /> Web WhatsApp
+              </a>
             </div>
 
             {/* Message feed */}
@@ -235,9 +246,21 @@ export function WhatsAppInboxClient({
 
             {/* Error banner */}
             {error && (
-              <div className="px-4 py-2 bg-rose-50 border-t border-rose-200 text-rose-700 text-xs flex items-center gap-2">
-                <AlertCircle className="h-3.5 w-3.5 shrink-0" />
-                {error}
+              <div className="px-4 py-2.5 bg-rose-50 border-t border-rose-200 text-rose-700 text-xs flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+                  <span>{error}</span>
+                </div>
+                {selectedPhone && (
+                  <a
+                    href={buildWhatsAppDirectUrl(selectedPhone, newText || "Hello from MediFlow")}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 font-semibold text-emerald-800 bg-emerald-100 hover:bg-emerald-200 px-2 py-1 rounded transition-colors text-[11px] shrink-0"
+                  >
+                    Send via Web WhatsApp &rarr;
+                  </a>
+                )}
               </div>
             )}
 
