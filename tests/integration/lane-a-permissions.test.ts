@@ -26,6 +26,7 @@ import { addOpeningStock, adjustBatchStock, getBatches } from "@/app/actions/sto
 import { getAuditFilterOptions, getAuditLogs } from "@/app/actions/audit";
 import { getCustomersWithDue, getRecentReceipts } from "@/app/actions/payments";
 import { getRolesOverview, getTeam } from "@/app/actions/users";
+import { createDraftTransferAction, listTransfersAction } from "@/app/actions/transfers";
 
 let t: Awaited<ReturnType<typeof createTestDb>>;
 beforeAll(async () => {
@@ -81,6 +82,19 @@ const CASES: Case[] = [
   // Settings
   { name: "getStoreSettings", permission: "settings.manage", kind: "read", call: () => getStoreSettings() },
   { name: "updateStoreSettings", permission: "settings.manage", kind: "form", call: () => updateStoreSettings(form({ name: "Test Pharmacy", invoicePrefix: "INV" })) },
+  // Stock transfers
+  { name: "listTransfersAction", permission: "inventory.view", kind: "form", call: () => listTransfersAction() },
+  {
+    name: "createDraftTransferAction",
+    permission: "inventory.transfer",
+    kind: "form",
+    call: () =>
+      createDraftTransferAction({
+        fromStoreId: "11111111-1111-4111-8111-111111111111",
+        toStoreId: "22222222-2222-4222-8222-222222222222",
+        items: [{ medicineId: "33333333-3333-4333-8333-333333333333", fromBatchId: "44444444-4444-4444-8444-444444444444", qty: 1 }],
+      }),
+  },
 ];
 
 /** A signed-in user whose custom role holds exactly `permissions`. */
