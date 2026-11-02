@@ -1,7 +1,7 @@
  "use server";
 
 import { db, schema } from "@/server/db";
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and, desc, ilike, or, sql } from "drizzle-orm";
 import { requirePermission } from "@/server/rbac";
 import { revalidatePath } from "next/cache";
 import { writeAudit } from "@/server/audit";
@@ -13,27 +13,53 @@ import {
   RecordSupplierPaymentSchema,
 } from "@/server/domain/suppliers";
 
-export async function getSuppliers(searchQuery?: string) {
+export async function getSuppliersCount(searchQuery?: string): Promise<number> {
   const ctx = await requirePermission("supplier.view");
+  const conditions = [eq(schema.suppliers.tenantId, ctx.tenantId)];
 
-  const results = await db
-    .select()
-    .from(schema.suppliers)
-    .where(eq(schema.suppliers.tenantId, ctx.tenantId))
-    .orderBy(desc(schema.suppliers.createdAt));
-
-  if (searchQuery) {
-    const lowerQuery = searchQuery.toLowerCase();
-    return results.filter(
-      (s) =>
-        s.name.toLowerCase().includes(lowerQuery) ||
-        (s.phone && s.phone.includes(lowerQuery)) ||
-        (s.gstin && s.gstin.toLowerCase().includes(lowerQuery)) ||
-        (s.contactPerson && s.contactPerson.toLowerCase().includes(lowerQuery))
+  if (searchQuery?.trim()) {
+    const q = `%${searchQuery.trim().toLowerCase()}%`;
+    conditions.push(
+      or(
+        ilike(schema.suppliers.name, q),
+        ilike(schema.suppliers.phone, q),
+        ilike(schema.suppliers.gstin, q),
+        ilike(schema.suppliers.contactPerson, q)
+      )!
     );
   }
 
-  return results;
+  const [row] = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(schema.suppliers)
+    .where(and(...conditions));
+
+  return row?.count ?? 0;
+}
+
+export async function getSuppliers(searchQuery?: string, limit = 50, offset = 0) {
+  const ctx = await requirePermission("supplier.view");
+  const conditions = [eq(schema.suppliers.tenantId, ctx.tenantId)];
+
+  if (searchQuery?.trim()) {
+    const q = `%${searchQuery.trim().toLowerCase()}%`;
+    conditions.push(
+      or(
+        ilike(schema.suppliers.name, q),
+        ilike(schema.suppliers.phone, q),
+        ilike(schema.suppliers.gstin, q),
+        ilike(schema.suppliers.contactPerson, q)
+      )!
+    );
+  }
+
+  return db
+    .select()
+    .from(schema.suppliers)
+    .where(and(...conditions))
+    .orderBy(desc(schema.suppliers.createdAt))
+    .limit(limit)
+    .offset(offset);
 }
 
 export async function getSupplierById(supplierId: string) {
