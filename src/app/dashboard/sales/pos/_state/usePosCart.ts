@@ -1,6 +1,6 @@
 "use client";
 
-import { useReducer, useMemo, useCallback } from "react";
+import { useReducer, useMemo, useCallback, useEffect } from "react";
 import type { PosState, PosAction, PosCartLine, ComplianceState, SplitPayments } from "./types";
 import { computeSaleTotals } from "@/lib/money";
 import { playCounterSound } from "@/lib/sound";
@@ -174,6 +174,13 @@ export function posCartReducer(state: PosState, action: PosAction): PosState {
       return { ...state, redeemPoints: Math.max(0, action.payload) };
 
     case "SET_SOUND_ENABLED":
+      if (typeof window !== "undefined") {
+        try {
+          localStorage.setItem("pos_sound_enabled", String(action.payload));
+        } catch {
+          // ignore localStorage access errors
+        }
+      }
       return { ...state, soundEnabled: action.payload };
 
     case "HYDRATE_HELD_SALE":
@@ -197,6 +204,15 @@ export function posCartReducer(state: PosState, action: PosAction): PosState {
 
 export function usePosCart() {
   const [state, dispatch] = useReducer(posCartReducer, initialPosState);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const stored = localStorage.getItem("pos_sound_enabled");
+      if (stored !== null) {
+        dispatch({ type: "SET_SOUND_ENABLED", payload: stored === "true" });
+      }
+    }
+  }, []);
 
   const loyaltyDiscountPaise = useMemo(() => {
     if (!state.customer || state.redeemPoints <= 0) return 0;

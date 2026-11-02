@@ -10,6 +10,48 @@ import { useCartKeyboard } from "./useCartKeyboard";
 import type { PosCartLine } from "../_state/types";
 import type { SearchResultBatch } from "../_data/posData";
 
+export function ScheduleBadge({ schedule }: { schedule: string }) {
+  const norm = schedule.trim().toUpperCase();
+  if (norm === "H1") {
+    return (
+      <span
+        className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10.5px] font-bold font-mono bg-rose-100 text-rose-800 border border-rose-300 shadow-xs"
+        title="Schedule H1: Separate register entry & doctor details required"
+      >
+        <span className="w-1.5 h-1.5 rounded-full bg-rose-600 animate-pulse" />
+        Rx · Sched H1
+      </span>
+    );
+  }
+  if (norm === "X") {
+    return (
+      <span
+        className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10.5px] font-bold font-mono bg-purple-100 text-purple-800 border border-purple-300 shadow-xs"
+        title="Schedule X: NDPS Controlled Substance. Duplicate prescription required."
+      >
+        <span className="w-1.5 h-1.5 rounded-full bg-purple-600" />
+        NDPS · Sched X
+      </span>
+    );
+  }
+  if (norm === "H") {
+    return (
+      <span
+        className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10.5px] font-semibold font-mono bg-amber-100 text-amber-800 border border-amber-300"
+        title="Schedule H: Prescription required"
+      >
+        <span className="w-1.5 h-1.5 rounded-full bg-amber-600" />
+        Rx · Sched H
+      </span>
+    );
+  }
+  return (
+    <span className="badge badge-neutral !text-[10px] font-mono">
+      Sched {schedule}
+    </span>
+  );
+}
+
 interface CartTableProps {
   cart: PosCartLine[];
   revalidationAlert?: { hasIssues: boolean; hasStockShortage: boolean; hasExpiredBatches: boolean; message: string } | null;
@@ -99,8 +141,8 @@ export function CartTable({
             <p className="text-xs text-ink-400 mt-1 max-w-xs">Press <kbd className="px-1.5 py-0.5 rounded bg-ink-200 font-mono text-[11px] font-bold">F2</kbd> to search medicines or scan a product barcode.</p>
           </div>
         ) : (
-          <div className="flex-1 overflow-y-auto">
-            <table className="data-table">
+          <div className="flex-1 overflow-x-auto overflow-y-auto min-w-0">
+            <table className="data-table min-w-[680px] w-full">
               <thead className="sticky top-0 bg-ink-50 z-10">
                 <tr>
                   <th className="w-8">#</th>
@@ -154,7 +196,7 @@ export function CartTable({
                       <td>
                         <div className="flex items-center gap-1.5 flex-wrap">
                           <span className="font-semibold text-ink-900 text-sm">{line.medicineName}</span>
-                          {line.schedule && <span className="badge badge-neutral !text-[10px] font-mono">Sched {line.schedule}</span>}
+                          {line.schedule && <ScheduleBadge schedule={line.schedule} />}
                           {line.schemeText && <span className="badge badge-brand !text-[10px] flex items-center gap-0.5 font-mono"><Tag className="w-2.5 h-2.5 inline" /> {line.schemeText}</span>}
                         </div>
                         <div className="text-[11.5px] text-ink-500 font-mono flex items-center gap-2">
