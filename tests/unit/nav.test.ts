@@ -2,6 +2,7 @@ import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { ALL_NAV_ITEMS, NAV, PALETTE_NAV_ITEMS, settingsItem, visibleNav, visiblePaletteItems } from "@/app/components/nav";
+import { isNavItemActive } from "@/app/components/Sidebar";
 import { PERMISSIONS, SYSTEM_ROLES } from "@/lib/permissions";
 
 describe("navigation config", () => {
@@ -84,5 +85,39 @@ describe("navigation config", () => {
       if (guard && guard !== item.permission) mismatches.push(`${item.href}: menu says ${item.permission}, page requires ${guard}`);
     }
     expect(mismatches).toEqual([]);
+  });
+
+  describe("active sidebar navigation route matching", () => {
+    const allItems = NAV.flatMap((g) => g.items);
+    const chainItem = allItems.find((i) => i.href === "/dashboard/reports/chain")!;
+    const reportsItem = allItems.find((i) => i.href === "/dashboard/reports")!;
+    const commissionsItem = allItems.find((i) => i.href === "/dashboard/reports/commissions")!;
+    const salesItem = allItems.find((i) => i.href === "/dashboard/sales")!;
+    const salesReturnsItem = allItems.find((i) => i.href === "/dashboard/sales/returns")!;
+
+    it("activates Chain Overview without activating Reports & Analytics when on chain overview page", () => {
+      expect(isNavItemActive("/dashboard/reports/chain", chainItem, allItems)).toBe(true);
+      expect(isNavItemActive("/dashboard/reports/chain", reportsItem, allItems)).toBe(false);
+    });
+
+    it("activates Reports & Analytics when on /dashboard/reports", () => {
+      expect(isNavItemActive("/dashboard/reports", reportsItem, allItems)).toBe(true);
+      expect(isNavItemActive("/dashboard/reports", chainItem, allItems)).toBe(false);
+    });
+
+    it("activates MR commissions without activating parent Reports & Analytics", () => {
+      expect(isNavItemActive("/dashboard/reports/commissions", commissionsItem, allItems)).toBe(true);
+      expect(isNavItemActive("/dashboard/reports/commissions", reportsItem, allItems)).toBe(false);
+    });
+
+    it("activates Sale returns without activating Sales & invoices", () => {
+      expect(isNavItemActive("/dashboard/sales/returns", salesReturnsItem, allItems)).toBe(true);
+      expect(isNavItemActive("/dashboard/sales/returns", salesItem, allItems)).toBe(false);
+    });
+
+    it("activates Sales & invoices when viewing an individual sale invoice", () => {
+      expect(isNavItemActive("/dashboard/sales/inv-123", salesItem, allItems)).toBe(true);
+      expect(isNavItemActive("/dashboard/sales/inv-123", salesReturnsItem, allItems)).toBe(false);
+    });
   });
 });
