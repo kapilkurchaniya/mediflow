@@ -13,6 +13,7 @@ interface RawMedicine {
   genericName?: string | null;
   unit?: string | null;
   packSize?: string | null;
+  purchasePrice?: number | null;
   mrp?: number;
   salePrice?: number | null;
 }
@@ -92,10 +93,28 @@ export default function NewBatchPage() {
           </FormSection>
 
           <FormSection title="Pricing (per unit)" description="Used for stock valuation and default billing rate.">
-            <Field label="Purchase rate (PTR)" htmlFor="purchaseRate">
+            <Field label="Purchase rate (PTR)" htmlFor="purchaseRate" hint="Defaults to 80% of MRP if left blank.">
               <div className="relative">
                 <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-ink-400 text-[13px]">₹</span>
-                <input id="purchaseRate" type="number" name="purchaseRate" step="0.01" min="0" className="input pl-7 num" placeholder="0.00" />
+                <input
+                  id="purchaseRate"
+                  key={`purchase-${selectedMedicine?.id ?? "none"}`}
+                  type="number"
+                  name="purchaseRate"
+                  step="0.01"
+                  min="0"
+                  defaultValue={
+                    selectedMedicine
+                      ? selectedMedicine.purchasePrice
+                        ? (selectedMedicine.purchasePrice / 100).toFixed(2)
+                        : selectedMedicine.mrp
+                          ? ((selectedMedicine.mrp * 0.8) / 100).toFixed(2)
+                          : ""
+                      : ""
+                  }
+                  className="input pl-7 num"
+                  placeholder="0.00"
+                />
               </div>
             </Field>
             <Field label="MRP" htmlFor="mrp">

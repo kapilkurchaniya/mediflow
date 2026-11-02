@@ -42,6 +42,7 @@ export function ReorderClient({
   const [creatingPoSupplierId, setCreatingPoSupplierId] = useState<string | null>(null);
   const [createdPoNotice, setCreatedPoNotice] = useState<{ poNo: string; id: string } | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [packQtyOverrides, setPackQtyOverrides] = useState<Record<string, number>>({});
 
   const handleRefresh = (storeId: string, q: string) => {
     startTransition(async () => {
@@ -73,12 +74,15 @@ export function ReorderClient({
           supplierId,
           storeId: selectedStoreId,
           notes: `Automated reorder PO for ${group.items.length} items (${report.storeName})`,
-          items: group.items.map((i) => ({
-            medicineId: i.medicineId,
-            qty: i.suggestedPacks,
-            rate: i.lastPurchaseRatePaise,
-            freeQty: 0,
-          })),
+          items: group.items.map((i) => {
+            const packs = packQtyOverrides[i.medicineId] ?? i.suggestedPacks;
+            return {
+              medicineId: i.medicineId,
+              qty: Math.max(1, packs),
+              rate: i.lastPurchaseRatePaise,
+              freeQty: 0,
+            };
+          }),
         });
 
         if (res?.data) {
@@ -342,16 +346,32 @@ export function ReorderClient({
                           <td className="py-3 px-4 text-right font-mono text-ink-500">
                             {item.reorderLevel} {item.looseUnit}s
                           </td>
-                          <td className="py-3 px-4 text-right font-semibold text-teal-700">
-                            <span className="bg-teal-50 px-2 py-0.5 rounded border border-teal-200">
-                              {item.suggestedPacks} {item.packUnit}s ({item.suggestedQty} {item.looseUnit}s)
-                            </span>
+                          <td className="py-3 px-4 text-right">
+                            <div className="flex items-center justify-end gap-1.5">
+                              <input
+                                type="number"
+                                min="1"
+                                value={packQtyOverrides[item.medicineId] ?? item.suggestedPacks}
+                                onChange={(e) => {
+                                  const val = Math.max(1, parseInt(e.target.value, 10) || 1);
+                                  setPackQtyOverrides((prev) => ({ ...prev, [item.medicineId]: val }));
+                                }}
+                                className="input !py-0.5 !px-2 !w-16 text-right font-mono font-bold text-xs"
+                                title="Adjust commercial packaging boxes/packs"
+                              />
+                              <span className="text-[11.5px] text-ink-600 font-medium whitespace-nowrap">
+                                {item.packUnit}s
+                              </span>
+                            </div>
+                            <div className="text-[10.5px] font-mono text-ink-400 text-right mt-0.5">
+                              = {(packQtyOverrides[item.medicineId] ?? item.suggestedPacks) * item.unitsPerPack} {item.looseUnit}s
+                            </div>
                           </td>
                           <td className="py-3 px-4 text-right font-mono text-ink-600">
                             {item.lastPurchaseRatePaise > 0 ? formatINR(item.lastPurchaseRatePaise) : "—"}
                           </td>
                           <td className="py-3 px-4 text-right font-semibold text-ink-900">
-                            {formatINR(item.estimatedCostPaise)}
+                            {formatINR((packQtyOverrides[item.medicineId] ?? item.suggestedPacks) * item.lastPurchaseRatePaise)}
                           </td>
                         </tr>
                       ))}
