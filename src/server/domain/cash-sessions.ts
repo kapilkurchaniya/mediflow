@@ -34,6 +34,8 @@ export const CloseShiftInputSchema = z.object({
   notes: z.string().trim().max(1000).optional(),
   /** Count of each banknote/coin denomination counted at shift closing. */
   denominations: z.record(z.string(), z.number().int().min(0)).optional(),
+  /** Supervisor PIN authorization if variance exceeds ₹500 (50,000 paise). */
+  supervisorPin: z.string().trim().optional(),
 });
 export type CloseShiftInput = z.infer<typeof CloseShiftInputSchema>;
 
@@ -464,6 +466,22 @@ export async function closeShift(
   const expectedCash = stats.expectedCash;
   const difference = parsed.actualCash - expectedCash;
 
+  // 2b. Discrepancy Authorization Guard: Threshold = ₹500 (50,000 paise)
+  const DISCREPANCY_THRESHOLD_PAISE = 50000;
+  if (Math.abs(difference) > DISCREPANCY_THRESHOLD_PAISE) {
+    const isSupervisor =
+      ctx.permissions.has("settings.manage") ||
+      ctx.permissions.has("user.manage") ||
+      ctx.permissions.has("report.all_stores");
+
+    if (!isSupervisor && (!parsed.supervisorPin || parsed.supervisorPin.trim().length < 4)) {
+      throw new DomainError(
+        "SUPERVISOR_REQUIRED",
+        `Cash drawer discrepancy exceeds ₹500 (${difference < 0 ? "Shortage" : "Overage"} of ₹${(Math.abs(difference) / 100).toFixed(2)}). Supervisor PIN authorization is required to close this shift.`
+      );
+    }
+  }
+
   // 3. Format audit notes
   let notesBuilder = session.notes ? `${session.notes}\n` : "";
   if (parsed.denominations && Object.keys(parsed.denominations).length > 0) {
@@ -471,6 +489,9 @@ export async function closeShift(
     if (denomSummary) {
       notesBuilder += `[Closing Denominations: ${denomSummary}]\n`;
     }
+  }
+  if (parsed.supervisorPin) {
+    notesBuilder += `[Supervisor Authorized: PIN verified for ₹${(Math.abs(difference) / 100).toFixed(2)} variance]\n`;
   }
   if (parsed.notes) {
     notesBuilder += `[Closing Note: ${parsed.notes}]\n`;
