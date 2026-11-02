@@ -87,7 +87,7 @@ export default async function PrintZReportPage({
         /* ──────────────── 80mm Thermal POS Z-Report Format ──────────────── */
         <div
           id="report-printable"
-          className="max-w-[80mm] mx-auto bg-white p-4 shadow-xl border border-ink-200 print:shadow-none print:border-none print:p-0 print:m-0 font-mono text-[11px] leading-tight text-black"
+          className="max-w-[80mm] mx-auto bg-white p-4 shadow-xl border border-ink-200 print:shadow-none print:border-none print:p-0 print:m-0 font-mono text-[11px] leading-tight text-black thermal-slip"
         >
           {/* Store Header */}
           <div className="text-center pb-2 border-b border-black">
