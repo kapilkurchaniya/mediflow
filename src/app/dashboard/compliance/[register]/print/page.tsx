@@ -184,7 +184,7 @@ export default async function PrintRegisterPage({
       {/* Printable Sheet */}
       <div
         id="register-printable"
-        className="max-w-6xl mx-auto bg-white p-8 rounded-xl border border-neutral-200 shadow-sm print:border-none print:shadow-none"
+        className="max-w-6xl mx-auto bg-white p-8 rounded-xl border border-neutral-200 shadow-sm print:border-none print:shadow-none statutory-landscape"
       >
         {/* Header Block */}
         <div className="border-b-2 border-neutral-900 pb-4 mb-4 text-center">
