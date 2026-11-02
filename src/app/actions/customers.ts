@@ -1,13 +1,36 @@
 "use server";
 
 import { db, schema } from "@/server/db";
-import { eq, ilike, and, desc, or } from "drizzle-orm";
+import { eq, ilike, and, desc, or, sql } from "drizzle-orm";
 import { requirePermission } from "@/server/rbac";
 import { revalidatePath } from "next/cache";
 import { extractStateCodeFromGstin } from "@/server/domain/gst";
 import { LoyaltyService } from "@/server/domain/loyalty";
 
-export async function getCustomers(searchQuery?: string, limit = 50) {
+export async function getCustomersCount(searchQuery?: string): Promise<number> {
+  const ctx = await requirePermission("customer.view");
+  const conditions = [eq(schema.customers.tenantId, ctx.tenantId)];
+
+  if (searchQuery?.trim()) {
+    const q = `%${searchQuery.trim().toLowerCase()}%`;
+    conditions.push(
+      or(
+        ilike(schema.customers.name, q),
+        ilike(schema.customers.phone, q),
+        ilike(schema.customers.email, q)
+      )!
+    );
+  }
+
+  const [row] = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(schema.customers)
+    .where(and(...conditions));
+
+  return row?.count ?? 0;
+}
+
+export async function getCustomers(searchQuery?: string, limit = 50, offset = 0) {
   const ctx = await requirePermission("customer.view");
 
   const conditions = [eq(schema.customers.tenantId, ctx.tenantId)];
@@ -28,7 +51,8 @@ export async function getCustomers(searchQuery?: string, limit = 50) {
     .from(schema.customers)
     .where(and(...conditions))
     .orderBy(desc(schema.customers.createdAt))
-    .limit(limit);
+    .limit(limit)
+    .offset(offset);
 }
 
 export async function createQuickCustomer(name: string, phone?: string) {
