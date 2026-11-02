@@ -13,21 +13,21 @@ export default async function NewStocktakePage() {
   const racks = await getStoreRacksAction();
 
   return (
-    <div className="space-y-6 max-w-4xl mx-auto p-4 sm:p-6 lg:p-8">
+    <div className="page space-y-6 max-w-4xl mx-auto">
       {/* Header */}
       <div>
         <Link
           href="/dashboard/inventory/stocktake"
-          className="inline-flex items-center gap-1 text-xs text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 transition-colors mb-2"
+          className="inline-flex items-center gap-1 text-xs text-ink-500 hover:text-ink-900 transition-colors mb-2"
         >
           <ArrowLeft className="w-3.5 h-3.5" />
           Back to Audit Sessions
         </Link>
-        <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900 dark:text-white flex items-center gap-2">
-          <ClipboardCheck className="w-6 h-6 text-teal-600 dark:text-teal-400" />
+        <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-ink-900 flex items-center gap-2">
+          <ClipboardCheck className="w-6 h-6 text-brand-600" />
           Start Physical Stocktake Session
         </h1>
-        <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1">
+        <p className="text-xs sm:text-sm text-ink-500 mt-1">
           Snapshot active batches to generate an immutable stock count sheet.
         </p>
       </div>
@@ -36,4 +36,3 @@ export default async function NewStocktakePage() {
     </div>
   );
 }
-

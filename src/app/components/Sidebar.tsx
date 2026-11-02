@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import clsx from "clsx";
@@ -11,18 +11,26 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   X,
-  Check,
-  Building2,
 } from "lucide-react";
 import { Logo, LogoMark } from "./ui";
 import { logoutAction } from "@/app/actions/auth";
 import { useShell } from "./ShellContext";
 import { visibleNav, settingsItem, type NavItem } from "./nav";
 
-function isActive(pathname: string, item: NavItem) {
+function matches(pathname: string, item: NavItem): boolean {
   if (item.exact) return pathname === item.href || pathname === `${item.href}/new`;
-  if (item.href === "/dashboard/sales") return pathname === "/dashboard/sales";
   return pathname === item.href || pathname.startsWith(`${item.href}/`);
+}
+
+export function isNavItemActive(
+  pathname: string,
+  item: NavItem,
+  allItems: readonly NavItem[]
+): boolean {
+  if (!matches(pathname, item)) return false;
+  return !allItems.some(
+    (other) => other !== item && other.href.length > item.href.length && matches(pathname, other)
+  );
 }
 
 export function Sidebar({
@@ -46,6 +54,7 @@ export function Sidebar({
     setStoreSwitcherOpen,
   } = useShell();
   const nav = visibleNav(permissions);
+  const allNavItems = nav.flatMap((group) => group.items);
   const showSettings = !settingsItem.permission || permissions.has(settingsItem.permission);
 
   const letters = userName
@@ -146,7 +155,7 @@ export function Sidebar({
             )}
             <ul className="space-y-px">
               {group.items.map((item) => {
-                const active = isActive(pathname, item);
+                const active = isNavItemActive(pathname, item, allNavItems);
                 const Icon = item.icon;
                 return (
                   <li key={item.href}>
