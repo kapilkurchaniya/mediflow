@@ -2,7 +2,7 @@ import { getSales } from "@/app/actions/sales";
 import { Plus, Receipt, Printer, Eye, RotateCcw, Banknote } from "lucide-react";
 import Link from "next/link";
 import { format } from "date-fns";
-import { PageHeader, SearchForm, EmptyState, Avatar } from "@/app/components/ui";
+import { PageHeader, SearchForm, EmptyState, Avatar, TableWrapper } from "@/app/components/ui";
 import { formatINR, formatNumber } from "@/lib/format";
 import { DateRangeFilter } from "@/app/components/DateRangeFilter";
 import { ExportButton } from "@/app/components/ExportButton";
@@ -76,8 +76,8 @@ export default async function SalesPage({
         </SearchForm>
 
         {sales.length > 0 ? (
-          <div className="overflow-x-auto">
-            <table className="data-table">
+          <TableWrapper>
+            <table className="data-table data-table-sticky min-w-[800px]">
               <thead>
                 <tr>
                   <th>Invoice</th>
@@ -149,7 +149,7 @@ export default async function SalesPage({
             <div className="flex items-center justify-between border-t border-ink-150 px-4 py-2.5 text-[12.5px] text-ink-500">
               <span className="num">Showing {formatNumber(sales.length)} invoices</span>
             </div>
-          </div>
+          </TableWrapper>
         ) : (
           <EmptyState
             icon={Receipt}

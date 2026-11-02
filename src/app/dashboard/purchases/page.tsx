@@ -7,7 +7,7 @@ import { formatINR, formatNumber } from "@/lib/format";
 import { DateRangeFilter } from "@/app/components/DateRangeFilter";
 import { ExportButton } from "@/app/components/ExportButton";
 import { resolveDateRange } from "@/lib/date-range";
-import { requirePagePermission } from "@/server/rbac";
+import { requirePagePermission, can } from "@/server/rbac";
 
 export const metadata = { title: "Purchases" };
 
@@ -16,7 +16,8 @@ export default async function PurchasesPage({
 }: {
   searchParams: Promise<{ q?: string; range?: string; from?: string; to?: string }>;
 }) {
-  await requirePagePermission("purchase.view");
+  const ctx = await requirePagePermission("purchase.view");
+  const canCreate = can(ctx, "purchase.create");
   const params = await searchParams;
   const dateRange = resolveDateRange({
     range: params.range,
@@ -39,9 +40,11 @@ export default async function PurchasesPage({
               from={dateRange.from}
               to={dateRange.to}
             />
-            <Link href="/dashboard/purchases/new" className="btn btn-primary">
-              <Plus /> New purchase
-            </Link>
+            {canCreate && (
+              <Link href="/dashboard/purchases/new" className="btn btn-primary">
+                <Plus /> New purchase
+              </Link>
+            )}
           </>
         }
       />
@@ -108,9 +111,11 @@ export default async function PurchasesPage({
             title="No purchases recorded"
             description="Post your first supplier invoice to add stock and create the payable automatically."
             action={
-              <Link href="/dashboard/purchases/new" className="btn btn-primary btn-sm">
-                <Plus /> New purchase
-              </Link>
+              canCreate ? (
+                <Link href="/dashboard/purchases/new" className="btn btn-primary btn-sm">
+                  <Plus /> New purchase
+                </Link>
+              ) : undefined
             }
           />
         )}
