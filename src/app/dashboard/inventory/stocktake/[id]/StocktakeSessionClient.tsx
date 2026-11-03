@@ -1,19 +1,13 @@
 "use client";
 
 import React, { useState } from "react";
+import Link from "next/link";
 import {
   recordStockAuditCountsAction,
   approveStockAuditSessionAction,
   cancelStockAuditSessionAction,
 } from "@/app/actions/stocktake";
-import {
-  AlertTriangle,
-  CheckCircle2,
-  EyeOff,
-  Loader2,
-  Save,
-  XCircle,
-} from "lucide-react";
+import { AlertTriangle, CheckCircle2, EyeOff, Loader2, Printer, Save, XCircle } from "lucide-react";
 import {
   type AuditItem,
   type AuditSession,
@@ -91,23 +85,12 @@ export function StocktakeSessionClient({
 
         setItems((prev) => {
           const updated = prev.map((item) => {
-            const countEntry = countsPayload.find((c) => c.itemId === item.id);
-            if (countEntry) {
-              const variance =
-                item.systemQty !== null ? countEntry.countedQty - item.systemQty : null;
-              const varianceCost =
-                variance !== null ? variance * item.unitCostPaise : 0;
-              return {
-                ...item,
-                countedQty: countEntry.countedQty,
-                varianceQty: variance,
-                varianceCostPaise: varianceCost,
-                status: "counted",
-              };
-            }
-            return item;
+            const entry = countsPayload.find((c) => c.itemId === item.id);
+            if (!entry) return item;
+            const variance = item.systemQty !== null ? entry.countedQty - item.systemQty : null;
+            const varianceCost = variance !== null ? variance * item.unitCostPaise : 0;
+            return { ...item, countedQty: entry.countedQty, varianceQty: variance, varianceCostPaise: varianceCost, status: "counted" };
           });
-
           setSummary(calculateAuditSummary(updated));
           return updated;
         });
@@ -237,6 +220,15 @@ export function StocktakeSessionClient({
 
         {/* Action Buttons */}
         <div className="flex items-center gap-2 self-start md:self-auto">
+          <Link
+            href={`/dashboard/inventory/stocktake/${session.id}/print`}
+            className="btn btn-secondary btn-sm"
+            title="Print Physical Count Sheet"
+          >
+            <Printer className="w-3.5 h-3.5" />
+            Print Sheet
+          </Link>
+
           {!isClosed && (
             <>
               <button
