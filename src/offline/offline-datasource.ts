@@ -41,14 +41,20 @@ export class OfflinePosDataSource implements PosDataSource {
         packUnit: "strip",
         looseUnit: "tablet",
       },
-      batches: r.batches.map((b) => ({
-        id: b.batch.id,
-        batchNo: b.batch.batchNumber,
-        expiryDate: b.batch.expiryDate,
-        qtyOnHand: b.availableQty,
-        mrp: b.batch.mrpPaise / 100,
-        saleRate: b.batch.saleRatePaise / 100,
-      })),
+      batches: r.batches.map((b) => {
+        const raw = b.batch as unknown as Record<string, unknown>;
+        const mrp = typeof raw.mrp === "number" ? raw.mrp : (b.batch.mrpPaise ? b.batch.mrpPaise / 100 : 0);
+        const saleRate = typeof raw.saleRate === "number" ? raw.saleRate : (b.batch.saleRatePaise ? b.batch.saleRatePaise / 100 : mrp);
+        const batchNo = (raw.batchNo as string) || b.batch.batchNumber || "";
+        return {
+          id: b.batch.id,
+          batchNo,
+          expiryDate: b.batch.expiryDate,
+          qtyOnHand: b.availableQty,
+          mrp,
+          saleRate,
+        };
+      }),
     }));
   }
 
@@ -71,20 +77,24 @@ export class OfflinePosDataSource implements PosDataSource {
         .equals([this.ctx.storeId, med.id])
         .toArray();
 
-      const active = batches.filter((b) => b.isActive);
+      const active = batches.filter((b) => (b.isActive ?? ((b as unknown as { status?: string }).status === "active")));
       const batchSummaries = [];
       let totalStock = 0;
 
       for (const b of active) {
         const stock = await getBatchAvailableStock(this.db, this.ctx.storeId, b.id);
         if (stock && stock.availableQty > 0) {
+          const raw = b as unknown as Record<string, unknown>;
+          const mrp = typeof raw.mrp === "number" ? raw.mrp : (b.mrpPaise ? b.mrpPaise / 100 : 0);
+          const saleRate = typeof raw.saleRate === "number" ? raw.saleRate : (b.saleRatePaise ? b.saleRatePaise / 100 : mrp);
+          const batchNo = (raw.batchNo as string) || b.batchNumber || "";
           batchSummaries.push({
             id: b.id,
-            batchNo: b.batchNumber,
+            batchNo,
             expiryDate: b.expiryDate,
             qtyOnHand: stock.availableQty,
-            mrp: b.mrpPaise / 100,
-            saleRate: b.saleRatePaise / 100,
+            mrp,
+            saleRate,
           });
           totalStock += stock.availableQty;
         }

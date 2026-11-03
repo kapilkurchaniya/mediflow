@@ -44,14 +44,18 @@ test.describe("Offline POS Counter E2E Smoke & Integration Suite (Task A4.8)", (
     await expect(page.getByPlaceholder(/search medicine/i)).toBeVisible({ timeout: 10000 });
 
     // 3. Initialize Dexie with test device credentials and prime sync
-    await initDexieDevice(page, {
-      tenantId: fixture.tenant.id,
-      storeId: fixture.store.id,
-      deviceId: fixture.device.id,
-      deviceCode: fixture.device.code,
-      storeCode: fixture.store.code,
-      deviceToken: fixture.rawToken,
-    });
+    await initDexieDevice(
+      page,
+      {
+        tenantId: fixture.tenant.id,
+        storeId: fixture.store.id,
+        deviceId: fixture.device.id,
+        deviceCode: fixture.device.code,
+        storeCode: fixture.store.code,
+        deviceToken: fixture.rawToken,
+      },
+      fixture.reservation,
+    );
     await primeDexieSync(page);
   });
 

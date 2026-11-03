@@ -6,7 +6,6 @@ import { OfflinePosDataSource } from "./offline-datasource";
 import { defaultPosDataSource, type PosDataSource } from "@/app/dashboard/sales/pos/_data/posData";
 import { startSyncCoordinator, runSyncCycle } from "./sync";
 import { useLiveQuery } from "./useLiveQuery";
-import type { OfflineDeviceConfig } from "./types";
 
 export interface PosDataSourceState {
   isOffline: boolean;
@@ -35,15 +34,16 @@ export function usePosDataSource(options: UsePosDataSourceOptions): PosDataSourc
   );
   const [isSyncing, setIsSyncing] = useState(false);
   const [lastSyncAt, setLastSyncAt] = useState<string | null>(null);
-  const [deviceConfig, setDeviceConfig] = useState<OfflineDeviceConfig | null>(null);
 
-  // Load device config from Dexie
-  useEffect(() => {
-    if (!db) return;
-    void db.getDeviceConfig().then((cfg) => {
-      if (cfg) setDeviceConfig(cfg);
-    });
-  }, [db]);
+  // Load device config from Dexie reactively
+  const deviceConfig = useLiveQuery(
+    async () => {
+      if (!db) return null;
+      return await db.getDeviceConfig();
+    },
+    [db],
+    null,
+  );
 
   // Listen to connectivity events
   useEffect(() => {

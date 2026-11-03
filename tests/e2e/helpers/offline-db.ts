@@ -2,6 +2,7 @@ import type { Page } from "@playwright/test";
 import crypto from "crypto";
 import type { OfflineDeviceConfig, OfflinePendingSale, OfflineProvisionalAllocation } from "../../../src/offline/types";
 import type { PosDB } from "../../../src/offline/db";
+import type { ReserveNumbersResponse } from "../../../src/server/domain/sync/types";
 
 declare global {
   interface Window {
@@ -12,15 +13,37 @@ declare global {
 /**
  * Injects authoritative server-issued device config into browser Dexie instance.
  */
-export async function initDexieDevice(page: Page, config: OfflineDeviceConfig): Promise<void> {
+export async function initDexieDevice(
+  page: Page,
+  config: OfflineDeviceConfig,
+  reservation?: ReserveNumbersResponse,
+): Promise<void> {
   await page.waitForFunction(() => Boolean(window.__posDb), { timeout: 15000 });
-  await page.evaluate(async (cfg) => {
-    const db = window.__posDb;
-    if (!db) {
-      throw new Error("[offline-db] window.__posDb not initialized on page.");
-    }
-    await db.setDeviceConfig(cfg);
-  }, config);
+  await page.evaluate(
+    async ({ cfg, res }) => {
+      const db = window.__posDb;
+      if (!db) {
+        throw new Error("[offline-db] window.__posDb not initialized on page.");
+      }
+      await db.setDeviceConfig(cfg);
+      if (res) {
+        await db.numberBlocks.put({
+          id: res.reservationId,
+          storeId: cfg.storeId,
+          deviceId: cfg.deviceId,
+          fiscalYear: res.fiscalYear,
+          reservationId: res.reservationId,
+          storeCode: res.storeCode,
+          deviceCode: res.deviceCode,
+          startSeq: res.startSeq,
+          endSeq: res.endSeq,
+          nextSeq: res.startSeq,
+          active: 1,
+        });
+      }
+    },
+    { cfg: config, res: reservation },
+  );
 }
 
 /**
@@ -39,6 +62,18 @@ export async function primeDexieSync(page: Page): Promise<void> {
       await runSync(db);
     }
   });
+
+  // Ensure sync deltas were written to Dexie
+  await page.waitForFunction(
+    async () => {
+      const db = window.__posDb;
+      if (!db) return false;
+      const medCount = await db.medicines.count();
+      const batchCount = await db.batches.count();
+      return medCount > 0 && batchCount > 0;
+    },
+    { timeout: 15000 },
+  );
 }
 
 /**

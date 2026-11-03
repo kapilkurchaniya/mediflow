@@ -15,6 +15,14 @@ export interface MedicineSearchResult {
   totalAvailableStock: number;
 }
 
+function isBatchActive(b: OfflineBatch): boolean {
+  if (typeof b.isActive === "boolean") return b.isActive;
+  if (typeof (b as unknown as { status?: string }).status === "string") {
+    return (b as unknown as { status?: string }).status === "active";
+  }
+  return true;
+}
+
 /**
  * Calculates effective available stock for a batch taking into account provisional offline consumption.
  */
@@ -24,7 +32,7 @@ export async function getBatchAvailableStock(
   batchId: string,
 ): Promise<BatchStockSummary | null> {
   const batch = await db.batches.get(batchId);
-  if (!batch || batch.storeId !== storeId || !batch.isActive) {
+  if (!batch || batch.storeId !== storeId || !isBatchActive(batch)) {
     return null;
   }
 
@@ -98,7 +106,7 @@ export async function searchMedicines(
       .equals([storeId, medicine.id])
       .toArray();
 
-    const activeBatches = storeBatches.filter((b) => b.isActive);
+    const activeBatches = storeBatches.filter(isBatchActive);
 
     const batchSummaries: BatchStockSummary[] = [];
     let totalStock = 0;
