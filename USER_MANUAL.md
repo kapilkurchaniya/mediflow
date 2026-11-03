@@ -575,6 +575,33 @@ Press **Save**. Only roles that can manage medicines (owner, manager, pharmacist
 
 The list shows **Scheme Name, Applicability, Terms, Validity, Status**, with a delete (bin) button. Roles that can view purchases (owner, manager, purchase manager, accountant, auditor) open this page.
 
+### 6.9 Offline Sync Stock Conflicts (Inventory → Offline sync conflicts)
+
+When counter workstations operate offline during broadband outages, sales are finalized locally and physical goods leave the pharmacy immediately. When offline sales later synchronize to the cloud server, if central cloud inventory was concurrently sold or transferred, the central ledger balance for that batch can drop negative.
+
+MediFlow accepts these sales so legal GST tax invoices reflect physical reality, while flagging a durable **Stock Conflict Exception** under **Inventory → Offline sync conflicts**.
+
+#### 1. Fundamental Rules
+- **Tax Invoices Are Immutable:** Conflict handling never voids or cancels customer invoices. Legal GST documents remain untouched.
+- **No Phantom Inventory:** Clearing a deficit on an empty shelf never records fictitious positive stock discovery.
+- **Traceable Attribution:** Every contributing offline sale, counter terminal code, and synchronization timestamp remains permanently auditable.
+
+#### 2. Resolving a Conflict Case
+Open **Inventory → Offline sync conflicts** and click **Investigate / Resolve** on any active case:
+
+1. **Physical Recount (Tab 1):**
+   - Count the dispensary shelf.
+   - If stock is physically discovered on the shelf, enter the observed count. The ledger balance updates directly to match physical reality.
+   - If the shelf is confirmed empty (0 stock), the system records an audited reconciliation offset (`refType: "conflict_reconciliation"`) with a loss accounting entry (`Debit 5030 Stock Shortage & Loss` / `Credit 1080 Stock in Hand`), squaring the ledger to 0 without fabricating phantom units.
+2. **Audited Batch Reallocation (Tab 2):**
+   - If the cashier physically handed over an alternative batch of the same medicine (e.g. barcode mis-scan or bin substitution), select the surplus batch from the dropdown.
+   - Requires documented physical dispensing evidence.
+   - Atomically transfers the deficit quantity between the batches with row locks.
+3. **Branch Transfer Reconciliation (Tab 3):**
+   - Inter-branch transfers only reconcile conflict deficits upon verified physical *receipt* at the destination store (`Receive Transfer`). Dispatch alone does not clear the conflict.
+4. **Dismiss Case (Tab 4):**
+   - For administrative duplicates or false alarms, record a mandatory reason note to close the case.
+
 ---
 
 ## 7. Buying from suppliers

@@ -1,4 +1,4 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { db, schema, type Tx } from "@/server/db";
 import { DomainError } from "@/server/errors";
 import { writeAudit } from "@/server/audit";
@@ -155,6 +155,56 @@ export async function receiveTransfer(
           note: `Transfer in from source branch. Transfer #${transfer.transferNo}`,
           userId: ctx.userId,
         });
+
+        // Reconcile active conflict on destination batch if one exists
+        const [activeConflict] = await tx
+          .select()
+          .from(schema.stockConflictCases)
+          .where(
+            and(
+              eq(schema.stockConflictCases.tenantId, ctx.tenantId),
+              eq(schema.stockConflictCases.storeId, transfer.toStoreId),
+              eq(schema.stockConflictCases.batchId, destBatchId),
+              sql`${schema.stockConflictCases.status} IN ('open', 'investigating', 'partially_resolved')`,
+            ),
+          )
+          .for("update")
+          .limit(1);
+
+        if (activeConflict) {
+          const remainingToReconcile = Math.max(
+            0,
+            activeConflict.requiredReconciliationQty - activeConflict.reconciledQty,
+          );
+          const creditQty = Math.min(remainingToReconcile, line.qtyReceived);
+          if (creditQty > 0) {
+            const newReconciled = activeConflict.reconciledQty + creditQty;
+            const isResolved = newReconciled >= activeConflict.requiredReconciliationQty;
+            await tx
+              .update(schema.stockConflictCases)
+              .set({
+                reconciledQty: newReconciled,
+                status: isResolved ? "resolved" : "partially_resolved",
+                resolvedAt: isResolved ? new Date() : null,
+                resolvedBy: isResolved ? ctx.userId : null,
+                resolutionType: "transfer",
+                resolutionNotes: `Reconciled via transfer receipt #${transfer.transferNo}`,
+                updatedAt: new Date(),
+              })
+              .where(eq(schema.stockConflictCases.id, activeConflict.id));
+
+            await tx.insert(schema.stockConflictResolutions).values({
+              tenantId: ctx.tenantId,
+              conflictCaseId: activeConflict.id,
+              operationKey: `transfer_receipt:${activeConflict.id}:${transfer.id}:${input.idempotencyKey}:${destBatchId}`,
+              resolutionType: "transfer",
+              reconciledQty: creditQty,
+              transferId: transfer.id,
+              performedBy: ctx.userId,
+              evidenceNotes: `Transfer receipt #${transfer.transferNo} accepted ${line.qtyReceived} units`,
+            });
+          }
+        }
       }
 
       // 7. Track damaged stock in quarantine

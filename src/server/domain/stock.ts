@@ -1,5 +1,5 @@
 import { schema } from "@/server/db";
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import type { Tx } from "@/server/db";
 import { AsyncLocalStorage } from "node:async_hooks";
 
@@ -17,7 +17,12 @@ export type StockMovementType =
 
 export type StockMovementPolicy =
   | { mode: "strict" }
-  | { mode: "offline_reconciliation"; deviceId: string; clientSaleId: string };
+  | {
+      mode: "offline_reconciliation";
+      deviceId: string;
+      clientSaleId: string;
+      invoiceNo?: string;
+    };
 
 export const stockMovementPolicyStorage = new AsyncLocalStorage<StockMovementPolicy>();
 
@@ -132,6 +137,79 @@ export async function recordStockMovement(params: RecordStockParams) {
           body: conflictBody,
           dedupeKey,
         });
+      }
+
+      // 2. Durable Conflict Case & Contribution Tracking
+      const previousDeficit = Math.max(0, -lockedBatch.qtyOnHand);
+      const newDeficit = Math.max(0, -balanceAfter);
+      const deficitContribution = newDeficit - previousDeficit;
+
+      if (deficitContribution > 0) {
+        const [activeCase] = await tx
+          .select()
+          .from(schema.stockConflictCases)
+          .where(
+            and(
+              eq(schema.stockConflictCases.tenantId, tenantId),
+              eq(schema.stockConflictCases.storeId, storeId),
+              eq(schema.stockConflictCases.batchId, batchId),
+              sql`${schema.stockConflictCases.status} IN ('open', 'investigating', 'partially_resolved')`,
+            ),
+          )
+          .for("update")
+          .limit(1);
+
+        let caseId: string;
+        if (activeCase) {
+          caseId = activeCase.id;
+          await tx
+            .update(schema.stockConflictCases)
+            .set({
+              requiredReconciliationQty:
+                activeCase.requiredReconciliationQty + deficitContribution,
+              updatedAt: new Date(),
+            })
+            .where(eq(schema.stockConflictCases.id, activeCase.id));
+        } else {
+          const [inserted] = await tx
+            .insert(schema.stockConflictCases)
+            .values({
+              tenantId,
+              storeId,
+              batchId,
+              medicineId,
+              status: "open",
+              requiredReconciliationQty: deficitContribution,
+              reconciledQty: 0,
+            })
+            .returning({ id: schema.stockConflictCases.id });
+          caseId = inserted.id;
+        }
+
+        if (refId) {
+          const [existingContrib] = await tx
+            .select({ id: schema.stockConflictContributions.id })
+            .from(schema.stockConflictContributions)
+            .where(
+              and(
+                eq(schema.stockConflictContributions.conflictCaseId, caseId),
+                eq(schema.stockConflictContributions.saleId, refId),
+              ),
+            )
+            .limit(1);
+
+          if (!existingContrib) {
+            await tx.insert(schema.stockConflictContributions).values({
+              tenantId,
+              conflictCaseId: caseId,
+              saleId: refId,
+              clientSaleId: activePolicy.clientSaleId,
+              deviceId: activePolicy.deviceId,
+              invoiceNo: activePolicy.invoiceNo || "OFFLINE-SALE",
+              contributedQty: deficitContribution,
+            });
+          }
+        }
       }
     } else {
       throw new Error(

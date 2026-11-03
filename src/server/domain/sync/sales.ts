@@ -139,6 +139,7 @@ export async function ingestOfflineSales(
             mode: "offline_reconciliation",
             deviceId: deviceCtx.deviceId,
             clientSaleId: s.clientSaleId,
+            invoiceNo: s.invoiceNo,
           },
           async () =>
             createSale(tx, cashierCtx, saleInput, {
