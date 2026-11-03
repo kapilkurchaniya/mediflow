@@ -86,6 +86,7 @@ export const medicines = pgTable(
     index("medicines_tenant_idx").on(t.tenantId, t.isActive),
     index("medicines_name_trgm").using("gin", sql`${t.name} gin_trgm_ops`),
     index("medicines_generic_trgm").using("gin", sql`coalesce(${t.genericName}, '') gin_trgm_ops`),
+    index("medicines_tenant_updated_idx").on(t.tenantId, t.updatedAt, t.id),
   ],
 );
 
@@ -108,6 +109,7 @@ export const storeMedicineSettings = pgTable(
     primaryKey({ columns: [t.storeId, t.medicineId], name: "store_medicine_settings_pk" }),
     index("idx_sms_tenant_store").on(t.tenantId, t.storeId),
     index("idx_sms_store_rack").on(t.storeId, t.rackId),
+    index("sms_store_updated_idx").on(t.storeId, t.updatedAt, t.medicineId),
   ],
 );
 

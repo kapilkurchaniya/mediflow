@@ -10,7 +10,7 @@ import {
   uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
-import { id, money, createdAt } from "./_helpers";
+import { id, money, createdAt, updatedAt } from "./_helpers";
 import { categories, medicines } from "./catalog";
 import { batches } from "./inventory";
 import { storeId, tenantId } from "./platform";
@@ -182,11 +182,13 @@ export const schemes = pgTable(
     validTo: date("valid_to"),
     isActive: boolean("is_active").notNull().default(true),
     createdAt: createdAt(),
+    updatedAt: updatedAt(),
   },
   (t) => [
     index("schemes_tenant_idx").on(t.tenantId, t.isActive),
     index("schemes_medicine_idx").on(t.medicineId),
     index("schemes_supplier_idx").on(t.supplierId),
+    index("schemes_tenant_updated_idx").on(t.tenantId, t.updatedAt, t.id),
   ],
 );
 

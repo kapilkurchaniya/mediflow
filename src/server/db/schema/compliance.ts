@@ -33,10 +33,12 @@ export const doctors = pgTable(
     address: text("address"),
     isActive: boolean("is_active").notNull().default(true),
     createdAt: createdAt(),
+    updatedAt: updatedAt(),
   },
   (t) => [
     uniqueIndex("doctors_tenant_reg_uq").on(t.tenantId, sql`lower(${t.regNo})`),
     index("doctors_tenant_name_idx").on(t.tenantId, sql`lower(${t.name})`),
+    index("doctors_tenant_updated_idx").on(t.tenantId, t.updatedAt, t.id),
   ],
 );
 
