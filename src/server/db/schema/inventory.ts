@@ -12,9 +12,9 @@ import {
   uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
-import { id, money, createdAt } from "./_helpers";
+import { id, money, createdAt, updatedAt } from "./_helpers";
 import { medicines } from "./catalog";
-import { storeId, stores, tenantId } from "./platform";
+import { storeId, tenantId } from "./platform";
 import { suppliers } from "./purchasing";
 
 export const batches = pgTable(
@@ -36,11 +36,13 @@ export const batches = pgTable(
     qtyOnHand: integer("qty_on_hand").notNull().default(0),
     status: text("status").notNull().default("active"), // active | hold
     createdAt: createdAt(),
+    updatedAt: updatedAt(),
   },
   (t) => [
     uniqueIndex("batches_store_med_batch_uq").on(t.storeId, t.medicineId, t.batchNo),
     index("batches_store_med_idx").on(t.storeId, t.medicineId),
     index("batches_expiry_idx").on(t.tenantId, t.expiryDate),
+    index("batches_store_updated_idx").on(t.storeId, t.updatedAt, t.id),
   ],
 );
 
