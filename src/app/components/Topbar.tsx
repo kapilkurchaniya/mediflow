@@ -10,11 +10,11 @@ import {
   Search,
   Menu,
   WifiOff,
+  ArrowLeftRight,
 } from "lucide-react";
 import { LogoMark } from "./ui";
 import { useShell } from "./ShellContext";
 import { NotificationsPopover } from "./NotificationsPopover";
-import { StoreSwitcher } from "./StoreSwitcher";
 
 const LABELS: Record<string, string> = {
   dashboard: "Overview",
@@ -39,19 +39,24 @@ export function Topbar() {
     setCommandOpen,
     setShortcutsOpen,
     isOnline,
+    currentStore,
   } = useShell();
 
-  // Global F2 shortcut for new POS bill
+  const isWarehouse = currentStore?.kind === "warehouse";
+
+  // Global F2 shortcut for new POS bill (active retail counter only)
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "F2") {
         e.preventDefault();
-        router.push("/dashboard/sales/pos");
+        if (!isWarehouse) {
+          router.push("/dashboard/sales/pos");
+        }
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [router]);
+  }, [router, isWarehouse]);
 
   const segments = pathname.split("/").filter(Boolean);
   const crumbs = segments.map((seg, i) => ({
@@ -144,18 +149,29 @@ export function Topbar() {
         {/* Notifications Popover */}
         <NotificationsPopover />
 
-        {/* New POS Bill Action */}
-        <Link
-          href="/dashboard/sales/pos"
-          className="btn btn-primary btn-sm ml-1 shrink-0"
-          title="New POS Bill (F2)"
-        >
-          <Plus className="h-4 w-4" />
-          <span className="hidden sm:inline">New bill</span>
-          <span className="kbd hidden md:inline-flex !border-white/20 !bg-white/10 !text-white/80 !shadow-none text-[10px]">
-            F2
-          </span>
-        </Link>
+        {/* New POS Bill Action (or Transfer Stock for Warehouse) */}
+        {isWarehouse ? (
+          <Link
+            href="/dashboard/inventory/transfers/new"
+            className="btn btn-primary btn-sm ml-1 shrink-0"
+            title="Create Stock Transfer"
+          >
+            <ArrowLeftRight className="h-4 w-4" />
+            <span className="hidden sm:inline">Transfer stock</span>
+          </Link>
+        ) : (
+          <Link
+            href="/dashboard/sales/pos"
+            className="btn btn-primary btn-sm ml-1 shrink-0"
+            title="New POS Bill (F2)"
+          >
+            <Plus className="h-4 w-4" />
+            <span className="hidden sm:inline">New bill</span>
+            <span className="kbd hidden md:inline-flex !border-white/20 !bg-white/10 !text-white/80 !shadow-none text-[10px]">
+              F2
+            </span>
+          </Link>
+        )}
       </div>
     </header>
   );

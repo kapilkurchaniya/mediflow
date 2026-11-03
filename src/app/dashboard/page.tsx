@@ -9,9 +9,12 @@ import {
   UserPlus,
   ArrowUpRight,
   ChevronRight,
+  ArrowLeftRight,
 } from "lucide-react";
 import Link from "next/link";
 import { format } from "date-fns";
+import { eq } from "drizzle-orm";
+import { db, schema } from "@/server/db";
 import { getDashboardStats } from "@/app/actions/dashboard";
 import { getCurrentSession } from "@/server/auth";
 import { PageHeader, StatCard, EmptyState, Avatar } from "@/app/components/ui";
@@ -44,28 +47,58 @@ export default async function DashboardPage({
   await requirePagePermission("dashboard.view");
   const { range, from, to } = await searchParams;
   const dateRange = resolveDateRange({ range, from, to });
-  const [stats, { user }] = await Promise.all([getDashboardStats(dateRange), getCurrentSession()]);
+  const [stats, { user, session }] = await Promise.all([getDashboardStats(dateRange), getCurrentSession()]);
   const firstName = user?.name?.split(" ")[0] ?? "there";
   const avgBill = stats.todayCount > 0 ? Math.round(stats.todaySales / stats.todayCount) : 0;
   const attention = stats.lowStockCount + stats.expiringSoonCount;
   const isFiltered = Boolean((range && range !== "today") || from || to);
   const revenueLabel = range === "today" || !isFiltered ? "Today’s revenue" : "Period revenue";
 
+  let isWarehouse = false;
+  if (session?.storeId) {
+    const [store] = await db
+      .select({ kind: schema.stores.kind })
+      .from(schema.stores)
+      .where(eq(schema.stores.id, session.storeId))
+      .limit(1);
+    isWarehouse = store?.kind === "warehouse";
+  }
+
+  const quickActions = isWarehouse
+    ? [
+        { href: "/dashboard/inventory/transfers/new", label: "Transfer stock", desc: "Dispatch to retail branch", icon: ArrowLeftRight },
+        { href: "/dashboard/purchases/new", label: "Record purchase", desc: "Post a supplier GRN", icon: FileInput },
+        { href: "/dashboard/inventory/import", label: "Import stock", desc: "Upload a CSV / Excel export", icon: Upload },
+        { href: "/dashboard/inventory/batches", label: "Stock batches", desc: "View warehouse lot balances", icon: PackageOpen },
+      ]
+    : QUICK_ACTIONS;
+
   return (
     <div className="page space-y-6">
       <PageHeader
         eyebrow={format(new Date(), "EEEE, d MMMM yyyy")}
         title={`${greeting()}, ${firstName}`}
-        description="Here’s what’s happening at your store."
+        description={isWarehouse ? "Here’s what’s happening at your warehouse." : "Here’s what’s happening at your store."}
         actions={
-          <>
-            <Link href="/dashboard/purchases/new" className="btn btn-secondary">
-              <FileInput /> Record purchase
-            </Link>
-            <Link href="/dashboard/sales/pos" className="btn btn-primary">
-              <ScanLine /> New bill
-            </Link>
-          </>
+          isWarehouse ? (
+            <>
+              <Link href="/dashboard/purchases/new" className="btn btn-secondary">
+                <FileInput /> Record purchase
+              </Link>
+              <Link href="/dashboard/inventory/transfers/new" className="btn btn-primary">
+                <ArrowLeftRight /> Transfer stock
+              </Link>
+            </>
+          ) : (
+            <>
+              <Link href="/dashboard/purchases/new" className="btn btn-secondary">
+                <FileInput /> Record purchase
+              </Link>
+              <Link href="/dashboard/sales/pos" className="btn btn-primary">
+                <ScanLine /> New bill
+              </Link>
+            </>
+          )
         }
       />
 
@@ -223,7 +256,7 @@ export default async function DashboardPage({
               <h2 className="card-title">Quick actions</h2>
             </div>
             <ul className="p-2">
-              {QUICK_ACTIONS.map(({ href, label, desc, icon: Icon, kbd }) => (
+              {quickActions.map(({ href, label, desc, icon: Icon, kbd }) => (
                 <li key={href}>
                   <Link
                     href={href}

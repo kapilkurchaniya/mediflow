@@ -186,7 +186,11 @@ export function ShellProvider({
         const k = e.key.toLowerCase();
         if (k === "n") {
           e.preventDefault();
-          router.push("/dashboard/sales/pos");
+          if (currentStore?.kind === "warehouse") {
+            router.push("/dashboard/inventory/transfers/new");
+          } else {
+            router.push("/dashboard/sales/pos");
+          }
           return;
         }
         if (k === "p") {
@@ -196,7 +200,9 @@ export function ShellProvider({
         }
         if (k === "m") {
           e.preventDefault();
-          router.push("/dashboard/sales/register");
+          if (currentStore?.kind !== "warehouse") {
+            router.push("/dashboard/sales/register");
+          }
           return;
         }
         if (k === "i") {

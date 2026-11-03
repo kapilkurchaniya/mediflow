@@ -1,7 +1,9 @@
 import { getSales } from "@/app/actions/sales";
-import { Plus, Receipt, Printer, Eye, RotateCcw, Banknote } from "lucide-react";
+import { Plus, Receipt, Printer, Eye, RotateCcw, Banknote, ArrowLeftRight, Building2 } from "lucide-react";
 import Link from "next/link";
 import { format } from "date-fns";
+import { eq } from "drizzle-orm";
+import { db, schema } from "@/server/db";
 import { PageHeader, SearchForm, EmptyState, Avatar, TableWrapper } from "@/app/components/ui";
 import { formatINR, formatNumber } from "@/lib/format";
 import { DateRangeFilter } from "@/app/components/DateRangeFilter";
@@ -16,7 +18,7 @@ export default async function SalesPage({
 }: {
   searchParams: Promise<{ q?: string; range?: string; from?: string; to?: string }>;
 }) {
-  await requirePagePermission("sale.view");
+  const ctx = await requirePagePermission("sale.view");
   const params = await searchParams;
   const dateRange = resolveDateRange({
     range: params.range,
@@ -24,7 +26,16 @@ export default async function SalesPage({
     to: params.to,
   });
 
-  const sales = await getSales(dateRange.from, dateRange.to);
+  const [sales, [store]] = await Promise.all([
+    getSales(dateRange.from, dateRange.to),
+    db
+      .select({ kind: schema.stores.kind })
+      .from(schema.stores)
+      .where(eq(schema.stores.id, ctx.storeId))
+      .limit(1),
+  ]);
+
+  const isWarehouse = store?.kind === "warehouse";
   const total = sales.reduce((a, { sale }) => a + (sale.totalAmount ?? 0), 0);
   const outstanding = sales.reduce((a, { sale }) => a + Math.max(sale.creditAmount ?? 0, 0), 0);
 
@@ -34,24 +45,49 @@ export default async function SalesPage({
         title="Sales & invoices"
         description="Every bill raised from this store, with payment status."
         actions={
-          <>
-            <Link href="/dashboard/sales/register" className="btn btn-secondary">
-              <Banknote className="h-4 w-4 mr-1 text-emerald-600" /> Cash register
-            </Link>
-            <Link href="/dashboard/sales/returns" className="btn btn-secondary">
-              <RotateCcw className="h-4 w-4 mr-1 text-amber-600" /> Credit notes
-            </Link>
-            <ExportButton
-              endpoint="/api/export/sales"
-              from={dateRange.from}
-              to={dateRange.to}
-            />
-            <Link href="/dashboard/sales/pos" className="btn btn-primary">
-              <Plus /> New bill
-            </Link>
-          </>
+          isWarehouse ? (
+            <>
+              <ExportButton
+                endpoint="/api/export/sales"
+                from={dateRange.from}
+                to={dateRange.to}
+              />
+              <Link href="/dashboard/inventory/transfers" className="btn btn-primary">
+                <ArrowLeftRight className="h-4 w-4 mr-1" /> Stock transfers
+              </Link>
+            </>
+          ) : (
+            <>
+              <Link href="/dashboard/sales/register" className="btn btn-secondary">
+                <Banknote className="h-4 w-4 mr-1 text-emerald-600" /> Cash register
+              </Link>
+              <Link href="/dashboard/sales/returns" className="btn btn-secondary">
+                <RotateCcw className="h-4 w-4 mr-1 text-amber-600" /> Credit notes
+              </Link>
+              <ExportButton
+                endpoint="/api/export/sales"
+                from={dateRange.from}
+                to={dateRange.to}
+              />
+              <Link href="/dashboard/sales/pos" className="btn btn-primary">
+                <Plus /> New bill
+              </Link>
+            </>
+          )
         }
       />
+
+      {isWarehouse && (
+        <div className="rounded-xl border border-amber-200 bg-amber-50/80 p-4 text-xs text-amber-800 flex items-start gap-3">
+          <Building2 className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
+          <div>
+            <p className="font-semibold text-amber-900">Warehouse Mode Active</p>
+            <p className="mt-0.5 text-amber-700">
+              This facility is a central warehouse. Retail counter billing is handled by retail branch counters. Use Stock Transfers to allocate inventory to branches.
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Date Range Filter */}
       <div className="card px-4 py-3">

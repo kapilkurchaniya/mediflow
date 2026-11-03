@@ -19,4 +19,6 @@ export type NavItem = {
   permission?: Permission;
   /** Shown only in the command palette (quick links such as "Add customer"), not in the sidebar. */
   paletteOnly?: boolean;
+  /** Hidden when operating in warehouse mode (Task A3.5: retail counter sales only). */
+  retailOnly?: boolean;
 };

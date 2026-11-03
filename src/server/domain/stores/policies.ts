@@ -10,6 +10,27 @@ export function canStoreUsePos(store: { kind: StoreKind; isActive: boolean }): b
 }
 
 /**
+ * Capability check: Only active retail stores manage cash register shifts and physical drawers.
+ */
+export function canStoreManageShifts(store: { kind: StoreKind; isActive: boolean }): boolean {
+  return store.isActive && store.kind === "retail";
+}
+
+/**
+ * Capability check: Only active retail stores can park held counter sales.
+ */
+export function canStoreParkBills(store: { kind: StoreKind; isActive: boolean }): boolean {
+  return store.isActive && store.kind === "retail";
+}
+
+/**
+ * Capability check: Only active retail stores process walk-in customer sale returns.
+ */
+export function canStoreProcessSaleReturns(store: { kind: StoreKind; isActive: boolean }): boolean {
+  return store.isActive && store.kind === "retail";
+}
+
+/**
  * Capability check: Both active retail stores and warehouses can receive supplier purchases and GRNs.
  */
 export function canStoreReceivePurchases(store: { isActive: boolean }): boolean {
