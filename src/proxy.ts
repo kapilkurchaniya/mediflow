@@ -8,7 +8,7 @@ const authRoutes = ["/login", "/register"];
  * API routes that authenticate themselves (API key, HMAC, etc.) and must NOT
  * be redirected to /login when the session cookie is absent.
  */
-const selfAuthPrefixes = ["/api/v1", "/api/webhooks", "/api/cron", "/api/health"];
+const selfAuthPrefixes = ["/api/v1", "/api/webhooks", "/api/cron", "/api/health", "/api/sync"];
 
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
