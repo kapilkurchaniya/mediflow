@@ -234,14 +234,15 @@ test.describe("Offline POS Counter E2E Smoke & Integration Suite (Task A4.8)", (
     await page.getByPlaceholder(/search medicine/i).fill(medicine.name);
     await page.getByRole("button", { name: "+ Add" }).first().click();
 
-    // Change qty to 10
-    const qtyInput = page.locator("table.data-table input[type='number']").first();
-    await qtyInput.fill("10");
+    // Ensure packQty is 1 (1 pack = 10 units)
+    const packInput = page.locator('input[data-cart-input="pack"]').first();
+    await packInput.fill("1");
     await page.keyboard.press("F10");
 
     const receiptModal = page.getByRole("heading", { name: /offline sale recorded/i });
     await expect(receiptModal).toBeVisible({ timeout: 5000 });
-    const [pending] = await getDexiePendingSales(page);
+    const pendingSales = await getDexiePendingSales(page);
+    const pending = pendingSales.find((s) => s.status === "pending") ?? pendingSales[pendingSales.length - 1];
     const offlineInv = pending.invoiceNo;
     await page.getByTitle("Close").click();
 

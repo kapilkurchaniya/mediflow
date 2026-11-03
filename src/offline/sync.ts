@@ -12,6 +12,10 @@ export interface SyncCycleResult {
 
 let isSyncRunning = false;
 
+if (typeof window !== "undefined") {
+  (window as unknown as { __runSyncCycle?: typeof runSyncCycle }).__runSyncCycle = runSyncCycle;
+}
+
 /**
  * Runs a full two-way synchronization cycle:
  * 1. Pushes pending local sales to /api/sync/sales

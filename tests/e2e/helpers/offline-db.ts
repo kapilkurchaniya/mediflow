@@ -13,6 +13,7 @@ declare global {
  * Injects authoritative server-issued device config into browser Dexie instance.
  */
 export async function initDexieDevice(page: Page, config: OfflineDeviceConfig): Promise<void> {
+  await page.waitForFunction(() => Boolean(window.__posDb), { timeout: 15000 });
   await page.evaluate(async (cfg) => {
     const db = window.__posDb;
     if (!db) {
@@ -26,12 +27,17 @@ export async function initDexieDevice(page: Page, config: OfflineDeviceConfig): 
  * Triggers online synchronization cycle in the browser to prime catalog & number blocks into Dexie.
  */
 export async function primeDexieSync(page: Page): Promise<void> {
+  await page.waitForFunction(
+    () => Boolean((window as unknown as { __runSyncCycle?: unknown }).__runSyncCycle),
+    { timeout: 15000 },
+  );
   await page.evaluate(async () => {
     const db = window.__posDb;
     if (!db) throw new Error("window.__posDb not available");
-    // Dynamically import runSyncCycle to ensure identical browser bundle execution
-    const syncModule = await import("@/offline/sync");
-    await syncModule.runSyncCycle(db);
+    const runSync = (window as unknown as { __runSyncCycle?: (db: unknown) => Promise<unknown> }).__runSyncCycle;
+    if (runSync) {
+      await runSync(db);
+    }
   });
 }
 
