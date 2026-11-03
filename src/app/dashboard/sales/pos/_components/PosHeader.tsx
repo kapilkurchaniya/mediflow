@@ -15,6 +15,7 @@ import {
   Building2,
   Warehouse,
 } from "lucide-react";
+import { PosStatusChip } from "./PosStatusChip";
 
 interface PosHeaderProps {
   currentStore: {
@@ -33,6 +34,11 @@ interface PosHeaderProps {
   onResetSale: () => void;
   activeShift: unknown | null;
   requireShift: boolean;
+  isOffline?: boolean;
+  isSyncing?: boolean;
+  pendingCount?: number;
+  lastSyncAt?: string | null;
+  onOpenPendingDrawer?: () => void;
 }
 
 export function PosHeader({
@@ -47,6 +53,11 @@ export function PosHeader({
   onResetSale,
   activeShift,
   requireShift,
+  isOffline = false,
+  isSyncing = false,
+  pendingCount = 0,
+  lastSyncAt = null,
+  onOpenPendingDrawer,
 }: PosHeaderProps) {
   const isWarehouse = currentStore?.kind === "warehouse";
 
@@ -87,6 +98,17 @@ export function PosHeader({
                   [{currentStore.code}]
                 </span>
               </button>
+            )}
+
+            {/* Offline / Online Sync Status Chip */}
+            {onOpenPendingDrawer && (
+              <PosStatusChip
+                isOffline={isOffline}
+                isSyncing={isSyncing}
+                pendingCount={pendingCount}
+                lastSyncAt={lastSyncAt}
+                onOpenDrawer={onOpenPendingDrawer}
+              />
             )}
           </div>
         </div>

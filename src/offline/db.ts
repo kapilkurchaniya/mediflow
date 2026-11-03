@@ -74,6 +74,8 @@ export function getPosDb(dbName = "mediflow-pos"): PosDB {
   return posDbInstance;
 }
 
+export const getPosDB = getPosDb;
+
 export async function resetPosDb(db?: PosDB): Promise<void> {
   const instance = db ?? posDbInstance;
   if (instance) {

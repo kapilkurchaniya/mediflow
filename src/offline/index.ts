@@ -6,3 +6,6 @@ export * from "./offline-sale";
 export * from "./push";
 export * from "./pull";
 export * from "./sync";
+export * from "./useLiveQuery";
+export * from "./offline-datasource";
+export * from "./usePosDataSource";

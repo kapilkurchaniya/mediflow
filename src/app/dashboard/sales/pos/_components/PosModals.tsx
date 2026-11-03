@@ -19,6 +19,7 @@ interface PosModalsProps {
   dispatch: React.Dispatch<PosAction>;
   isSubmitting: boolean;
   submitError: string;
+  isOffline?: boolean;
   dataSource: PosDataSource;
   refreshMeta: () => void;
   setRevalidationAlert: (alert: {
@@ -100,6 +101,7 @@ export function PosModals(props: PosModalsProps) {
         redeemPoints={state.redeemPoints}
         isSubmitting={props.isSubmitting}
         errorMsg={props.submitError}
+        isOffline={props.isOffline}
         onUpdateSplit={(p) => dispatch({ type: "SET_SPLIT_PAYMENTS", payload: p })}
         onUpdateRedeemPoints={(pts) => dispatch({ type: "SET_REDEEM_POINTS", payload: pts })}
         onSubmit={props.onCompleteSplitSale}

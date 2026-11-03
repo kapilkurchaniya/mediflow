@@ -1,6 +1,5 @@
 "use client";
 
-import { useState, useEffect } from "react";
 import { CreditCard, Banknote, QrCode, Sparkles, X, Loader2, AlertCircle } from "lucide-react";
 import { formatINR } from "@/lib/format";
 import type { SplitPayments, SelectedCustomer } from "../_state/types";
@@ -13,6 +12,7 @@ interface PaymentPanelProps {
   redeemPoints: number;
   isSubmitting: boolean;
   errorMsg?: string;
+  isOffline?: boolean;
   onUpdateSplit: (patch: Partial<SplitPayments>) => void;
   onUpdateRedeemPoints: (points: number) => void;
   onSubmit: () => void;
@@ -27,6 +27,7 @@ export function PaymentPanel({
   redeemPoints,
   isSubmitting,
   errorMsg,
+  isOffline = false,
   onUpdateSplit,
   onUpdateRedeemPoints,
   onSubmit,
@@ -108,25 +109,31 @@ export function PaymentPanel({
                 Avail: <strong>{maxRedeemablePoints} pts</strong> ({formatINR(customer.redeemableValuePaise ?? 0)})
               </span>
             </div>
-            <div className="flex items-center gap-2">
-              <input
-                type="number"
-                min="0"
-                max={maxRedeemablePoints}
-                value={redeemPoints === 0 ? "" : redeemPoints}
-                onChange={(e) => onUpdateRedeemPoints(Math.min(maxRedeemablePoints, parseInt(e.target.value, 10) || 0))}
-                placeholder="Pts to redeem"
-                className="input !py-1 text-xs font-mono font-bold flex-1"
-              />
-              <button
-                type="button"
-                onClick={handleSetMaxLoyalty}
-                className="btn btn-secondary btn-sm !text-[11px] font-bold text-amber-800 border-amber-300 hover:bg-amber-100"
-              >
-                Redeem Max
-              </button>
-            </div>
-            {currentLoyaltyDiscountPaise > 0 && (
+            {isOffline ? (
+              <p className="text-[11px] text-amber-800 bg-amber-100/60 p-2 rounded border border-amber-200">
+                Loyalty redemption is unavailable while offline. Points will still be earned upon server sync.
+              </p>
+            ) : (
+              <div className="flex items-center gap-2">
+                <input
+                  type="number"
+                  min="0"
+                  max={maxRedeemablePoints}
+                  value={redeemPoints === 0 ? "" : redeemPoints}
+                  onChange={(e) => onUpdateRedeemPoints(Math.min(maxRedeemablePoints, parseInt(e.target.value, 10) || 0))}
+                  placeholder="Pts to redeem"
+                  className="input !py-1 text-xs font-mono font-bold flex-1"
+                />
+                <button
+                  type="button"
+                  onClick={handleSetMaxLoyalty}
+                  className="btn btn-secondary btn-sm !text-[11px] font-bold text-amber-800 border-amber-300 hover:bg-amber-100"
+                >
+                  Redeem Max
+                </button>
+              </div>
+            )}
+            {!isOffline && currentLoyaltyDiscountPaise > 0 && (
               <div className="text-[11px] text-emerald-700 font-semibold flex justify-between">
                 <span>Loyalty Discount Applied:</span>
                 <span>-{formatINR(currentLoyaltyDiscountPaise)}</span>

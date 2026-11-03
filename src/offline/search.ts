@@ -1,5 +1,5 @@
 import type { PosDB } from "./db";
-import type { OfflineMedicine, OfflineBatch, OfflineCustomer } from "./types";
+import type { OfflineMedicine, OfflineBatch, OfflineCustomer, OfflineDoctor } from "./types";
 
 export interface BatchStockSummary {
   batch: OfflineBatch;
@@ -161,4 +161,31 @@ export async function searchCustomers(
   );
 
   return [...phoneMatches, ...nameMatches].slice(0, limit);
+}
+
+/**
+ * Searches registered doctors offline in Dexie by name or registration number.
+ */
+export async function searchDoctors(
+  db: PosDB,
+  tenantId: string,
+  query: string,
+  limit = 10,
+): Promise<OfflineDoctor[]> {
+  const q = query.trim().toLowerCase();
+  if (!q) return [];
+
+  const allDoctors = await db.doctors
+    .where("tenantId")
+    .equals(tenantId)
+    .toArray();
+
+  return allDoctors
+    .filter(
+      (d) =>
+        d.isActive &&
+        (d.name.toLowerCase().includes(q) ||
+          (d.regNo && d.regNo.toLowerCase().includes(q))),
+    )
+    .slice(0, limit);
 }

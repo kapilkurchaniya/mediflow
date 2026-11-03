@@ -71,7 +71,7 @@ Here is a clear summary of all the core features and flows MediFlow provides to 
 - **Salt / Substitute finder (`F9`):** When a prescribed brand is out of stock, press `F9` to instantly see all available in-stock alternatives sharing the exact same active pharmaceutical molecule.
 - **Prescription & Schedule H/H1/X compliance:** The counter alerts you when prescription drugs are in the cart and mandates entering the prescribing doctor and patient details before completing the sale.
 - **Instant invoice printing:** Print 2-inch or 3-inch thermal receipts or full A4/A5 tax invoices with HSN summaries.
-- **Offline POS synchronization infrastructure (Phase 4):** Counter terminals authenticate with secure device tokens and pre-reserve consecutive invoice number blocks. Sales recorded while offline are automatically queued and synced back to cloud inventory and accounting once reconnected.
+- **Offline POS billing & synchronization (Phase 4):** Counter terminals seamlessly continue billing even during broadband outages. Terminals allocate legal GST Rule 46(b) consecutive invoice numbers from local reserved blocks, search cached batch stock with provisional deductions, enforce credit limits, queue pending bills in an IndexedDB outbox, print receipts offline, and automatically push sales to cloud inventory once reconnected.
 - **Same-day bill cancellation (`Alt + C`):** Void bills made by mistake on the same business day with automated batch stock restoration, reversing journal entries, and GSTR-1 voiding.
 - **Sale returns & GST credit notes (`Alt + R`):** Process customer medicine returns (full or partial strips/loose tablets), restore inventory to exact batches, automatically quarantine expired batches (`hold`), post balanced credit note journals, and issue GST Credit Notes (`CN/YY-YY/000000`).
 
@@ -212,7 +212,7 @@ Do these once, in this order.
 - **⌨ icon** (or press **?**) shows all keyboard shortcuts.
 - **🔔 bell** shows alerts: *Near Expiry Alert*, *Low Stock Warning*, and a reminder that the day's sales register is ready to reconcile. *View all inventory alerts* takes you to the stock pages.
 - **New bill** button opens the billing counter from anywhere.
-- An **Offline Mode** badge appears if your internet drops. (Billing offline is not available yet; see [chapter 19](#19-not-available-yet).)
+- An **Online / Offline Status Chip** in the POS header displays connectivity and sync state (e.g. *Online · synced 2 min ago*, *Offline · 3 bills pending*, or *Syncing...*). Clicking this chip opens the **Pending Bills Outbox** drawer to view unsynced sales, trigger manual sync, reprint receipts, or export emergency JSON backups.
 
 ### 3.2 The command palette (fastest way to get anywhere)
 
@@ -1059,7 +1059,7 @@ If your pharmacy staff is accustomed to Marg ERP 9+ or Marg Books, here is how t
 | A supplier bill is rejected as a duplicate | That supplier's invoice number is already recorded. |
 | *E-invoicing is not configured* | E-invoicing hasn't been switched on by your administrator. |
 | *Something went wrong. Please try again.* | A temporary problem. Try again; if it repeats, tell your administrator. |
-| The page says "Offline Mode" | Your internet dropped. Wait until it returns before saving. |
+| The page says "Offline · N pending" | Your counter terminal is operating offline. You can continue searching local stock and billing customers normally. Pending sales will automatically synchronize when internet returns. |
 | I made a mistake on a bill | Use **Cancel Bill** (Alt+C) on the same business day, or **Return Items** (Alt+R) to issue a GST Credit Note. |
 | *An open cash register shift is required to complete sales* | Your store has shift enforcement enabled. Open a shift with your initial float under **Operations → Cash register (Shifts)** or press **F4** on POS. |
 | *An active register shift is already open for this store* | Exactly one shift can be open per branch. Close the previous cashier's shift before opening a new one. |
@@ -1124,7 +1124,7 @@ These features are part of upcoming development phases and are planned for futur
 
 | Area | Planned feature | Status |
 |---|---|---|
-| Billing | Offline counter billing with IndexedDB/SQLite sync (Phase 4) | Backend sync API (A4.1–A4.3), Offline DB (A4.4), and PWA shell (A4.5) completed; POS offline mode UI next (A4.6) |
+| Billing | Offline counter billing with IndexedDB sync (Phase 4) | Completed in A4.6 — transparent failover, offline stock search, outbox sync, and receipt printing |
 | Platforms | Standalone PWA Counter App (Chrome / Edge / Tablet) | Completed (A4.5) — installable from browser with offline shell caching |
 | Platforms | Native Windows desktop `.exe` installer (via Tauri) | In Roadmap (Phase 4) |
 | Platforms | Native macOS desktop `.dmg` application | Future Scope |
