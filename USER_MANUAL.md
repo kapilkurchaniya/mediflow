@@ -71,6 +71,7 @@ Here is a clear summary of all the core features and flows MediFlow provides to 
 - **Salt / Substitute finder (`F9`):** When a prescribed brand is out of stock, press `F9` to instantly see all available in-stock alternatives sharing the exact same active pharmaceutical molecule.
 - **Prescription & Schedule H/H1/X compliance:** The counter alerts you when prescription drugs are in the cart and mandates entering the prescribing doctor and patient details before completing the sale.
 - **Instant invoice printing:** Print 2-inch or 3-inch thermal receipts or full A4/A5 tax invoices with HSN summaries.
+- **Offline POS synchronization infrastructure (Phase 4):** Counter terminals authenticate with secure device tokens and pre-reserve consecutive invoice number blocks. Sales recorded while offline are automatically queued and synced back to cloud inventory and accounting once reconnected.
 - **Same-day bill cancellation (`Alt + C`):** Void bills made by mistake on the same business day with automated batch stock restoration, reversing journal entries, and GSTR-1 voiding.
 - **Sale returns & GST credit notes (`Alt + R`):** Process customer medicine returns (full or partial strips/loose tablets), restore inventory to exact batches, automatically quarantine expired batches (`hold`), post balanced credit note journals, and issue GST Credit Notes (`CN/YY-YY/000000`).
 
@@ -889,7 +890,7 @@ Fill in: **Pharmacy name**, **Drug licence no.**, **GSTIN** (e.g. *27AAAAA0000A1
 - Your licence number and name appear on invoices and registers; your pharmacy name shows in the left menu.
 
 ### 15.2 Other settings pages
-Racks ([6.4](#64-racks-and-shelves)), Trade schemes ([6.8](#68-trade-schemes)), Loyalty ([8.3](#83-setting-up-the-rewards-loyalty-programme)), Medical reps ([8.5](#85-medical-representatives-and-commission)), WhatsApp and SMS ([chapter 11](#11-whatsapp-and-sms)). Several of these appear in other menu sections; each is visible only to the roles that may use it. A shop-wide **maximum discount** (see [5.5](#55-discounts)) is currently set by your administrator.
+Racks ([6.4](#64-racks-and-shelves)), Trade schemes ([6.8](#68-trade-schemes)), Loyalty ([8.3](#83-setting-up-the-rewards-loyalty-programme)), Medical reps ([8.5](#85-medical-representatives-and-commission)), WhatsApp and SMS ([chapter 11](#11-whatsapp-and-sms)), POS Devices and offline counters ([15.4](#154-pos-devices--offline-terminals-settings--devices)). Several of these appear in other menu sections; each is visible only to the roles that may use it. A shop-wide **maximum discount** (see [5.5](#55-discounts)) is currently set by your administrator.
 
 ### 15.3 API keys for connected apps
 For a website or partner app that checks your stock or sends you orders. This page isn't in the menu; your administrator opens `/dashboard/settings/api-keys`.
@@ -899,6 +900,28 @@ For a website or partner app that checks your stock or sends you orders. This pa
 3. The list later shows name, scopes, last-used and created dates. **Revoke** a key to stop it immediately.
 
 Treat a key like a password; never share it by chat or email. The connected app sends it as `Authorization: Bearer mf_live_…`.
+
+---
+
+### 15.4 POS Devices & Offline Terminals (Settings → Devices)
+
+For pharmacies operating physical checkout counters, MediFlow allows registering dedicated POS terminals that can continue billing offline during broadband outages.
+
+**Register a counter device:**
+1. Go to **Settings → Devices** (or navigate to `/dashboard/settings/devices`). Only owners and store managers (`settings.manage`) have access.
+2. Select your store branch, enter a **Device name** (e.g., *Counter 1 (Main Cashier)*), and assign a **2-digit Device Code** from `01` to `99` (e.g., `01`).
+3. Press **Register Device**.
+4. **Copy the Device Token immediately**: MediFlow generates a secure, one-time authentication token. For security, it is hashed on the server and shown **only once**.
+5. Save the token into your counter terminal's offline setup. The terminal uses this token to authenticate against the `/api/sync/*` endpoints.
+
+**Why each device has its own 2-digit code:**
+GST Rule 46(b) mandates that invoice serial numbers must be consecutive, unique per financial year, and strictly $\le 16$ characters. MediFlow assigns each physical counter terminal its own independent invoice series:
+- Format: `{StoreCode}{DeviceCode}/{FY}/{Sequence}` (e.g. `ST01/2526/000001` = 15 characters).
+- Each device reserves sequential blocks of numbers from the server while online (e.g., 200 numbers at a time).
+- When internet drops, Counter 1 and Counter 2 can issue bills simultaneously without contacting the cloud or causing sequence collisions.
+
+**Revoke a device:**
+If a terminal is retired, reassigned, or compromised, click **Revoke** on its row in the Devices list. Revocation is instantaneous: any further sync requests from that device token are immediately rejected.
 
 ---
 
@@ -1101,7 +1124,7 @@ These features are part of upcoming development phases and are planned for futur
 
 | Area | Planned feature | Status |
 |---|---|---|
-| Billing | Offline counter billing with IndexedDB/SQLite sync (Phase 4) | In Roadmap |
+| Billing | Offline counter billing with IndexedDB/SQLite sync (Phase 4) | Backend sync API (A4.1–A4.3) and Browser offline DB & sync engine (A4.4) completed; PWA shell & POS offline mode UI next (A4.5–A4.6) |
 | Platforms | Native Windows desktop `.exe` installer (via Tauri) | In Roadmap (Phase 4) |
 | Platforms | Native macOS desktop `.dmg` application | Future Scope |
 | Platforms | Mobile companion app (iOS & Android) for store owners | Future Scope |
@@ -1146,3 +1169,7 @@ These features are part of upcoming development phases and are planned for futur
 | **Medical rep (MR)** | A pharma company's representative; may earn commission. |
 | **Role** | The set of things a staff login is allowed to do. |
 | **Financial year** | 1 April to 31 March; invoice numbering restarts each year. |
+| **Device Code** | A unique 2-digit identifier (`01`–`99`) assigned to each physical POS counter terminal to isolate its offline invoice series under GST Rule 46(b). |
+| **Device Token** | A secure, one-time Bearer token used by POS counter devices to authenticate with MediFlow synchronization endpoints. |
+| **Number Reservation Block** | A pre-allocated range of sequential invoice numbers granted to an offline counter terminal so it can issue gap-free bills without contacting the server. |
+| **Stock Reconciliation (Offline)** | Server handling of offline sales where a bill is accepted even if shelf stock temporarily went negative during a network outage, accompanied by an automatic conflict notification for store management. |
