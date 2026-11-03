@@ -23,9 +23,8 @@ self.addEventListener("install", (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
       return cache.addAll(PRECACHE_ASSETS);
-    }),
+    }).then(() => self.skipWaiting()),
   );
-  // Deliberately do NOT call self.skipWaiting() here to avoid breaking active checkouts
 });
 
 // Activate: Clean up obsolete caches and claim clients safely

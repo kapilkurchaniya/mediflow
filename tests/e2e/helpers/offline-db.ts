@@ -74,6 +74,24 @@ export async function primeDexieSync(page: Page): Promise<void> {
     },
     { timeout: 15000 },
   );
+
+  // Ensure Service Worker is active and controlling client before potential offline test steps
+  await page.evaluate(async () => {
+    if (typeof window !== "undefined" && "serviceWorker" in navigator) {
+      try {
+        await navigator.serviceWorker.ready;
+        if (!navigator.serviceWorker.controller) {
+          await new Promise<void>((resolve) => {
+            navigator.serviceWorker.addEventListener("controllerchange", () => resolve(), { once: true });
+            if (navigator.serviceWorker.controller) resolve();
+            setTimeout(resolve, 3000);
+          });
+        }
+      } catch {
+        // Ignore fallback
+      }
+    }
+  });
 }
 
 /**

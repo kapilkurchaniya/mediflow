@@ -49,7 +49,12 @@ export function usePosDataSource(options: UsePosDataSourceOptions): PosDataSourc
   useEffect(() => {
     if (typeof window === "undefined") return;
 
-    const handleOnline = () => setIsBrowserOffline(false);
+    const handleOnline = () => {
+      setIsBrowserOffline(false);
+      if (db) {
+        void runSyncCycle(db);
+      }
+    };
     const handleOffline = () => setIsBrowserOffline(true);
 
     window.addEventListener("online", handleOnline);
@@ -59,7 +64,7 @@ export function usePosDataSource(options: UsePosDataSourceOptions): PosDataSourc
       window.removeEventListener("online", handleOnline);
       window.removeEventListener("offline", handleOffline);
     };
-  }, []);
+  }, [db]);
 
   // Observe pending outbox sales reactively for the active store
   const pendingCount = useLiveQuery(
@@ -87,13 +92,13 @@ export function usePosDataSource(options: UsePosDataSourceOptions): PosDataSourc
 
   // Periodic and event-driven background sync coordinator
   useEffect(() => {
-    if (!db || isBrowserOffline) return;
+    if (!db) return;
 
     const coordinator = startSyncCoordinator(db, 60_000);
     return () => {
       coordinator.stop();
     };
-  }, [db, isBrowserOffline]);
+  }, [db]);
 
   // Manual sync trigger
   const triggerSyncNow = useCallback(async () => {

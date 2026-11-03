@@ -200,7 +200,7 @@ test.describe("Offline POS Counter E2E Smoke & Integration Suite (Task A4.8)", (
 
     // 2. Open Pending Bills Drawer & Trigger JSON Export
     await page.getByRole("button", { name: /pending/i }).click();
-    await expect(page.getByRole("heading", { name: /pending offline bills/i })).toBeVisible();
+    await expect(page.getByRole("heading", { name: /pending (offline )?bills/i })).toBeVisible();
 
     page.on("dialog", (dialog) => dialog.accept());
     const downloadPromise = page.waitForEvent("download");

@@ -57,7 +57,7 @@ export function PosStatusChip({
         onClick={onOpenDrawer}
         className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-900 border border-amber-300 hover:bg-amber-100 transition-colors shadow-2xs"
         title="Counter is operating offline. Click to view pending bills."
-        aria-label={`Offline mode active, ${pendingCount} bills pending`}
+        aria-label={pendingCount > 0 ? `Offline mode active, ${pendingCount} pending` : "Offline mode active"}
       >
         <WifiOff className="w-3.5 h-3.5 text-amber-600" />
         <span className="font-medium">
@@ -78,7 +78,7 @@ export function PosStatusChip({
       onClick={onOpenDrawer}
       className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-900 border border-emerald-300 hover:bg-emerald-100 transition-colors shadow-2xs"
       title={`Counter is online. Last synced ${formatRelativeSync(lastSyncAt)}. Click to view pending bills.`}
-      aria-label={`Online, last synced ${formatRelativeSync(lastSyncAt)}`}
+      aria-label={`Online, last synced ${formatRelativeSync(lastSyncAt)}${pendingCount > 0 ? `, ${pendingCount} pending` : ""}`}
     >
       <span className="relative flex h-2 w-2">
         <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
