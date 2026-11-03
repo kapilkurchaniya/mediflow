@@ -14,7 +14,7 @@ export interface AuditItem {
   countedQty: number | null;
   varianceQty: number | null;
   unitCostPaise: number;
-  varianceCostPaise: number;
+  varianceCostPaise: number | null;
   status: string;
 }
 

@@ -1,5 +1,5 @@
 import { schema, type Tx } from "@/server/db";
-import { and, eq, gt } from "drizzle-orm";
+import { and, eq, gt, isNull, ne, or } from "drizzle-orm";
 import { DomainError } from "@/server/errors";
 import { nextDocNumber } from "@/server/domain/sequence";
 import { format } from "date-fns";
@@ -10,11 +10,12 @@ import type { ApproveAuditSessionParams } from "./types";
 
 /**
  * Reconciles and posts an approved physical stocktake audit session.
- * 1. Locks affected batch rows deterministically.
- * 2. Uses movement-aware reconciliation (F = C + M_after) to calculate adjustments.
- * 3. Updates live batch quantities and inserts immutable stock movements.
- * 4. Posts balanced double-entry financial journal entry for shortage/excess.
- * 5. Records an immutable audit log entry.
+ * 1. Locks the audit session row (SELECT FOR UPDATE) to guarantee idempotency.
+ * 2. Locks affected batch rows in deterministic sorted order (anti-deadlock).
+ * 3. Uses movement-aware reconciliation (F = C + M_after) to calculate adjustments.
+ * 4. Updates live batch quantities and inserts immutable stock movements.
+ * 5. Posts balanced double-entry financial journal entry to dedicated adjustment accounts.
+ * 6. Records an immutable audit log entry.
  */
 export async function approveStockAuditSession(
   tx: Tx,
@@ -22,6 +23,7 @@ export async function approveStockAuditSession(
 ) {
   const { tenantId, storeId, sessionId, userId, notes } = params;
 
+  // 1. Lock session row (concurrency guard & idempotency)
   const [session] = await tx
     .select()
     .from(schema.stockAuditSessions)
@@ -32,17 +34,24 @@ export async function approveStockAuditSession(
         eq(schema.stockAuditSessions.storeId, storeId)
       )
     )
-    .limit(1);
+    .limit(1)
+    .for("update");
 
   if (!session) {
     throw new DomainError("SESSION_NOT_FOUND", "Audit session not found");
   }
 
+  // Idempotent retry: return existing approved session without re-posting
   if (session.status === "approved") {
-    throw new DomainError(
-      "ALREADY_APPROVED",
-      "This audit session has already been approved and reconciled"
-    );
+    return {
+      sessionId: session.id,
+      sessionNo: session.sessionNo,
+      reconciledAdjustmentsCount: 0,
+      totalShortagePaise: 0,
+      totalExcessPaise: 0,
+      netFinancialImpactPaise: 0,
+      status: session.status,
+    };
   }
 
   if (session.status === "cancelled") {
@@ -74,8 +83,10 @@ export async function approveStockAuditSession(
   let totalExcessPaise = 0;
   let reconciledAdjustmentsCount = 0;
 
-  for (const item of items) {
-    // 1. Lock batch row
+  // Sort deterministically by batchId to eliminate deadlock risk
+  const sortedItems = [...items].sort((a, b) => a.batchId.localeCompare(b.batchId));
+
+  for (const item of sortedItems) {
     const [batch] = await tx
       .select()
       .from(schema.batches)
@@ -90,7 +101,7 @@ export async function approveStockAuditSession(
 
     if (!batch || item.countedQty === null) continue;
 
-    // 2. Query movements that occurred strictly after physical observation
+    // Query interim movements after observation cutoff, excluding stocktake adjustments
     let netMovementsAfterCount = 0;
     if (item.countedAt) {
       const interimMovements = await tx
@@ -100,7 +111,11 @@ export async function approveStockAuditSession(
           and(
             eq(schema.stockMovements.batchId, batch.id),
             eq(schema.stockMovements.storeId, storeId),
-            gt(schema.stockMovements.createdAt, item.countedAt)
+            gt(schema.stockMovements.createdAt, item.countedAt),
+            or(
+              isNull(schema.stockMovements.refId),
+              ne(schema.stockMovements.refId, session.id)
+            )
           )
         );
 
@@ -110,7 +125,6 @@ export async function approveStockAuditSession(
       );
     }
 
-    // 3. Deterministic movement-aware calculation: F = Math.max(0, C + M_after)
     const { finalBalance, adjustmentDelta, varianceCostPaise } =
       calculateReconciliationDelta({
         countedQty: item.countedQty,
@@ -128,15 +142,12 @@ export async function approveStockAuditSession(
       continue;
     }
 
-    const newStatus = finalBalance === 0 ? "hold" : batch.status;
-
-    // 4. Update batch stock
+    // Preserve batch status (zero balance does not alter quarantine status)
     await tx
       .update(schema.batches)
-      .set({ qtyOnHand: finalBalance, status: newStatus })
+      .set({ qtyOnHand: finalBalance })
       .where(eq(schema.batches.id, batch.id));
 
-    // 5. Insert immutable stock movement
     await tx.insert(schema.stockMovements).values({
       tenantId,
       storeId,
@@ -152,7 +163,6 @@ export async function approveStockAuditSession(
       userId,
     });
 
-    // Mark line reconciled
     await tx
       .update(schema.stockAuditItems)
       .set({ status: "reconciled" })
@@ -167,7 +177,7 @@ export async function approveStockAuditSession(
     reconciledAdjustmentsCount++;
   }
 
-  // 6. Double-entry financial journal voucher for net financial impact
+  // Financial journal voucher using dedicated accounts
   const netFinancialImpactPaise = totalExcessPaise - totalShortagePaise;
   const accounts = await getOrSeedAccounts(tx, tenantId);
   const now = new Date();
@@ -182,6 +192,10 @@ export async function approveStockAuditSession(
       "JV"
     );
 
+    const narration = netFinancialImpactPaise < 0
+      ? `Physical stocktake shortage loss for session ${session.sessionNo}`
+      : `Physical stocktake surplus gain for session ${session.sessionNo}`;
+
     const [jv] = await tx
       .insert(schema.journalEntries)
       .values({
@@ -189,22 +203,22 @@ export async function approveStockAuditSession(
         storeId,
         entryNo,
         entryDate: todayStr,
-        narration: `Physical stocktake reconciliation for session ${session.sessionNo}`,
+        narration,
         refType: "stock_audit_session",
         refId: session.id,
         createdBy: userId,
       })
       .returning({ id: schema.journalEntries.id });
 
-    // Net Shortage: Debit Expense (purchases 4010), Credit Inventory Asset (inventory 1080)
     if (netFinancialImpactPaise < 0) {
       const shortageAmount = Math.abs(netFinancialImpactPaise);
-      if (accounts.purchases && accounts.inventory) {
+      const debitAccount = accounts.stock_loss || accounts.purchases;
+      if (debitAccount && accounts.inventory) {
         await tx.insert(schema.journalLines).values([
           {
             tenantId,
             entryId: jv.id,
-            accountId: accounts.purchases,
+            accountId: debitAccount,
             debit: shortageAmount,
             credit: 0,
           },
@@ -218,9 +232,9 @@ export async function approveStockAuditSession(
         ]);
       }
     } else {
-      // Net Excess: Debit Inventory Asset (inventory 1080), Credit Income (discounts 3020)
       const excessAmount = netFinancialImpactPaise;
-      if (accounts.inventory && accounts.discounts) {
+      const creditAccount = accounts.stock_gain || accounts.discounts;
+      if (accounts.inventory && creditAccount) {
         await tx.insert(schema.journalLines).values([
           {
             tenantId,
@@ -232,7 +246,7 @@ export async function approveStockAuditSession(
           {
             tenantId,
             entryId: jv.id,
-            accountId: accounts.discounts,
+            accountId: creditAccount,
             debit: 0,
             credit: excessAmount,
           },
@@ -241,7 +255,6 @@ export async function approveStockAuditSession(
     }
   }
 
-  // 7. Write immutable audit log
   await writeAudit(
     tx,
     { tenantId, storeId, userId },
@@ -260,7 +273,6 @@ export async function approveStockAuditSession(
     }
   );
 
-  // 8. Update session to approved
   const [approvedSession] = await tx
     .update(schema.stockAuditSessions)
     .set({
