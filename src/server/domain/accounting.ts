@@ -21,8 +21,10 @@ export const DEFAULT_ACCOUNTS = [
   { code: "2070", name: "Output IGST", type: "liability", systemKey: "igst_output" },
   { code: "3010", name: "Sales Account", type: "income", systemKey: "sales" },
   { code: "3020", name: "Discount Received", type: "income", systemKey: "discounts" },
+  { code: "3030", name: "Stock Adjustment Surplus", type: "income", systemKey: "stock_gain" },
   { code: "4010", name: "Purchase Account", type: "expense", systemKey: "purchases" },
   { code: "4090", name: "Round Off Account", type: "expense", systemKey: "roundoff" },
+  { code: "5030", name: "Stock Shortage & Loss", type: "expense", systemKey: "stock_loss" },
 ] as const;
 
 /**

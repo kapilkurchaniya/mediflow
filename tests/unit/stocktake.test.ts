@@ -190,11 +190,13 @@ describe("Physical Stocktake & Rack Audit Sessions (Task A3.6)", () => {
                 return Promise.resolve([]); // zero interim movements
               }
               return {
-                limit: vi.fn().mockImplementation(() => {
-                  if (table === schema.stockAuditSessions) {
-                    return Promise.resolve([{ id: "session-1", sessionNo: "AUD/26-27/000001", status: "under_review" }]);
-                  }
-                  return Promise.resolve([]);
+                limit: vi.fn().mockReturnValue({
+                  for: vi.fn().mockImplementation(() => {
+                    if (table === schema.stockAuditSessions) {
+                      return Promise.resolve([{ id: "session-1", sessionNo: "AUD/26-27/000001", status: "under_review" }]);
+                    }
+                    return Promise.resolve([]);
+                  }),
                 }),
                 for: vi.fn().mockResolvedValue([{ id: "batch-1", qtyOnHand: 100, status: "active" }]),
               };

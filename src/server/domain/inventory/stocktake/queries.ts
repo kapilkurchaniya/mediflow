@@ -49,7 +49,6 @@ export async function getStockAuditSessionDetails(
     .orderBy(schema.racks.code, schema.medicines.name);
 
   const formattedItems: FormattedAuditItem[] = items.map((r) => {
-    const isCounted = r.item.countedQty !== null;
     return {
       id: r.item.id,
       batchId: r.item.batchId,
@@ -63,15 +62,21 @@ export async function getStockAuditSessionDetails(
       rackId: r.item.rackId,
       rackCode: r.rack?.code || "Unassigned",
       rackName: r.rack?.name || "General Floor",
-      // Hide systemQty if blind count is enabled and user is in staff counting view
+      // Hide systemQty and variances completely in blind staff view to prevent bias
       systemQty:
-        isBlindStaffView && session.session.blindCount && !isCounted
+        isBlindStaffView && session.session.blindCount
           ? null
           : r.item.systemQty,
       countedQty: r.item.countedQty,
-      varianceQty: r.item.varianceQty,
+      varianceQty:
+        isBlindStaffView && session.session.blindCount
+          ? null
+          : r.item.varianceQty,
       unitCostPaise: r.item.unitCostPaise,
-      varianceCostPaise: r.item.varianceCostPaise,
+      varianceCostPaise:
+        isBlindStaffView && session.session.blindCount
+          ? null
+          : r.item.varianceCostPaise,
       status: r.item.status,
       countedAt: r.item.countedAt,
     };

@@ -1,10 +1,11 @@
+import { DomainError } from "@/server/errors";
 import type { ReconciliationCalculation } from "./types";
 
 /**
  * Pure, deterministic calculation of movement-aware inventory reconciliation.
  *
  * Industry-standard formula:
- * Final Balance: F = Math.max(0, C + M_after)
+ * Final Balance: F = C + M_after
  * Adjustment Delta: Δ = F - currentBalance
  *
  * where:
@@ -27,7 +28,15 @@ export function calculateReconciliationDelta(params: {
     unitCostPaise,
   } = params;
 
-  const finalBalance = Math.max(0, countedQty + netMovementsAfterCount);
+  const rawBalance = countedQty + netMovementsAfterCount;
+  if (rawBalance < 0) {
+    throw new DomainError(
+      "RECONCILIATION_ANOMALY",
+      `Physical count (${countedQty}) plus subsequent movements (${netMovementsAfterCount}) results in negative balance (${rawBalance}). Audit reconciliation aborted for investigation.`
+    );
+  }
+
+  const finalBalance = rawBalance;
   const adjustmentDelta = finalBalance - currentQtyOnHand;
   const varianceCostPaise = adjustmentDelta * unitCostPaise;
 

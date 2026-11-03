@@ -157,11 +157,11 @@ export function StocktakeTable({
                       <span className="text-ink-400 font-normal">₹0.00</span>
                     ) : isShort ? (
                       <span className="text-rose-600">
-                        -{formatINR(Math.abs(item.varianceCostPaise))}
+                        -{formatINR(Math.abs(item.varianceCostPaise || 0))}
                       </span>
                     ) : (
                       <span className="text-emerald-600">
-                        +{formatINR(item.varianceCostPaise)}
+                        +{formatINR(item.varianceCostPaise || 0)}
                       </span>
                     )}
                   </td>

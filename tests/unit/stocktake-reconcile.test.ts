@@ -68,18 +68,16 @@ describe("Movement-Aware Reconciliation Algorithm (Task A3.6)", () => {
     expect(res.varianceCostPaise).toBe(-10000);
   });
 
-  it("clamps final balance to 0 if subsequent sales exceeded physical count", () => {
-    const res = calculateReconciliationDelta({
-      countedQty: 2,
-      systemQtyAtSnapshot: 5,
-      netMovementsAfterCount: -5,
-      currentQtyOnHand: 0,
-      unitCostPaise: 2000,
-    });
-
-    expect(res.finalBalance).toBe(0);
-    expect(res.adjustmentDelta).toBe(0);
-    expect(res.varianceCostPaise).toBe(0);
+  it("throws RECONCILIATION_ANOMALY if subsequent sales exceeded physical count", () => {
+    expect(() =>
+      calculateReconciliationDelta({
+        countedQty: 2,
+        systemQtyAtSnapshot: 5,
+        netMovementsAfterCount: -5,
+        currentQtyOnHand: 0,
+        unitCostPaise: 2000,
+      })
+    ).toThrow(/results in negative balance/i);
   });
 
   it("handles physical surplus (count > snapshot)", () => {
