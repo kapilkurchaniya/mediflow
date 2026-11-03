@@ -218,6 +218,12 @@ test.describe("POS Counter E2E Smoke & Hardening Tests", () => {
   test("supports dual ergonomics: F8 opens modal, Esc dismisses, and F10 keyboard accelerator finalizes sale", async ({
     page,
   }) => {
+    const [initialPara] = await db
+      .select({ qty: schema.batches.qtyOnHand })
+      .from(schema.batches)
+      .where(eq(schema.batches.batchNo, "B-PARA-001"));
+    const expectedQty = (initialPara?.qty ?? 90) - 10;
+
     // Navigate to POS Counter
     await page.goto("/dashboard/sales/pos");
     const searchInput = page.getByPlaceholder(/search medicine/i);
@@ -227,13 +233,15 @@ test.describe("POS Counter E2E Smoke & Hardening Tests", () => {
       name: /Payment & Settlement/i,
     });
 
-    // 1. Verify F8 opens modal & Escape dismisses modal
+    // 1. Verify F8 opens modal & Escape dismisses modal (toPass absorbs hydration delay)
     await searchInput.focus();
-    await page.keyboard.press("F8");
-    await expect(modalHeading).toBeVisible({ timeout: 5000 });
+    await expect(async () => {
+      await page.keyboard.press("F8");
+      await expect(modalHeading).toBeVisible({ timeout: 2000 });
+    }).toPass({ timeout: 15000 });
 
     await page.keyboard.press("Escape");
-    await expect(modalHeading).not.toBeVisible({ timeout: 5000 });
+    await expect(modalHeading).not.toBeVisible({ timeout: 10000 });
 
     // 2. Add Paracetamol to cart (1 strip, 10 units @ ₹15.00)
     await searchInput.fill("Paracetamol");
@@ -270,13 +278,12 @@ test.describe("POS Counter E2E Smoke & Hardening Tests", () => {
     await expect(page.locator("body")).toContainText("15.00");
 
     // 4. Direct DB verification of second sale:
-    // Paracetamol was at 90 units after first sale; second sale sold 10 units -> now 80 units.
     const [paraBatch] = await db
       .select()
       .from(schema.batches)
       .where(eq(schema.batches.batchNo, "B-PARA-001"));
     expect(paraBatch).toBeDefined();
-    expect(paraBatch.qtyOnHand).toBe(80);
+    expect(paraBatch.qtyOnHand).toBe(expectedQty);
 
     const f10Movements = await db
       .select()
@@ -284,7 +291,7 @@ test.describe("POS Counter E2E Smoke & Hardening Tests", () => {
       .where(eq(schema.stockMovements.refId, f10SaleId));
     expect(f10Movements.length).toBe(1);
     expect(f10Movements[0].qtyChange).toBe(-10);
-    expect(f10Movements[0].balanceAfter).toBe(80);
+    expect(f10Movements[0].balanceAfter).toBe(expectedQty);
     expect(f10Movements[0].type).toBe("sale");
   });
 });
