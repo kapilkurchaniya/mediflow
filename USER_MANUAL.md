@@ -1124,7 +1124,8 @@ These features are part of upcoming development phases and are planned for futur
 
 | Area | Planned feature | Status |
 |---|---|---|
-| Billing | Offline counter billing with IndexedDB/SQLite sync (Phase 4) | Backend sync API (A4.1–A4.3) and Browser offline DB & sync engine (A4.4) completed; PWA shell & POS offline mode UI next (A4.5–A4.6) |
+| Billing | Offline counter billing with IndexedDB/SQLite sync (Phase 4) | Backend sync API (A4.1–A4.3), Offline DB (A4.4), and PWA shell (A4.5) completed; POS offline mode UI next (A4.6) |
+| Platforms | Standalone PWA Counter App (Chrome / Edge / Tablet) | Completed (A4.5) — installable from browser with offline shell caching |
 | Platforms | Native Windows desktop `.exe` installer (via Tauri) | In Roadmap (Phase 4) |
 | Platforms | Native macOS desktop `.dmg` application | Future Scope |
 | Platforms | Mobile companion app (iOS & Android) for store owners | Future Scope |
