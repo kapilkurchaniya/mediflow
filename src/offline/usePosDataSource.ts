@@ -6,6 +6,7 @@ import { OfflinePosDataSource } from "./offline-datasource";
 import { defaultPosDataSource, type PosDataSource } from "@/app/dashboard/sales/pos/_data/posData";
 import { startSyncCoordinator, runSyncCycle } from "./sync";
 import { useLiveQuery } from "./useLiveQuery";
+import type { OfflineDeviceConfig } from "./types";
 
 export interface PosDataSourceState {
   isOffline: boolean;
@@ -34,6 +35,15 @@ export function usePosDataSource(options: UsePosDataSourceOptions): PosDataSourc
   );
   const [isSyncing, setIsSyncing] = useState(false);
   const [lastSyncAt, setLastSyncAt] = useState<string | null>(null);
+  const [deviceConfig, setDeviceConfig] = useState<OfflineDeviceConfig | null>(null);
+
+  // Load device config from Dexie
+  useEffect(() => {
+    if (!db) return;
+    void db.getDeviceConfig().then((cfg) => {
+      if (cfg) setDeviceConfig(cfg);
+    });
+  }, [db]);
 
   // Listen to connectivity events
   useEffect(() => {
@@ -104,12 +114,12 @@ export function usePosDataSource(options: UsePosDataSourceOptions): PosDataSourc
   const offlineDs = useMemo(() => {
     if (!db) return null;
     return new OfflinePosDataSource(db, {
-      tenantId: options.tenantId || "default-tenant",
-      storeId: options.storeId || "default-store",
-      deviceId: options.deviceId || "dev01",
+      tenantId: options.tenantId || deviceConfig?.tenantId || "default-tenant",
+      storeId: options.storeId || deviceConfig?.storeId || "default-store",
+      deviceId: options.deviceId || deviceConfig?.deviceId || "dev01",
       cashierId: options.cashierId || "cashier-default",
     });
-  }, [db, options.tenantId, options.storeId, options.deviceId, options.cashierId]);
+  }, [db, options.tenantId, options.storeId, options.deviceId, options.cashierId, deviceConfig]);
 
   // Active data source: online server actions or offline Dexie
   const activeDataSource = useMemo<PosDataSource>(() => {

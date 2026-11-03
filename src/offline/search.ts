@@ -67,15 +67,17 @@ export async function searchMedicines(
     .toArray();
 
   let matchedMeds: OfflineMedicine[] = byBarcode.filter(
-    (m) => m.tenantId === tenantId && m.isActive,
+    (m) => (tenantId === "default-tenant" || m.tenantId === tenantId) && m.isActive,
   );
 
   // 2. If no barcode match or query might be a name, search name and genericName
   if (matchedMeds.length === 0) {
-    const allTenantMeds = await db.medicines
-      .where("tenantId")
-      .equals(tenantId)
-      .toArray();
+    const allTenantMeds = tenantId === "default-tenant"
+      ? await db.medicines.toArray()
+      : await db.medicines
+          .where("tenantId")
+          .equals(tenantId)
+          .toArray();
 
     matchedMeds = allTenantMeds
       .filter((m) => {

@@ -70,6 +70,9 @@ let posDbInstance: PosDB | null = null;
 export function getPosDb(dbName = "mediflow-pos"): PosDB {
   if (!posDbInstance) {
     posDbInstance = new PosDB(dbName);
+    if (typeof window !== "undefined") {
+      (window as unknown as { __posDb?: PosDB }).__posDb = posDbInstance;
+    }
   }
   return posDbInstance;
 }
