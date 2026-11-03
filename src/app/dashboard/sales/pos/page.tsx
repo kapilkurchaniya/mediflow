@@ -3,6 +3,7 @@
 import { useShell } from "@/app/components/ShellContext";
 import { WarehousePosNotice } from "./WarehousePosNotice";
 import { RetailPosTerminal } from "./_components/RetailPosTerminal";
+import { RegisterSW } from "./_offline/RegisterSW";
 
 export default function POSPage() {
   const { currentStore } = useShell();
@@ -12,5 +13,10 @@ export default function POSPage() {
     return <WarehousePosNotice currentStore={currentStore} />;
   }
 
-  return <RetailPosTerminal />;
+  return (
+    <>
+      <RetailPosTerminal />
+      <RegisterSW />
+    </>
+  );
 }
