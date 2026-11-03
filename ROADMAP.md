@@ -769,13 +769,15 @@ Full map in `.github/CODEOWNERS` and [ADR 0004](docs/adr/0004-two-lane-ownership
 
 ### Lane A · Phase 4
 
-#### A4.1 Devices & device auth ⏱ 2 days
+#### [x] A4.1 Devices & device auth ⏱ 2 days
 - **Files:** ✏️ `schema/platform.ts`: ➕ `devices (id, tenant_id, store_id, code char(2), name, token_hash, last_seen_at, revoked_at, created_by, created_at)`, unique on `(store_id, code)`; migration. ➕ `src/server/domain/devices.ts` (`registerDevice` → returns a one-time token; `revokeDevice`; `authenticateDevice(req)` → `{ tenantId, storeId, deviceId, code }`). ➕ `src/app/dashboard/settings/devices/page.tsx` (`settings.manage`).
+- **Progress:** completed in `lane-a/a4-1-devices` (PR #61, migration 0016). Device registration, 2-digit counter code assignment, one-time token hashing, revocation, and settings management page.
 
-#### A4.2 Sync-ready schema ⏱ 1 day
+#### [x] A4.2 Sync-ready schema ⏱ 1 day
 - ✏️ Add `updated_at` to `batches`, `customers`, `doctors`, `schemes`, `store_medicine_settings`. Add a Postgres trigger `set_updated_at()` in the migration so every UPDATE bumps it, including updates made by `recordStockMovement`. Add indexes `(store_id, updated_at)` / `(tenant_id, updated_at)`.
+- **Progress:** completed in `lane-a/a4-2-sync-ready-schema` (PR #62, migration 0017). Composite indexes and `set_updated_at()` PostgreSQL triggers installed across all 5 operational tables.
 
-#### A4.3 Sync API ⏱ 3 days
+#### [x] A4.3 Sync API ⏱ 3 days
 - **Files:**
   - ➕ `src/app/api/sync/pull/route.ts`: `GET ?since=&cursor=`. Paged (5,000 rows), gzip. Returns medicines (tenant), batches (store, non-expired), customers (tenant, active), doctors, active schemes, store settings, and `serverTime`.
   - ➕ `src/app/api/sync/sales/route.ts`: `POST { sales: OfflineSale[] }` (max 50 per request). Per sale, in its own transaction: idempotency key insert → `createSale(tx, deviceCtx, input, { source: "offline", allowNegativeStock: true, invoiceNo })` (A2.1) → store the response. Returns per-sale `{ clientSaleId, status: "created"|"duplicate"|"rejected", saleId?, error? }`.
@@ -784,8 +786,9 @@ Full map in `.github/CODEOWNERS` and [ADR 0004](docs/adr/0004-two-lane-ownership
   - ✏️ `src/server/domain/sequence.ts`: `formatInvoiceNo({ storeCode, deviceCode, fiscalYear, seq })` validated to ≤ 16 characters (docs/10 §1).
   - ✏️ `src/proxy.ts`: treat `/api/sync` as self-authenticating (bearer device token).
 - **Device ctx:** `authenticateDevice` builds an `AuthCtx`-like object. The cashier who billed offline is recorded via `createdBy` from the payload, checked to be a member allowed in this store.
+- **Progress:** completed in `lane-a/a4-3-sync-api` (PR #63, migration 0018). Session-bound delta pull with microsecond cursors, Rule 46(b) sequence block reservation, isolated sales ingestion with payload hashing, and StockMovementPolicy negative stock reconciliation.
 
-#### A4.4 Browser offline DB & sync engine ⏱ 4 days
+#### [x] A4.4 Browser offline DB & sync engine ⏱ 4 days
 - **Files:** `npm i dexie` 🔀 (tiny separate PR). ➕ `src/offline/db.ts`:
   ```ts
   import Dexie, { type Table } from "dexie";
@@ -804,6 +807,7 @@ Full map in `.github/CODEOWNERS` and [ADR 0004](docs/adr/0004-two-lane-ownership
   ```
   ➕ `src/offline/sync.ts` (pull loop every 60 s while online; push pending on the `online` event and every 15 s; exponential backoff; Web Locks API so only one tab syncs), ➕ `src/offline/invoice-series.ts` (take the next number from the local block; reserve more when fewer than 50 remain), ➕ `src/offline/search.ts` (local search: name/generic prefix and substring over IndexedDB; barcode exact), ➕ `src/offline/offline-sale.ts` (computes totals with the **same** `src/lib/money.ts` functions, decrements the local batch quantity, prints).
   Client-side tax uses the same `computeSaleTotals`. The server recomputes on sync and **flags** differences over ₹1 instead of rejecting.
+- **Progress:** completed in `lane-a/a4-4-browser-offline-db`. IndexedDB schema with Dexie (`PosDB`), separate provisional stock ledger (`provisionalAllocations`), multi-tab atomic invoice sequence allocation under GST Rule 46(b), session-bound delta pull with tombstone propagation, push outbox with stale syncing recovery and idempotency handling, Web Locks concurrency coordination, and offline search with FEFO ranking.
 
 #### A4.5 PWA shell ⏱ 2 days
 - **Files:** ➕ `src/app/manifest.ts` (name, icons, `start_url: "/dashboard/sales/pos"`, `display: "standalone"`), ➕ `public/icons/icon-192.png`, `icon-512.png`, ➕ `public/sw.js` (precache the POS shell and static assets on install; network-first for navigations with cache fallback for the POS route; no caching of `/api/*`), ➕ `src/app/dashboard/sales/pos/_offline/RegisterSW.tsx` (registers `/sw.js` in production only). Read `node_modules/next/dist/docs/01-app/02-guides/progressive-web-apps.md` and the `headers` config for `sw.js` (`Cache-Control: no-cache`, `Service-Worker-Allowed`).
@@ -1053,7 +1057,7 @@ Tick items in PRs. One line per task, in the same order as above.
 **Phase 1** — A: [x] A1.1 [x] A1.2 [x] A1.3 [x] A1.4 [x] A1.5 [x] A1.6 [x] A1.7 · B: [x] B1.1 [x] B1.2 [x] B1.3 [x] B1.4 [x] B1.5 [x] B1.6 [x] B1.7
 **Phase 2** — A: [x] A2.1 [x] A2.2 [x] A2.3 [x] A2.4 [x] A2.5 [x] A2.6 [x] A2.7 [x] A2.8 [x] A2.9 [x] A2.10 [x] A2.11 [x] A2.12 · B: [x] B2.1 [x] B2.2 [x] B2.3 [x] B2.4 [x] B2.5 [x] B2.6 [x] B2.7 [x] B2.8
 **Phase 3** — A: [x] A3.1 [x] A3.2 [x] A3.3 [x] A3.4 [x] A3.5 [x] A3.6 · B: [x] B3.1 [x] B3.2 [x] B3.3 [x] B3.4 [x] B3.5 [x] B3.6 [x] B3.7
-**Phase 4** — A: [x] A4.1 [x] A4.2 [ ] A4.3 [ ] A4.4 [ ] A4.5 [ ] A4.6 [ ] A4.7 [ ] A4.8 [ ] A4.9 · B: [x] B4.1 [x] B4.2 [x] B4.3 [x] B4.4 [x] B4.5 [x] B4.6
+**Phase 4** — A: [x] A4.1 [x] A4.2 [x] A4.3 [x] A4.4 [ ] A4.5 [ ] A4.6 [ ] A4.7 [ ] A4.8 [ ] A4.9 · B: [x] B4.1 [x] B4.2 [x] B4.3 [x] B4.4 [x] B4.5 [x] B4.6
 **Phase 5** — A: [ ] A5.1 [ ] A5.2 [ ] A5.3 [ ] A5.4 [ ] A5.5 [ ] A5.6 [ ] A5.7 · B: [ ] B5.1 [ ] B5.2 [ ] B5.3 [ ] B5.4 [ ] B5.5 [ ] B5.6 [ ] B5.7
 **Phase 6** — A: [ ] A6.1 [ ] A6.2 [ ] A6.3 [ ] A6.4 [ ] A6.5 [ ] A6.6 · B: [ ] B6.1 [ ] B6.2 [ ] B6.3 [ ] B6.4 [ ] B6.5 [ ] B6.6
 
