@@ -14,7 +14,9 @@ export type AuditAction =
   | "discount_override"
   | "fefo_override"
   | "store_switch"
-  | "store_medicine_settings_update";
+  | "store_medicine_settings_update"
+  | "rotate_token"
+  | "revoke";
 
 export interface WriteAuditParams {
   action: AuditAction;

@@ -23,3 +23,4 @@ export * from "./comms";
 export * from "./banking";
 export * from "./ai";
 export * from "./import";
+export * from "./devices";
