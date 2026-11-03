@@ -127,6 +127,13 @@
       "when": 1793689049294,
       "tag": "0017_jittery_enchantress",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1793693395553,
+      "tag": "0018_high_night_thrasher",
+      "breakpoints": true
     }
   ]
 }
