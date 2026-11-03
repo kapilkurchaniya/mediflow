@@ -4,6 +4,7 @@ import { schema, type DbOrTx, type Tx } from "@/server/db";
 import type { AuthCtx } from "@/server/rbac";
 import { DomainError } from "@/server/errors";
 import { writeAudit } from "@/server/audit";
+import { canStoreManageShifts } from "@/server/domain/stores";
 import {
   INDIAN_CURRENCY_DENOMINATIONS,
   type Denomination,
@@ -138,6 +139,22 @@ export async function openShift(
 ): Promise<typeof schema.cashSessions.$inferSelect> {
   const parsed = OpenShiftInputSchema.parse(input);
   const now = new Date();
+
+  // 0. Guard against warehouse stores opening register shifts
+  const [store] = await tx
+    .select({ kind: schema.stores.kind, isActive: schema.stores.isActive })
+    .from(schema.stores)
+    .where(and(eq(schema.stores.id, ctx.storeId), eq(schema.stores.tenantId, ctx.tenantId)))
+    .limit(1);
+
+  if (!store || !canStoreManageShifts(store)) {
+    throw new DomainError(
+      "WAREHOUSE_SHIFT_NOT_ALLOWED",
+      store?.kind === "warehouse"
+        ? "Cash register shifts cannot be opened in a warehouse store."
+        : "Cash register shifts cannot be opened in an inactive store.",
+    );
+  }
 
   // 1. Guard against duplicate open shifts for the store
   const [existing] = await tx

@@ -53,7 +53,7 @@ export function Sidebar({
     currentStore,
     setStoreSwitcherOpen,
   } = useShell();
-  const nav = visibleNav(permissions);
+  const nav = visibleNav(permissions, currentStore?.kind);
   const allNavItems = nav.flatMap((group) => group.items);
   const showSettings = !settingsItem.permission || permissions.has(settingsItem.permission);
 

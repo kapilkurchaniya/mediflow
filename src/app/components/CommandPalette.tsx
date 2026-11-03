@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useRef, useMemo } from "react";
+import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import {
   Search,
@@ -34,6 +34,7 @@ export function CommandPalette() {
     setShortcutsOpen,
     setCalculatorOpen,
     permissions,
+    currentStore,
   } = useShell();
   const router = useRouter();
   const [query, setQuery] = useState("");
@@ -41,15 +42,18 @@ export function CommandPalette() {
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
 
-  const navigateTo = (href: string) => {
-    setCommandOpen(false);
-    router.push(href);
-  };
+  const navigateTo = useCallback(
+    (href: string) => {
+      setCommandOpen(false);
+      router.push(href);
+    },
+    [router, setCommandOpen],
+  );
 
   const items: CommandItem[] = useMemo(
     () => [
       // Navigation: generated from the same config as the sidebar (components/nav)
-      ...visiblePaletteItems(permissions).map(
+      ...visiblePaletteItems(permissions, currentStore?.kind).map(
         (n): CommandItem => ({
           id: `nav-${n.href}`,
           category: "Navigation",
@@ -115,7 +119,15 @@ export function CommandPalette() {
         },
       },
     ],
-    [router, setCommandOpen, toggleCollapsed, setShortcutsOpen, setCalculatorOpen, permissions]
+    [
+      setCommandOpen,
+      toggleCollapsed,
+      setShortcutsOpen,
+      setCalculatorOpen,
+      permissions,
+      currentStore?.kind,
+      navigateTo,
+    ],
   );
 
   const filteredItems = useMemo(() => {
@@ -231,9 +243,7 @@ export function CommandPalette() {
                   <div
                     className={clsx(
                       "grid h-8 w-8 shrink-0 place-items-center rounded-md border",
-                      isSelected
-                        ? "border-brand-200 bg-white text-brand-700"
-                        : "border-ink-150 bg-ink-50 text-ink-500"
+                      isSelected ? "border-brand-200 bg-white text-brand-700" : "border-ink-150 bg-ink-50 text-ink-500"
                     )}
                   >
                     <Icon className="h-4 w-4" />
@@ -241,28 +251,14 @@ export function CommandPalette() {
 
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
-                      <span className="truncate text-[13.5px] font-medium text-ink-900">
-                        {item.label}
-                      </span>
-                      <span className="text-[11px] text-ink-400 font-mono uppercase tracking-wide">
-                        {item.category}
-                      </span>
+                      <span className="truncate text-[13.5px] font-medium text-ink-900">{item.label}</span>
+                      <span className="text-[11px] text-ink-400 font-mono uppercase tracking-wide">{item.category}</span>
                     </div>
-                    {item.description && (
-                      <p className="truncate text-[12px] text-ink-500">
-                        {item.description}
-                      </p>
-                    )}
+                    {item.description && <p className="truncate text-[12px] text-ink-500">{item.description}</p>}
                   </div>
 
-                  {item.shortcut && (
-                    <span className="kbd text-[10.5px] shrink-0">
-                      {item.shortcut}
-                    </span>
-                  )}
-                  {isSelected && (
-                    <ArrowRight className="h-3.5 w-3.5 text-brand-600 shrink-0" />
-                  )}
+                  {item.shortcut && <span className="kbd text-[10.5px] shrink-0">{item.shortcut}</span>}
+                  {isSelected && <ArrowRight className="h-3.5 w-3.5 text-brand-600 shrink-0" />}
                 </div>
               );
             })
