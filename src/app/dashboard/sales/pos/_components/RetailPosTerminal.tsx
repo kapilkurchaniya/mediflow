@@ -2,7 +2,11 @@
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { defaultPosDataSource as ds } from "../_data/posData";
+import { usePosDataSource } from "@/offline/usePosDataSource";
+import { PendingBillsDrawer } from "./PendingBillsDrawer";
+import { OfflineReceiptModal } from "./OfflineReceiptModal";
+import { getPosDB } from "@/offline/db";
+import type { OfflinePendingSale } from "@/offline/types";
 import { usePosCart } from "../_state/usePosCart";
 import { usePosShortcuts } from "../_state/usePosShortcuts";
 import { useShell } from "@/app/components/ShellContext";
@@ -29,12 +33,19 @@ export function RetailPosTerminal() {
     setStoreSwitcherOpen,
   } = useShell();
 
+  const posDs = usePosDataSource({
+    storeId: currentStore?.id,
+  });
+  const ds = posDs.dataSource;
+
   const [activeShift, setActiveShift] = useState<CurrentShiftStats | null>(null);
   const [requireShift, setRequireShift] = useState(false);
   const [heldCount, setHeldCount] = useState(0);
   const [isPaymentOpen, setIsPaymentOpen] = useState(false);
   const [isParkOpen, setIsParkOpen] = useState(false);
   const [isHeldListOpen, setIsHeldListOpen] = useState(false);
+  const [isPendingDrawerOpen, setIsPendingDrawerOpen] = useState(false);
+  const [offlineReceiptBill, setOfflineReceiptBill] = useState<OfflinePendingSale | null>(null);
   const [substituteGeneric, setSubstituteGeneric] = useState<string | null>(null);
   const [promiseMedicine, setPromiseMedicine] = useState<{ id: string; name: string } | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -57,7 +68,7 @@ export function RetailPosTerminal() {
     } catch (e) {
       console.error("Meta refresh error:", e);
     }
-  }, []);
+  }, [ds]);
 
   useEffect(() => {
     void Promise.resolve().then(() => refreshMeta());
@@ -126,7 +137,12 @@ export function RetailPosTerminal() {
         playSound("chime");
         dispatch({ type: "RESET_SALE" });
         setIsPaymentOpen(false);
-        router.push(`/dashboard/sales/${res.saleId}/print?format=thermal`);
+        if (posDs.isOffline) {
+          const bill = await getPosDB().pendingSales.get(res.saleId);
+          if (bill) setOfflineReceiptBill(bill);
+        } else {
+          router.push(`/dashboard/sales/${res.saleId}/print?format=thermal`);
+        }
       } else {
         setSubmitError(res.error || "Failed to finalize sale");
       }
@@ -178,6 +194,11 @@ export function RetailPosTerminal() {
           onResetSale={() => { dispatch({ type: "RESET_SALE" }); searchInputRef.current?.focus(); }}
           activeShift={activeShift}
           requireShift={requireShift}
+          isOffline={posDs.isOffline}
+          isSyncing={posDs.isSyncing}
+          pendingCount={posDs.pendingCount}
+          lastSyncAt={posDs.lastSyncAt}
+          onOpenPendingDrawer={() => setIsPendingDrawerOpen(true)}
         />
 
         <SearchBar
@@ -233,6 +254,7 @@ export function RetailPosTerminal() {
         dispatch={dispatch}
         isSubmitting={isSubmitting}
         submitError={submitError}
+        isOffline={posDs.isOffline}
         dataSource={ds}
         refreshMeta={refreshMeta}
         setRevalidationAlert={setRevalidationAlert}
@@ -244,6 +266,25 @@ export function RetailPosTerminal() {
         }}
         onCloseSubstitute={() => setSubstituteGeneric(null)}
         onClosePromise={() => setPromiseMedicine(null)}
+      />
+
+      <PendingBillsDrawer
+        isOpen={isPendingDrawerOpen}
+        onClose={() => setIsPendingDrawerOpen(false)}
+        storeId={currentStore?.id || ""}
+        storeCode={currentStore?.code || ""}
+        isOffline={posDs.isOffline}
+        isSyncing={posDs.isSyncing}
+        onTriggerSync={posDs.triggerSyncNow}
+        onReprintBill={(b) => setOfflineReceiptBill(b)}
+      />
+
+      <OfflineReceiptModal
+        isOpen={Boolean(offlineReceiptBill)}
+        onClose={() => setOfflineReceiptBill(null)}
+        bill={offlineReceiptBill}
+        storeName={currentStore?.name}
+        storeCode={currentStore?.code}
       />
     </div>
   );
