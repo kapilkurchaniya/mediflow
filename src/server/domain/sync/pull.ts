@@ -9,7 +9,7 @@ import type {
 } from "./types";
 
 interface CursorParts {
-  timestamp: Date;
+  cursorTs: string;
   id: string;
 }
 
@@ -17,14 +17,10 @@ function parseCursor(cursor?: string): CursorParts | null {
   if (!cursor) return null;
   const idx = cursor.indexOf("_");
   if (idx === -1) return null;
-  const ts = new Date(cursor.slice(0, idx));
+  const cursorTs = cursor.slice(0, idx);
   const id = cursor.slice(idx + 1);
-  if (isNaN(ts.getTime()) || !id) return null;
-  return { timestamp: ts, id };
-}
-
-function formatCursor(updatedAt: Date, id: string): string {
-  return `${updatedAt.toISOString()}_${id}`;
+  if (!cursorTs || !id) return null;
+  return { cursorTs, id };
 }
 
 const emptyPage = <T>(): SyncEntityPage<T> => ({
@@ -48,8 +44,11 @@ async function paginateTable(
   if (cursor) {
     conds.push(
       or(
-        sql`${updatedAtCol} > ${cursor.timestamp}`,
-        and(eq(updatedAtCol, cursor.timestamp), sql`${idCol} > ${cursor.id}`),
+        sql`${updatedAtCol} > ${cursor.cursorTs}::timestamptz`,
+        and(
+          sql`${updatedAtCol} = ${cursor.cursorTs}::timestamptz`,
+          sql`${idCol} > ${cursor.id}`,
+        ),
       ),
     );
   }
@@ -58,21 +57,25 @@ async function paginateTable(
   orderClauses.push(asc(idCol));
 
   const rows = await db
-    .select()
+    .select({
+      record: table,
+      cursorTs: sql<string>`to_char(${updatedAtCol}, 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')`,
+    })
     .from(table)
     .where(and(...conds.filter(Boolean)))
     .orderBy(...orderClauses)
     .limit(limit + 1);
 
   const hasMore = rows.length > limit;
-  const items = (hasMore ? rows.slice(0, limit) : rows) as Record<string, unknown>[];
-  const last = items[items.length - 1];
+  const sliced = hasMore ? rows.slice(0, limit) : rows;
+  const items = sliced.map((r) => r.record) as Record<string, unknown>[];
+  const last = sliced[sliced.length - 1];
   let nextCursor: string | null = null;
   if (hasMore && last) {
-    const rawTs = (last.updatedAt ?? last.updated_at) as string | Date;
-    const rawId = (last.id ?? last.medicineId ?? last.code) as string;
-    if (rawTs && rawId) {
-      nextCursor = formatCursor(new Date(rawTs), String(rawId));
+    const rawRecord = last.record as Record<string, unknown>;
+    const rawId = (rawRecord.id ?? rawRecord.medicineId ?? rawRecord.code) as string;
+    if (last.cursorTs && rawId) {
+      nextCursor = `${last.cursorTs}_${rawId}`;
     }
   }
 
@@ -92,7 +95,8 @@ export async function pullSyncDeltas(
   params: SyncEntityPageParam,
 ): Promise<SyncPullResponse> {
   const serverTime = new Date().toISOString();
-  const snapshotTime = params.snapshotTime ?? serverTime;
+  // Safe upper bound: if client didn't fix snapshotTime, provide a 5s buffer to avoid docker clock drift
+  const snapshotTime = params.snapshotTime ?? new Date(Date.now() + 5000).toISOString();
   const snapshotDate = new Date(snapshotTime);
   const sessionId = params.sessionId ?? crypto.randomUUID();
   const expiresAt = new Date(Date.now() + 15 * 60 * 1000).toISOString();

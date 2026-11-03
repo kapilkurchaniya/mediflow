@@ -86,7 +86,7 @@ describe("Task A4.3: Delta Pull Engine", () => {
   });
 
   it("respects fixed upper bound (snapshotTime) across pull session", async () => {
-    const { tenant, store, deviceCtx } = await setupWorld();
+    const { tenant, deviceCtx } = await setupWorld();
 
     const med1 = await makeMedicine(t.db, tenant.id, { name: "Med Before Snapshot" });
 
@@ -112,6 +112,7 @@ describe("Task A4.3: Delta Pull Engine", () => {
     const medA = await makeMedicine(t.db, tenant.id, { name: "Med A" });
     const medB = await makeMedicine(t.db, tenant.id, { name: "Med B" });
     const medC = await makeMedicine(t.db, tenant.id, { name: "Med C" });
+    const medD = await makeMedicine(t.db, tenant.id, { name: "Med D" });
 
     // Page 1 with limit = 2
     const page1 = await pullSyncDeltas(t.db, deviceCtx, {
@@ -138,6 +139,8 @@ describe("Task A4.3: Delta Pull Engine", () => {
     ];
     expect(allPulledIds).toContain(medA.id);
     expect(allPulledIds).toContain(medB.id);
+    expect(allPulledIds).toContain(medC.id);
+    expect(allPulledIds).toContain(medD.id);
     expect(allPulledIds).toContain(medC.id);
   });
 
