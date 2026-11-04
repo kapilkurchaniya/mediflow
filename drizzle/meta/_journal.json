@@ -148,6 +148,13 @@
       "when": 1793794215891,
       "tag": "0020_talented_nuke",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1793795600000,
+      "tag": "0021_daybook_ledger_indexes",
+      "breakpoints": true
     }
   ]
 }
