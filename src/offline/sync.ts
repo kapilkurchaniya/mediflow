@@ -37,7 +37,8 @@ export async function runSyncCycle(
 
   // Web Locks coordination
   if (typeof navigator !== "undefined" && navigator.locks) {
-    return await navigator.locks.request("mediflow-pos-sync", { ifAvailable: true }, async (lock) => {
+    const lockOpts = force ? {} : { ifAvailable: true };
+    return await navigator.locks.request("mediflow-pos-sync", lockOpts, async (lock) => {
       if (!lock) {
         // Another browser tab currently holds the sync worker lock
         return null;

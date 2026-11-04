@@ -56,8 +56,8 @@ export async function pushOfflineSales(
 
   // 2. Select pending sales whose nextRetryAt has arrived (or all if force is true)
   const allPending = await db.pendingSales
-    .where("[storeId+status]")
-    .equals([config.storeId, "pending"])
+    .where("status")
+    .equals("pending")
     .toArray();
 
   const eligible = allPending
