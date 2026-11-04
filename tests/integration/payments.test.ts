@@ -302,6 +302,12 @@ describe("postPayment: paying suppliers and expenses (🤝 Lane B)", () => {
     await expect(
       t.db.delete(schema.payments).where(eq(schema.payments.id, res.paymentId))
     ).rejects.toThrow();
+
+    // Cleaning up allocations first allows the payment to be deleted safely
+    await t.db.delete(schema.paymentAllocations).where(eq(schema.paymentAllocations.paymentId, res.paymentId));
+    await expect(
+      t.db.delete(schema.payments).where(eq(schema.payments.id, res.paymentId))
+    ).resolves.not.toThrow();
   });
 
   it("cannot pay more than is owed on the purchase", async () => {
