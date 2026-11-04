@@ -30,3 +30,4 @@ describe("QR Code Generator (ISO/IEC 18004)", () => {
     expect(svg).toContain("</svg>");
   });
 });
+
