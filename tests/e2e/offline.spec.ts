@@ -261,7 +261,7 @@ test.describe("Offline POS Counter E2E Smoke & Integration Suite (Task A4.8)", (
     const receiptModal = page.getByRole("heading", { name: /offline sale recorded/i });
     await expect(receiptModal).toBeVisible({ timeout: 5000 });
     const pendingSales = await getDexiePendingSales(page);
-    const pending = pendingSales.find((s) => s.status === "pending") ?? pendingSales[pendingSales.length - 1];
+    const pending = pendingSales.find((s) => s.payload.lines?.some((l) => l.batchId === batch.id)) ?? pendingSales[pendingSales.length - 1];
     const offlineInv = pending.invoiceNo;
     await page.getByTitle("Close").click();
 
