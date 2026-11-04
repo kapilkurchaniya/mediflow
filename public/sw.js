@@ -105,7 +105,7 @@ self.addEventListener("fetch", (event) => {
   }
 
   // 5. Document Navigation: Network-first with /offline.html fallback for POS counter
-  if (req.mode === "navigate" && url.pathname === "/dashboard/sales/pos") {
+  if (req.mode === "navigate" && (url.pathname === "/dashboard/sales/pos" || url.pathname.startsWith("/dashboard/sales/pos"))) {
     event.respondWith(
       fetch(req).catch(async () => {
         const fallback = await caches.match("/offline.html");

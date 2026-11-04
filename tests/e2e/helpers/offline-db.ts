@@ -75,11 +75,16 @@ export async function primeDexieSync(page: Page): Promise<void> {
     { timeout: 15000 },
   );
 
-  // Ensure Service Worker is active and controlling client before potential offline test steps
+  // Ensure Service Worker is active, controlling client, and offline shell precached
   await page.evaluate(async () => {
     if (typeof window !== "undefined" && "serviceWorker" in navigator) {
       try {
         await navigator.serviceWorker.ready;
+        const cache = await caches.open("mediflow-pos-v1");
+        const hasOffline = await cache.match("/offline.html");
+        if (!hasOffline) {
+          await cache.addAll(["/offline.html", "/icons/icon-192.png", "/icons/icon-512.png"]);
+        }
         if (!navigator.serviceWorker.controller) {
           await new Promise<void>((resolve) => {
             navigator.serviceWorker.addEventListener("controllerchange", () => resolve(), { once: true });
@@ -90,6 +95,20 @@ export async function primeDexieSync(page: Page): Promise<void> {
       } catch {
         // Ignore fallback
       }
+    }
+  });
+}
+
+/**
+ * Triggers a synchronization cycle in browser Dexie to flush outbox sales to server.
+ */
+export async function triggerDexieSync(page: Page): Promise<void> {
+  await page.evaluate(async () => {
+    const db = window.__posDb;
+    if (!db) throw new Error("window.__posDb not available");
+    const runSync = (window as unknown as { __runSyncCycle?: (db: unknown) => Promise<unknown> }).__runSyncCycle;
+    if (runSync) {
+      await runSync(db);
     }
   });
 }

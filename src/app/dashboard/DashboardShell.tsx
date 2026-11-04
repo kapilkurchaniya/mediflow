@@ -15,6 +15,7 @@ interface DashboardShellProps {
   children: React.ReactNode;
   userName: string;
   userEmail: string;
+  userId?: string;
   storeName: string;
   currentStore?: AllowedStoreItem | null;
   allowedStores?: AllowedStoreItem[];
@@ -138,6 +139,7 @@ export function DashboardShell(props: DashboardShellProps) {
       allowedStores={props.allowedStores}
       userName={props.userName}
       userEmail={props.userEmail}
+      userId={props.userId}
       permissions={props.permissions}
     >
       <DashboardShellContent {...props} />

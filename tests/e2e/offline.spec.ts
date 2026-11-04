@@ -9,6 +9,7 @@ import {
 import {
   initDexieDevice,
   primeDexieSync,
+  triggerDexieSync,
   getDexiePendingSales,
   getDexieProvisionalAllocations,
   computePayloadHash,
@@ -53,6 +54,7 @@ test.describe("Offline POS Counter E2E Smoke & Integration Suite (Task A4.8)", (
         deviceCode: fixture.device.code,
         storeCode: fixture.store.code,
         deviceToken: fixture.rawToken,
+        cashierId: fixture.adminUser.id,
       },
       fixture.reservation,
     );
@@ -119,6 +121,7 @@ test.describe("Offline POS Counter E2E Smoke & Integration Suite (Task A4.8)", (
 
     // 3. Restore network connectivity & await sync completion
     await page.context().setOffline(false);
+    await triggerDexieSync(page);
     await expect.poll(async () => {
       const pending = await getDexiePendingSales(page);
       return pending.filter((s) => s.status === "pending" || s.status === "syncing").length;
@@ -152,7 +155,7 @@ test.describe("Offline POS Counter E2E Smoke & Integration Suite (Task A4.8)", (
 
     // Reload while offline: Service Worker must serve /offline.html
     await page.reload();
-    await expect(page.getByRole("heading", { name: /offline counter/i })).toBeVisible({ timeout: 10000 });
+    await expect(page.getByRole("heading", { name: /pos counter/i })).toBeVisible({ timeout: 10000 });
     await expect(page.getByText(/offline mode active/i)).toBeVisible();
 
     // Inspect Dexie inside /offline.html: verify same sale survives unmutated
@@ -165,6 +168,7 @@ test.describe("Offline POS Counter E2E Smoke & Integration Suite (Task A4.8)", (
     await page.context().setOffline(false);
     await page.getByRole("link", { name: /retry pos connection/i }).click();
     await page.waitForURL("**/dashboard/sales/pos**", { timeout: 15000 });
+    await triggerDexieSync(page);
 
     // Await automatic sync completion
     await expect.poll(async () => {
@@ -261,6 +265,7 @@ test.describe("Offline POS Counter E2E Smoke & Integration Suite (Task A4.8)", (
 
     // 4. Reconnect Context 1 & sync under offline_reconciliation policy
     await page.context().setOffline(false);
+    await triggerDexieSync(page);
     await expect.poll(async () => {
       const sales = await getDexiePendingSales(page);
       return sales.find((s) => s.invoiceNo === offlineInv)?.status;

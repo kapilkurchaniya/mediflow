@@ -122,7 +122,7 @@ export function usePosDataSource(options: UsePosDataSourceOptions): PosDataSourc
       tenantId: options.tenantId || deviceConfig?.tenantId || "default-tenant",
       storeId: options.storeId || deviceConfig?.storeId || "default-store",
       deviceId: options.deviceId || deviceConfig?.deviceId || "dev01",
-      cashierId: options.cashierId || "cashier-default",
+      cashierId: options.cashierId || deviceConfig?.cashierId || "cashier-default",
     });
   }, [db, options.tenantId, options.storeId, options.deviceId, options.cashierId, deviceConfig]);
 
