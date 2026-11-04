@@ -25,6 +25,13 @@ export const DEFAULT_ACCOUNTS = [
   { code: "4010", name: "Purchase Account", type: "expense", systemKey: "purchases" },
   { code: "4090", name: "Round Off Account", type: "expense", systemKey: "roundoff" },
   { code: "5030", name: "Stock Shortage & Loss", type: "expense", systemKey: "stock_loss" },
+  { code: "4110", name: "Rent & Premises", type: "expense", systemKey: "expense_rent" },
+  { code: "4120", name: "Salaries & Wages", type: "expense", systemKey: "expense_salary" },
+  { code: "4130", name: "Electricity & Utilities", type: "expense", systemKey: "expense_utilities" },
+  { code: "4140", name: "Transport & Delivery", type: "expense", systemKey: "expense_transport" },
+  { code: "4145", name: "Printing & Stationery", type: "expense", systemKey: "expense_stationery" },
+  { code: "4150", name: "Miscellaneous Expenses", type: "expense", systemKey: "expense_misc" },
+  { code: "4155", name: "Repairs & Maintenance", type: "expense", systemKey: "expense_maintenance" },
 ] as const;
 
 /**

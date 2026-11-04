@@ -13,6 +13,7 @@ import {
   Users,
   ChevronRight,
   ArrowRight,
+  ReceiptText,
 } from "lucide-react";
 import Link from "next/link";
 import { format } from "date-fns";
@@ -59,6 +60,13 @@ const FINANCIAL_STATEMENTS = [
     desc: "Customer credit debtors & supplier payables",
     icon: Users,
     tone: "text-rose-600 bg-rose-50 border-rose-200",
+  },
+  {
+    href: "/dashboard/accounting/expenses",
+    title: "Operating Expenses",
+    desc: "Vouchers, till payouts, rent, utilities & overheads",
+    icon: ReceiptText,
+    tone: "text-violet-600 bg-violet-50 border-violet-200",
   },
 ];
 
