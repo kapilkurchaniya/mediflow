@@ -28,6 +28,7 @@ export async function runSyncCycle(
   db: PosDB,
   config?: OfflineDeviceConfig,
   fetchFn: typeof fetch = fetch,
+  force = false,
 ): Promise<SyncCycleResult | null> {
   const deviceConfig = config ?? (await db.getDeviceConfig());
   if (!deviceConfig) {
@@ -41,7 +42,7 @@ export async function runSyncCycle(
         // Another browser tab currently holds the sync worker lock
         return null;
       }
-      return await executeSyncCycle(db, deviceConfig, fetchFn);
+      return await executeSyncCycle(db, deviceConfig, fetchFn, force);
     });
   }
 
@@ -49,7 +50,7 @@ export async function runSyncCycle(
   if (isSyncRunning) return null;
   try {
     isSyncRunning = true;
-    return await executeSyncCycle(db, deviceConfig, fetchFn);
+    return await executeSyncCycle(db, deviceConfig, fetchFn, force);
   } finally {
     isSyncRunning = false;
   }
@@ -59,9 +60,10 @@ async function executeSyncCycle(
   db: PosDB,
   config: OfflineDeviceConfig,
   fetchFn: typeof fetch,
+  force = false,
 ): Promise<SyncCycleResult> {
   // 1. Push pending offline sales first
-  const pushRes = await pushOfflineSales(db, config, 50, fetchFn);
+  const pushRes = await pushOfflineSales(db, config, 50, fetchFn, force);
 
   // 2. Pull server deltas
   const pullRes = await pullSyncDeltas(db, config, fetchFn);
@@ -137,12 +139,12 @@ export function startSyncCoordinator(
 ): { stop: () => void; triggerSync: () => Promise<SyncCycleResult | null> } {
   let timer: NodeJS.Timeout | null = null;
 
-  const triggerSync = async () => {
-    return await runSyncCycle(db, undefined, fetchFn);
+  const triggerSync = async (force = false) => {
+    return await runSyncCycle(db, undefined, fetchFn, force);
   };
 
   const handleOnline = () => {
-    void triggerSync();
+    void triggerSync(true);
   };
 
   if (typeof window !== "undefined") {

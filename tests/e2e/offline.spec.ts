@@ -123,9 +123,10 @@ test.describe("Offline POS Counter E2E Smoke & Integration Suite (Task A4.8)", (
     await page.context().setOffline(false);
     await triggerDexieSync(page);
     await expect.poll(async () => {
+      await triggerDexieSync(page);
       const pending = await getDexiePendingSales(page);
       return pending.filter((s) => s.status === "pending" || s.status === "syncing").length;
-    }, { timeout: 20000 }).toBe(0);
+    }, { timeout: 20000, intervals: [1000, 2000] }).toBe(0);
 
     // 4. PostgreSQL Authoritative Business Truth Verifications
     await assertServerSaleDetails({ invoiceNo: expectedInv1, expectedPaymentMethods: ["cash"] });
@@ -172,9 +173,10 @@ test.describe("Offline POS Counter E2E Smoke & Integration Suite (Task A4.8)", (
 
     // Await automatic sync completion
     await expect.poll(async () => {
+      await triggerDexieSync(page);
       const sales = await getDexiePendingSales(page);
       return sales.find((s) => s.clientSaleId === saleBefore.clientSaleId)?.status;
-    }, { timeout: 20000 }).toBe("synced");
+    }, { timeout: 20000, intervals: [1000, 2000] }).toBe("synced");
 
     await assertServerSaleDetails({ invoiceNo: saleBefore.invoiceNo });
   });

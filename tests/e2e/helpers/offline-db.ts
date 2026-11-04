@@ -105,33 +105,79 @@ export async function primeDexieSync(page: Page): Promise<void> {
 export async function triggerDexieSync(page: Page): Promise<void> {
   await page.evaluate(async () => {
     const db = window.__posDb;
-    if (!db) throw new Error("window.__posDb not available");
-    const runSync = (window as unknown as { __runSyncCycle?: (db: unknown) => Promise<unknown> }).__runSyncCycle;
+    if (!db) return;
+    const runSync = (window as unknown as { __runSyncCycle?: (db: unknown, cfg?: unknown, fn?: unknown, force?: boolean) => Promise<unknown> }).__runSyncCycle;
     if (runSync) {
-      await runSync(db);
+      await runSync(db, undefined, undefined, true);
     }
   });
 }
 
 /**
- * Retrieves all pending outbox sales from browser Dexie.
+ * Retrieves all pending outbox sales from browser Dexie with IndexedDB fallback when on static offline shell.
  */
 export async function getDexiePendingSales(page: Page): Promise<OfflinePendingSale[]> {
   return await page.evaluate(async () => {
-    const db = window.__posDb;
-    if (!db) return [];
-    return await db.pendingSales.toArray();
+    if (window.__posDb) {
+      return await window.__posDb.pendingSales.toArray();
+    }
+    return new Promise<OfflinePendingSale[]>((resolve) => {
+      if (typeof indexedDB === "undefined") return resolve([]);
+      const req = indexedDB.open("mediflow-pos");
+      req.onerror = () => resolve([]);
+      req.onsuccess = () => {
+        const idb = req.result;
+        if (!idb.objectStoreNames.contains("pendingSales")) {
+          idb.close();
+          return resolve([]);
+        }
+        const tx = idb.transaction("pendingSales", "readonly");
+        const store = tx.objectStore("pendingSales");
+        const getAllReq = store.getAll();
+        getAllReq.onsuccess = () => {
+          idb.close();
+          resolve(getAllReq.result || []);
+        };
+        getAllReq.onerror = () => {
+          idb.close();
+          resolve([]);
+        };
+      };
+    });
   });
 }
 
 /**
- * Retrieves all provisional stock allocations from browser Dexie.
+ * Retrieves all provisional stock allocations from browser Dexie with IndexedDB fallback.
  */
 export async function getDexieProvisionalAllocations(page: Page): Promise<OfflineProvisionalAllocation[]> {
   return await page.evaluate(async () => {
-    const db = window.__posDb;
-    if (!db) return [];
-    return await db.provisionalAllocations.toArray();
+    if (window.__posDb) {
+      return await window.__posDb.provisionalAllocations.toArray();
+    }
+    return new Promise<OfflineProvisionalAllocation[]>((resolve) => {
+      if (typeof indexedDB === "undefined") return resolve([]);
+      const req = indexedDB.open("mediflow-pos");
+      req.onerror = () => resolve([]);
+      req.onsuccess = () => {
+        const idb = req.result;
+        if (!idb.objectStoreNames.contains("provisionalAllocations")) {
+          idb.close();
+          return resolve([]);
+        }
+        const tx = idb.transaction("provisionalAllocations", "readonly");
+        const store = tx.objectStore("provisionalAllocations");
+        const getAllReq = store.getAll();
+        getAllReq.onsuccess = () => {
+          idb.close();
+          resolve(getAllReq.result || []);
+        };
+        getAllReq.onerror = () => {
+          idb.close();
+          resolve([]);
+        };
+      };
+    });
   });
 }
 

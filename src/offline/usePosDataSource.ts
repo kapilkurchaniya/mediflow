@@ -52,7 +52,7 @@ export function usePosDataSource(options: UsePosDataSourceOptions): PosDataSourc
     const handleOnline = () => {
       setIsBrowserOffline(false);
       if (db) {
-        void runSyncCycle(db);
+        void runSyncCycle(db, undefined, undefined, true);
       }
     };
     const handleOffline = () => setIsBrowserOffline(true);
@@ -105,7 +105,7 @@ export function usePosDataSource(options: UsePosDataSourceOptions): PosDataSourc
     if (!db || isBrowserOffline || isSyncing) return;
     setIsSyncing(true);
     try {
-      await runSyncCycle(db);
+      await runSyncCycle(db, undefined, undefined, true);
       const updatedSyncAt = await db.getMeta<string>("lastSyncAt");
       if (updatedSyncAt) setLastSyncAt(updatedSyncAt);
     } catch (e) {

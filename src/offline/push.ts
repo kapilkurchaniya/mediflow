@@ -47,20 +47,21 @@ export async function pushOfflineSales(
   config: OfflineDeviceConfig,
   batchSize = 50,
   fetchFn: typeof fetch = fetch,
+  force = false,
 ): Promise<PushResultSummary> {
   // 1. Recover any sales stuck from previous interruptions
   await recoverStaleSyncingSales(db);
 
   const now = new Date().toISOString();
 
-  // 2. Select pending sales whose nextRetryAt has arrived
+  // 2. Select pending sales whose nextRetryAt has arrived (or all if force is true)
   const allPending = await db.pendingSales
     .where("[storeId+status]")
     .equals([config.storeId, "pending"])
     .toArray();
 
   const eligible = allPending
-    .filter((s) => s.nextRetryAt <= now)
+    .filter((s) => force || s.nextRetryAt <= now)
     .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
     .slice(0, batchSize);
 

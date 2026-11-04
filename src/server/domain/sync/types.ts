@@ -18,6 +18,7 @@ export const SyncEntityPageParamSchema = z.object({
       "doctors",
       "schemes",
       "storeMedicineSettings",
+      "storeSettings",
     ])
     .optional(),
   cursor: z.string().max(100).optional(),
@@ -34,7 +35,8 @@ export interface SyncEntityPageParam {
     | "customers"
     | "doctors"
     | "schemes"
-    | "storeMedicineSettings";
+    | "storeMedicineSettings"
+    | "storeSettings";
   cursor?: string;
   limit?: number;
 }
