@@ -3,208 +3,53 @@ import { schema } from "@/server/db";
 import { eq, and, desc } from "drizzle-orm";
 import type { DbOrTx } from "@/server/db";
 import { DEFAULT_GST_RATE_BP } from "@/lib/regulatory";
+import { resolveIRPProvider } from "./einvoice-provider-factory";
 
-export interface EInvoiceSellerDetails {
-  gstin: string;
-  legalName: string;
-  tradeName?: string;
-  address: string;
-  location: string;
-  pincode: string;
-  stateCode: string;
-}
+export * from "./einvoice-types";
+export * from "./einvoice-simulator";
+export { resolveIRPProvider } from "./einvoice-provider-factory";
 
-export interface EInvoiceBuyerDetails {
-  gstin: string;
-  legalName: string;
-  tradeName?: string;
-  address: string;
-  location: string;
-  pincode: string;
-  stateCode: string;
-  placeOfSupply: string;
-}
-
-export interface EInvoiceItemPayload {
-  slNo: number;
-  itemDescription: string;
-  hsnCode: string;
-  quantity: number;
-  unit: string;
-  unitPrice: number; // in rupees
-  grossAmount: number;
-  discount: number;
-  taxableAmount: number;
-  gstRate: number; // e.g. 12.0
-  cgstAmount: number;
-  sgstAmount: number;
-  igstAmount: number;
-  totalItemValue: number;
-}
-
-export interface EInvoicePayload {
-  version: "1.1";
-  transactionDetails: {
-    taxScheme: "GST";
-    supplyType: "B2B" | "SEZWP" | "SEZWOP" | "EXPWP" | "EXPWOP" | "DEXP";
-    reverseCharge: "Y" | "N";
-    igstOnIntra: "Y" | "N";
-  };
-  documentDetails: {
-    documentType: "INV" | "CRN" | "DBN";
-    documentNumber: string;
-    documentDate: string; // DD/MM/YYYY
-  };
-  sellerDetails: EInvoiceSellerDetails;
-  buyerDetails: EInvoiceBuyerDetails;
-  itemList: EInvoiceItemPayload[];
-  valueDetails: {
-    assValue: number;
-    cgstValue: number;
-    sgstValue: number;
-    igstValue: number;
-    cessValue: number;
-    roundOff: number;
-    totalInvoiceValue: number;
-  };
-}
-
-export interface IRNResult {
-  irn: string;
-  ackNo: string;
-  ackDate: string;
-  signedQrCode: string;
-  status: "ACT";
-}
-
-export interface EWayBillInput {
-  transporterId?: string;
-  transporterName?: string;
-  transportMode?: "1" | "2" | "3" | "4"; // 1: Road, 2: Rail, 3: Air, 4: Ship
-  vehicleNo?: string;
-  distanceKm: number;
-  vehicleType?: "R" | "O"; // Regular | Over Dimensional Cargo
-}
-
-export interface EWayBillResult {
-  ewayBillNo: string;
-  ewayBillDate: string;
-  validUpto: string;
-}
-
-export interface IRPProvider {
-  name: string;
-  generateIRN(payload: EInvoicePayload): Promise<IRNResult>;
-  cancelIRN(irn: string, reasonCode: string, remarks: string): Promise<{ success: boolean; cancelledDate: string }>;
-  generateEWayBill(irn: string, details: EWayBillInput): Promise<EWayBillResult>;
-  cancelEWayBill(ewayBillNo: string, reason: string): Promise<{ success: boolean }>;
-}
+import {
+  type IRPProvider,
+  type EInvoicePayload,
+  type EInvoiceItemPayload,
+  type EInvoiceSellerDetails,
+  type EInvoiceBuyerDetails,
+  type EInvoiceBatchDetails,
+  type IRNResult,
+  type EWayBillInput,
+  type EWayBillResult,
+  type EInvoiceMode,
+  getEInvoiceMode,
+} from "./einvoice-types";
+import { defaultIRPProvider, calculateIrnHash } from "./einvoice-simulator";
 
 /**
- * Computes official 64-character SHA-256 hash IRN
- * Formula: SHA256(SupplierGSTIN + FiscalYear + DocType + DocNo)
+ * Maps pharmacy packaging and selling units to official GST UQC codes.
  */
-export function calculateIrnHash(
-  sellerGstin: string,
-  fiscalYear: string,
-  docType: string,
-  docNo: string
-): string {
-  const normalized = `${sellerGstin.trim().toUpperCase()}${fiscalYear.trim()}${docType.trim().toUpperCase()}${docNo.trim()}`;
-  return crypto.createHash("sha256").update(normalized).digest("hex").toUpperCase();
+export function mapToGstUqc(unit?: string | null): string {
+  if (!unit) return "NOS";
+  const clean = unit.trim().toUpperCase();
+  if (["STRIP", "TAB", "TABLET", "CAP", "CAPSULE", "BOX", "STR"].includes(clean)) return "BOX";
+  if (["BOTTLE", "BTL"].includes(clean)) return "BTL";
+  if (["VIAL", "AMP", "AMPOULE"].includes(clean)) return "VIAL";
+  if (["TUBE", "TUB"].includes(clean)) return "TUB";
+  if (["GM", "GRAM", "GMS"].includes(clean)) return "GMS";
+  if (["KG", "KILOGRAM", "KGS"].includes(clean)) return "KGS";
+  if (["ML", "MILLILITRE", "MLT"].includes(clean)) return "MLT";
+  if (["LTR", "LITRE"].includes(clean)) return "LTR";
+  if (["PACK", "PAC", "KIT"].includes(clean)) return "PAC";
+  return "NOS";
 }
 
-/**
- * Simulated IRP Provider — generates mathematically correct IRNs locally.
- * NOT a valid e-invoice. Never use in production without a real GSP.
- */
-export class SimulatedIRPProvider implements IRPProvider {
-  name = "SIMULATOR";
-
-  async generateIRN(payload: EInvoicePayload): Promise<IRNResult> {
-    const docDateParts = payload.documentDetails.documentDate.split("/");
-    const docYear = parseInt(docDateParts[2] || "2026", 10);
-    const docMonth = parseInt(docDateParts[1] || "4", 10);
-    // Indian FY calculation
-    const fy = docMonth >= 4 ? `${docYear}-${String(docYear + 1).slice(2)}` : `${docYear - 1}-${String(docYear).slice(2)}`;
-
-    const irn = calculateIrnHash(
-      payload.sellerDetails.gstin,
-      fy,
-      payload.documentDetails.documentType,
-      payload.documentDetails.documentNumber
-    );
-
-    const now = new Date();
-    // 15-digit acknowledgement number
-    const timestampSeed = Date.now().toString().slice(-9);
-    const ackNo = `1226${timestampSeed.padStart(11, "0")}`;
-    const ackDate = now.toISOString();
-
-    // Construct standard QR code signed data packet
-    const qrData = {
-      sellerGstin: payload.sellerDetails.gstin,
-      buyerGstin: payload.buyerDetails.gstin,
-      docNo: payload.documentDetails.documentNumber,
-      docDate: payload.documentDetails.documentDate,
-      totVal: payload.valueDetails.totalInvoiceValue,
-      itemCnt: payload.itemList.length,
-      mainHsn: payload.itemList[0]?.hsnCode || "30049099",
-      irn,
-    };
-
-    const signedQrCode = Buffer.from(JSON.stringify(qrData)).toString("base64");
-
-    return {
-      irn,
-      ackNo,
-      ackDate,
-      signedQrCode,
-      status: "ACT",
-    };
+/** Formats YYYY-MM-DD to DD/MM/YYYY for NIC API */
+export function formatGstDate(dateStr?: string | null): string | undefined {
+  if (!dateStr) return undefined;
+  const parts = dateStr.split("-");
+  if (parts.length === 3) {
+    return `${parts[2]}/${parts[1]}/${parts[0]}`;
   }
-
-  async cancelIRN(irn: string, reasonCode: string, remarks: string) {
-    if (!irn || irn.length !== 64) {
-      throw new Error("Invalid IRN: Must be 64-character SHA-256 hash");
-    }
-    return {
-      success: true,
-      cancelledDate: new Date().toISOString(),
-    };
-  }
-
-  async generateEWayBill(irn: string, details: EWayBillInput): Promise<EWayBillResult> {
-    const now = new Date();
-    const daysValid = Math.max(1, Math.ceil(details.distanceKm / 200)); // 1 day per 200 km
-    const validUptoDate = new Date(now.getTime() + daysValid * 24 * 60 * 60 * 1000);
-
-    const ewbNo = `311${Math.floor(100000000 + Math.random() * 900000000)}`;
-
-    return {
-      ewayBillNo: ewbNo,
-      ewayBillDate: now.toISOString(),
-      validUpto: validUptoDate.toISOString(),
-    };
-  }
-
-  async cancelEWayBill(ewayBillNo: string, reason: string) {
-    return { success: true };
-  }
-}
-
-export const defaultIRPProvider = new SimulatedIRPProvider();
-
-/** Valid EINVOICE_MODE values */
-export type EInvoiceMode = "disabled" | "simulator" | "sandbox" | "production";
-
-/** Returns the current e-invoice mode from env (defaults to 'disabled'). */
-export function getEInvoiceMode(): EInvoiceMode {
-  const mode = process.env.EINVOICE_MODE ?? "disabled";
-  if (["disabled", "simulator", "sandbox", "production"].includes(mode)) {
-    return mode as EInvoiceMode;
-  }
-  return "disabled";
+  return dateStr;
 }
 
 /**
@@ -264,9 +109,13 @@ export async function buildEInvoicePayload(
         sgst: schema.saleItems.sgst,
         igst: schema.saleItems.igst,
         totalAmount: schema.saleItems.totalAmount,
-        hsn: schema.medicines.hsn,
+        hsn: schema.saleItems.hsn,
+        medHsn: schema.medicines.hsn,
         unit: schema.medicines.unit,
+        packUnit: schema.saleItems.packUnit,
         gstRateBp: schema.saleItems.gstRateBp,
+        batchNo: schema.saleItems.batchNo,
+        expiryDate: schema.saleItems.expiryDate,
       })
       .from(schema.saleItems)
       .leftJoin(schema.medicines, eq(schema.saleItems.medicineId, schema.medicines.id))
@@ -280,13 +129,14 @@ export async function buildEInvoicePayload(
       const totalRs = Number(((item.totalAmount ?? 0) / 100).toFixed(2));
       const unitPriceRs = Number(((item.rate ?? 0) / 100).toFixed(2));
       const discountRs = Number(((item.discountAmount ?? 0) / 100).toFixed(2));
+      const hsnCode = item.hsn?.trim() || item.medHsn?.trim() || "30049099";
 
       return {
         slNo: idx + 1,
         itemDescription: item.medicineName,
-        hsnCode: item.hsn?.trim() || "30049099",
+        hsnCode,
         quantity: item.qty,
-        unit: (item.unit || "NOS").toUpperCase(),
+        unit: mapToGstUqc(item.packUnit || item.unit),
         unitPrice: unitPriceRs,
         grossAmount: Number((unitPriceRs * item.qty).toFixed(2)),
         discount: discountRs,
@@ -296,6 +146,12 @@ export async function buildEInvoicePayload(
         sgstAmount: sgstRs,
         igstAmount: igstRs,
         totalItemValue: totalRs,
+        batchDetails: item.batchNo
+          ? {
+              batchNo: item.batchNo,
+              expiryDate: formatGstDate(item.expiryDate),
+            }
+          : undefined,
       };
     });
   }
@@ -325,6 +181,14 @@ export async function buildEInvoicePayload(
   // Format doc date as DD/MM/YYYY
   const [yr, mo, da] = doc.docDate.split("-");
   const formattedDate = `${da}/${mo}/${yr}`;
+
+  const sumAss = itemsPayload.reduce((acc, it) => acc + it.taxableAmount, 0);
+  const sumCgst = itemsPayload.reduce((acc, it) => acc + it.cgstAmount, 0);
+  const sumSgst = itemsPayload.reduce((acc, it) => acc + it.sgstAmount, 0);
+  const sumIgst = itemsPayload.reduce((acc, it) => acc + it.igstAmount, 0);
+  const calcTotal = Number((sumAss + sumCgst + sumSgst + sumIgst).toFixed(2));
+  const docTotalRs = Number((doc.total / 100).toFixed(2));
+  const roundOff = Number((docTotalRs - calcTotal).toFixed(2));
 
   return {
     version: "1.1",
@@ -364,8 +228,8 @@ export async function buildEInvoicePayload(
       sgstValue: Number((doc.sgst / 100).toFixed(2)),
       igstValue: Number((doc.igst / 100).toFixed(2)),
       cessValue: Number((doc.cess / 100).toFixed(2)),
-      roundOff: 0,
-      totalInvoiceValue: Number((doc.total / 100).toFixed(2)),
+      roundOff,
+      totalInvoiceValue: docTotalRs,
     },
   };
 }
@@ -390,7 +254,22 @@ export async function generateEInvoiceForDocument(
     );
   }
 
-  const provider = params.provider || defaultIRPProvider;
+  const [doc] = await db
+    .select()
+    .from(schema.gstDocuments)
+    .where(and(eq(schema.gstDocuments.id, params.gstDocumentId), eq(schema.gstDocuments.tenantId, params.tenantId)));
+
+  if (!doc) {
+    throw new Error("GST Document not found");
+  }
+
+  let provider = params.provider;
+  if (!provider) {
+    provider = await resolveIRPProvider(db, {
+      tenantId: params.tenantId,
+      storeId: doc.storeId ?? undefined,
+    });
+  }
 
   if (mode === "simulator" && provider.name !== "SIMULATOR") {
     throw new Error("EINVOICE_MODE=simulator but a non-simulator provider was supplied.");
@@ -415,6 +294,8 @@ export async function generateEInvoiceForDocument(
         ackNo: response.ackNo,
         ackDate: new Date(response.ackDate),
         signedQrCode: response.signedQrCode,
+        signedInvoice: response.signedInvoice || null,
+        einvoiceProvider: provider.name,
       })
       .where(and(eq(schema.gstDocuments.id, params.gstDocumentId), eq(schema.gstDocuments.tenantId, params.tenantId)))
       .returning();
@@ -462,8 +343,6 @@ export async function cancelEInvoiceForDocument(
     provider?: IRPProvider;
   }
 ) {
-  const provider = params.provider || defaultIRPProvider;
-
   const [doc] = await db
     .select()
     .from(schema.gstDocuments)
@@ -476,8 +355,19 @@ export async function cancelEInvoiceForDocument(
   if (doc.irnDate) {
     const hoursElapsed = (Date.now() - new Date(doc.irnDate).getTime()) / (1000 * 60 * 60);
     if (hoursElapsed > 24) {
-      throw new Error(`Cannot cancel IRN after 24 hours (${hoursElapsed.toFixed(1)} hrs elapsed). File a credit note instead.`);
+      throw new Error(
+        `Cannot cancel IRN after statutory 24-hour limit (${hoursElapsed.toFixed(1)} hrs elapsed). ` +
+          "Per GST statutory rules, you must issue a Credit Note (GSTR-1 Table 9B) instead."
+      );
     }
+  }
+
+  let provider = params.provider;
+  if (!provider) {
+    provider = await resolveIRPProvider(db, {
+      tenantId: params.tenantId,
+      storeId: doc.storeId ?? undefined,
+    });
   }
 
   const result = await provider.cancelIRN(doc.irn, params.reasonCode, params.remarks);
@@ -487,6 +377,8 @@ export async function cancelEInvoiceForDocument(
     .update(schema.gstDocuments)
     .set({
       status: "cancelled",
+      cancelledReason: params.reasonCode,
+      cancelledRemarks: params.remarks.trim(),
     })
     .where(eq(schema.gstDocuments.id, params.gstDocumentId))
     .returning();
