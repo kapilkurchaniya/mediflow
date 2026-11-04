@@ -18,7 +18,7 @@ describe("E-Invoice Statutory 24-Hour Cancellation Guard", () => {
           ]),
         }),
       }),
-    } as any;
+    } as unknown as Parameters<typeof cancelEInvoiceForDocument>[0];
 
     const mockProvider: IRPProvider = {
       name: "TEST",
@@ -74,7 +74,7 @@ describe("E-Invoice Statutory 24-Hour Cancellation Guard", () => {
       insert: vi.fn().mockReturnValue({
         values: vi.fn().mockResolvedValue(undefined),
       }),
-    } as any;
+    } as unknown as Parameters<typeof cancelEInvoiceForDocument>[0];
 
     const mockProvider: IRPProvider = {
       name: "TEST",
@@ -101,3 +101,4 @@ describe("E-Invoice Statutory 24-Hour Cancellation Guard", () => {
     );
   });
 });
+

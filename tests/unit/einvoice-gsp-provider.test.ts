@@ -126,9 +126,9 @@ describe("GspIRPProvider (Real NIC & GSP Integration)", () => {
       tokenExpiresAt: new Date(Date.now() + 60 * 60 * 1000),
     });
 
-    global.fetch = vi.fn().mockImplementation((url: string, opts: any) => {
+    global.fetch = vi.fn().mockImplementation((url: string, opts?: RequestInit) => {
       if (url.includes("/einvoice/generate")) {
-        const body = JSON.parse(opts.body);
+        const body = JSON.parse(opts?.body as string);
         expect(body.sellerDetails.gstin).toBe("27GSPTE0985F1Z5");
         expect(body.itemList[0].batchDetails.batchNo).toBe("AMX-99");
         return Promise.resolve({
@@ -226,9 +226,9 @@ describe("GspIRPProvider (Real NIC & GSP Integration)", () => {
       tokenExpiresAt: new Date(Date.now() + 60 * 60 * 1000),
     });
 
-    global.fetch = vi.fn().mockImplementation((url: string, opts: any) => {
+    global.fetch = vi.fn().mockImplementation((url: string, opts?: RequestInit) => {
       if (url.includes("/einvoice/cancel")) {
-        const body = JSON.parse(opts.body);
+        const body = JSON.parse(opts?.body as string);
         expect(body.Irn).toBe("6D615F193AE5429E9EA3647BB9D41435E14DE6719FE851CBFF688E04CA2159BC");
         expect(body.CnlRsn).toBe("1");
         expect(body.CnlRem).toBe("Duplicate bill issued");
@@ -256,3 +256,4 @@ describe("GspIRPProvider (Real NIC & GSP Integration)", () => {
     expect(res.cancelledDate).toBe("2026-11-04 22:00:00");
   });
 });
+
