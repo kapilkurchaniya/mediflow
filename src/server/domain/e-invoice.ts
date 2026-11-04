@@ -1,6 +1,6 @@
 import crypto from "crypto";
 import { schema } from "@/server/db";
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and, desc, sql } from "drizzle-orm";
 import type { DbOrTx } from "@/server/db";
 import { DEFAULT_GST_RATE_BP } from "@/lib/regulatory";
 import { resolveIRPProvider } from "./einvoice-provider-factory";
@@ -19,6 +19,7 @@ import {
   type IRNResult,
   type EWayBillInput,
   type EWayBillResult,
+  type UpdateVehicleInput,
   type EInvoiceMode,
   getEInvoiceMode,
 } from "./einvoice-types";
@@ -396,8 +397,38 @@ export async function cancelEInvoiceForDocument(
   return { success: true, document: updatedDoc };
 }
 
+/** Indian Motor Vehicles registration syntax: e.g. MH12AB1234, DL01A9999, KA05MB0001 */
+export const VEHICLE_NO_REGEX = /^[A-Z]{2}[0-9]{1,2}[A-Z]{0,3}[0-9]{4}$/;
+
 /**
- * Generates an E-Way Bill for an invoice.
+ * Validates and normalizes Indian vehicle registration numbers.
+ * Strips whitespace and hyphens, converts to uppercase.
+ */
+export function validateVehicleNumber(vehicleNo: string): { valid: boolean; normalized?: string; error?: string } {
+  if (!vehicleNo || typeof vehicleNo !== "string") {
+    return { valid: false, error: "Vehicle number is required" };
+  }
+  const normalized = vehicleNo.replace(/[\s-]/g, "").toUpperCase();
+  if (!VEHICLE_NO_REGEX.test(normalized)) {
+    return {
+      valid: false,
+      error: `Invalid vehicle registration format: "${vehicleNo}". Must match format like MH12AB1234 or DL01A9999`,
+    };
+  }
+  return { valid: true, normalized };
+}
+
+/**
+ * Calculates statutory E-Way Bill validity in days based on distance (Notification No. 94/2020-CT):
+ * 1 day per 200 km for normal cargo (minimum 1 day).
+ */
+export function calculateEWayBillValidityDays(distanceKm: number): number {
+  const dist = Math.max(1, distanceKm || 1);
+  return Math.max(1, Math.ceil(dist / 200));
+}
+
+/**
+ * Generates an E-Way Bill for an invoice or delivery challan.
  */
 export async function generateEWayBillForDocument(
   db: DbOrTx,
@@ -408,8 +439,6 @@ export async function generateEWayBillForDocument(
     provider?: IRPProvider;
   }
 ) {
-  const provider = params.provider || defaultIRPProvider;
-
   const [doc] = await db
     .select()
     .from(schema.gstDocuments)
@@ -417,7 +446,30 @@ export async function generateEWayBillForDocument(
 
   if (!doc) throw new Error("GST Document not found");
 
-  const result = await provider.generateEWayBill(doc.irn || "DIRECT", params.transportDetails);
+  // Validate vehicle number if provided
+  let normalizedVehicleNo: string | undefined = undefined;
+  if (params.transportDetails.vehicleNo && params.transportDetails.vehicleNo.trim().length > 0) {
+    const vCheck = validateVehicleNumber(params.transportDetails.vehicleNo);
+    if (!vCheck.valid) {
+      throw new Error(vCheck.error);
+    }
+    normalizedVehicleNo = vCheck.normalized;
+  }
+
+  const transportPayload: EWayBillInput = {
+    ...params.transportDetails,
+    vehicleNo: normalizedVehicleNo,
+  };
+
+  let provider = params.provider;
+  if (!provider) {
+    provider = await resolveIRPProvider(db, {
+      tenantId: params.tenantId,
+      storeId: doc.storeId ?? undefined,
+    });
+  }
+
+  const result = await provider.generateEWayBill(doc.irn || "DIRECT", transportPayload);
 
   const [updatedDoc] = await db
     .update(schema.gstDocuments)
@@ -425,6 +477,11 @@ export async function generateEWayBillForDocument(
       eWayBillNo: result.ewayBillNo,
       eWayBillDate: new Date(result.ewayBillDate),
       eWayBillValidTill: new Date(result.validUpto),
+      vehicleNo: normalizedVehicleNo || null,
+      transporterId: transportPayload.transporterId || null,
+      transporterName: transportPayload.transporterName || null,
+      transportMode: transportPayload.transportMode || "1",
+      distanceKm: transportPayload.distanceKm || null,
     })
     .where(eq(schema.gstDocuments.id, params.gstDocumentId))
     .returning();
@@ -433,11 +490,167 @@ export async function generateEWayBillForDocument(
     tenantId: params.tenantId,
     gstDocumentId: params.gstDocumentId,
     action: "generate_eway_bill",
-    requestPayload: params.transportDetails as unknown as Record<string, unknown>,
+    requestPayload: transportPayload as unknown as Record<string, unknown>,
     responsePayload: result as unknown as Record<string, unknown>,
     status: "success",
     errorMessage: null,
   });
 
   return { success: true, document: updatedDoc, ewayBillNo: result.ewayBillNo, validUpto: result.validUpto };
+}
+
+/**
+ * Updates Part-B vehicle details on an active E-Way Bill.
+ */
+export async function updateVehicleForEWayBill(
+  db: DbOrTx,
+  params: {
+    gstDocumentId: string;
+    tenantId: string;
+    vehicleDetails: UpdateVehicleInput;
+    provider?: IRPProvider;
+  }
+) {
+  const [doc] = await db
+    .select()
+    .from(schema.gstDocuments)
+    .where(and(eq(schema.gstDocuments.id, params.gstDocumentId), eq(schema.gstDocuments.tenantId, params.tenantId)));
+
+  if (!doc) throw new Error("GST Document not found");
+  if (!doc.eWayBillNo) throw new Error("Document has no active E-Way Bill to update");
+  if (doc.status === "cancelled") throw new Error("Cannot update vehicle on a cancelled E-Way Bill");
+
+  const vCheck = validateVehicleNumber(params.vehicleDetails.vehicleNo);
+  if (!vCheck.valid) {
+    throw new Error(vCheck.error);
+  }
+  const normalizedVehicle = vCheck.normalized!;
+
+  let provider = params.provider;
+  if (!provider) {
+    provider = await resolveIRPProvider(db, {
+      tenantId: params.tenantId,
+      storeId: doc.storeId ?? undefined,
+    });
+  }
+
+  let validUpto = doc.eWayBillValidTill?.toISOString() || new Date().toISOString();
+  if (provider.updateEWayBillVehicle) {
+    const res = await provider.updateEWayBillVehicle(doc.eWayBillNo, {
+      ...params.vehicleDetails,
+      vehicleNo: normalizedVehicle,
+    });
+    if (res.validUpto) {
+      validUpto = res.validUpto;
+    }
+  }
+
+  const [updatedDoc] = await db
+    .update(schema.gstDocuments)
+    .set({
+      vehicleNo: normalizedVehicle,
+      eWayBillValidTill: new Date(validUpto),
+      transportMode: params.vehicleDetails.transportMode || doc.transportMode || "1",
+    })
+    .where(eq(schema.gstDocuments.id, params.gstDocumentId))
+    .returning();
+
+  await db.insert(schema.eInvoiceLogs).values({
+    tenantId: params.tenantId,
+    gstDocumentId: params.gstDocumentId,
+    action: "update_eway_bill_vehicle",
+    requestPayload: {
+      oldVehicleNo: doc.vehicleNo,
+      newVehicleNo: normalizedVehicle,
+      ...params.vehicleDetails,
+    } as unknown as Record<string, unknown>,
+    responsePayload: { success: true, validUpto },
+    status: "success",
+    errorMessage: null,
+  });
+
+  return { success: true, document: updatedDoc, validUpto };
+}
+
+/**
+ * Cancels an E-Way Bill within the statutory 24-hour window.
+ */
+export async function cancelEWayBillForDocument(
+  db: DbOrTx,
+  params: {
+    gstDocumentId: string;
+    tenantId: string;
+    reasonCode: "1" | "2" | "3" | "4"; // 1: Duplicate, 2: Order Cancelled, 3: Data Entry Mistake, 4: Other
+    remarks?: string;
+    provider?: IRPProvider;
+  }
+) {
+  const [doc] = await db
+    .select()
+    .from(schema.gstDocuments)
+    .where(and(eq(schema.gstDocuments.id, params.gstDocumentId), eq(schema.gstDocuments.tenantId, params.tenantId)));
+
+  if (!doc) throw new Error("GST Document not found");
+  if (!doc.eWayBillNo) throw new Error("Document has no E-Way Bill to cancel");
+
+  // Statutory 24-hour cancellation rule
+  if (doc.eWayBillDate) {
+    const hoursElapsed = (Date.now() - new Date(doc.eWayBillDate).getTime()) / (1000 * 60 * 60);
+    if (hoursElapsed > 24) {
+      throw new Error(
+        `Cannot cancel E-Way Bill after statutory 24-hour limit (${hoursElapsed.toFixed(1)} hrs elapsed). ` +
+          "Per CGST Rule 138(9), E-Way Bills cannot be cancelled after 24 hours of generation."
+      );
+    }
+  }
+
+  let provider = params.provider;
+  if (!provider) {
+    provider = await resolveIRPProvider(db, {
+      tenantId: params.tenantId,
+      storeId: doc.storeId ?? undefined,
+    });
+  }
+
+  const cancelReasonText = params.remarks
+    ? `Reason [${params.reasonCode}]: ${params.remarks.trim()}`
+    : `Reason [${params.reasonCode}]`;
+
+  const result = await provider.cancelEWayBill(doc.eWayBillNo, cancelReasonText);
+
+  const [updatedDoc] = await db
+    .update(schema.gstDocuments)
+    .set({
+      status: "cancelled",
+      cancelledReason: params.reasonCode,
+      cancelledRemarks: params.remarks?.trim() || null,
+    })
+    .where(eq(schema.gstDocuments.id, params.gstDocumentId))
+    .returning();
+
+  // If this was linked to a stock transfer, update the transfer notes
+  if (doc.refType === "transfer" && doc.refId) {
+    await db
+      .update(schema.stockTransfers)
+      .set({
+        notes: sql`COALESCE(${schema.stockTransfers.notes}, '') || ' [E-Way Bill ' || ${doc.eWayBillNo} || ' cancelled]'`,
+      })
+      .where(eq(schema.stockTransfers.id, doc.refId));
+  }
+
+  await db.insert(schema.eInvoiceLogs).values({
+    tenantId: params.tenantId,
+    gstDocumentId: params.gstDocumentId,
+    action: "cancel_eway_bill",
+    requestPayload: {
+      ewayBillNo: doc.eWayBillNo,
+      reasonCode: params.reasonCode,
+      remarks: params.remarks,
+    } as unknown as Record<string, unknown>,
+    responsePayload: result as unknown as Record<string, unknown>,
+    status: "success",
+    errorMessage: null,
+  });
+
+  return { success: true, document: updatedDoc };
 }
