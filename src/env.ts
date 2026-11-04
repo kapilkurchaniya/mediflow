@@ -72,6 +72,15 @@ const envSchema = z
       .enum(["disabled", "simulator", "sandbox", "production"])
       .default("disabled"),
 
+    /**
+     * Optional global GSP / IRP API credentials (used as defaults if tenant credentials are unset)
+     */
+    GSP_BASE_URL: z.string().optional(),
+    GSP_CLIENT_ID: z.string().optional(),
+    GSP_CLIENT_SECRET: z.string().optional(),
+    GSP_PORTAL_USERNAME: z.string().optional(),
+    GSP_PORTAL_PASSWORD: z.string().optional(),
+
     // ─── AI providers (all optional) ─────────────────────────────────────────
     GEMINI_API_KEY: z.string().optional(),
     GROQ_API_KEY: z.string().optional(),

@@ -155,6 +155,13 @@
       "when": 1793795600000,
       "tag": "0021_daybook_ledger_indexes",
       "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1793812901617,
+      "tag": "0022_dear_snowbird",
+      "breakpoints": true
     }
   ]
 }

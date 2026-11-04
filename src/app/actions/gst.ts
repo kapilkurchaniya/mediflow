@@ -1,11 +1,12 @@
 "use server";
 
 import { db, schema } from "@/server/db";
-import { eq, and, desc, gte, lte, sql, ilike, inArray } from "drizzle-orm";
+import { eq, and, desc, gte, lte, sql, ilike, inArray, isNull } from "drizzle-orm";
 import { requireAuth } from "@/server/auth";
 import { requirePermission } from "@/server/rbac";
 import { revalidatePath } from "next/cache";
 import { isValidGstRateBp, type GstRateBp, GST_RATES_BP } from "@/lib/regulatory";
+import { encryptSecret } from "@/server/crypto";
 import {
   buildGstr1Data,
   buildGstr2Data,
@@ -514,5 +515,145 @@ export async function bulkUpdateGstRates(params: {
     return {
       error: err instanceof Error ? err.message : String(err) || "Failed to update GST rates",
     };
+  }
+}
+
+/**
+ * Saves multi-tenant GSP / NIC API credentials securely encrypted at rest (B5.1).
+ */
+export async function saveGspCredentialsAction(input: {
+  provider: string;
+  clientId: string;
+  clientSecret: string;
+  portalUsername: string;
+  portalPassword: string;
+  isSandbox: boolean;
+  storeId?: string | null;
+}) {
+  const ctx = await requirePermission("accounting.post");
+
+  try {
+    const clientIdEnc = encryptSecret(input.clientId.trim());
+    const clientSecretEnc = encryptSecret(input.clientSecret.trim());
+    const portalUsernameEnc = encryptSecret(input.portalUsername.trim());
+    const portalPasswordEnc = encryptSecret(input.portalPassword.trim());
+
+    const conditions = [
+      eq(schema.tenantGspCredentials.tenantId, ctx.tenantId),
+      eq(schema.tenantGspCredentials.isSandbox, input.isSandbox),
+    ];
+    if (input.storeId) {
+      conditions.push(eq(schema.tenantGspCredentials.storeId, input.storeId));
+    } else {
+      conditions.push(isNull(schema.tenantGspCredentials.storeId));
+    }
+
+    const [existing] = await db
+      .select({ id: schema.tenantGspCredentials.id })
+      .from(schema.tenantGspCredentials)
+      .where(and(...conditions))
+      .limit(1);
+
+    let credentialId: string;
+    if (existing) {
+      credentialId = existing.id;
+      await db
+        .update(schema.tenantGspCredentials)
+        .set({
+          provider: input.provider.trim(),
+          clientIdEnc,
+          clientSecretEnc,
+          portalUsernameEnc,
+          portalPasswordEnc,
+          cachedAuthTokenEnc: null,
+          tokenExpiresAt: null,
+          updatedAt: new Date(),
+        })
+        .where(eq(schema.tenantGspCredentials.id, existing.id));
+    } else {
+      const [inserted] = await db
+        .insert(schema.tenantGspCredentials)
+        .values({
+          tenantId: ctx.tenantId,
+          storeId: input.storeId || null,
+          provider: input.provider.trim(),
+          clientIdEnc,
+          clientSecretEnc,
+          portalUsernameEnc,
+          portalPasswordEnc,
+          isSandbox: input.isSandbox,
+        })
+        .returning({ id: schema.tenantGspCredentials.id });
+      credentialId = inserted!.id;
+    }
+
+    await writeAudit(db, ctx, {
+      action: "update",
+      entityType: "gsp_credentials",
+      entityId: credentialId,
+      newValue: {
+        provider: input.provider.trim(),
+        isSandbox: input.isSandbox,
+        storeId: input.storeId || null,
+      },
+    });
+
+    revalidatePath("/dashboard/settings/gst");
+    revalidatePath("/dashboard/gst/e-invoice");
+    return { success: true };
+  } catch (err: unknown) {
+    return { error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
+/**
+ * Returns configured GSP integration settings per tenant (without plaintext secrets).
+ */
+export async function getGspSettingsAction() {
+  const ctx = await requirePermission("gst.view");
+
+  const creds = await db
+    .select({
+      id: schema.tenantGspCredentials.id,
+      storeId: schema.tenantGspCredentials.storeId,
+      provider: schema.tenantGspCredentials.provider,
+      isSandbox: schema.tenantGspCredentials.isSandbox,
+      hasToken: sql<boolean>`${schema.tenantGspCredentials.cachedAuthTokenEnc} is not null`,
+      tokenExpiresAt: schema.tenantGspCredentials.tokenExpiresAt,
+      updatedAt: schema.tenantGspCredentials.updatedAt,
+    })
+    .from(schema.tenantGspCredentials)
+    .where(eq(schema.tenantGspCredentials.tenantId, ctx.tenantId));
+
+  return creds;
+}
+
+/**
+ * Tests authentication handshake with the GSP / NIC API using supplied credentials.
+ */
+export async function testGspConnectionAction(input: {
+  provider: string;
+  clientId: string;
+  clientSecret: string;
+  portalUsername: string;
+  portalPassword: string;
+  isSandbox: boolean;
+}) {
+  await requirePermission("accounting.post");
+
+  try {
+    const { GspIRPProvider } = await import("@/server/domain/einvoice-providers/gsp-provider");
+    const testProvider = new GspIRPProvider({
+      clientId: input.clientId.trim(),
+      clientSecret: input.clientSecret.trim(),
+      portalUsername: input.portalUsername.trim(),
+      portalPassword: input.portalPassword.trim(),
+      isSandbox: input.isSandbox,
+    });
+
+    const token = await testProvider.getAuthToken();
+    return { success: true, tokenPreview: `${token.slice(0, 8)}...${token.slice(-4)}` };
+  } catch (err: unknown) {
+    return { error: err instanceof Error ? err.message : String(err) };
   }
 }

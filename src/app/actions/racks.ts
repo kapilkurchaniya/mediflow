@@ -2,7 +2,7 @@
 
 import { z } from "zod";
 import { db, schema } from "@/server/db";
-import { eq, and, sql } from "drizzle-orm";
+import { eq, and, ne, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { protectedAction } from "@/server/action";
 import { requirePermission } from "@/server/rbac";
@@ -79,6 +79,22 @@ function rethrowDuplicateCode(err: unknown, code: string): never {
 export const createRack = protectedAction("medicine.manage")
   .inputSchema(RackFields)
   .action(async ({ parsedInput: data, ctx }) => {
+    // Check if rack code already exists in this store (case-insensitive)
+    const [existing] = await db
+      .select({ id: schema.racks.id })
+      .from(schema.racks)
+      .where(
+        and(
+          eq(schema.racks.tenantId, ctx.tenantId),
+          eq(schema.racks.storeId, ctx.storeId),
+          sql`lower(${schema.racks.code}) = lower(${data.code})`,
+        ),
+      )
+      .limit(1);
+    if (existing) {
+      throw new DomainError("RACK_CODE_EXISTS", `Rack code '${data.code.toUpperCase()}' already exists in this store.`);
+    }
+
     try {
       const [rack] = await db
         .insert(schema.racks)
@@ -102,6 +118,24 @@ export const updateRack = protectedAction("medicine.manage")
   .inputSchema(RackFields.extend({ id: idSchema, isActive: z.boolean().optional() }))
   .action(async ({ parsedInput: data, ctx }) => {
     await findOwnRack(ctx, data.id);
+
+    // Check if another rack with the same code already exists in this store
+    const [existing] = await db
+      .select({ id: schema.racks.id })
+      .from(schema.racks)
+      .where(
+        and(
+          eq(schema.racks.tenantId, ctx.tenantId),
+          eq(schema.racks.storeId, ctx.storeId),
+          ne(schema.racks.id, data.id),
+          sql`lower(${schema.racks.code}) = lower(${data.code})`,
+        ),
+      )
+      .limit(1);
+    if (existing) {
+      throw new DomainError("RACK_CODE_EXISTS", `Rack code '${data.code.toUpperCase()}' already exists in this store.`);
+    }
+
     try {
       const [rack] = await db
         .update(schema.racks)

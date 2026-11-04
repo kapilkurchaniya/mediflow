@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import {
-  QrCode,
+  QrCode as QrCodeIcon,
   Truck,
   CheckCircle2,
   AlertCircle,
@@ -19,6 +19,7 @@ import {
   cancelEInvoiceAction,
   generateEWayBillAction,
 } from "@/app/actions/gst";
+import { QrCode as QrCodePreview } from "@/app/components/QrCode";
 
 export interface GstDocItem {
   id: string;
@@ -36,6 +37,7 @@ export interface GstDocItem {
   ackNo: string | null;
   ackDate: Date | string | null;
   signedQrCode: string | null;
+  einvoiceProvider?: string | null;
   eWayBillNo: string | null;
   eWayBillDate: Date | string | null;
   eWayBillValidTill: Date | string | null;
@@ -50,9 +52,15 @@ export function EInvoiceClient({ invoices }: { invoices: GstDocItem[] }) {
   // Modals
   const [viewDoc, setViewDoc] = useState<GstDocItem | null>(null);
   const [cancelDoc, setCancelDoc] = useState<GstDocItem | null>(null);
+  const [cancelModalOpenedAt, setCancelModalOpenedAt] = useState<number>(0);
   const [cancelReason, setCancelReason] = useState<"1" | "2" | "3" | "4">("2");
   const [cancelRemarks, setCancelRemarks] = useState("");
   const [cancelling, setCancelling] = useState(false);
+
+  function handleOpenCancelModal(inv: GstDocItem) {
+    setCancelDoc(inv);
+    setCancelModalOpenedAt(Date.now());
+  }
 
   const [ewayDoc, setEwayDoc] = useState<GstDocItem | null>(null);
   const [distanceKm, setDistanceKm] = useState(50);
@@ -225,9 +233,19 @@ export function EInvoiceClient({ invoices }: { invoices: GstDocItem[] }) {
                           <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-emerald-100 text-emerald-800">
                             <CheckCircle2 className="h-3 w-3" /> Generated
                           </span>
-                          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold bg-rose-100 text-rose-700 border border-rose-200" title="Simulated IRP: Not legally valid for tax compliance">
-                            <AlertCircle className="h-2.5 w-2.5" /> SIMULATED – NOT VALID
-                          </span>
+                          {inv.einvoiceProvider === "SANDBOX_GSP" ? (
+                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold bg-sky-100 text-sky-800 border border-sky-200">
+                              SANDBOX VERIFIED
+                            </span>
+                          ) : inv.einvoiceProvider === "PRODUCTION_GSP" ? (
+                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                              NIC LIVE ACTIVE
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold bg-rose-100 text-rose-700 border border-rose-200" title="Simulated IRP: Not legally valid for tax compliance">
+                              <AlertCircle className="h-2.5 w-2.5" /> SIMULATED – NOT VALID
+                            </span>
+                          )}
                         </div>
                       ) : (
                         <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-100 text-amber-800">
@@ -263,7 +281,7 @@ export function EInvoiceClient({ invoices }: { invoices: GstDocItem[] }) {
                             {loadingId === inv.id ? (
                               <Loader2 className="h-3 w-3 animate-spin mr-1" />
                             ) : (
-                              <QrCode className="h-3 w-3 mr-1" />
+                              <QrCodeIcon className="h-3 w-3 mr-1" />
                             )}
                             Generate IRN
                           </button>
@@ -293,7 +311,7 @@ export function EInvoiceClient({ invoices }: { invoices: GstDocItem[] }) {
 
                             <button
                               type="button"
-                              onClick={() => setCancelDoc(inv)}
+                              onClick={() => handleOpenCancelModal(inv)}
                               className="btn btn-ghost text-xs py-1 px-2 text-red-600 hover:bg-red-50"
                               title="Cancel IRN (24 hr window)"
                             >
@@ -317,7 +335,7 @@ export function EInvoiceClient({ invoices }: { invoices: GstDocItem[] }) {
           <div className="card max-w-lg w-full p-6 shadow-xl space-y-4">
             <div className="flex items-center justify-between pb-3 border-b border-ink-150">
               <div className="flex items-center gap-2">
-                <QrCode className="h-5 w-5 text-brand-600" />
+                <QrCodeIcon className="h-5 w-5 text-brand-600" />
                 <h3 className="text-sm font-bold text-ink-900">
                   E-Invoice Details ({viewDoc.docNo})
                 </h3>
@@ -332,10 +350,22 @@ export function EInvoiceClient({ invoices }: { invoices: GstDocItem[] }) {
             </div>
 
             <div className="space-y-3 text-xs">
-              <div className="bg-rose-50 border border-rose-200 rounded-lg p-2.5 text-rose-800 text-xs font-semibold flex items-center gap-2">
-                <AlertCircle className="h-4 w-4 shrink-0 text-rose-600" />
-                <span>SIMULATED IRN — NOT A VALID E-INVOICE FOR STATUTORY COMPLIANCE</span>
-              </div>
+              {viewDoc.einvoiceProvider === "SANDBOX_GSP" ? (
+                <div className="bg-sky-50 border border-sky-200 rounded-lg p-2.5 text-sky-800 text-xs font-semibold flex items-center gap-2">
+                  <CheckCircle2 className="h-4 w-4 shrink-0 text-sky-600" />
+                  <span>SANDBOX TEST IRN — AUTHENTICATED VIA GST SUVIDHA PROVIDER (GSP)</span>
+                </div>
+              ) : viewDoc.einvoiceProvider === "PRODUCTION_GSP" ? (
+                <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-2.5 text-emerald-800 text-xs font-semibold flex items-center gap-2">
+                  <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" />
+                  <span>OFFICIAL GST E-INVOICE — VERIFIED & RECORDED ON NIC IRP PORTAL</span>
+                </div>
+              ) : (
+                <div className="bg-rose-50 border border-rose-200 rounded-lg p-2.5 text-rose-800 text-xs font-semibold flex items-center gap-2">
+                  <AlertCircle className="h-4 w-4 shrink-0 text-rose-600" />
+                  <span>SIMULATED IRN — NOT A VALID E-INVOICE FOR STATUTORY COMPLIANCE</span>
+                </div>
+              )}
               <div>
                 <label className="text-ink-500 font-semibold block mb-1">
                   64-Character IRN (Invoice Reference Number)
@@ -389,10 +419,18 @@ export function EInvoiceClient({ invoices }: { invoices: GstDocItem[] }) {
 
               {viewDoc.signedQrCode && (
                 <div>
-                  <label className="text-ink-500 font-semibold block mb-1">Signed QR Code Payload</label>
-                  <p className="font-mono text-[10px] bg-ink-50 p-2 rounded border border-ink-200 text-ink-600 break-all max-h-20 overflow-y-auto">
-                    {viewDoc.signedQrCode}
-                  </p>
+                  <label className="text-ink-500 font-semibold block mb-1">NIC Signed 2D QR Code & Token</label>
+                  <div className="flex items-start gap-3 bg-ink-50 p-2.5 rounded-lg border border-ink-200">
+                    <div className="bg-white p-1 rounded border border-ink-200 shrink-0">
+                      <QrCodePreview value={viewDoc.signedQrCode || viewDoc.irn || ""} size={96} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <span className="text-[10px] text-ink-500 font-bold uppercase block mb-0.5">Signed JWT Token</span>
+                      <p className="font-mono text-[9px] bg-white p-1.5 rounded border border-ink-150 text-ink-600 break-all max-h-20 overflow-y-auto">
+                        {viewDoc.signedQrCode}
+                      </p>
+                    </div>
+                  </div>
                 </div>
               )}
             </div>
@@ -411,80 +449,101 @@ export function EInvoiceClient({ invoices }: { invoices: GstDocItem[] }) {
       )}
 
       {/* Modal 2: Cancel IRN */}
-      {cancelDoc && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4">
-          <div className="card max-w-md w-full p-6 shadow-xl space-y-4">
-            <div className="flex items-center justify-between pb-3 border-b border-ink-150">
-              <div className="flex items-center gap-2 text-red-600 font-bold text-sm">
-                <Ban className="h-5 w-5" />
-                Cancel E-Invoice ({cancelDoc.docNo})
-              </div>
-              <button
-                type="button"
-                onClick={() => setCancelDoc(null)}
-                className="btn btn-ghost btn-icon h-7 w-7"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
+      {cancelDoc && (() => {
+        const irnTime = cancelDoc.irnDate ? new Date(cancelDoc.irnDate).getTime() : 0;
+        const now = cancelModalOpenedAt || 0;
+        const hoursElapsed = irnTime && now ? (now - irnTime) / (1000 * 60 * 60) : 0;
+        const is24HrExpired = hoursElapsed > 24;
+        const hoursLeft = Math.max(0, 24 - hoursElapsed);
 
-            <div className="space-y-3 text-xs">
-              <div className="bg-rose-50 border border-rose-200 rounded-lg p-2.5 text-rose-800 text-xs font-semibold flex items-center gap-2">
-                <AlertCircle className="h-4 w-4 shrink-0 text-rose-600" />
-                <span>SIMULATED IRN — NOT A VALID E-INVOICE FOR STATUTORY COMPLIANCE</span>
-              </div>
-              <div className="p-3 bg-amber-50 rounded-lg border border-amber-200 text-amber-900">
-                <span className="font-semibold block mb-0.5">Statutory 24-Hour Cancellation:</span>
-                An IRN can only be cancelled within 24 hours of generation on the NIC portal. After 24 hours, you must issue a GST credit note.
-              </div>
-
-              <div>
-                <label className="label">Cancellation Reason</label>
-                <select
-                  value={cancelReason}
-                  onChange={(e) => setCancelReason(e.target.value as "1" | "2" | "3" | "4")}
-                  className="input text-xs"
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4">
+            <div className="card max-w-md w-full p-6 shadow-xl space-y-4">
+              <div className="flex items-center justify-between pb-3 border-b border-ink-150">
+                <div className="flex items-center gap-2 text-red-600 font-bold text-sm">
+                  <Ban className="h-5 w-5" />
+                  Cancel E-Invoice ({cancelDoc.docNo})
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setCancelDoc(null)}
+                  className="btn btn-ghost btn-icon h-7 w-7"
                 >
-                  <option value="1">1 - Duplicate Invoice</option>
-                  <option value="2">2 - Data Entry Mistake</option>
-                  <option value="3">3 - Order Cancelled by Buyer</option>
-                  <option value="4">4 - Others</option>
-                </select>
+                  <X className="h-4 w-4" />
+                </button>
               </div>
 
-              <div>
-                <label className="label">Remarks</label>
-                <input
-                  type="text"
-                  value={cancelRemarks}
-                  onChange={(e) => setCancelRemarks(e.target.value)}
-                  placeholder="e.g. Corrected batch details entered"
-                  className="input text-xs"
-                />
-              </div>
-            </div>
+              <div className="space-y-3 text-xs">
+                {is24HrExpired ? (
+                  <div className="p-3 bg-red-50 rounded-lg border border-red-300 text-red-900 space-y-1">
+                    <span className="font-bold flex items-center gap-1.5 text-red-700">
+                      <AlertCircle className="w-4 h-4 shrink-0" /> Statutory 24-Hour Limit Expired
+                    </span>
+                    <p className="text-[11px] leading-relaxed">
+                      This IRN was generated <strong>{hoursElapsed.toFixed(1)} hours ago</strong>. Under GST rules, an IRN cannot be cancelled after 24 hours. You must issue a <strong>GST Credit Note (Table 9B)</strong> instead.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="p-3 bg-amber-50 rounded-lg border border-amber-200 text-amber-900">
+                    <span className="font-semibold block mb-0.5">Statutory 24-Hour Cancellation Window:</span>
+                    <p className="text-[11px]">
+                      {hoursElapsed > 0
+                        ? `${hoursLeft.toFixed(1)} hours remaining to cancel on the NIC registry before the window permanently closes.`
+                        : "An IRN can only be cancelled within 24 hours of generation on the NIC portal. After 24 hours, you must issue a GST credit note."}
+                    </p>
+                  </div>
+                )}
 
-            <div className="pt-3 border-t border-ink-150 flex items-center justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => setCancelDoc(null)}
-                className="btn btn-secondary text-xs"
-              >
-                Dismiss
-              </button>
-              <button
-                type="button"
-                onClick={handleConfirmCancel}
-                disabled={cancelling}
-                className="btn btn-primary bg-red-600 hover:bg-red-700 text-white text-xs"
-              >
-                {cancelling ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : null}
-                Confirm Cancellation
-              </button>
+                <div>
+                  <label className="text-ink-700 font-medium block mb-1">Cancellation Reason Code</label>
+                  <select
+                    value={cancelReason}
+                    onChange={(e) => setCancelReason(e.target.value as "1" | "2" | "3" | "4")}
+                    disabled={is24HrExpired}
+                    className="select text-xs w-full disabled:bg-ink-100 disabled:opacity-60"
+                  >
+                    <option value="1">1 — Duplicate entry</option>
+                    <option value="2">2 — Data entry mistake</option>
+                    <option value="3">3 — Order cancelled by customer</option>
+                    <option value="4">4 — Other reason</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-ink-700 font-medium block mb-1">Remarks (Required, min 3 chars)</label>
+                  <input
+                    type="text"
+                    value={cancelRemarks}
+                    onChange={(e) => setCancelRemarks(e.target.value)}
+                    placeholder="e.g. Corrected batch details entered"
+                    disabled={is24HrExpired}
+                    className="input text-xs disabled:bg-ink-100 disabled:opacity-60"
+                  />
+                </div>
+              </div>
+
+              <div className="pt-3 border-t border-ink-150 flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setCancelDoc(null)}
+                  className="btn btn-secondary text-xs"
+                >
+                  Dismiss
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConfirmCancel}
+                  disabled={cancelling || is24HrExpired}
+                  className="btn btn-primary bg-red-600 hover:bg-red-700 text-white text-xs disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  {cancelling ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : null}
+                  Confirm Cancellation
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* Modal 3: Generate E-Way Bill */}
       {ewayDoc && (

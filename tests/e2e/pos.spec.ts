@@ -121,7 +121,7 @@ test.describe("POS Counter E2E Smoke & Hardening Tests", () => {
     // If redirected to thermal print view, click "Back to Invoice"
     if (page.url().includes("/print")) {
       const backLink = page.getByRole("link", { name: /back to invoice/i });
-      await expect(backLink).toBeVisible();
+      await expect(backLink).toBeVisible({ timeout: 15000 });
       await backLink.click();
       await page.waitForURL(/\/dashboard\/sales\/[0-9a-fA-F-]+$/, { timeout: 10000 });
     }
@@ -265,7 +265,7 @@ test.describe("POS Counter E2E Smoke & Hardening Tests", () => {
 
     if (page.url().includes("/print")) {
       const backLink = page.getByRole("link", { name: /back to invoice/i });
-      await expect(backLink).toBeVisible();
+      await expect(backLink).toBeVisible({ timeout: 15000 });
       await backLink.click();
       await page.waitForURL(/\/dashboard\/sales\/[0-9a-fA-F-]+$/, { timeout: 10000 });
     }

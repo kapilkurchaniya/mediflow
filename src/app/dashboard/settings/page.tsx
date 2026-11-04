@@ -9,6 +9,7 @@ import {
   User,
   Sliders,
 } from "lucide-react";
+import Link from "next/link";
 import { requirePagePermission } from "@/server/rbac";
 
 export const metadata = { title: "Settings" };
@@ -132,6 +133,22 @@ export default async function SettingsPage() {
               </div>
             </div>
           </div>
+
+          {/* GSP & E-Invoice Integration Link Card */}
+          <Link
+            href="/dashboard/settings/gst"
+            className="card p-5 space-y-2 hover:border-brand-300 transition-colors block group"
+          >
+            <div className="flex items-center justify-between">
+              <span className="font-semibold text-ink-900 group-hover:text-brand-700 flex items-center gap-2 text-sm">
+                <Receipt className="w-4 h-4 text-brand-600" /> GSP & E-Invoice API
+              </span>
+              <span className="text-xs text-brand-600 font-semibold group-hover:underline">Configure →</span>
+            </div>
+            <p className="text-[12px] text-ink-500 leading-relaxed">
+              Configure GSP credentials (Sandbox / Production) for automated NIC IRN and signed QR code generation.
+            </p>
+          </Link>
         </div>
       </div>
     </div>
