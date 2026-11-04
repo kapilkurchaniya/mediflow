@@ -128,6 +128,27 @@ export async function setupTestDevice(options: {
 }
 
 /**
+ * Reserves a fresh non-overlapping invoice sequence block for a test execution.
+ */
+export async function reserveFreshTestBlock(
+  fixture: TestDeviceSetup,
+  count = 50,
+): Promise<ReserveNumbersResponse> {
+  const deviceCtx: DeviceAuthCtx = {
+    tenantId: fixture.tenant.id,
+    storeId: fixture.store.id,
+    deviceId: fixture.device.id,
+    code: fixture.device.code,
+    name: fixture.device.name,
+    platform: "browser",
+  };
+  return reserveDeviceInvoiceNumbers(testDb, deviceCtx, {
+    clientReservationId: `e2e-run-${fixture.device.code}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+    count,
+  });
+}
+
+/**
  * Creates an isolated batch dedicated to deterministic multi-device stock conflict verification.
  */
 export async function setupConflictBatch(params: {
@@ -171,7 +192,7 @@ export async function setupConflictBatch(params: {
   if (existingBatch) {
     const [updated] = await testDb
       .update(schema.batches)
-      .set({ qtyOnHand: initialQty, status: "active" })
+      .set({ qtyOnHand: 0, status: "active" })
       .where(eq(schema.batches.id, existingBatch.id))
       .returning();
     batch = updated;

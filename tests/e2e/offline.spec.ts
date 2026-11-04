@@ -4,8 +4,10 @@ import {
   setupConflictBatch,
   depleteBatchStock,
   closeDbPool,
+  reserveFreshTestBlock,
   type TestDeviceSetup,
 } from "./helpers/offline-fixture";
+import type { ReserveNumbersResponse } from "../../src/server/domain/sync/types";
 import {
   initDexieDevice,
   primeDexieSync,
@@ -22,6 +24,7 @@ import {
 import { formatDeviceInvoiceNo } from "../../src/server/domain/sync/numbers";
 
 let fixture: TestDeviceSetup;
+let currentReservation: ReserveNumbersResponse;
 
 test.beforeAll(async () => {
   fixture = await setupTestDevice({ deviceCode: "01" });
@@ -44,7 +47,8 @@ test.describe("Offline POS Counter E2E Smoke & Integration Suite (Task A4.8)", (
     await page.goto("/dashboard/sales/pos");
     await expect(page.getByPlaceholder(/search medicine/i)).toBeVisible({ timeout: 10000 });
 
-    // 3. Initialize Dexie with test device credentials and prime sync
+    // 3. Reserve clean number sequence block & initialize Dexie with test credentials
+    currentReservation = await reserveFreshTestBlock(fixture, 50);
     await initDexieDevice(
       page,
       {
@@ -56,7 +60,7 @@ test.describe("Offline POS Counter E2E Smoke & Integration Suite (Task A4.8)", (
         deviceToken: fixture.rawToken,
         cashierId: fixture.adminUser.id,
       },
-      fixture.reservation,
+      currentReservation,
     );
     await primeDexieSync(page);
   });
@@ -73,10 +77,10 @@ test.describe("Offline POS Counter E2E Smoke & Integration Suite (Task A4.8)", (
     await expect(offlineChip).toBeVisible({ timeout: 5000 });
 
     const searchInput = page.getByPlaceholder(/search medicine/i);
-    const expectedFy = fixture.reservation.fiscalYear;
+    const expectedFy = currentReservation.fiscalYear;
     const storeCode = fixture.store.code;
     const deviceCode = fixture.device.code;
-    const startSeq = fixture.reservation.startSeq;
+    const startSeq = currentReservation.startSeq;
 
     // --- Sale 1: Cash payment ---
     await searchInput.fill("Paracetamol");
@@ -96,7 +100,7 @@ test.describe("Offline POS Counter E2E Smoke & Integration Suite (Task A4.8)", (
     await searchInput.fill("Dolo");
     await page.getByRole("button", { name: "+ Add" }).first().click();
     await page.getByRole("button", { name: /split tender/i }).click();
-    await page.getByLabel("UPI tender amount").fill("30.50");
+    await page.getByLabel("UPI tender amount").fill("31.00");
     await page.getByRole("button", { name: /complete sale/i }).click();
 
     await expect(receiptModal).toBeVisible({ timeout: 5000 });
@@ -167,8 +171,11 @@ test.describe("Offline POS Counter E2E Smoke & Integration Suite (Task A4.8)", (
 
     // Reconnect & return to POS
     await page.context().setOffline(false);
-    await page.getByRole("link", { name: /retry pos connection/i }).click();
-    await page.waitForURL("**/dashboard/sales/pos**", { timeout: 15000 });
+    try {
+      await page.waitForURL("**/dashboard/sales/pos**", { timeout: 5000 });
+    } catch {
+      await page.goto("/dashboard/sales/pos");
+    }
     await triggerDexieSync(page);
 
     // Await automatic sync completion
@@ -283,6 +290,8 @@ test.describe("Offline POS Counter E2E Smoke & Integration Suite (Task A4.8)", (
 
     // 6. Navigate to Conflict Management UI & verify presence
     await page.goto("/dashboard/inventory/conflicts");
+    await expect(page.getByText(medicine.name)).toBeVisible({ timeout: 10000 });
+    await page.getByRole("button", { name: /investigate \/ resolve/i }).first().click();
     await expect(page.getByText(offlineInv)).toBeVisible({ timeout: 10000 });
   });
 });

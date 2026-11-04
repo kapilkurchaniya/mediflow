@@ -26,6 +26,9 @@ export async function initDexieDevice(
         throw new Error("[offline-db] window.__posDb not initialized on page.");
       }
       await db.setDeviceConfig(cfg);
+      await db.pendingSales.clear();
+      await db.provisionalAllocations.clear();
+      await db.syncConflicts.clear();
       if (res) {
         await db.numberBlocks.put({
           id: res.reservationId,
