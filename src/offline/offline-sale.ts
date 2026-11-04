@@ -110,15 +110,15 @@ export async function createOfflineSale(
     invoiceNo: allocated.invoiceNo,
     fiscalYear: allocated.fiscalYear,
     sequenceNumber: allocated.sequenceNumber,
-    reservationId: allocated.reservationId,
+    reservationId: allocated.reservationId || undefined,
     createdBy: effectiveCashierId,
     completedAt: now,
-    customerId: input.customerId,
+    customerId: input.customerId?.trim() ? input.customerId.trim() : undefined,
     lines: offlineLines,
     payments: offlinePayments,
     billDiscountPaise: input.billDiscountPaise ?? 0,
     compliance: input.compliance,
-    medicalRepId: input.medicalRepId,
+    medicalRepId: input.medicalRepId?.trim() ? input.medicalRepId.trim() : undefined,
   };
 
   const pendingSale: OfflinePendingSale = {

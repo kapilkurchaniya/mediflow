@@ -241,7 +241,7 @@ export class OfflinePosDataSource implements PosDataSource {
         storeId: this.ctx.storeId,
         deviceId: this.ctx.deviceId,
         cashierId: this.ctx.cashierId,
-        customerId: params.customerId,
+        customerId: params.customerId?.trim() ? params.customerId.trim() : undefined,
         lines: params.items.map((it) => ({
           batchId: it.batchId || "",
           medicineId: it.medicineId,
@@ -261,7 +261,7 @@ export class OfflinePosDataSource implements PosDataSource {
           patientAge: params.complianceDetails.patientAge,
           patientGender: params.complianceDetails.patientGender,
         } : undefined,
-        medicalRepId: params.medicalRepId,
+        medicalRepId: params.medicalRepId?.trim() ? params.medicalRepId.trim() : undefined,
       });
 
       return {
