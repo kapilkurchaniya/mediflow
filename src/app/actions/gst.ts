@@ -627,3 +627,33 @@ export async function getGspSettingsAction() {
 
   return creds;
 }
+
+/**
+ * Tests authentication handshake with the GSP / NIC API using supplied credentials.
+ */
+export async function testGspConnectionAction(input: {
+  provider: string;
+  clientId: string;
+  clientSecret: string;
+  portalUsername: string;
+  portalPassword: string;
+  isSandbox: boolean;
+}) {
+  await requirePermission("accounting.post");
+
+  try {
+    const { GspIRPProvider } = await import("@/server/domain/einvoice-providers/gsp-provider");
+    const testProvider = new GspIRPProvider({
+      clientId: input.clientId.trim(),
+      clientSecret: input.clientSecret.trim(),
+      portalUsername: input.portalUsername.trim(),
+      portalPassword: input.portalPassword.trim(),
+      isSandbox: input.isSandbox,
+    });
+
+    const token = await testProvider.getAuthToken();
+    return { success: true, tokenPreview: `${token.slice(0, 8)}...${token.slice(-4)}` };
+  } catch (err: unknown) {
+    return { error: err instanceof Error ? err.message : String(err) };
+  }
+}
