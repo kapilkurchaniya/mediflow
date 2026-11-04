@@ -1,3 +1,4 @@
+import { db, type DbOrTx } from "@/server/db";
 import type { DayBookFilter, DayBookReport, LedgerFilter, LedgerReport } from "./types";
 import { getDayBookReport } from "./day-book";
 import { getAccountLedgerReport } from "./account-ledger";
@@ -24,13 +25,18 @@ export function formatPaiseDecimal(paise: number): string {
 export async function generateDayBookCsv(
   tenantId: string,
   filter: DayBookFilter,
+  d: DbOrTx = db,
 ): Promise<string> {
   // Use high limit to fetch complete dataset for snapshot export
-  const report: DayBookReport = await getDayBookReport(tenantId, {
-    ...filter,
-    limit: 5000,
-    offset: 0,
-  });
+  const report: DayBookReport = await getDayBookReport(
+    tenantId,
+    {
+      ...filter,
+      limit: 5000,
+      offset: 0,
+    },
+    d,
+  );
 
   const headers = [
     "Date",
@@ -89,12 +95,17 @@ export async function generateDayBookCsv(
 export async function generateLedgerCsv(
   tenantId: string,
   filter: LedgerFilter,
+  d: DbOrTx = db,
 ): Promise<string> {
-  const report: LedgerReport = await getAccountLedgerReport(tenantId, {
-    ...filter,
-    limit: 5000,
-    cursor: null,
-  });
+  const report: LedgerReport = await getAccountLedgerReport(
+    tenantId,
+    {
+      ...filter,
+      limit: 5000,
+      cursor: null,
+    },
+    d,
+  );
 
   const rows: string[] = [];
   rows.push(`Account,${sanitizeCsvCell(`${report.account.code} - ${report.account.name}`)}`);

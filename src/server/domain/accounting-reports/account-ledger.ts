@@ -1,4 +1,4 @@
-import { db, schema } from "@/server/db";
+import { db, schema, type DbOrTx } from "@/server/db";
 import { and, asc, eq, gt, gte, inArray, lte, or, sql, type SQL } from "drizzle-orm";
 import type {
   AccountInfo,
@@ -18,11 +18,12 @@ import {
 export async function getAccountLedgerReport(
   tenantId: string,
   filter: LedgerFilter,
+  d: DbOrTx = db,
 ): Promise<LedgerReport> {
   const { accountId, dateRange, storeScope, partyType, partyId, cursor, limit = 50 } = filter;
 
   // 1. Resolve Account Info (read-only)
-  const [accountRow] = await db
+  const [accountRow] = await d
     .select()
     .from(schema.accounts)
     .where(and(eq(schema.accounts.tenantId, tenantId), eq(schema.accounts.id, accountId)))
@@ -49,7 +50,7 @@ export async function getAccountLedgerReport(
   let periodDebit0 = 0;
   let periodCredit0 = 0;
   if (dateRange.from) {
-    const [openRes] = await db
+    const [openRes] = await d
       .select({
         dr: sql<number>`coalesce(sum(${schema.journalLines.debit}), 0)::int`,
         cr: sql<number>`coalesce(sum(${schema.journalLines.credit}), 0)::int`,
@@ -71,7 +72,7 @@ export async function getAccountLedgerReport(
   let pageCredit0 = periodCredit0;
   if (cursor) {
     const lineIdNum = Number(cursor.lineId);
-    const [cursorDeltaRes] = await db
+    const [cursorDeltaRes] = await d
       .select({
         dr: sql<number>`coalesce(sum(${schema.journalLines.debit}), 0)::int`,
         cr: sql<number>`coalesce(sum(${schema.journalLines.credit}), 0)::int`,
@@ -118,7 +119,7 @@ export async function getAccountLedgerReport(
     );
   }
 
-  const rawLines = await db
+  const rawLines = await d
     .select({
       lineId: schema.journalLines.id,
       entryId: schema.journalEntries.id,
@@ -148,7 +149,7 @@ export async function getAccountLedgerReport(
   // 5. Build Particulars for each page line by inspecting complete journal entries
   const entryIds = [...new Set(pageLines.map((l) => l.entryId))];
   const counterpartLines = entryIds.length > 0
-    ? await db
+    ? await d
         .select({
           entryId: schema.journalLines.entryId,
           accountId: schema.journalLines.accountId,
@@ -218,7 +219,7 @@ export async function getAccountLedgerReport(
   if (dateRange.from) periodConds.push(gte(schema.journalEntries.entryDate, dateRange.from));
   if (dateRange.to) periodConds.push(lte(schema.journalEntries.entryDate, dateRange.to));
 
-  const [periodTotalsRes] = await db
+  const [periodTotalsRes] = await d
     .select({
       dr: sql<number>`coalesce(sum(${schema.journalLines.debit}), 0)::int`,
       cr: sql<number>`coalesce(sum(${schema.journalLines.credit}), 0)::int`,

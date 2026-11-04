@@ -1,4 +1,4 @@
-import { db, schema } from "@/server/db";
+import { db, schema, type DbOrTx } from "@/server/db";
 import { and, desc, eq, gte, inArray, isNull, lte, or, sql, type SQL } from "drizzle-orm";
 import type {
   AccountType,
@@ -30,6 +30,7 @@ export function buildVoucherTypeCondition(voucherType?: string): SQL | undefined
 export async function getDayBookReport(
   tenantId: string,
   filter: DayBookFilter,
+  d: DbOrTx = db,
 ): Promise<DayBookReport> {
   const { dateRange, storeScope, voucherType, limit = 50, offset = 0 } = filter;
   const storeCond = buildStoreScopeCondition(storeScope);
@@ -53,7 +54,7 @@ export async function getDayBookReport(
   const whereClause = and(...entryConditions);
 
   // 1. Compute summary totals over the entire filtered scope
-  const summaryResult = await db
+  const summaryResult = await d
     .select({
       totalVouchers: sql<number>`count(distinct ${schema.journalEntries.id})::int`,
       totalDebit: sql<number>`coalesce(sum(${schema.journalLines.debit}), 0)::int`,
@@ -82,7 +83,7 @@ export async function getDayBookReport(
   }
 
   // 2. Fetch paginated distinct journal entries with store info
-  const entryRows = await db
+  const entryRows = await d
     .select({
       id: schema.journalEntries.id,
       entryNo: schema.journalEntries.entryNo,
@@ -121,7 +122,7 @@ export async function getDayBookReport(
   const entryIds = entryRows.map((e) => e.id);
 
   // 3. Fetch all journal lines for these entries
-  const lineRows = await db
+  const lineRows = await d
     .select({
       id: schema.journalLines.id,
       entryId: schema.journalLines.entryId,
@@ -149,7 +150,7 @@ export async function getDayBookReport(
 
   const customerMap = new Map<string, string>();
   if (customerIds.length > 0) {
-    const customers = await db
+    const customers = await d
       .select({ id: schema.customers.id, name: schema.customers.name })
       .from(schema.customers)
       .where(and(eq(schema.customers.tenantId, tenantId), inArray(schema.customers.id, customerIds)));
@@ -158,7 +159,7 @@ export async function getDayBookReport(
 
   const supplierMap = new Map<string, string>();
   if (supplierIds.length > 0) {
-    const suppliers = await db
+    const suppliers = await d
       .select({ id: schema.suppliers.id, name: schema.suppliers.name })
       .from(schema.suppliers)
       .where(and(eq(schema.suppliers.tenantId, tenantId), inArray(schema.suppliers.id, supplierIds)));

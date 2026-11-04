@@ -1,4 +1,4 @@
-import { db, schema } from "@/server/db";
+import { db, schema, type DbOrTx } from "@/server/db";
 import { and, eq, isNull, sql } from "drizzle-orm";
 import type {
   AccountInfo,
@@ -15,12 +15,13 @@ export async function getPartyControlReconciliation(
   partyType: "customer" | "supplier",
   storeScope: ReportStoreScope,
   partyId?: string | null,
+  d: DbOrTx = db,
 ): Promise<ReconciliationReport> {
   const systemKey = partyType === "customer" ? "debtors" : "creditors";
   const defaultCode = partyType === "customer" ? "1050" : "2010";
 
   // 1. Resolve Control Account (Read-only lookup)
-  const [accountRow] = await db
+  const [accountRow] = await d
     .select()
     .from(schema.accounts)
     .where(
@@ -56,7 +57,7 @@ export async function getPartyControlReconciliation(
   );
 
   // 2. Control Account Totals
-  const [controlTotals] = await db
+  const [controlTotals] = await d
     .select({
       dr: sql<number>`coalesce(sum(${schema.journalLines.debit}), 0)::int`,
       cr: sql<number>`coalesce(sum(${schema.journalLines.credit}), 0)::int`,
@@ -79,7 +80,7 @@ export async function getPartyControlReconciliation(
     subledgerConds.push(eq(schema.journalLines.partyId, partyId));
   }
 
-  const [subledgerTotals] = await db
+  const [subledgerTotals] = await d
     .select({
       dr: sql<number>`coalesce(sum(${schema.journalLines.debit}), 0)::int`,
       cr: sql<number>`coalesce(sum(${schema.journalLines.credit}), 0)::int`,
@@ -98,7 +99,7 @@ export async function getPartyControlReconciliation(
     isNull(schema.journalLines.partyId),
   );
 
-  const [unattributedTotals] = await db
+  const [unattributedTotals] = await d
     .select({
       dr: sql<number>`coalesce(sum(${schema.journalLines.debit}), 0)::int`,
       cr: sql<number>`coalesce(sum(${schema.journalLines.credit}), 0)::int`,
@@ -123,7 +124,7 @@ export async function getPartyControlReconciliation(
 
   // 6. Fetch Sample Unattributed Postings (up to 20 for diagnostic preview)
   const unattributedRows = unattributedCount > 0
-    ? await db
+    ? await d
         .select({
           entryId: schema.journalEntries.id,
           entryNo: schema.journalEntries.entryNo,
@@ -154,13 +155,13 @@ export async function getPartyControlReconciliation(
   let partyName: string | null = null;
   if (partyId) {
     if (partyType === "customer") {
-      const [c] = await db
+      const [c] = await d
         .select({ name: schema.customers.name })
         .from(schema.customers)
         .where(and(eq(schema.customers.tenantId, tenantId), eq(schema.customers.id, partyId)));
       partyName = c?.name ?? null;
     } else {
-      const [s] = await db
+      const [s] = await d
         .select({ name: schema.suppliers.name })
         .from(schema.suppliers)
         .where(and(eq(schema.suppliers.tenantId, tenantId), eq(schema.suppliers.id, partyId)));

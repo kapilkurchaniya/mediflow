@@ -1,4 +1,5 @@
-import { describe, expect, it, beforeAll } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { createTestDb } from "../setup/db";
 import {
   getDayBookReport,
   generateDayBookCsv,
@@ -9,17 +10,27 @@ import {
 } from "./accounting-reports-fixture";
 
 describe("Accounting Reports — Day Book Integration Tests", () => {
+  let t: Awaited<ReturnType<typeof createTestDb>>;
   let f: AccountingReportsFixture;
 
   beforeAll(async () => {
-    f = await setupAccountingReportsFixture();
+    t = await createTestDb();
+    f = await setupAccountingReportsFixture(t.db);
+  });
+
+  afterAll(async () => {
+    await t?.cleanup();
   });
 
   it("reports exactly Store A transactions with balanced Dr == Cr", async () => {
-    const report = await getDayBookReport(f.tenantId, {
-      dateRange: { from: "2026-11-01", to: "2026-11-04" },
-      storeScope: { type: "store", storeId: f.storeA },
-    });
+    const report = await getDayBookReport(
+      f.tenantId,
+      {
+        dateRange: { from: "2026-11-01", to: "2026-11-04" },
+        storeScope: { type: "store", storeId: f.storeA },
+      },
+      t.db,
+    );
 
     expect(report.totalVouchers).toBe(4); // JV-001, JV-002, JV-003, JV-006
     expect(report.isBalanced).toBe(true);
@@ -28,11 +39,15 @@ describe("Accounting Reports — Day Book Integration Tests", () => {
   });
 
   it("filters accurately by voucher type including sale_return", async () => {
-    const report = await getDayBookReport(f.tenantId, {
-      dateRange: { from: "2026-11-01", to: "2026-11-04" },
-      storeScope: { type: "store", storeId: f.storeA },
-      voucherType: "sale_return",
-    });
+    const report = await getDayBookReport(
+      f.tenantId,
+      {
+        dateRange: { from: "2026-11-01", to: "2026-11-04" },
+        storeScope: { type: "store", storeId: f.storeA },
+        voucherType: "sale_return",
+      },
+      t.db,
+    );
 
     expect(report.totalVouchers).toBe(1);
     expect(report.entries[0]?.entryNo).toBe("JV-006");
@@ -40,27 +55,39 @@ describe("Accounting Reports — Day Book Integration Tests", () => {
   });
 
   it("consolidated all-stores report includes Store A, Store B, and unallocated tenant-wide entry exactly once", async () => {
-    const allReport = await getDayBookReport(f.tenantId, {
-      dateRange: { from: "2026-11-01", to: "2026-11-04" },
-      storeScope: { type: "all" },
-    });
+    const allReport = await getDayBookReport(
+      f.tenantId,
+      {
+        dateRange: { from: "2026-11-01", to: "2026-11-04" },
+        storeScope: { type: "all" },
+      },
+      t.db,
+    );
 
     expect(allReport.totalVouchers).toBe(6);
     expect(allReport.isBalanced).toBe(true);
 
-    const unallocatedReport = await getDayBookReport(f.tenantId, {
-      dateRange: { from: "2026-11-01", to: "2026-11-04" },
-      storeScope: { type: "unallocated" },
-    });
+    const unallocatedReport = await getDayBookReport(
+      f.tenantId,
+      {
+        dateRange: { from: "2026-11-01", to: "2026-11-04" },
+        storeScope: { type: "unallocated" },
+      },
+      t.db,
+    );
     expect(unallocatedReport.totalVouchers).toBe(1);
     expect(unallocatedReport.entries[0]?.entryNo).toBe("JV-005");
   });
 
   it("exports Day Book CSV matching query totals and vouchers", async () => {
-    const dayBookCsv = await generateDayBookCsv(f.tenantId, {
-      dateRange: { from: "2026-11-01", to: "2026-11-04" },
-      storeScope: { type: "store", storeId: f.storeA },
-    });
+    const dayBookCsv = await generateDayBookCsv(
+      f.tenantId,
+      {
+        dateRange: { from: "2026-11-01", to: "2026-11-04" },
+        storeScope: { type: "store", storeId: f.storeA },
+      },
+      t.db,
+    );
 
     expect(dayBookCsv).toContain("JV-001");
     expect(dayBookCsv).toContain("JV-002");

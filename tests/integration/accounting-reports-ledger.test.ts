@@ -1,4 +1,5 @@
-import { describe, expect, it, beforeAll } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { createTestDb } from "../setup/db";
 import {
   getAccountLedgerReport,
   getPartyControlReconciliation,
@@ -10,20 +11,30 @@ import {
 } from "./accounting-reports-fixture";
 
 describe("Accounting Reports — Account Ledger & Reconciliation Integration Tests", () => {
+  let t: Awaited<ReturnType<typeof createTestDb>>;
   let f: AccountingReportsFixture;
 
   beforeAll(async () => {
-    f = await setupAccountingReportsFixture();
+    t = await createTestDb();
+    f = await setupAccountingReportsFixture(t.db);
+  });
+
+  afterAll(async () => {
+    await t?.cleanup();
   });
 
   describe("Continuous Running Balance & Opposing Particulars", () => {
     it("calculates continuous running balance correctly for Cash on Hand (1010)", async () => {
-      const report = await getAccountLedgerReport(f.tenantId, {
-        accountId: f.accounts.cash,
-        dateRange: { from: "2026-11-01", to: "2026-11-04" },
-        storeScope: { type: "store", storeId: f.storeA },
-        limit: 10,
-      });
+      const report = await getAccountLedgerReport(
+        f.tenantId,
+        {
+          accountId: f.accounts.cash,
+          dateRange: { from: "2026-11-01", to: "2026-11-04" },
+          storeScope: { type: "store", storeId: f.storeA },
+          limit: 10,
+        },
+        t.db,
+      );
 
       expect(report.account.code).toBe("1010");
       expect(report.periodOpeningBalance).toBe(0);
@@ -49,12 +60,16 @@ describe("Accounting Reports — Account Ledger & Reconciliation Integration Tes
 
     it("preserves continuous running balance across keyset pagination without resetting to zero", async () => {
       // Page 1 with limit 1
-      const page1 = await getAccountLedgerReport(f.tenantId, {
-        accountId: f.accounts.cash,
-        dateRange: { from: "2026-11-01", to: "2026-11-04" },
-        storeScope: { type: "store", storeId: f.storeA },
-        limit: 1,
-      });
+      const page1 = await getAccountLedgerReport(
+        f.tenantId,
+        {
+          accountId: f.accounts.cash,
+          dateRange: { from: "2026-11-01", to: "2026-11-04" },
+          storeScope: { type: "store", storeId: f.storeA },
+          limit: 1,
+        },
+        t.db,
+      );
 
       expect(page1.rows.length).toBe(1);
       expect(page1.rows[0]?.entryNo).toBe("JV-001");
@@ -63,13 +78,17 @@ describe("Accounting Reports — Account Ledger & Reconciliation Integration Tes
       expect(page1.nextCursor).not.toBeNull();
 
       // Page 2 using nextCursor
-      const page2 = await getAccountLedgerReport(f.tenantId, {
-        accountId: f.accounts.cash,
-        dateRange: { from: "2026-11-01", to: "2026-11-04" },
-        storeScope: { type: "store", storeId: f.storeA },
-        cursor: page1.nextCursor,
-        limit: 1,
-      });
+      const page2 = await getAccountLedgerReport(
+        f.tenantId,
+        {
+          accountId: f.accounts.cash,
+          dateRange: { from: "2026-11-01", to: "2026-11-04" },
+          storeScope: { type: "store", storeId: f.storeA },
+          cursor: page1.nextCursor,
+          limit: 1,
+        },
+        t.db,
+      );
 
       expect(page2.rows.length).toBe(1);
       expect(page2.rows[0]?.entryNo).toBe("JV-006");
@@ -82,11 +101,15 @@ describe("Accounting Reports — Account Ledger & Reconciliation Integration Tes
     });
 
     it("correctly identifies compound entries in particulars", async () => {
-      const report = await getAccountLedgerReport(f.tenantId, {
-        accountId: f.accounts.debtors,
-        dateRange: { from: "2026-11-01", to: "2026-11-04" },
-        storeScope: { type: "store", storeId: f.storeA },
-      });
+      const report = await getAccountLedgerReport(
+        f.tenantId,
+        {
+          accountId: f.accounts.debtors,
+          dateRange: { from: "2026-11-01", to: "2026-11-04" },
+          storeScope: { type: "store", storeId: f.storeA },
+        },
+        t.db,
+      );
 
       const compoundRow = report.rows.find((r) => r.entryNo === "JV-002");
       expect(compoundRow).toBeDefined();
@@ -97,13 +120,17 @@ describe("Accounting Reports — Account Ledger & Reconciliation Integration Tes
 
   describe("Party Subledger & Multi-Metric Reconciliation", () => {
     it("filters customer subledger strictly by partyId", async () => {
-      const report = await getAccountLedgerReport(f.tenantId, {
-        accountId: f.accounts.debtors,
-        dateRange: { from: "2026-11-01", to: "2026-11-04" },
-        storeScope: { type: "store", storeId: f.storeA },
-        partyType: "customer",
-        partyId: f.customerId,
-      });
+      const report = await getAccountLedgerReport(
+        f.tenantId,
+        {
+          accountId: f.accounts.debtors,
+          dateRange: { from: "2026-11-01", to: "2026-11-04" },
+          storeScope: { type: "store", storeId: f.storeA },
+          partyType: "customer",
+          partyId: f.customerId,
+        },
+        t.db,
+      );
 
       expect(report.rows.length).toBe(1);
       expect(report.rows[0]?.entryNo).toBe("JV-002");
@@ -115,6 +142,8 @@ describe("Accounting Reports — Account Ledger & Reconciliation Integration Tes
         f.tenantId,
         "customer",
         { type: "store", storeId: f.storeA },
+        null,
+        t.db,
       );
 
       expect(recon.account.code).toBe("1050");
@@ -130,11 +159,15 @@ describe("Accounting Reports — Account Ledger & Reconciliation Integration Tes
 
   describe("Ledger CSV Export Parity", () => {
     it("exports Ledger CSV matching query balances", async () => {
-      const ledgerCsv = await generateLedgerCsv(f.tenantId, {
-        accountId: f.accounts.cash,
-        dateRange: { from: "2026-11-01", to: "2026-11-04" },
-        storeScope: { type: "store", storeId: f.storeA },
-      });
+      const ledgerCsv = await generateLedgerCsv(
+        f.tenantId,
+        {
+          accountId: f.accounts.cash,
+          dateRange: { from: "2026-11-01", to: "2026-11-04" },
+          storeScope: { type: "store", storeId: f.storeA },
+        },
+        t.db,
+      );
 
       expect(ledgerCsv).toContain("Opening Balance");
       expect(ledgerCsv).toContain("Closing Balance");
