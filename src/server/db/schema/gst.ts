@@ -9,7 +9,7 @@ import {
   timestamp,
   uuid,
 } from "drizzle-orm/pg-core";
-import { id, money, createdAt } from "./_helpers";
+import { id, money, createdAt, updatedAt } from "./_helpers";
 import { storeId, tenantId } from "./platform";
 
 export const gstDocuments = pgTable(
@@ -40,10 +40,14 @@ export const gstDocuments = pgTable(
     ackNo: text("ack_no"),
     ackDate: timestamp("ack_date", { withTimezone: true }),
     signedQrCode: text("signed_qr_code"),
+    signedInvoice: text("signed_invoice"), // NIC-signed JWT token payload
+    einvoiceProvider: text("einvoice_provider"), // SIMULATOR | SANDBOX | PRODUCTION | provider name
     eWayBillNo: text("e_way_bill_no"),
     eWayBillDate: timestamp("e_way_bill_date", { withTimezone: true }),
     eWayBillValidTill: timestamp("e_way_bill_valid_till", { withTimezone: true }),
     status: text("status").notNull().default("active"), // active | cancelled | amended
+    cancelledReason: text("cancelled_reason"), // 1: Duplicate | 2: Data entry mistake | 3: Order cancelled | 4: Other
+    cancelledRemarks: text("cancelled_remarks"),
     createdAt: createdAt(),
   },
   (t) => [
@@ -73,7 +77,32 @@ export const eInvoiceLogs = pgTable(
   (t) => [index("e_inv_logs_doc_idx").on(t.gstDocumentId)],
 );
 
+export const tenantGspCredentials = pgTable(
+  "tenant_gsp_credentials",
+  {
+    id: id(),
+    tenantId: tenantId(),
+    storeId: uuid("store_id"), // null = tenant-wide default
+    provider: text("provider").notNull().default("sandbox_co_in"), // sandbox_co_in | cleartax | masters_india | nic_direct
+    clientIdEnc: text("client_id_enc").notNull(),
+    clientSecretEnc: text("client_secret_enc").notNull(),
+    portalUsernameEnc: text("portal_username_enc").notNull(),
+    portalPasswordEnc: text("portal_password_enc").notNull(),
+    cachedAuthTokenEnc: text("cached_auth_token_enc"),
+    tokenExpiresAt: timestamp("token_expires_at", { withTimezone: true }),
+    isSandbox: boolean("is_sandbox").notNull().default(true),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    index("gsp_creds_tenant_idx").on(t.tenantId),
+    index("gsp_creds_store_idx").on(t.storeId),
+  ],
+);
+
 export type GstDocument = typeof gstDocuments.$inferSelect;
 export type NewGstDocument = typeof gstDocuments.$inferInsert;
 export type EInvoiceLog = typeof eInvoiceLogs.$inferSelect;
 export type NewEInvoiceLog = typeof eInvoiceLogs.$inferInsert;
+export type TenantGspCredential = typeof tenantGspCredentials.$inferSelect;
+export type NewTenantGspCredential = typeof tenantGspCredentials.$inferInsert;
