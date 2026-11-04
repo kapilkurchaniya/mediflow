@@ -1,26 +1,14 @@
 import { test, expect } from "@playwright/test";
 import {
-  setupTestDevice,
-  setupConflictBatch,
-  depleteBatchStock,
-  closeDbPool,
-  reserveFreshTestBlock,
-  type TestDeviceSetup,
+  setupTestDevice, setupConflictBatch, depleteBatchStock, closeDbPool,
+  reserveFreshTestBlock, type TestDeviceSetup,
 } from "./helpers/offline-fixture";
 import type { ReserveNumbersResponse } from "../../src/server/domain/sync/types";
 import {
-  initDexieDevice,
-  primeDexieSync,
-  triggerDexieSync,
-  getDexiePendingSales,
-  getDexieProvisionalAllocations,
-  computePayloadHash,
-  validateAllowlistExport,
+  initDexieDevice, primeDexieSync, triggerDexieSync, getDexiePendingSales,
+  getDexieProvisionalAllocations, computePayloadHash, validateAllowlistExport,
 } from "./helpers/offline-db";
-import {
-  assertServerSaleDetails,
-  assertServerConflictCase,
-} from "./helpers/offline-server-assertions";
+import { assertServerSaleDetails, assertServerConflictCase } from "./helpers/offline-server-assertions";
 import { formatDeviceInvoiceNo } from "../../src/server/domain/sync/numbers";
 
 let fixture: TestDeviceSetup;
@@ -49,19 +37,11 @@ test.describe("Offline POS Counter E2E Smoke & Integration Suite (Task A4.8)", (
 
     // 3. Reserve clean number sequence block & initialize Dexie with test credentials
     currentReservation = await reserveFreshTestBlock(fixture, 50);
-    await initDexieDevice(
-      page,
-      {
-        tenantId: fixture.tenant.id,
-        storeId: fixture.store.id,
-        deviceId: fixture.device.id,
-        deviceCode: fixture.device.code,
-        storeCode: fixture.store.code,
-        deviceToken: fixture.rawToken,
-        cashierId: fixture.adminUser.id,
-      },
-      currentReservation,
-    );
+    await initDexieDevice(page, {
+      tenantId: fixture.tenant.id, storeId: fixture.store.id, deviceId: fixture.device.id,
+      deviceCode: fixture.device.code, storeCode: fixture.store.code,
+      deviceToken: fixture.rawToken, cashierId: fixture.adminUser.id,
+    }, currentReservation);
     await primeDexieSync(page);
   });
 
@@ -84,7 +64,10 @@ test.describe("Offline POS Counter E2E Smoke & Integration Suite (Task A4.8)", (
 
     // --- Sale 1: Cash payment ---
     await searchInput.fill("Paracetamol");
-    await page.getByRole("button", { name: "+ Add" }).first().click();
+    const addPara1 = page.locator("tr", { hasText: "Paracetamol 500mg" }).getByRole("button", { name: "+ Add" });
+    await expect(addPara1).toBeVisible({ timeout: 5000 });
+    await addPara1.click();
+    await expect(page.locator("table.data-table tr", { hasText: "Paracetamol 500mg" })).toBeVisible({ timeout: 5000 });
     await page.keyboard.press("F10");
 
     // Verify Offline Receipt Modal & Rule 46(b) Invoice No
@@ -93,12 +76,15 @@ test.describe("Offline POS Counter E2E Smoke & Integration Suite (Task A4.8)", (
     const expectedInv1 = formatDeviceInvoiceNo({ storeCode, deviceCode, fiscalYear: expectedFy, sequence: startSeq });
     await expect(page.locator("body")).toContainText(expectedInv1);
     await page.getByTitle("Close").click();
-    await expect(receiptModal).not.toBeVisible();
+    await expect(receiptModal).not.toBeVisible({ timeout: 5000 });
     await expect(page.getByRole("button", { name: /1 pending/i })).toBeVisible();
 
     // --- Sale 2: UPI payment ---
     await searchInput.fill("Dolo");
-    await page.getByRole("button", { name: "+ Add" }).first().click();
+    const addDolo = page.locator("tr", { hasText: "Dolo 650" }).getByRole("button", { name: "+ Add" });
+    await expect(addDolo).toBeVisible({ timeout: 5000 });
+    await addDolo.click();
+    await expect(page.locator("table.data-table tr", { hasText: "Dolo 650" })).toBeVisible({ timeout: 5000 });
     await page.getByRole("button", { name: /split tender/i }).click();
     await page.getByLabel("UPI tender amount").fill("31.00");
     await page.getByRole("button", { name: /complete sale/i }).click();
@@ -107,11 +93,15 @@ test.describe("Offline POS Counter E2E Smoke & Integration Suite (Task A4.8)", (
     const expectedInv2 = formatDeviceInvoiceNo({ storeCode, deviceCode, fiscalYear: expectedFy, sequence: startSeq + 1 });
     await expect(page.locator("body")).toContainText(expectedInv2);
     await page.getByTitle("Close").click();
+    await expect(receiptModal).not.toBeVisible({ timeout: 5000 });
     await expect(page.getByRole("button", { name: /2 pending/i })).toBeVisible();
 
     // --- Sale 3: Split Tender ---
     await searchInput.fill("Paracetamol");
-    await page.getByRole("button", { name: "+ Add" }).first().click();
+    const addPara3 = page.locator("tr", { hasText: "Paracetamol 500mg" }).getByRole("button", { name: "+ Add" });
+    await expect(addPara3).toBeVisible({ timeout: 5000 });
+    await addPara3.click();
+    await expect(page.locator("table.data-table tr", { hasText: "Paracetamol 500mg" })).toBeVisible({ timeout: 5000 });
     await page.getByRole("button", { name: /split tender/i }).click();
     await page.getByLabel("Cash tender amount").fill("5.00");
     await page.getByLabel("UPI tender amount").fill("10.00");
@@ -121,6 +111,7 @@ test.describe("Offline POS Counter E2E Smoke & Integration Suite (Task A4.8)", (
     const expectedInv3 = formatDeviceInvoiceNo({ storeCode, deviceCode, fiscalYear: expectedFy, sequence: startSeq + 2 });
     await expect(page.locator("body")).toContainText(expectedInv3);
     await page.getByTitle("Close").click();
+    await expect(receiptModal).not.toBeVisible({ timeout: 5000 });
     await expect(page.getByRole("button", { name: /3 pending/i })).toBeVisible();
 
     // 3. Restore network connectivity & await sync completion
@@ -171,10 +162,12 @@ test.describe("Offline POS Counter E2E Smoke & Integration Suite (Task A4.8)", (
 
     // Reconnect & return to POS
     await page.context().setOffline(false);
-    try {
-      await page.waitForURL("**/dashboard/sales/pos**", { timeout: 5000 });
-    } catch {
-      await page.goto("/dashboard/sales/pos");
+    const retryBtn = page.locator("#retryBtn, a:has-text('Retry POS Connection')");
+    if (await retryBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
+      await retryBtn.click().catch(() => {});
+    }
+    if (!page.url().includes("/dashboard/sales/pos")) {
+      await page.goto("/dashboard/sales/pos").catch(() => {});
     }
     await expect(page.getByPlaceholder(/search medicine/i)).toBeVisible({ timeout: 15000 });
     await triggerDexieSync(page);
@@ -250,7 +243,10 @@ test.describe("Offline POS Counter E2E Smoke & Integration Suite (Task A4.8)", (
     // 2. Disconnect Context 1 & bill all 10 units offline
     await page.context().setOffline(true);
     await page.getByPlaceholder(/search medicine/i).fill(medicine.name);
-    await page.getByRole("button", { name: "+ Add" }).first().click();
+    const conflictRow = page.locator("tr", { hasText: batch.batchNo });
+    await expect(conflictRow).toBeVisible({ timeout: 5000 });
+    await conflictRow.getByRole("button", { name: "+ Add" }).click();
+    await expect(page.locator("table.data-table tr", { hasText: batch.batchNo })).toBeVisible({ timeout: 5000 });
 
     // Ensure packQty is 1 (1 pack = 10 units)
     const packInput = page.locator('input[data-cart-input="pack"]').first();
@@ -260,9 +256,11 @@ test.describe("Offline POS Counter E2E Smoke & Integration Suite (Task A4.8)", (
     const receiptModal = page.getByRole("heading", { name: /offline sale recorded/i });
     await expect(receiptModal).toBeVisible({ timeout: 5000 });
     const pendingSales = await getDexiePendingSales(page);
-    const pending = pendingSales.find((s) => s.status === "pending") ?? pendingSales[pendingSales.length - 1];
-    const offlineInv = pending.invoiceNo;
+    const pending = pendingSales.find((s) => s.payload.lines?.some((l) => l.batchId === batch.id));
+    expect(pending).toBeDefined();
+    const offlineInv = pending!.invoiceNo;
     await page.getByTitle("Close").click();
+    await expect(receiptModal).not.toBeVisible({ timeout: 5000 });
 
     // 3. Context 2: Server concurrently depletes batch to 0 before Context 1 reconnects
     await depleteBatchStock({

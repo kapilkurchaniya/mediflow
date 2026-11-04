@@ -1,8 +1,12 @@
 "use client";
 
-import React, { useRef } from "react";
-import { Printer, X, CheckCircle2 } from "lucide-react";
+import React, { useRef, useState, useMemo } from "react";
+import { Printer, X, CheckCircle2, Cpu } from "lucide-react";
 import type { OfflinePendingSale } from "@/offline/types";
+import { useHardwareBridge } from "@/desktop/useHardwareBridge";
+import { DesktopPrintService } from "@/desktop/print-service";
+import { mapOfflineSaleToPrintData } from "@/desktop/offline-print-mapper";
+import type { PrintFormat } from "@/desktop/types";
 
 interface OfflineReceiptModalProps {
   isOpen: boolean;
@@ -20,6 +24,11 @@ export function OfflineReceiptModal({
   storeCode = "STORE",
 }: OfflineReceiptModalProps) {
   const printAreaRef = useRef<HTMLDivElement>(null);
+  const [printStatus, setPrintStatus] = useState<string | null>(null);
+  const [isPrinting, setIsPrinting] = useState(false);
+
+  const { isDesktop } = useHardwareBridge();
+  const printService = useMemo(() => new DesktopPrintService(), []);
 
   if (!isOpen || !bill) return null;
 
@@ -27,8 +36,30 @@ export function OfflineReceiptModal({
   const totalRs = (totalPaise / 100).toFixed(2);
   const createdDate = new Date(bill.createdAt).toLocaleString();
 
-  const handlePrint = () => {
+  const handleBrowserPrint = () => {
     window.print();
+  };
+
+  const handleSilentPrint = async (fmt: PrintFormat) => {
+    if (!bill) return;
+    setIsPrinting(true);
+    setPrintStatus("Formatting raw print job...");
+    try {
+      const printData = await mapOfflineSaleToPrintData(bill, storeName, storeCode);
+      const res = await printService.printSaleReceipt(printData, {
+        format: fmt,
+        kickDrawer: true,
+      });
+      if (res.success) {
+        setPrintStatus(`Printed to ${res.printerName} (${res.durationMs}ms)`);
+      } else {
+        setPrintStatus(`Print notice: ${res.error || "spooled"}`);
+      }
+    } catch (err: unknown) {
+      setPrintStatus(`Print error: ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setIsPrinting(false);
+    }
   };
 
   return (
@@ -39,6 +70,11 @@ export function OfflineReceiptModal({
           <div className="flex items-center gap-2">
             <CheckCircle2 className="w-5 h-5 text-emerald-600" />
             <h2 className="text-sm font-bold text-ink-900">Offline Sale Recorded</h2>
+            {isDesktop && (
+              <span className="flex items-center gap-1 text-[10px] bg-brand-50 text-brand-700 px-2 py-0.5 rounded-full font-medium border border-brand-200">
+                <Cpu className="w-3 h-3" /> Native Bridge
+              </span>
+            )}
           </div>
           <button
             type="button"
@@ -101,7 +137,9 @@ export function OfflineReceiptModal({
             {bill.payload.lines.map((l, idx) => (
               <div key={idx} className="space-y-0.5 text-[11px]">
                 <div className="flex justify-between font-semibold">
-                  <span className="truncate max-w-[240px]">Med #{l.medicineId ? l.medicineId.slice(0, 8) : "item"}</span>
+                  <span className="truncate max-w-[240px]">
+                    Med #{l.medicineId ? l.medicineId.slice(0, 8) : "item"}
+                  </span>
                   <span>{l.qty}</span>
                 </div>
                 <div className="text-[10px] text-ink-500 flex justify-between">
@@ -135,21 +173,51 @@ export function OfflineReceiptModal({
         </div>
 
         {/* Modal Footer Actions */}
-        <div className="p-4 border-t border-ink-100 bg-ink-50 flex items-center justify-between gap-3 print:hidden">
-          <button
-            type="button"
-            onClick={onClose}
-            className="btn btn-secondary text-xs flex-1"
-          >
-            Done (F2 New Bill)
-          </button>
-          <button
-            type="button"
-            onClick={handlePrint}
-            className="btn btn-primary text-xs flex-1 flex items-center justify-center gap-1.5"
-          >
-            <Printer className="w-3.5 h-3.5" /> Print Receipt
-          </button>
+        <div className="p-4 border-t border-ink-100 bg-ink-50 flex flex-col gap-2 print:hidden">
+          {printStatus && (
+            <div className="text-[11px] text-center font-mono py-1 px-2 rounded bg-ink-100 text-ink-700 truncate">
+              {printStatus}
+            </div>
+          )}
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="btn btn-secondary text-xs flex-1"
+            >
+              Done (F2)
+            </button>
+            {isDesktop ? (
+              <div className="flex gap-2 flex-2">
+                <button
+                  type="button"
+                  disabled={isPrinting}
+                  onClick={() => handleSilentPrint("thermal-80mm")}
+                  className="btn btn-primary text-xs flex-1 flex items-center justify-center gap-1"
+                  title="Silent ESC/POS thermal print + kick drawer (<1s SLA)"
+                >
+                  <Printer className="w-3.5 h-3.5" /> ESC/POS
+                </button>
+                <button
+                  type="button"
+                  disabled={isPrinting}
+                  onClick={() => handleSilentPrint("dotmatrix-80col")}
+                  className="btn btn-secondary text-xs flex-1 flex items-center justify-center gap-1"
+                  title="Silent ESC/P 80-column continuous tractor feed"
+                >
+                  <Printer className="w-3.5 h-3.5" /> ESC/P 80C
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={handleBrowserPrint}
+                className="btn btn-primary text-xs flex-1 flex items-center justify-center gap-1.5"
+              >
+                <Printer className="w-3.5 h-3.5" /> Print Receipt
+              </button>
+            )}
+          </div>
         </div>
       </div>
     </div>

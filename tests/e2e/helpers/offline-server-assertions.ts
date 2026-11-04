@@ -15,22 +15,27 @@ export async function assertServerSaleDetails(params: {
   expectedPaymentMethods?: string[];
   expectedMinItems?: number;
 }): Promise<Sale> {
-  const [sale] = await testDb
-    .select()
-    .from(schema.sales)
-    .where(eq(schema.sales.invoiceNo, params.invoiceNo))
-    .limit(1);
+  let sale: Sale | undefined;
+  await expect.poll(async () => {
+    const [row] = await testDb
+      .select()
+      .from(schema.sales)
+      .where(eq(schema.sales.invoiceNo, params.invoiceNo))
+      .limit(1);
+    sale = row;
+    return Boolean(row);
+  }, { timeout: 15000, message: `Expected server sale for ${params.invoiceNo}` }).toBe(true);
 
   expect(sale).toBeDefined();
-  expect(sale.status).toBe("completed");
-  expect(sale.invoiceNo).toBe(params.invoiceNo);
-  expect(sale.totalAmount).toBeGreaterThan(0);
+  expect(sale!.status).toBe("completed");
+  expect(sale!.invoiceNo).toBe(params.invoiceNo);
+  expect(sale!.totalAmount).toBeGreaterThan(0);
 
   // Assert line items
   const items = await testDb
     .select()
     .from(schema.saleItems)
-    .where(eq(schema.saleItems.saleId, sale.id));
+    .where(eq(schema.saleItems.saleId, sale!.id));
 
   expect(items.length).toBeGreaterThanOrEqual(params.expectedMinItems ?? 1);
   for (const item of items) {
@@ -43,7 +48,7 @@ export async function assertServerSaleDetails(params: {
   const payments = await testDb
     .select()
     .from(schema.salePayments)
-    .where(eq(schema.salePayments.saleId, sale.id));
+    .where(eq(schema.salePayments.saleId, sale!.id));
 
   expect(payments.length).toBeGreaterThan(0);
   if (params.expectedPaymentMethods) {
@@ -57,7 +62,7 @@ export async function assertServerSaleDetails(params: {
   const movements = await testDb
     .select()
     .from(schema.stockMovements)
-    .where(eq(schema.stockMovements.refId, sale.id));
+    .where(eq(schema.stockMovements.refId, sale!.id));
 
   expect(movements.length).toBe(items.length);
   for (const m of movements) {
@@ -65,7 +70,7 @@ export async function assertServerSaleDetails(params: {
     expect(m.qtyChange).toBeLessThan(0);
   }
 
-  return sale;
+  return sale!;
 }
 
 /**
@@ -76,29 +81,39 @@ export async function assertServerConflictCase(params: {
   invoiceNo: string;
   expectedDeficit: number;
 }): Promise<{ caseRow: StockConflictCase; contribution: StockConflictContribution }> {
-  // 1. Locate contribution by invoiceNo
-  const [contribution] = await testDb
-    .select()
-    .from(schema.stockConflictContributions)
-    .where(eq(schema.stockConflictContributions.invoiceNo, params.invoiceNo))
-    .limit(1);
+  // 1. Locate contribution by invoiceNo (poll until PostgreSQL sync transaction commits)
+  let contribution: StockConflictContribution | undefined;
+  await expect.poll(async () => {
+    const [row] = await testDb
+      .select()
+      .from(schema.stockConflictContributions)
+      .where(eq(schema.stockConflictContributions.invoiceNo, params.invoiceNo))
+      .limit(1);
+    contribution = row;
+    return Boolean(row);
+  }, { timeout: 15000, message: `Expected conflict contribution for invoice ${params.invoiceNo}` }).toBe(true);
 
   expect(contribution).toBeDefined();
-  expect(contribution.contributedQty).toBe(params.expectedDeficit);
+  expect(contribution!.contributedQty).toBe(params.expectedDeficit);
 
   // 2. Locate parent conflict case
-  const [caseRow] = await testDb
-    .select()
-    .from(schema.stockConflictCases)
-    .where(eq(schema.stockConflictCases.id, contribution.conflictCaseId))
-    .limit(1);
+  let caseRow: StockConflictCase | undefined;
+  await expect.poll(async () => {
+    const [row] = await testDb
+      .select()
+      .from(schema.stockConflictCases)
+      .where(eq(schema.stockConflictCases.id, contribution!.conflictCaseId))
+      .limit(1);
+    caseRow = row;
+    return Boolean(row);
+  }, { timeout: 15000 }).toBe(true);
 
   expect(caseRow).toBeDefined();
-  expect(caseRow.storeId).toBe(params.storeId);
-  expect(caseRow.status).toBe("open");
-  expect(caseRow.requiredReconciliationQty).toBeGreaterThanOrEqual(params.expectedDeficit);
+  expect(caseRow!.storeId).toBe(params.storeId);
+  expect(caseRow!.status).toBe("open");
+  expect(caseRow!.requiredReconciliationQty).toBeGreaterThanOrEqual(params.expectedDeficit);
 
-  return { caseRow, contribution };
+  return { caseRow: caseRow!, contribution: contribution! };
 }
 
 /**

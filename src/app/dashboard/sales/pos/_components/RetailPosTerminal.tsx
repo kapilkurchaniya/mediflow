@@ -9,6 +9,7 @@ import { getPosDB } from "@/offline/db";
 import type { OfflinePendingSale } from "@/offline/types";
 import { usePosCart } from "../_state/usePosCart";
 import { usePosShortcuts } from "../_state/usePosShortcuts";
+import { usePosBarcodeBridge } from "../_hooks/usePosBarcodeBridge";
 import { useShell } from "@/app/components/ShellContext";
 import { PosHeader } from "./PosHeader";
 import { SearchBar } from "./SearchBar";
@@ -24,20 +25,9 @@ export function RetailPosTerminal() {
   const router = useRouter();
   const searchInputRef = useRef<HTMLInputElement>(null);
   const { state, dispatch, totals, loyaltyDiscountPaise, rxWarning, controlledItems, playSound } = usePosCart();
-  const {
-    toggleCalculator,
-    setShortcutsOpen,
-    calculatorOpen,
-    shortcutsOpen,
-    currentStore,
-    setStoreSwitcherOpen,
-    userId,
-  } = useShell();
+  const { toggleCalculator, setShortcutsOpen, calculatorOpen, shortcutsOpen, currentStore, setStoreSwitcherOpen, userId } = useShell();
 
-  const posDs = usePosDataSource({
-    storeId: currentStore?.id,
-    cashierId: userId,
-  });
+  const posDs = usePosDataSource({ storeId: currentStore?.id, cashierId: userId });
   const ds = posDs.dataSource;
 
   const [activeShift, setActiveShift] = useState<CurrentShiftStats | null>(null);
@@ -77,7 +67,6 @@ export function RetailPosTerminal() {
     searchInputRef.current?.focus();
   }, [refreshMeta]);
 
-  // Safely clear cart and refresh metadata on store switch
   useEffect(() => {
     const onStoreSwitch = () => {
       dispatch({ type: "RESET_SALE" });
@@ -106,28 +95,18 @@ export function RetailPosTerminal() {
         customerId: state.customer?.id,
         doctorName: state.compliance.doctorName,
         items: state.cart.map((c) => ({
-          batchId: c.batchId,
-          medicineId: c.medicineId,
-          qty: c.qty,
-          packQty: c.packQty,
-          looseQty: c.looseQty,
-          rate: c.saleRate ?? c.mrp,
-          discountBp: c.discountBp,
-          autoFefo: c.autoFefo,
-          overrideBatch: c.overrideBatch,
-          overrideReason: c.overrideReason,
+          batchId: c.batchId, medicineId: c.medicineId, qty: c.qty, packQty: c.packQty, looseQty: c.looseQty,
+          rate: c.saleRate ?? c.mrp, discountBp: c.discountBp, autoFefo: c.autoFefo,
+          overrideBatch: c.overrideBatch, overrideReason: c.overrideReason,
         })),
         paymentMethod: method === "split" ? "cash" : method,
         amountPaid: totals.total,
         complianceDetails: {
-          doctorName: state.compliance.doctorName,
-          doctorRegNo: state.compliance.doctorRegNo,
+          doctorName: state.compliance.doctorName, doctorRegNo: state.compliance.doctorRegNo,
           doctorAddress: state.compliance.doctorAddress,
           patientAge: state.compliance.patientAge === "" ? undefined : Number(state.compliance.patientAge),
-          patientGender: state.compliance.patientGender,
-          patientAddress: state.compliance.patientAddress,
-          prescriptionRef: state.compliance.prescriptionRef,
-          prescriptionDate: state.compliance.prescriptionDate,
+          patientGender: state.compliance.patientGender, patientAddress: state.compliance.patientAddress,
+          prescriptionRef: state.compliance.prescriptionRef, prescriptionDate: state.compliance.prescriptionDate,
         },
         medicalRepId: state.compliance.medicalRepId,
         paymentsInput,
@@ -155,13 +134,10 @@ export function RetailPosTerminal() {
 
   usePosShortcuts({
     onFocusSearch: () => searchInputRef.current?.focus(),
-    onResetSale: () => {
-      dispatch({ type: "RESET_SALE" });
-      searchInputRef.current?.focus();
-    },
+    onResetSale: () => { dispatch({ type: "RESET_SALE" }); searchInputRef.current?.focus(); },
     onOpenSubstitutes: () => {
-      const itemWithGen = state.cart.find((c) => c.genericName);
-      if (itemWithGen?.genericName) setSubstituteGeneric(itemWithGen.genericName);
+      const item = state.cart.find((c) => c.genericName);
+      if (item?.genericName) setSubstituteGeneric(item.genericName);
     },
     onOpenRegister: () => router.push("/dashboard/sales/register"),
     onHoldBill: () => { if (state.cart.length > 0) setIsParkOpen(true); },
@@ -172,13 +148,22 @@ export function RetailPosTerminal() {
     onOpenCalculator: () => toggleCalculator(),
     onOpenShortcutsCheatSheet: () => setShortcutsOpen(true),
     onEscape: () => {
-      setIsPaymentOpen(false);
-      setIsParkOpen(false);
-      setIsHeldListOpen(false);
-      setSubstituteGeneric(null);
-      setPromiseMedicine(null);
+      setIsPaymentOpen(false); setIsParkOpen(false); setIsHeldListOpen(false);
+      setSubstituteGeneric(null); setPromiseMedicine(null);
     },
     isModalOpen: isPaymentOpen || isParkOpen || isHeldListOpen || shortcutsOpen || calculatorOpen || Boolean(substituteGeneric) || Boolean(promiseMedicine),
+  });
+
+  usePosBarcodeBridge({
+    dataSource: ds,
+    onSelectBatch: (m, b, all) => dispatch({ type: "ADD_LINE", payload: { medicine: m, batch: b, allBatches: all } }),
+    playSound,
+    onBarcodeMiss: (barcode) => {
+      if (searchInputRef.current) {
+        searchInputRef.current.focus();
+        searchInputRef.current.value = barcode;
+      }
+    },
   });
 
   return (
@@ -262,10 +247,7 @@ export function RetailPosTerminal() {
         setRevalidationAlert={setRevalidationAlert}
         onCompleteSplitSale={() => handleCompleteSale("split")}
         onClosePayment={() => setIsPaymentOpen(false)}
-        onCloseHeld={() => {
-          setIsParkOpen(false);
-          setIsHeldListOpen(false);
-        }}
+        onCloseHeld={() => { setIsParkOpen(false); setIsHeldListOpen(false); }}
         onCloseSubstitute={() => setSubstituteGeneric(null)}
         onClosePromise={() => setPromiseMedicine(null)}
       />
