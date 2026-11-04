@@ -1,0 +1,9 @@
+{
+  "name": "mediflow-desktop",
+  "version": "0.1.0",
+  "description": "MediFlow Native Desktop POS Application (Tauri 2.x)",
+  "private": true,
+  "scripts": {
+    "tauri": "tauri"
+  }
+}

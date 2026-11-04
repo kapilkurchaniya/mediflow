@@ -163,3 +163,28 @@ export const cashSessions = pgTable(
   },
   (t) => [uniqueIndex("cash_sessions_one_open_uq").on(t.storeId).where(sql`${t.status} = 'open'`)],
 );
+
+export const cashMovements = pgTable(
+  "cash_movements",
+  {
+    id: id(),
+    tenantId: tenantId(),
+    storeId: storeId(),
+    cashSessionId: uuid("cash_session_id")
+      .notNull()
+      .references(() => cashSessions.id, { onDelete: "cascade" }),
+    movementType: text("movement_type").notNull(), // cash_payout | opening_float | cash_in | safe_drop
+    direction: text("direction").notNull(), // in | out
+    amount: money("amount").notNull(),
+    paymentId: uuid("payment_id"),
+    notes: text("notes"),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    createdBy: uuid("created_by"),
+  },
+  (t) => [
+    index("cash_movements_session_idx").on(t.tenantId, t.cashSessionId),
+    uniqueIndex("cash_movements_payment_uq")
+      .on(t.paymentId)
+      .where(sql`${t.paymentId} is not null`),
+  ],
+);

@@ -71,6 +71,7 @@ Here is a clear summary of all the core features and flows MediFlow provides to 
 - **Salt / Substitute finder (`F9`):** When a prescribed brand is out of stock, press `F9` to instantly see all available in-stock alternatives sharing the exact same active pharmaceutical molecule.
 - **Prescription & Schedule H/H1/X compliance:** The counter alerts you when prescription drugs are in the cart and mandates entering the prescribing doctor and patient details before completing the sale.
 - **Instant invoice printing:** Print 2-inch or 3-inch thermal receipts or full A4/A5 tax invoices with HSN summaries.
+- **Offline POS billing & synchronization (Phase 4):** Counter terminals seamlessly continue billing even during broadband outages. Terminals allocate legal GST Rule 46(b) consecutive invoice numbers from local reserved blocks, search cached batch stock with provisional deductions, enforce credit limits, queue pending bills in an IndexedDB outbox, print receipts offline, and automatically push sales to cloud inventory once reconnected.
 - **Same-day bill cancellation (`Alt + C`):** Void bills made by mistake on the same business day with automated batch stock restoration, reversing journal entries, and GSTR-1 voiding.
 - **Sale returns & GST credit notes (`Alt + R`):** Process customer medicine returns (full or partial strips/loose tablets), restore inventory to exact batches, automatically quarantine expired batches (`hold`), post balanced credit note journals, and issue GST Credit Notes (`CN/YY-YY/000000`).
 
@@ -211,7 +212,7 @@ Do these once, in this order.
 - **⌨ icon** (or press **?**) shows all keyboard shortcuts.
 - **🔔 bell** shows alerts: *Near Expiry Alert*, *Low Stock Warning*, and a reminder that the day's sales register is ready to reconcile. *View all inventory alerts* takes you to the stock pages.
 - **New bill** button opens the billing counter from anywhere.
-- An **Offline Mode** badge appears if your internet drops. (Billing offline is not available yet; see [chapter 19](#19-not-available-yet).)
+- An **Online / Offline Status Chip** in the POS header displays connectivity and sync state (e.g. *Online · synced 2 min ago*, *Offline · 3 bills pending*, or *Syncing...*). Clicking this chip opens the **Pending Bills Outbox** drawer to view unsynced sales, trigger manual sync, reprint receipts, or export emergency JSON backups.
 
 ### 3.2 The command palette (fastest way to get anywhere)
 
@@ -320,6 +321,35 @@ To protect your pharmacy from expired inventory losses and speed up checkout:
 - **Visual FEFO Badge:** In the search dropdown, the earliest-expiring batch is highlighted with a green **`⚡ Auto-FEFO`** badge. Later-expiring batches are tagged with a neutral badge.
 - **Multi-Batch Slicing:** If the soonest batch only has 4 tablets in stock but the customer needs 10, MediFlow automatically allocates 4 tablets from the first batch and slices the remaining 6 tablets from the next earliest batch. The cart displays a breakdown badge showing the multi-batch allocation.
 - **Audited Manual Overrides:** If a customer or doctor specifically insists on a newer batch, the cashier can manually click and select that batch. To prevent stock dumping, MediFlow records an immutable **`fefo_override`** audit event noting the selected batch and the earlier-expiring batches that were bypassed. Store owners and auditors can review all overrides in **Settings → Audit log**.
+
+### 5.1e Offline POS billing, outbox synchronization, and disaster recovery backup
+
+During internet and broadband outages, MediFlow POS terminals continue billing without interruptions:
+- **Transparent Offline Operation:** The terminal automatically detects connection loss and switches to local IndexedDB (`PosDB`). The status chip in the top navigation changes from green *Online* to amber *Offline · N pending*.
+- **Local Stock & FEFO:** Product catalog search and FEFO batch selection use the local database with provisional stock deductions.
+- **GST Rule 46(b) Invoicing:** Bills are numbered consecutively using the counter device's pre-reserved series (e.g. `ST01-2627-000001`), complying strictly with the 16-character statutory ceiling.
+- **Offline Receipts:** Finalizing a sale displays the **Offline Sale Recorded** dialog for thermal or A4 printing with customer details and HSN summary.
+- **Pending Bills Drawer & Disaster Recovery:** Click the status chip anytime to view the outbox. The **Export JSON** button generates a clean disaster-recovery file (strictly excluding device tokens, credentials, or session secrets) containing all pending sales.
+- **Service Worker Resilience:** If the browser page is accidentally refreshed while offline, the Service Worker immediately serves the precached offline bootstrap screen (`/offline.html`), preventing blank screen errors while preserving the local database unmutated.
+- **Automatic Reconnection Sync:** Once internet connectivity returns, the terminal automatically pushes pending sales to the central server. The outbox clears, sales are written to the central PostgreSQL ledger, and inventory is reconciled.
+
+### 5.1f Desktop POS Application, Silent Raw Printing & Hardware Bridge (Phase 4)
+
+For peak-rush pharmacy counters requiring maximum checkout speed and zero latency, MediFlow provides a lightweight native desktop container built on Tauri 2.x and Rust:
+
+1. **Sub-Second Silent Raw Printing (< 1.0s SLA)**:
+   - **No Browser Popups**: Unlike web browsers which launch OS print preview dialogs requiring mouse clicks, the desktop bridge spools binary escape codes directly to the printer spooler (Windows `winspool.drv` RAW or Linux CUPS/character device).
+   - **ESC/POS Thermal Receipts (58mm & 80mm)**: Generates native ESC/POS commands with pharmacy header, DL numbers (Form 20/21), GSTIN, HSN summary, and dynamic UPI QR codes.
+   - **Epson ESC/P 80-Column Dot-Matrix Invoices**: Formats continuous tractor-feed tax invoices for Epson LX-300+II, TVS MSP 240, and FX-890 printers in crisp 10 CPI draft character mode. Automatically appends a Form Feed (`0x0C`) byte to advance tractor stationery exactly to the next perforation without manual wheel adjustments.
+   - **Automatic Cash Drawer Kick**: Automatically fires a solenoid pulse (`ESC p 0 25 250`) on bill completion or cash drawer shortcut (`Alt + D`), opening the cash drawer instantly.
+
+2. **Global Hardware USB HID Barcode Scanner Intercept**:
+   - Hardware USB barcode scanners emit keystrokes in high-speed bursts (inter-character intervals $< 35$ms).
+   - The desktop hardware bridge listens globally for rapid barcode sequences. If a barcode is scanned while focus is on a dropdown, table row, or button, MediFlow prevents unintended shortcut triggering, searches the scanned barcode, and automatically adds the in-stock batch to the active cart with an audio confirmation beep.
+
+3. **Local Durable SQLite WAL Storage**:
+   - In desktop environments, counter transactions and synced medicine catalogs are securely persisted in an embedded SQLite database configured in WAL (Write-Ahead Logging) mode (`PRAGMA synchronous = NORMAL;`).
+   - Syncs incrementally with central servers via `/api/sync/pull` and `/api/sync/sales`, guaranteeing immunity against browser storage eviction under disk pressure.
 
 ### 5.2 What MediFlow does for you when you complete a bill
 
@@ -573,6 +603,33 @@ Press **Save**. Only roles that can manage medicines (owner, manager, pharmacist
 - Optional **Valid From / Valid To** dates.
 
 The list shows **Scheme Name, Applicability, Terms, Validity, Status**, with a delete (bin) button. Roles that can view purchases (owner, manager, purchase manager, accountant, auditor) open this page.
+
+### 6.9 Offline Sync Stock Conflicts (Inventory → Offline sync conflicts)
+
+When counter workstations operate offline during broadband outages, sales are finalized locally and physical goods leave the pharmacy immediately. When offline sales later synchronize to the cloud server, if central cloud inventory was concurrently sold or transferred, the central ledger balance for that batch can drop negative.
+
+MediFlow accepts these sales so legal GST tax invoices reflect physical reality, while flagging a durable **Stock Conflict Exception** under **Inventory → Offline sync conflicts**.
+
+#### 1. Fundamental Rules
+- **Tax Invoices Are Immutable:** Conflict handling never voids or cancels customer invoices. Legal GST documents remain untouched.
+- **No Phantom Inventory:** Clearing a deficit on an empty shelf never records fictitious positive stock discovery.
+- **Traceable Attribution:** Every contributing offline sale, counter terminal code, and synchronization timestamp remains permanently auditable.
+
+#### 2. Resolving a Conflict Case
+Open **Inventory → Offline sync conflicts** and click **Investigate / Resolve** on any active case:
+
+1. **Physical Recount (Tab 1):**
+   - Count the dispensary shelf.
+   - If stock is physically discovered on the shelf, enter the observed count. The ledger balance updates directly to match physical reality.
+   - If the shelf is confirmed empty (0 stock), the system records an audited reconciliation offset (`refType: "conflict_reconciliation"`) with a loss accounting entry (`Debit 5030 Stock Shortage & Loss` / `Credit 1080 Stock in Hand`), squaring the ledger to 0 without fabricating phantom units.
+2. **Audited Batch Reallocation (Tab 2):**
+   - If the cashier physically handed over an alternative batch of the same medicine (e.g. barcode mis-scan or bin substitution), select the surplus batch from the dropdown.
+   - Requires documented physical dispensing evidence.
+   - Atomically transfers the deficit quantity between the batches with row locks.
+3. **Branch Transfer Reconciliation (Tab 3):**
+   - Inter-branch transfers only reconcile conflict deficits upon verified physical *receipt* at the destination store (`Receive Transfer`). Dispatch alone does not clear the conflict.
+4. **Dismiss Case (Tab 4):**
+   - For administrative duplicates or false alarms, record a mandatory reason note to close the case.
 
 ---
 
@@ -889,7 +946,7 @@ Fill in: **Pharmacy name**, **Drug licence no.**, **GSTIN** (e.g. *27AAAAA0000A1
 - Your licence number and name appear on invoices and registers; your pharmacy name shows in the left menu.
 
 ### 15.2 Other settings pages
-Racks ([6.4](#64-racks-and-shelves)), Trade schemes ([6.8](#68-trade-schemes)), Loyalty ([8.3](#83-setting-up-the-rewards-loyalty-programme)), Medical reps ([8.5](#85-medical-representatives-and-commission)), WhatsApp and SMS ([chapter 11](#11-whatsapp-and-sms)). Several of these appear in other menu sections; each is visible only to the roles that may use it. A shop-wide **maximum discount** (see [5.5](#55-discounts)) is currently set by your administrator.
+Racks ([6.4](#64-racks-and-shelves)), Trade schemes ([6.8](#68-trade-schemes)), Loyalty ([8.3](#83-setting-up-the-rewards-loyalty-programme)), Medical reps ([8.5](#85-medical-representatives-and-commission)), WhatsApp and SMS ([chapter 11](#11-whatsapp-and-sms)), POS Devices and offline counters ([15.4](#154-pos-devices--offline-terminals-settings--devices)). Several of these appear in other menu sections; each is visible only to the roles that may use it. A shop-wide **maximum discount** (see [5.5](#55-discounts)) is currently set by your administrator.
 
 ### 15.3 API keys for connected apps
 For a website or partner app that checks your stock or sends you orders. This page isn't in the menu; your administrator opens `/dashboard/settings/api-keys`.
@@ -899,6 +956,28 @@ For a website or partner app that checks your stock or sends you orders. This pa
 3. The list later shows name, scopes, last-used and created dates. **Revoke** a key to stop it immediately.
 
 Treat a key like a password; never share it by chat or email. The connected app sends it as `Authorization: Bearer mf_live_…`.
+
+---
+
+### 15.4 POS Devices & Offline Terminals (Settings → Devices)
+
+For pharmacies operating physical checkout counters, MediFlow allows registering dedicated POS terminals that can continue billing offline during broadband outages.
+
+**Register a counter device:**
+1. Go to **Settings → Devices** (or navigate to `/dashboard/settings/devices`). Only owners and store managers (`settings.manage`) have access.
+2. Select your store branch, enter a **Device name** (e.g., *Counter 1 (Main Cashier)*), and assign a **2-digit Device Code** from `01` to `99` (e.g., `01`).
+3. Press **Register Device**.
+4. **Copy the Device Token immediately**: MediFlow generates a secure, one-time authentication token. For security, it is hashed on the server and shown **only once**.
+5. Save the token into your counter terminal's offline setup. The terminal uses this token to authenticate against the `/api/sync/*` endpoints.
+
+**Why each device has its own 2-digit code:**
+GST Rule 46(b) mandates that invoice serial numbers must be consecutive, unique per financial year, and strictly $\le 16$ characters. MediFlow assigns each physical counter terminal its own independent invoice series:
+- Format: `{StoreCode}{DeviceCode}/{FY}/{Sequence}` (e.g. `ST01/2526/000001` = 15 characters).
+- Each device reserves sequential blocks of numbers from the server while online (e.g., 200 numbers at a time).
+- When internet drops, Counter 1 and Counter 2 can issue bills simultaneously without contacting the cloud or causing sequence collisions.
+
+**Revoke a device:**
+If a terminal is retired, reassigned, or compromised, click **Revoke** on its row in the Devices list. Revocation is instantaneous: any further sync requests from that device token are immediately rejected.
 
 ---
 
@@ -1036,7 +1115,7 @@ If your pharmacy staff is accustomed to Marg ERP 9+ or Marg Books, here is how t
 | A supplier bill is rejected as a duplicate | That supplier's invoice number is already recorded. |
 | *E-invoicing is not configured* | E-invoicing hasn't been switched on by your administrator. |
 | *Something went wrong. Please try again.* | A temporary problem. Try again; if it repeats, tell your administrator. |
-| The page says "Offline Mode" | Your internet dropped. Wait until it returns before saving. |
+| The page says "Offline · N pending" | Your counter terminal is operating offline. You can continue searching local stock and billing customers normally. Pending sales will automatically synchronize when internet returns. |
 | I made a mistake on a bill | Use **Cancel Bill** (Alt+C) on the same business day, or **Return Items** (Alt+R) to issue a GST Credit Note. |
 | *An open cash register shift is required to complete sales* | Your store has shift enforcement enabled. Open a shift with your initial float under **Operations → Cash register (Shifts)** or press **F4** on POS. |
 | *An active register shift is already open for this store* | Exactly one shift can be open per branch. Close the previous cashier's shift before opening a new one. |
@@ -1101,7 +1180,8 @@ These features are part of upcoming development phases and are planned for futur
 
 | Area | Planned feature | Status |
 |---|---|---|
-| Billing | Offline counter billing with IndexedDB/SQLite sync (Phase 4) | In Roadmap |
+| Billing | Offline counter billing with IndexedDB sync (Phase 4) | Completed in A4.6 — transparent failover, offline stock search, outbox sync, and receipt printing |
+| Platforms | Standalone PWA Counter App (Chrome / Edge / Tablet) | Completed (A4.5) — installable from browser with offline shell caching |
 | Platforms | Native Windows desktop `.exe` installer (via Tauri) | In Roadmap (Phase 4) |
 | Platforms | Native macOS desktop `.dmg` application | Future Scope |
 | Platforms | Mobile companion app (iOS & Android) for store owners | Future Scope |
@@ -1146,3 +1226,7 @@ These features are part of upcoming development phases and are planned for futur
 | **Medical rep (MR)** | A pharma company's representative; may earn commission. |
 | **Role** | The set of things a staff login is allowed to do. |
 | **Financial year** | 1 April to 31 March; invoice numbering restarts each year. |
+| **Device Code** | A unique 2-digit identifier (`01`–`99`) assigned to each physical POS counter terminal to isolate its offline invoice series under GST Rule 46(b). |
+| **Device Token** | A secure, one-time Bearer token used by POS counter devices to authenticate with MediFlow synchronization endpoints. |
+| **Number Reservation Block** | A pre-allocated range of sequential invoice numbers granted to an offline counter terminal so it can issue gap-free bills without contacting the server. |
+| **Stock Reconciliation (Offline)** | Server handling of offline sales where a bill is accepted even if shelf stock temporarily went negative during a network outage, accompanied by an automatic conflict notification for store management. |

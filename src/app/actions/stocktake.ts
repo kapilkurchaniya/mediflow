@@ -11,6 +11,7 @@ import {
   approveStockAuditSession,
   cancelStockAuditSession,
   getStockAuditSessionDetails,
+  getPrintCountSheetData,
   listStockAuditSessions,
 } from "@/server/domain/inventory/stocktake";
 
@@ -34,6 +35,15 @@ export async function getStockAuditSessionAction(sessionId: string) {
     tenantId: ctx.tenantId,
     sessionId,
     isBlindStaffView: !isOwnerOrManager,
+  });
+}
+
+export async function getPrintCountSheetAction(sessionId: string, mode?: "blind" | "manager") {
+  const ctx = await requirePermission("inventory.view");
+  return getPrintCountSheetData(db, {
+    tenantId: ctx.tenantId,
+    sessionId,
+    mode: mode ?? "blind",
   });
 }
 

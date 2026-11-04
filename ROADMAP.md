@@ -769,13 +769,15 @@ Full map in `.github/CODEOWNERS` and [ADR 0004](docs/adr/0004-two-lane-ownership
 
 ### Lane A · Phase 4
 
-#### A4.1 Devices & device auth ⏱ 2 days
+#### [x] A4.1 Devices & device auth ⏱ 2 days
 - **Files:** ✏️ `schema/platform.ts`: ➕ `devices (id, tenant_id, store_id, code char(2), name, token_hash, last_seen_at, revoked_at, created_by, created_at)`, unique on `(store_id, code)`; migration. ➕ `src/server/domain/devices.ts` (`registerDevice` → returns a one-time token; `revokeDevice`; `authenticateDevice(req)` → `{ tenantId, storeId, deviceId, code }`). ➕ `src/app/dashboard/settings/devices/page.tsx` (`settings.manage`).
+- **Progress:** completed in `lane-a/a4-1-devices` (PR #61, migration 0016). Device registration, 2-digit counter code assignment, one-time token hashing, revocation, and settings management page.
 
-#### A4.2 Sync-ready schema ⏱ 1 day
+#### [x] A4.2 Sync-ready schema ⏱ 1 day
 - ✏️ Add `updated_at` to `batches`, `customers`, `doctors`, `schemes`, `store_medicine_settings`. Add a Postgres trigger `set_updated_at()` in the migration so every UPDATE bumps it, including updates made by `recordStockMovement`. Add indexes `(store_id, updated_at)` / `(tenant_id, updated_at)`.
+- **Progress:** completed in `lane-a/a4-2-sync-ready-schema` (PR #62, migration 0017). Composite indexes and `set_updated_at()` PostgreSQL triggers installed across all 5 operational tables.
 
-#### A4.3 Sync API ⏱ 3 days
+#### [x] A4.3 Sync API ⏱ 3 days
 - **Files:**
   - ➕ `src/app/api/sync/pull/route.ts`: `GET ?since=&cursor=`. Paged (5,000 rows), gzip. Returns medicines (tenant), batches (store, non-expired), customers (tenant, active), doctors, active schemes, store settings, and `serverTime`.
   - ➕ `src/app/api/sync/sales/route.ts`: `POST { sales: OfflineSale[] }` (max 50 per request). Per sale, in its own transaction: idempotency key insert → `createSale(tx, deviceCtx, input, { source: "offline", allowNegativeStock: true, invoiceNo })` (A2.1) → store the response. Returns per-sale `{ clientSaleId, status: "created"|"duplicate"|"rejected", saleId?, error? }`.
@@ -784,8 +786,9 @@ Full map in `.github/CODEOWNERS` and [ADR 0004](docs/adr/0004-two-lane-ownership
   - ✏️ `src/server/domain/sequence.ts`: `formatInvoiceNo({ storeCode, deviceCode, fiscalYear, seq })` validated to ≤ 16 characters (docs/10 §1).
   - ✏️ `src/proxy.ts`: treat `/api/sync` as self-authenticating (bearer device token).
 - **Device ctx:** `authenticateDevice` builds an `AuthCtx`-like object. The cashier who billed offline is recorded via `createdBy` from the payload, checked to be a member allowed in this store.
+- **Progress:** completed in `lane-a/a4-3-sync-api` (PR #63, migration 0018). Session-bound delta pull with microsecond cursors, Rule 46(b) sequence block reservation, isolated sales ingestion with payload hashing, and StockMovementPolicy negative stock reconciliation.
 
-#### A4.4 Browser offline DB & sync engine ⏱ 4 days
+#### [x] A4.4 Browser offline DB & sync engine ⏱ 4 days
 - **Files:** `npm i dexie` 🔀 (tiny separate PR). ➕ `src/offline/db.ts`:
   ```ts
   import Dexie, { type Table } from "dexie";
@@ -804,20 +807,25 @@ Full map in `.github/CODEOWNERS` and [ADR 0004](docs/adr/0004-two-lane-ownership
   ```
   ➕ `src/offline/sync.ts` (pull loop every 60 s while online; push pending on the `online` event and every 15 s; exponential backoff; Web Locks API so only one tab syncs), ➕ `src/offline/invoice-series.ts` (take the next number from the local block; reserve more when fewer than 50 remain), ➕ `src/offline/search.ts` (local search: name/generic prefix and substring over IndexedDB; barcode exact), ➕ `src/offline/offline-sale.ts` (computes totals with the **same** `src/lib/money.ts` functions, decrements the local batch quantity, prints).
   Client-side tax uses the same `computeSaleTotals`. The server recomputes on sync and **flags** differences over ₹1 instead of rejecting.
+- **Progress:** completed in `lane-a/a4-4-browser-offline-db`. IndexedDB schema with Dexie (`PosDB`), separate provisional stock ledger (`provisionalAllocations`), multi-tab atomic invoice sequence allocation under GST Rule 46(b), session-bound delta pull with tombstone propagation, push outbox with stale syncing recovery and idempotency handling, Web Locks concurrency coordination, and offline search with FEFO ranking.
 
-#### A4.5 PWA shell ⏱ 2 days
+#### [x] A4.5 PWA shell ⏱ 2 days
 - **Files:** ➕ `src/app/manifest.ts` (name, icons, `start_url: "/dashboard/sales/pos"`, `display: "standalone"`), ➕ `public/icons/icon-192.png`, `icon-512.png`, ➕ `public/sw.js` (precache the POS shell and static assets on install; network-first for navigations with cache fallback for the POS route; no caching of `/api/*`), ➕ `src/app/dashboard/sales/pos/_offline/RegisterSW.tsx` (registers `/sw.js` in production only). Read `node_modules/next/dist/docs/01-app/02-guides/progressive-web-apps.md` and the `headers` config for `sw.js` (`Cache-Control: no-cache`, `Service-Worker-Allowed`).
+- **Progress:** completed in `lane-a/a4-5-pwa-shell`. Web App Manifest (`src/app/manifest.ts`), dedicated offline bootstrap document (`public/offline.html`), brand icons in `public/icons/`, route-aware service worker (`public/sw.js`) with RSC Flight request and `/api/*` isolation, registration component (`RegisterSW.tsx`) with update banner coordination, and cache control headers in `next.config.ts`.
 
-#### A4.6 POS offline mode ⏱ 3 days
+#### [x] A4.6 POS offline mode ⏱ 3 days
 - ✏️ POS components use `PosDataSource` (A2.7) with an `OfflinePosDataSource` when `!navigator.onLine` or a request fails. ➕ The status chip "Online · synced 2 min ago" / "Offline · 7 bills pending". Disabled offline: returns, credit beyond the known limit, loyalty redemption. ➕ A "Pending bills" drawer with retry and export JSON.
+- **Progress:** completed in `lane-a/a4-6-pos-offline-mode`. Integrated `OfflinePosDataSource` backed by Dexie `PosDB` and pure capability-based routing, real-time `PosStatusChip` with multi-tab `liveQuery` reactivity, `PendingBillsDrawer` with manual sync and token-scrubbed JSON disaster recovery export, domain-enforced offline limitations (returns, loyalty redemption, and excessive credit sales blocked), and `OfflineReceiptModal` for instant thermal/A4 printing with local GST Rule 46(b) invoice numbering.
 
-#### A4.7 Conflict handling UI ⏱ 1 day
+#### [x] A4.7 Conflict handling UI ⏱ 1 day
 - ➕ `src/app/dashboard/inventory/conflicts/page.tsx`: lists `stock_conflict` notifications with actions (adjust, transfer, change batch).
+- **Progress:** completed in `lane-a/a4-7-conflict-handling-ui`. Introduced durable schema tables (`stockConflictCases`, `stockConflictContributions`, `stockConflictResolutions`) decoupled from transient alerts. Implemented non-fabricating physical recount reconciliation vs confirmed zero stock reconciliation offset (`refType: "conflict_reconciliation"`), audited batch reallocation with atomic paired movements and dispensing evidence, and transactional receipt-driven transfer reconciliation. Created responsive dashboard with KPI summary cards, multi-tab modal for recount/reallocate/transfer/dismiss, and comprehensive unit and integration test coverage.
 
-#### A4.8 🧪 Offline E2E ⏱ 1 day
+#### [x] A4.8 🧪 Offline E2E ⏱ 1 day
 - ➕ `tests/e2e/offline.spec.ts`, scenario in docs/10 "Test plan".
+- **Progress:** completed in `lane-a/a4-8-offline-e2e`. Implemented end-to-end integration and smoke suite in `tests/e2e/offline.spec.ts` with dedicated modular helpers (`offline-fixture.ts`, `offline-db.ts`, `offline-server-assertions.ts`). Validated 3 consecutive offline checkouts (Cash, UPI, Split Tender) under GST Rule 46(b) formatting derived from authoritative server-issued number blocks, Service Worker offline fallback (`/offline.html`) with verified outbox payload hash survival across reload, offline capability restrictions with allowlist disaster-recovery JSON export, and multi-device concurrent conflict reconciliation creating durable `stockConflictCases` and `stockConflictContributions` records. All files $\le 300$ lines.
 
-#### A4.9 🤝 Desktop POS App (Tauri, SQLite & Hardware Print Bridge) ⏱ 3 days
+#### [x] A4.9 🤝 Desktop POS App (Tauri, SQLite & Hardware Print Bridge) ⏱ 3 days
 - **Why:** Chrome browser popups block fast counter billing. Chemists with dot-matrix printers (Epson LX-300) and thermal printers require direct, silent raw printing and zero-latency local SQLite billing.
 - **Files:** ➕ `desktop/` (Tauri 2.x shell wrapping the React POS), ➕ `src/desktop/hardware-bridge.ts`, ➕ `src/desktop/print-service.ts`.
 - **How:**
@@ -826,6 +834,7 @@ Full map in `.github/CODEOWNERS` and [ADR 0004](docs/adr/0004-two-lane-ownership
   - Native print manager with direct ESC/POS (thermal) and Epson ESC/P (dot-matrix 80-col) printer commands.
   - Direct USB barcode scanner input and automatic cash drawer kick.
 - **Done when:** bills print silently to an 80-col dot-matrix printer or thermal printer in under 1 second without browser print preview dialogs 🧪.
+- **Progress:** completed in `lane-a/a4-9-desktop-pos`. Built Tauri 2.x native shell container with Rust direct raw spooling bridge (`desktop/src-tauri/`) supporting Windows Winspool RAW and Linux CUPS. Implemented pure ESC/POS binary command builder (`src/desktop/escpos.ts`) for 58mm/80mm thermal receipts with dynamic UPI QR code generator and cash drawer solenoid pulses. Implemented pure Epson ESC/P binary builder (`src/desktop/escp.ts`) for 80-column continuous tractor-feed tax invoices with Form Feed page advancement (`0x0C`). Implemented global hardware USB HID barcode scanner listener (`src/desktop/hardware-bridge.ts`) capturing high-speed burst keystrokes (<35ms interval) even when search input is unfocused. Implemented sub-second silent print orchestrator (`src/desktop/print-service.ts`), local durable SQLite WAL mode storage engine (`src/desktop/sqlite-storage.ts`), React bridge hooks (`useHardwareBridge`, `usePosBarcodeBridge`), and integrated silent raw printing with cash drawer kick into `OfflineReceiptModal` and `RetailPosTerminal`. Added 6 comprehensive test suites (22 unit tests) with 100% pass rate. All files $\le 300$ lines.
 
 ### Lane B · Phase 4
 
@@ -864,10 +873,10 @@ Full map in `.github/CODEOWNERS` and [ADR 0004](docs/adr/0004-two-lane-ownership
 
 ### Lane A · Phase 5
 
-#### A5.1 Expenses ⏱ 1.5 days
+#### A5.1 Expenses ⏱ 1.5 days [COMPLETED]
 - ➕ `src/app/dashboard/accounting/expenses/{page,new/page}.tsx` using `postPayment({ direction: "out", partyType: "expense", expenseAccountId })`. Expense categories are accounts of type `expense` (seeded: Rent, Salary, Electricity, Transport, Misc), and the user can add more.
 
-#### A5.2 Day book & account ledgers ⏱ 2 days
+#### A5.2 Day book & account ledgers ⏱ 2 days [IN PROGRESS]
 - ➕ `src/app/dashboard/accounting/day-book/page.tsx` (all journal entries for a date, drill-down to the source document). ➕ `src/app/dashboard/accounting/ledger/[accountId]/page.tsx` (running balance; party filter for customer and supplier sub-ledgers). Export via `report.export`.
 
 #### A5.3 Credit control & receivables ageing ⏱ 2 days

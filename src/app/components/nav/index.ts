@@ -17,6 +17,7 @@ import { reportsNav } from "./reports";
 import { salesNav } from "./sales";
 import { settingsItem } from "./settings";
 import type { NavGroupId, NavItem } from "./types";
+import type { StoreKind } from "@/server/db/schema/platform";
 
 export type { NavGroupId, NavItem } from "./types";
 export { settingsItem } from "./settings";
@@ -63,14 +64,28 @@ export const NAV: { heading?: string; items: NavItem[] }[] = GROUPS.map((g) => (
 export const PALETTE_NAV_ITEMS: NavItem[] = [...ALL_NAV_ITEMS, settingsItem];
 
 /** Sidebar sections with only the items this user may use (items without a `permission` are always shown). */
-export function visibleNav(permissions: ReadonlySet<string>): typeof NAV {
+export function visibleNav(
+  permissions: ReadonlySet<string>,
+  storeKind?: StoreKind | null,
+): typeof NAV {
   return NAV.map((g) => ({
     ...g,
-    items: g.items.filter((i) => !i.permission || permissions.has(i.permission)),
+    items: g.items.filter((i) => {
+      if (i.permission && !permissions.has(i.permission)) return false;
+      if (storeKind === "warehouse" && i.retailOnly) return false;
+      return true;
+    }),
   })).filter((g) => g.items.length > 0);
 }
 
 /** Command-palette destinations this user may use. */
-export function visiblePaletteItems(permissions: ReadonlySet<string>): NavItem[] {
-  return PALETTE_NAV_ITEMS.filter((i) => !i.permission || permissions.has(i.permission));
+export function visiblePaletteItems(
+  permissions: ReadonlySet<string>,
+  storeKind?: StoreKind | null,
+): NavItem[] {
+  return PALETTE_NAV_ITEMS.filter((i) => {
+    if (i.permission && !permissions.has(i.permission)) return false;
+    if (storeKind === "warehouse" && i.retailOnly) return false;
+    return true;
+  });
 }

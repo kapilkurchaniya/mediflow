@@ -5,15 +5,13 @@ import {
   Building2,
   Upload,
   CheckCircle2,
-  Clock,
   ArrowDownRight,
   ArrowUpRight,
   Link2,
   Unlink,
   RefreshCw,
-  Plus,
   AlertCircle,
-  FileSpreadsheet,
+  X,
 } from "lucide-react";
 import {
   uploadBankStatement,
@@ -373,20 +371,21 @@ export function BankReconciliationClient({
 
       {/* Manual Match Selection Modal */}
       {matchingLineId && (
-        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-surface rounded-xl shadow-xl border border-ink-150 w-full max-w-xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
-            <div className="p-4 border-b border-ink-150 bg-ink-50 flex items-center justify-between">
+        <div className="fixed inset-0 z-50 bg-ink-950/40 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl shadow-2xl border border-ink-200 w-full max-w-xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+            <div className="px-5 py-4 border-b border-ink-150 bg-ink-50 flex items-center justify-between">
               <h3 className="font-semibold text-sm text-ink-900">Link System Payment</h3>
               <button
                 type="button"
                 onClick={() => setMatchingLineId(null)}
-                className="text-ink-400 hover:text-ink-700 text-lg leading-none"
+                className="btn btn-ghost btn-icon h-7 w-7 text-ink-400 hover:text-ink-700"
+                aria-label="Close dialog"
               >
-                ×
+                <X className="h-4 w-4" />
               </button>
             </div>
 
-            <div className="p-4 max-h-96 overflow-y-auto space-y-2">
+            <div className="p-5 max-h-96 overflow-y-auto space-y-2">
               <p className="text-xs text-ink-500 mb-3">
                 Select a receipt or supplier payment from your pharmacy books to link with this bank statement line:
               </p>
@@ -397,7 +396,7 @@ export function BankReconciliationClient({
                 candidatePayments.map((cp) => (
                   <div
                     key={cp.id}
-                    className="p-3 rounded-lg border border-ink-150 hover:border-primary-400 hover:bg-primary-50/20 flex items-center justify-between transition-colors cursor-pointer"
+                    className="p-3 rounded-lg border border-ink-150 hover:border-brand-500 hover:bg-brand-50/20 flex items-center justify-between transition-colors cursor-pointer"
                     onClick={() => handleManualMatch(cp.id)}
                   >
                     <div>
@@ -417,7 +416,7 @@ export function BankReconciliationClient({
               )}
             </div>
 
-            <div className="p-3 border-t border-ink-150 bg-ink-50/50 flex justify-end">
+            <div className="px-5 py-3.5 border-t border-ink-150 bg-ink-50/50 flex justify-end">
               <button
                 type="button"
                 onClick={() => setMatchingLineId(null)}
@@ -432,76 +431,79 @@ export function BankReconciliationClient({
 
       {/* Upload CSV Modal */}
       {showUploadModal && (
-        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-surface rounded-xl shadow-xl border border-ink-150 w-full max-w-lg overflow-hidden animate-in fade-in zoom-in-95 duration-150">
-            <div className="p-4 border-b border-ink-150 bg-ink-50 flex items-center justify-between">
+        <div className="fixed inset-0 z-50 bg-ink-950/40 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl shadow-2xl border border-ink-200 w-full max-w-lg overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+            <div className="px-5 py-4 border-b border-ink-150 bg-ink-50 flex items-center justify-between">
               <h3 className="font-semibold text-sm text-ink-900">Upload Bank Statement CSV</h3>
               <button
                 type="button"
                 onClick={() => setShowUploadModal(false)}
-                className="text-ink-400 hover:text-ink-700 text-lg leading-none"
+                className="btn btn-ghost btn-icon h-7 w-7 text-ink-400 hover:text-ink-700"
+                aria-label="Close dialog"
               >
-                ×
+                <X className="h-4 w-4" />
               </button>
             </div>
 
-            <form onSubmit={handleUpload} className="p-5 space-y-4">
-              {uploadError && (
-                <div className="alert-error text-xs">
-                  <AlertCircle className="h-4 w-4 shrink-0" />
-                  {uploadError}
-                </div>
-              )}
+            <form onSubmit={handleUpload}>
+              <div className="p-5 space-y-4">
+                {uploadError && (
+                  <div className="alert-error text-xs">
+                    <AlertCircle className="h-4 w-4 shrink-0" />
+                    {uploadError}
+                  </div>
+                )}
 
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <label className="text-xs font-medium text-ink-700">Bank Name</label>
-                  <select name="bankName" className="input input-sm w-full">
-                    <option value="HDFC Bank">HDFC Bank</option>
-                    <option value="ICICI Bank">ICICI Bank</option>
-                    <option value="State Bank of India">State Bank of India</option>
-                    <option value="Axis Bank">Axis Bank</option>
-                    <option value="Other Bank">Other / Standard CSV</option>
-                  </select>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <label className="label text-xs">Bank Name</label>
+                    <select name="bankName" className="input input-sm w-full">
+                      <option value="HDFC Bank">HDFC Bank</option>
+                      <option value="ICICI Bank">ICICI Bank</option>
+                      <option value="State Bank of India">State Bank of India</option>
+                      <option value="Axis Bank">Axis Bank</option>
+                      <option value="Other Bank">Other / Standard CSV</option>
+                    </select>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="label text-xs">Account Number</label>
+                    <input
+                      type="text"
+                      name="accountNo"
+                      required
+                      placeholder="50200012345678"
+                      className="input input-sm w-full font-mono"
+                    />
+                  </div>
                 </div>
+
                 <div className="space-y-1">
-                  <label className="text-xs font-medium text-ink-700">Account Number</label>
+                  <label className="label text-xs">Statement Date</label>
                   <input
-                    type="text"
-                    name="accountNo"
+                    type="date"
+                    name="statementDate"
                     required
-                    placeholder="50200012345678"
-                    className="input input-sm w-full font-mono"
+                    defaultValue={new Date().toISOString().split("T")[0]}
+                    className="input input-sm w-full"
                   />
                 </div>
+
+                <div className="space-y-1">
+                  <label className="label text-xs">Paste Bank Statement CSV Text *</label>
+                  <textarea
+                    name="csvContent"
+                    required
+                    rows={6}
+                    placeholder={`Txn Date,Description,Ref No,Debit,Credit,Balance\n01/10/2026,UPI-SWIGGY-10293,,0.00,1450.00,52340.00\n02/10/2026,CHQ DEP SUN PHARMA,CHQ9982,5000.00,0.00,47340.00`}
+                    className="input input-sm w-full font-mono text-xs py-2"
+                  />
+                  <span className="text-[11px] text-ink-400 block mt-1">
+                    Supports standard netbanking CSV exports from all major Indian banks.
+                  </span>
+                </div>
               </div>
 
-              <div className="space-y-1">
-                <label className="text-xs font-medium text-ink-700">Statement Date</label>
-                <input
-                  type="date"
-                  name="statementDate"
-                  required
-                  defaultValue={new Date().toISOString().split("T")[0]}
-                  className="input input-sm w-full"
-                />
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-xs font-medium text-ink-700">Paste Bank Statement CSV Text *</label>
-                <textarea
-                  name="csvContent"
-                  required
-                  rows={6}
-                  placeholder={`Txn Date,Description,Ref No,Debit,Credit,Balance\n01/10/2026,UPI-SWIGGY-10293,,0.00,1450.00,52340.00\n02/10/2026,CHQ DEP SUN PHARMA,CHQ9982,5000.00,0.00,47340.00`}
-                  className="input input-sm w-full font-mono text-xs py-2"
-                />
-                <span className="text-[11px] text-ink-400 block mt-1">
-                  Supports standard netbanking CSV exports from all major Indian banks.
-                </span>
-              </div>
-
-              <div className="flex items-center justify-end gap-2 pt-3 border-t border-ink-150">
+              <div className="flex items-center justify-end gap-2 px-5 py-3.5 bg-ink-50/50 border-t border-ink-150">
                 <button
                   type="button"
                   onClick={() => setShowUploadModal(false)}

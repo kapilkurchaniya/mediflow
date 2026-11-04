@@ -44,6 +44,7 @@ async function getShellContext() {
     return {
       userName: user?.name ?? "Pharmacist",
       userEmail: user?.email ?? "",
+      userId: user?.id,
       storeName,
       currentStore,
       allowedStores,
@@ -52,6 +53,7 @@ async function getShellContext() {
     return {
       userName: "Pharmacist",
       userEmail: "",
+      userId: undefined,
       storeName: "My Pharmacy",
       currentStore: null,
       allowedStores: [],

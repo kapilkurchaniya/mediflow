@@ -12,9 +12,9 @@ import {
   uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
-import { id, money, createdAt } from "./_helpers";
+import { id, money, createdAt, updatedAt } from "./_helpers";
 import { medicines } from "./catalog";
-import { storeId, stores, tenantId } from "./platform";
+import { storeId, tenantId } from "./platform";
 import { suppliers } from "./purchasing";
 
 export const batches = pgTable(
@@ -36,11 +36,13 @@ export const batches = pgTable(
     qtyOnHand: integer("qty_on_hand").notNull().default(0),
     status: text("status").notNull().default("active"), // active | hold
     createdAt: createdAt(),
+    updatedAt: updatedAt(),
   },
   (t) => [
     uniqueIndex("batches_store_med_batch_uq").on(t.storeId, t.medicineId, t.batchNo),
     index("batches_store_med_idx").on(t.storeId, t.medicineId),
     index("batches_expiry_idx").on(t.tenantId, t.expiryDate),
+    index("batches_store_updated_idx").on(t.storeId, t.updatedAt, t.id),
   ],
 );
 
@@ -83,53 +85,12 @@ export const stockAdjustments = pgTable("stock_adjustments", {
   createdAt: createdAt(),
 });
 
-/** Stock transfers between stores / warehouses. (Task A3.4 & B3.4 / B3.5) */
-export const stockTransfers = pgTable(
-  "stock_transfers",
-  {
-    id: id(),
-    tenantId: tenantId(),
-    transferNo: text("transfer_no").notNull(), // TRF/2026/0001
-    fromStoreId: uuid("from_store_id").notNull().references(() => stores.id),
-    toStoreId: uuid("to_store_id").notNull().references(() => stores.id),
-    status: text("status").notNull().default("draft"), // draft | dispatched | received | cancelled
-    docKind: text("doc_kind").notNull().default("delivery_challan"), // delivery_challan | tax_invoice
-    gstDocumentId: uuid("gst_document_id"),
-    eWayBillNo: text("e_way_bill_no"),
-    notes: text("notes"),
-    createdBy: uuid("created_by").notNull(),
-    dispatchedBy: uuid("dispatched_by"),
-    dispatchedAt: timestamp("dispatched_at", { withTimezone: true }),
-    receivedBy: uuid("received_by"),
-    receivedAt: timestamp("received_at", { withTimezone: true }),
-    createdAt: createdAt(),
-  },
-  (t) => [
-    uniqueIndex("stock_transfers_no_uq").on(t.tenantId, t.transferNo),
-    index("stock_transfers_from_idx").on(t.fromStoreId, t.status),
-    index("stock_transfers_to_idx").on(t.toStoreId, t.status),
-  ]
-);
-
-export const stockTransferItems = pgTable(
-  "stock_transfer_items",
-  {
-    id: id(),
-    tenantId: tenantId(),
-    transferId: uuid("transfer_id").notNull().references(() => stockTransfers.id, { onDelete: "cascade" }),
-    medicineId: uuid("medicine_id").notNull().references(() => medicines.id),
-    fromBatchId: uuid("from_batch_id").notNull().references(() => batches.id),
-    batchNo: text("batch_no").notNull(),
-    expiryDate: date("expiry_date").notNull(),
-    qty: integer("qty").notNull(),
-    receivedQty: integer("received_qty"),
-    unitCost: money("unit_cost"),
-    mrp: money("mrp"),
-    saleRate: money("sale_rate"),
-    toBatchId: uuid("to_batch_id"),
-  },
-  (t) => [index("stock_transfer_items_trf_idx").on(t.transferId)]
-);
+/** Re-export stock transfers from transfers.ts (Task A3.4) */
+export {
+  stockTransfers,
+  stockTransferItems,
+  stockTransferReceiptEvents,
+} from "./transfers";
 
 /** Expired/damaged stock quarantined away from POS. (Task B3.6) */
 export const quarantineBatches = pgTable(
@@ -244,8 +205,14 @@ export const stockAuditItems = pgTable(
 export type Batch = typeof batches.$inferSelect;
 export type NewBatch = typeof batches.$inferInsert;
 export type StockMovement = typeof stockMovements.$inferSelect;
-export type StockTransfer = typeof stockTransfers.$inferSelect;
-export type StockTransferItem = typeof stockTransferItems.$inferSelect;
+export type {
+  StockTransfer,
+  NewStockTransfer,
+  StockTransferItem,
+  NewStockTransferItem,
+  StockTransferReceiptEvent,
+  NewStockTransferReceiptEvent,
+} from "./transfers";
 export type QuarantineBatch = typeof quarantineBatches.$inferSelect;
 export type ExpiryClaim = typeof expiryClaims.$inferSelect;
 export type ExpiryClaimItem = typeof expiryClaimItems.$inferSelect;

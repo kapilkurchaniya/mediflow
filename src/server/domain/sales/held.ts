@@ -14,7 +14,6 @@
  * - Warns if a bill has been parked for > 24 hours.
  */
 
-import { z } from "zod";
 import { eq, and, desc } from "drizzle-orm";
 import * as schema from "@/server/db/schema";
 import type { Tx } from "@/server/db";
@@ -23,72 +22,47 @@ import { DomainError } from "@/server/errors";
 import { writeAudit } from "@/server/audit";
 import { computeSaleTotals } from "@/lib/money";
 import { format } from "date-fns";
+import { canStoreParkBills } from "@/server/domain/stores/policies";
+import {
+  HeldSaleItemSchema,
+  HoldSaleInputSchema,
+  type HeldSaleItem,
+  type HoldSaleInput,
+  type HeldSalePayload,
+  type RevalidatedHeldItem,
+  type ResumeHeldSaleResult,
+} from "./held-types";
 
-export const HeldSaleItemSchema = z.object({
-  medicineId: z.string().uuid(),
-  medicineName: z.string().min(1),
-  genericName: z.string().optional(),
-  batchId: z.string().uuid(),
-  batchNo: z.string().min(1),
-  expiryDate: z.string().min(1),
-  packQty: z.number().int().min(0).default(0),
-  looseQty: z.number().int().min(0).default(0),
-  unitsPerPack: z.number().int().min(1).default(1),
-  packUnit: z.string().default("strip"),
-  looseUnit: z.string().default("tablet"),
-  rate: z.number().int().min(0), // paise
-  mrp: z.number().int().min(0), // paise
-  discountBp: z.number().int().min(0).max(10000).default(0),
-  gstRateBp: z.number().int().default(500),
-  isAutoFefo: z.boolean().optional(),
-});
-export type HeldSaleItem = z.infer<typeof HeldSaleItemSchema>;
-
-export const HoldSaleInputSchema = z.object({
-  customerId: z.string().uuid().optional().nullable(),
-  customerName: z.string().trim().max(100).optional().nullable(),
-  customerPhone: z.string().trim().max(20).optional().nullable(),
-  doctorName: z.string().trim().max(100).optional().nullable(),
-  doctorRegNo: z.string().trim().max(50).optional().nullable(),
-  doctorAddress: z.string().trim().max(255).optional().nullable(),
-  patientAge: z.number().int().min(0).max(130).optional().nullable(),
-  patientGender: z.string().trim().max(20).optional().nullable(),
-  patientAddress: z.string().trim().max(255).optional().nullable(),
-  prescriptionRef: z.string().trim().max(50).optional().nullable(),
-  prescriptionId: z.string().uuid().optional().nullable(),
-  notes: z.string().trim().max(255).optional().nullable(),
-  items: z.array(HeldSaleItemSchema).min(1, "Cannot hold an empty bill"),
-});
-export type HoldSaleInput = z.input<typeof HoldSaleInputSchema>;
-
-export interface HeldSalePayload extends z.output<typeof HoldSaleInputSchema> {
-  heldAt: string;
-}
-
-export interface RevalidatedHeldItem extends HeldSaleItem {
-  availableQtyOnHand: number;
-  isAvailable: boolean;
-  isExpired: boolean;
-  isStockShortage: boolean;
-  priceChanged: boolean;
-  currentRate: number;
-}
-
-export interface ResumeHeldSaleResult {
-  heldSaleId: string;
-  payload: HeldSalePayload;
-  revalidation: {
-    hasIssues: boolean;
-    hasStockShortage: boolean;
-    hasExpiredBatches: boolean;
-    items: RevalidatedHeldItem[];
-  };
-}
+export {
+  HeldSaleItemSchema,
+  HoldSaleInputSchema,
+  type HeldSaleItem,
+  type HoldSaleInput,
+  type HeldSalePayload,
+  type RevalidatedHeldItem,
+  type ResumeHeldSaleResult,
+};
 
 /**
  * Parks the current POS cart as a held sale.
  */
 export async function holdSale(tx: Tx, ctx: AuthCtx, input: HoldSaleInput) {
+  // Validate store capabilities (warehouse cannot park retail counter bills)
+  const [store] = await tx
+    .select({ kind: schema.stores.kind, isActive: schema.stores.isActive })
+    .from(schema.stores)
+    .where(and(eq(schema.stores.id, ctx.storeId), eq(schema.stores.tenantId, ctx.tenantId)))
+    .limit(1);
+
+  if (!store || !canStoreParkBills(store)) {
+    throw new DomainError(
+      "WAREHOUSE_POS_NOT_ALLOWED",
+      store?.kind === "warehouse"
+        ? "Counter bills cannot be parked in a warehouse store."
+        : "Counter bills cannot be parked in an inactive store.",
+    );
+  }
+
   const parsed = HoldSaleInputSchema.parse(input);
 
   // Compute bill totals from lines (without stock deduction)

@@ -91,6 +91,7 @@ export const stores = pgTable(
   },
   (t) => [
     uniqueIndex("stores_tenant_code_uq").on(t.tenantId, t.code),
+    uniqueIndex("stores_tenant_id_uq").on(t.tenantId, t.id),
     check("stores_kind_check", sql`${t.kind} IN ('retail', 'warehouse')`),
   ],
 );

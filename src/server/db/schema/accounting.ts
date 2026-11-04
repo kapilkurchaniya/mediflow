@@ -45,7 +45,11 @@ export const journalEntries = pgTable(
     createdBy: uuid("created_by"),
     createdAt: createdAt(),
   },
-  (t) => [index("journal_tenant_date_idx").on(t.tenantId, t.entryDate), index("journal_ref_idx").on(t.refType, t.refId)],
+  (t) => [
+    index("journal_tenant_date_idx").on(t.tenantId, t.entryDate),
+    index("journal_ref_idx").on(t.refType, t.refId),
+    index("journal_tenant_store_date_idx").on(t.tenantId, t.storeId, t.entryDate),
+  ],
 );
 
 export const journalLines = pgTable(
@@ -63,6 +67,7 @@ export const journalLines = pgTable(
   (t) => [
     index("journal_lines_account_idx").on(t.tenantId, t.accountId),
     index("journal_lines_party_idx").on(t.partyType, t.partyId),
+    index("journal_lines_tenant_party_idx").on(t.tenantId, t.partyType, t.partyId),
     index("journal_lines_entry_idx").on(t.entryId),
   ],
 );
@@ -85,10 +90,23 @@ export const payments = pgTable(
     paymentDate: date("payment_date").notNull(),
     note: text("note"),
     journalEntryId: uuid("journal_entry_id").references(() => journalEntries.id),
+    clientOperationId: uuid("client_operation_id"),
+    cashSessionId: uuid("cash_session_id"),
+    paidFromTill: boolean("paid_from_till").notNull().default(false),
+    payeeName: text("payee_name"),
+    vendorInvoiceNo: text("vendor_invoice_no"),
+    vendorInvoiceDate: date("vendor_invoice_date"),
+    vendorGstin: text("vendor_gstin"),
     createdBy: uuid("created_by").notNull(),
     createdAt: createdAt(),
   },
-  (t) => [index("payments_party_idx").on(t.partyType, t.partyId)],
+  (t) => [
+    index("payments_party_idx").on(t.partyType, t.partyId),
+    index("payments_cash_session_idx").on(t.tenantId, t.cashSessionId),
+    uniqueIndex("payments_tenant_client_op_uq")
+      .on(t.tenantId, t.clientOperationId)
+      .where(sql`${t.clientOperationId} is not null`),
+  ],
 );
 
 /** Bill-wise allocations linking receipts and payments to specific sales or purchases. */

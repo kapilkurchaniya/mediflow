@@ -4,6 +4,7 @@ import { schema, type DbOrTx, type Tx } from "@/server/db";
 import type { AuthCtx } from "@/server/rbac";
 import { DomainError } from "@/server/errors";
 import { writeAudit } from "@/server/audit";
+import { canStoreManageShifts } from "@/server/domain/stores";
 import {
   INDIAN_CURRENCY_DENOMINATIONS,
   type Denomination,
@@ -138,6 +139,22 @@ export async function openShift(
 ): Promise<typeof schema.cashSessions.$inferSelect> {
   const parsed = OpenShiftInputSchema.parse(input);
   const now = new Date();
+
+  // 0. Guard against warehouse stores opening register shifts
+  const [store] = await tx
+    .select({ kind: schema.stores.kind, isActive: schema.stores.isActive })
+    .from(schema.stores)
+    .where(and(eq(schema.stores.id, ctx.storeId), eq(schema.stores.tenantId, ctx.tenantId)))
+    .limit(1);
+
+  if (!store || !canStoreManageShifts(store)) {
+    throw new DomainError(
+      "WAREHOUSE_SHIFT_NOT_ALLOWED",
+      store?.kind === "warehouse"
+        ? "Cash register shifts cannot be opened in a warehouse store."
+        : "Cash register shifts cannot be opened in an inactive store.",
+    );
+  }
 
   // 1. Guard against duplicate open shifts for the store
   const [existing] = await tx
@@ -290,10 +307,39 @@ export async function computeExpectedCash(
 
   const cashRefunds = cashReturnsRows.reduce((sum, r) => sum + (r.totalAmount ?? 0), 0);
 
-  // 4. Cash vouchers (payments domain A2.9)
-  const cashVouchersRows = await dbOrTx
+  // 4. Cash vouchers (payments domain A2.9 / expenses A5.1)
+  const cashPayoutsRows = await dbOrTx
     .select({
-      direction: schema.payments.direction,
+      id: schema.payments.id,
+      amount: schema.payments.amount,
+      cashSessionId: schema.payments.cashSessionId,
+      paidFromTill: schema.payments.paidFromTill,
+    })
+    .from(schema.payments)
+    .where(
+      and(
+        eq(schema.payments.tenantId, ctx.tenantId),
+        eq(schema.payments.storeId, ctx.storeId),
+        eq(schema.payments.method, "cash"),
+        eq(schema.payments.direction, "out"),
+        gte(schema.payments.createdAt, shiftStart),
+        lte(schema.payments.createdAt, shiftEnd),
+      ),
+    );
+
+  const validPayouts = cashPayoutsRows.filter((p) => {
+    // If explicitly marked as NOT from till (office cash expense), exclude from drawer
+    if (p.paidFromTill === false) return false;
+    // If attributed to a specific cash session, must match this session
+    if (p.cashSessionId) return p.cashSessionId === session.id;
+    // Otherwise it's a legacy or unassociated cash payout within the shift window
+    return true;
+  });
+
+  const cashPayouts = validPayouts.reduce((sum, p) => sum + (p.amount ?? 0), 0);
+
+  const cashReceiptsRows = await dbOrTx
+    .select({
       amount: schema.payments.amount,
     })
     .from(schema.payments)
@@ -302,18 +348,13 @@ export async function computeExpectedCash(
         eq(schema.payments.tenantId, ctx.tenantId),
         eq(schema.payments.storeId, ctx.storeId),
         eq(schema.payments.method, "cash"),
+        eq(schema.payments.direction, "in"),
         gte(schema.payments.createdAt, shiftStart),
         lte(schema.payments.createdAt, shiftEnd),
       ),
     );
 
-  const cashPayouts = cashVouchersRows
-    .filter((p) => p.direction === "out")
-    .reduce((sum, p) => sum + (p.amount ?? 0), 0);
-
-  const cashReceipts = cashVouchersRows
-    .filter((p) => p.direction === "in")
-    .reduce((sum, p) => sum + (p.amount ?? 0), 0);
+  const cashReceipts = cashReceiptsRows.reduce((sum, p) => sum + (p.amount ?? 0), 0);
 
   // 5. Tenders across all completed sales in shift window
   const completedSalePayments = await dbOrTx
@@ -388,8 +429,8 @@ export async function computeExpectedCash(
       sales: completedSales.length,
       cancels: cashCancelsRows.length,
       returns: cashReturnsRows.length,
-      payouts: cashVouchersRows.filter((p) => p.direction === "out").length,
-      receipts: cashVouchersRows.filter((p) => p.direction === "in").length,
+      payouts: validPayouts.length,
+      receipts: cashReceiptsRows.length,
     },
   };
 }

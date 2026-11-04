@@ -5,6 +5,7 @@ import { requirePagePermission } from "@/server/rbac";
 import { PageHeader } from "@/app/components/ui";
 import { getCurrentShift, getShiftHistory } from "@/server/domain/cash-sessions";
 import { RegisterClient } from "./RegisterClient";
+import { WarehouseRegisterNotice } from "./WarehouseRegisterNotice";
 
 export const metadata: Metadata = {
   title: "Cash Register & Shifts | MediFlow",
@@ -14,16 +15,29 @@ export const metadata: Metadata = {
 export default async function CashRegisterPage() {
   const ctx = await requirePagePermission("register.manage");
 
-  // Load current active shift & past history
-  const currentShift = await getCurrentShift(db, ctx);
-  const shiftHistory = await getShiftHistory(db, ctx, 25);
-
   // Store and tenant configuration
   const [store] = await db
-    .select({ name: schema.stores.name })
+    .select({ name: schema.stores.name, kind: schema.stores.kind })
     .from(schema.stores)
     .where(eq(schema.stores.id, ctx.storeId))
     .limit(1);
+
+  if (store?.kind === "warehouse") {
+    return (
+      <div className="page space-y-6">
+        <PageHeader
+          title="Cash register & shifts"
+          description="Shift open/close drawer tally, mid-shift X-Reports, and closing Z-Report audit reconciliation."
+          backHref="/dashboard/sales"
+        />
+        <WarehouseRegisterNotice storeName={store.name} />
+      </div>
+    );
+  }
+
+  // Load current active shift & past history
+  const currentShift = await getCurrentShift(db, ctx);
+  const shiftHistory = await getShiftHistory(db, ctx, 25);
 
   const [tenant] = await db
     .select({ settings: schema.tenants.settings })

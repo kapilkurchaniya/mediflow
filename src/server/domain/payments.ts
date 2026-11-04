@@ -42,6 +42,13 @@ export const PostPaymentInput = z.object({
       }),
     )
     .optional(),
+  clientOperationId: z.string().uuid().optional(),
+  cashSessionId: z.string().uuid().optional(),
+  paidFromTill: z.boolean().optional(),
+  payeeName: z.string().trim().max(255).optional(),
+  vendorInvoiceNo: z.string().trim().max(100).optional(),
+  vendorInvoiceDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  vendorGstin: z.string().trim().max(20).optional(),
 });
 export type PostPaymentInput = z.infer<typeof PostPaymentInput>;
 
@@ -65,7 +72,7 @@ export async function postPayment(tx: Tx, ctx: AuthCtx, input: PostPaymentInput)
   if (!["in:customer", "out:supplier", "out:expense"].includes(combo)) {
     throw new DomainError("INVALID_PAYMENT", "A payment must be a receipt from a customer, or a payment to a supplier or an expense.");
   }
-  if (!Number.isInteger(input.amount) || input.amount <= 0) {
+  if (!Number.isSafeInteger(input.amount) || input.amount <= 0) {
     throw new DomainError("INVALID_PAYMENT", "The amount must be more than zero.");
   }
   if (input.paymentDate > format(now, "yyyy-MM-dd")) {
@@ -164,6 +171,28 @@ export async function postPayment(tx: Tx, ctx: AuthCtx, input: PostPaymentInput)
   const isReceipt = input.direction === "in";
   const paymentNo = await nextDocNumber(tx, ctx.tenantId, ctx.storeId, isReceipt ? "payment_in" : "payment_out", isReceipt ? "RCT" : "PAY", now);
 
+  let cashSessionId = input.cashSessionId || null;
+  let paidFromTill = input.paidFromTill ?? false;
+
+  // Auto-link legacy cash payouts if an open shift exists and not explicitly opted out
+  if (input.direction === "out" && input.method === "cash" && input.paidFromTill === undefined && !cashSessionId) {
+    const [openSession] = await tx
+      .select({ id: schema.cashSessions.id })
+      .from(schema.cashSessions)
+      .where(
+        and(
+          eq(schema.cashSessions.tenantId, ctx.tenantId),
+          eq(schema.cashSessions.storeId, ctx.storeId),
+          eq(schema.cashSessions.status, "open"),
+        ),
+      )
+      .limit(1);
+    if (openSession) {
+      cashSessionId = openSession.id;
+      paidFromTill = true;
+    }
+  }
+
   const [payment] = await tx
     .insert(schema.payments)
     .values({
@@ -179,6 +208,13 @@ export async function postPayment(tx: Tx, ctx: AuthCtx, input: PostPaymentInput)
       reference: input.reference || null,
       paymentDate: input.paymentDate,
       note: input.note || null,
+      clientOperationId: input.clientOperationId || null,
+      cashSessionId,
+      paidFromTill,
+      payeeName: input.payeeName || null,
+      vendorInvoiceNo: input.vendorInvoiceNo || null,
+      vendorInvoiceDate: input.vendorInvoiceDate || null,
+      vendorGstin: input.vendorGstin || null,
       createdBy: ctx.userId,
     })
     .returning({ id: schema.payments.id });

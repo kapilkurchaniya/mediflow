@@ -9,7 +9,7 @@ import {
   text,
   uuid,
 } from "drizzle-orm/pg-core";
-import { id, money, createdAt } from "./_helpers";
+import { id, money, createdAt, updatedAt } from "./_helpers";
 import { medicines } from "./catalog";
 import { storeId, stores, tenantId } from "./platform";
 import { purchaseOrders } from "./purchasing";
@@ -51,11 +51,13 @@ export const customers = pgTable(
     doctorRegNo: text("doctor_reg_no"),
     isActive: boolean("is_active").notNull().default(true),
     createdAt: createdAt(),
+    updatedAt: updatedAt(),
   },
   (t) => [
     index("customers_tenant_idx").on(t.tenantId),
     index("customers_phone_idx").on(t.tenantId, t.phone),
     index("customers_group_idx").on(t.groupId),
+    index("customers_tenant_updated_idx").on(t.tenantId, t.updatedAt, t.id),
   ],
 );
 
