@@ -141,6 +141,13 @@
       "when": 1793724070154,
       "tag": "0019_breezy_jack_flag",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1793794215891,
+      "tag": "0020_talented_nuke",
+      "breakpoints": true
     }
   ]
 }

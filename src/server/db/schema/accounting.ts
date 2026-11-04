@@ -85,10 +85,23 @@ export const payments = pgTable(
     paymentDate: date("payment_date").notNull(),
     note: text("note"),
     journalEntryId: uuid("journal_entry_id").references(() => journalEntries.id),
+    clientOperationId: uuid("client_operation_id"),
+    cashSessionId: uuid("cash_session_id"),
+    paidFromTill: boolean("paid_from_till").notNull().default(false),
+    payeeName: text("payee_name"),
+    vendorInvoiceNo: text("vendor_invoice_no"),
+    vendorInvoiceDate: date("vendor_invoice_date"),
+    vendorGstin: text("vendor_gstin"),
     createdBy: uuid("created_by").notNull(),
     createdAt: createdAt(),
   },
-  (t) => [index("payments_party_idx").on(t.partyType, t.partyId)],
+  (t) => [
+    index("payments_party_idx").on(t.partyType, t.partyId),
+    index("payments_cash_session_idx").on(t.tenantId, t.cashSessionId),
+    uniqueIndex("payments_tenant_client_op_uq")
+      .on(t.tenantId, t.clientOperationId)
+      .where(sql`${t.clientOperationId} is not null`),
+  ],
 );
 
 /** Bill-wise allocations linking receipts and payments to specific sales or purchases. */
