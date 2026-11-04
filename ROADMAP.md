@@ -821,8 +821,9 @@ Full map in `.github/CODEOWNERS` and [ADR 0004](docs/adr/0004-two-lane-ownership
 - ➕ `src/app/dashboard/inventory/conflicts/page.tsx`: lists `stock_conflict` notifications with actions (adjust, transfer, change batch).
 - **Progress:** completed in `lane-a/a4-7-conflict-handling-ui`. Introduced durable schema tables (`stockConflictCases`, `stockConflictContributions`, `stockConflictResolutions`) decoupled from transient alerts. Implemented non-fabricating physical recount reconciliation vs confirmed zero stock reconciliation offset (`refType: "conflict_reconciliation"`), audited batch reallocation with atomic paired movements and dispensing evidence, and transactional receipt-driven transfer reconciliation. Created responsive dashboard with KPI summary cards, multi-tab modal for recount/reallocate/transfer/dismiss, and comprehensive unit and integration test coverage.
 
-#### A4.8 🧪 Offline E2E ⏱ 1 day
+#### [x] A4.8 🧪 Offline E2E ⏱ 1 day
 - ➕ `tests/e2e/offline.spec.ts`, scenario in docs/10 "Test plan".
+- **Progress:** completed in `lane-a/a4-8-offline-e2e`. Implemented end-to-end integration and smoke suite in `tests/e2e/offline.spec.ts` with dedicated modular helpers (`offline-fixture.ts`, `offline-db.ts`, `offline-server-assertions.ts`). Validated 3 consecutive offline checkouts (Cash, UPI, Split Tender) under GST Rule 46(b) formatting derived from authoritative server-issued number blocks, Service Worker offline fallback (`/offline.html`) with verified outbox payload hash survival across reload, offline capability restrictions with allowlist disaster-recovery JSON export, and multi-device concurrent conflict reconciliation creating durable `stockConflictCases` and `stockConflictContributions` records. All files $\le 300$ lines.
 
 #### A4.9 🤝 Desktop POS App (Tauri, SQLite & Hardware Print Bridge) ⏱ 3 days
 - **Why:** Chrome browser popups block fast counter billing. Chemists with dot-matrix printers (Epson LX-300) and thermal printers require direct, silent raw printing and zero-latency local SQLite billing.
@@ -1060,7 +1061,7 @@ Tick items in PRs. One line per task, in the same order as above.
 **Phase 1** — A: [x] A1.1 [x] A1.2 [x] A1.3 [x] A1.4 [x] A1.5 [x] A1.6 [x] A1.7 · B: [x] B1.1 [x] B1.2 [x] B1.3 [x] B1.4 [x] B1.5 [x] B1.6 [x] B1.7
 **Phase 2** — A: [x] A2.1 [x] A2.2 [x] A2.3 [x] A2.4 [x] A2.5 [x] A2.6 [x] A2.7 [x] A2.8 [x] A2.9 [x] A2.10 [x] A2.11 [x] A2.12 · B: [x] B2.1 [x] B2.2 [x] B2.3 [x] B2.4 [x] B2.5 [x] B2.6 [x] B2.7 [x] B2.8
 **Phase 3** — A: [x] A3.1 [x] A3.2 [x] A3.3 [x] A3.4 [x] A3.5 [x] A3.6 · B: [x] B3.1 [x] B3.2 [x] B3.3 [x] B3.4 [x] B3.5 [x] B3.6 [x] B3.7
-**Phase 4** — A: [x] A4.1 [x] A4.2 [x] A4.3 [x] A4.4 [x] A4.5 [x] A4.6 [x] A4.7 [ ] A4.8 [ ] A4.9 · B: [x] B4.1 [x] B4.2 [x] B4.3 [x] B4.4 [x] B4.5 [x] B4.6
+**Phase 4** — A: [x] A4.1 [x] A4.2 [x] A4.3 [x] A4.4 [x] A4.5 [x] A4.6 [x] A4.7 [x] A4.8 [ ] A4.9 · B: [x] B4.1 [x] B4.2 [x] B4.3 [x] B4.4 [x] B4.5 [x] B4.6
 **Phase 5** — A: [ ] A5.1 [ ] A5.2 [ ] A5.3 [ ] A5.4 [ ] A5.5 [ ] A5.6 [ ] A5.7 · B: [ ] B5.1 [ ] B5.2 [ ] B5.3 [ ] B5.4 [ ] B5.5 [ ] B5.6 [ ] B5.7
 **Phase 6** — A: [ ] A6.1 [ ] A6.2 [ ] A6.3 [ ] A6.4 [ ] A6.5 [ ] A6.6 · B: [ ] B6.1 [ ] B6.2 [ ] B6.3 [ ] B6.4 [ ] B6.5 [ ] B6.6
 

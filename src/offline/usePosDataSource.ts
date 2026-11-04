@@ -35,11 +35,26 @@ export function usePosDataSource(options: UsePosDataSourceOptions): PosDataSourc
   const [isSyncing, setIsSyncing] = useState(false);
   const [lastSyncAt, setLastSyncAt] = useState<string | null>(null);
 
+  // Load device config from Dexie reactively
+  const deviceConfig = useLiveQuery(
+    async () => {
+      if (!db) return null;
+      return await db.getDeviceConfig();
+    },
+    [db],
+    null,
+  );
+
   // Listen to connectivity events
   useEffect(() => {
     if (typeof window === "undefined") return;
 
-    const handleOnline = () => setIsBrowserOffline(false);
+    const handleOnline = () => {
+      setIsBrowserOffline(false);
+      if (db) {
+        void runSyncCycle(db, undefined, undefined, true);
+      }
+    };
     const handleOffline = () => setIsBrowserOffline(true);
 
     window.addEventListener("online", handleOnline);
@@ -49,7 +64,7 @@ export function usePosDataSource(options: UsePosDataSourceOptions): PosDataSourc
       window.removeEventListener("online", handleOnline);
       window.removeEventListener("offline", handleOffline);
     };
-  }, []);
+  }, [db]);
 
   // Observe pending outbox sales reactively for the active store
   const pendingCount = useLiveQuery(
@@ -77,20 +92,20 @@ export function usePosDataSource(options: UsePosDataSourceOptions): PosDataSourc
 
   // Periodic and event-driven background sync coordinator
   useEffect(() => {
-    if (!db || isBrowserOffline) return;
+    if (!db) return;
 
     const coordinator = startSyncCoordinator(db, 60_000);
     return () => {
       coordinator.stop();
     };
-  }, [db, isBrowserOffline]);
+  }, [db]);
 
   // Manual sync trigger
   const triggerSyncNow = useCallback(async () => {
     if (!db || isBrowserOffline || isSyncing) return;
     setIsSyncing(true);
     try {
-      await runSyncCycle(db);
+      await runSyncCycle(db, undefined, undefined, true);
       const updatedSyncAt = await db.getMeta<string>("lastSyncAt");
       if (updatedSyncAt) setLastSyncAt(updatedSyncAt);
     } catch (e) {
@@ -104,12 +119,12 @@ export function usePosDataSource(options: UsePosDataSourceOptions): PosDataSourc
   const offlineDs = useMemo(() => {
     if (!db) return null;
     return new OfflinePosDataSource(db, {
-      tenantId: options.tenantId || "default-tenant",
-      storeId: options.storeId || "default-store",
-      deviceId: options.deviceId || "dev01",
-      cashierId: options.cashierId || "cashier-default",
+      tenantId: options.tenantId || deviceConfig?.tenantId || "default-tenant",
+      storeId: options.storeId || deviceConfig?.storeId || "default-store",
+      deviceId: options.deviceId || deviceConfig?.deviceId || "dev01",
+      cashierId: options.cashierId || deviceConfig?.cashierId || "cashier-default",
     });
-  }, [db, options.tenantId, options.storeId, options.deviceId, options.cashierId]);
+  }, [db, options.tenantId, options.storeId, options.deviceId, options.cashierId, deviceConfig]);
 
   // Active data source: online server actions or offline Dexie
   const activeDataSource = useMemo<PosDataSource>(() => {

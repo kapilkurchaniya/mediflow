@@ -322,6 +322,17 @@ To protect your pharmacy from expired inventory losses and speed up checkout:
 - **Multi-Batch Slicing:** If the soonest batch only has 4 tablets in stock but the customer needs 10, MediFlow automatically allocates 4 tablets from the first batch and slices the remaining 6 tablets from the next earliest batch. The cart displays a breakdown badge showing the multi-batch allocation.
 - **Audited Manual Overrides:** If a customer or doctor specifically insists on a newer batch, the cashier can manually click and select that batch. To prevent stock dumping, MediFlow records an immutable **`fefo_override`** audit event noting the selected batch and the earlier-expiring batches that were bypassed. Store owners and auditors can review all overrides in **Settings → Audit log**.
 
+### 5.1e Offline POS billing, outbox synchronization, and disaster recovery backup
+
+During internet and broadband outages, MediFlow POS terminals continue billing without interruptions:
+- **Transparent Offline Operation:** The terminal automatically detects connection loss and switches to local IndexedDB (`PosDB`). The status chip in the top navigation changes from green *Online* to amber *Offline · N pending*.
+- **Local Stock & FEFO:** Product catalog search and FEFO batch selection use the local database with provisional stock deductions.
+- **GST Rule 46(b) Invoicing:** Bills are numbered consecutively using the counter device's pre-reserved series (e.g. `ST01-2627-000001`), complying strictly with the 16-character statutory ceiling.
+- **Offline Receipts:** Finalizing a sale displays the **Offline Sale Recorded** dialog for thermal or A4 printing with customer details and HSN summary.
+- **Pending Bills Drawer & Disaster Recovery:** Click the status chip anytime to view the outbox. The **Export JSON** button generates a clean disaster-recovery file (strictly excluding device tokens, credentials, or session secrets) containing all pending sales.
+- **Service Worker Resilience:** If the browser page is accidentally refreshed while offline, the Service Worker immediately serves the precached offline bootstrap screen (`/offline.html`), preventing blank screen errors while preserving the local database unmutated.
+- **Automatic Reconnection Sync:** Once internet connectivity returns, the terminal automatically pushes pending sales to the central server. The outbox clears, sales are written to the central PostgreSQL ledger, and inventory is reconciled.
+
 ### 5.2 What MediFlow does for you when you complete a bill
 
 - Takes the quantity out of the **exact batch** sold (so stock is always right).

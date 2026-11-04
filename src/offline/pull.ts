@@ -172,9 +172,16 @@ async function applyEntityPage(
     case "medicines":
       await db.medicines.bulkPut(items as unknown as OfflineMedicine[]);
       break;
-    case "batches":
-      await db.batches.bulkPut(items as unknown as OfflineBatch[]);
+    case "batches": {
+      const normalized = items.map((b) => ({
+        ...b,
+        batchNumber: (b.batchNo as string) || (b.batchNumber as string) || "",
+        batchNo: (b.batchNo as string) || (b.batchNumber as string) || "",
+        isActive: typeof b.isActive === "boolean" ? b.isActive : b.status === "active",
+      }));
+      await db.batches.bulkPut(normalized as unknown as OfflineBatch[]);
       break;
+    }
     case "customers":
       await db.customers.bulkPut(items as unknown as OfflineCustomer[]);
       break;

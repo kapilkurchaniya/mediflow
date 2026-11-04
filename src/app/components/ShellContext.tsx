@@ -60,6 +60,7 @@ interface ShellContextType {
   allowedStores: AllowedStoreItem[];
   userName: string;
   userEmail: string;
+  userId?: string;
   /** Permissions of the signed-in user; the sidebar and command palette hide what they may not use. */
   permissions: ReadonlySet<string>;
 }
@@ -75,6 +76,7 @@ export function ShellProvider({
   allowedStores = [],
   userName,
   userEmail,
+  userId,
   permissions,
 }: {
   children: React.ReactNode;
@@ -83,6 +85,7 @@ export function ShellProvider({
   allowedStores?: AllowedStoreItem[];
   userName: string;
   userEmail: string;
+  userId?: string;
   permissions: readonly string[];
 }) {
   const permissionSet = React.useMemo(() => new Set(permissions), [permissions]);
@@ -258,6 +261,7 @@ export function ShellProvider({
         allowedStores,
         userName,
         userEmail,
+        userId,
         permissions: permissionSet,
       }}
     >

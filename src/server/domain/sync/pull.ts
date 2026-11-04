@@ -217,16 +217,19 @@ export async function pullSyncDeltas(
     : emptyPage<Record<string, unknown>>();
 
   // 7. Store configuration metadata
-  const [store] = await db
-    .select()
-    .from(schema.stores)
-    .where(eq(schema.stores.id, deviceCtx.storeId));
+  let storeSettingsPage: SyncEntityPage<Record<string, unknown>> = emptyPage();
+  if (!target || target === "storeSettings") {
+    const [store] = await db
+      .select()
+      .from(schema.stores)
+      .where(eq(schema.stores.id, deviceCtx.storeId));
 
-  const storeSettingsPage: SyncEntityPage<Record<string, unknown>> = {
-    items: store ? [store as unknown as Record<string, unknown>] : [],
-    nextCursor: null,
-    hasMore: false,
-  };
+    storeSettingsPage = {
+      items: store ? [store as unknown as Record<string, unknown>] : [],
+      nextCursor: null,
+      hasMore: false,
+    };
+  }
 
   // Bump device last_sync_at
   await db

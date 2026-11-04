@@ -157,4 +157,5 @@ export interface OfflineDeviceConfig {
   deviceCode: string;
   storeCode: string;
   deviceToken: string;
+  cashierId?: string;
 }

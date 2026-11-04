@@ -115,7 +115,7 @@ export function PendingBillsDrawer({
         <div className="p-4 border-b border-ink-100 flex items-center justify-between bg-ink-50">
           <div>
             <h2 className="text-base font-bold text-ink-900 flex items-center gap-2">
-              Pending Bills Outbox
+              Pending Offline Bills Outbox
               {pendingCount > 0 && (
                 <span className="badge badge-warning text-xs font-mono">
                   {pendingCount} waiting

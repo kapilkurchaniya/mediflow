@@ -31,10 +31,12 @@ export function RetailPosTerminal() {
     shortcutsOpen,
     currentStore,
     setStoreSwitcherOpen,
+    userId,
   } = useShell();
 
   const posDs = usePosDataSource({
     storeId: currentStore?.id,
+    cashierId: userId,
   });
   const ds = posDs.dataSource;
 

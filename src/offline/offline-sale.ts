@@ -67,8 +67,17 @@ export async function createOfflineSale(
 
   const totals = computeSaleTotals(saleLineInputs, false, input.billDiscountPaise ?? 0);
 
+  // Authoritatively prioritize device configuration from local Dexie storage
+  const cfg = await db.getDeviceConfig();
+  const effectiveStoreId = cfg?.storeId || input.storeId;
+  const effectiveDeviceId = cfg?.deviceId || input.deviceId;
+  const effectiveCashierId =
+    (input.cashierId && input.cashierId !== "cashier-default" ? input.cashierId : null) ||
+    cfg?.cashierId ||
+    input.cashierId;
+
   // 2. Allocate consecutive invoice number from local block
-  const allocated = await allocateNextInvoiceNumber(db, input.storeId, input.deviceId);
+  const allocated = await allocateNextInvoiceNumber(db, effectiveStoreId, effectiveDeviceId);
 
   const clientSaleId =
     typeof crypto !== "undefined" && crypto.randomUUID
@@ -101,21 +110,21 @@ export async function createOfflineSale(
     invoiceNo: allocated.invoiceNo,
     fiscalYear: allocated.fiscalYear,
     sequenceNumber: allocated.sequenceNumber,
-    reservationId: allocated.reservationId,
-    createdBy: input.cashierId,
+    reservationId: allocated.reservationId || undefined,
+    createdBy: effectiveCashierId,
     completedAt: now,
-    customerId: input.customerId,
+    customerId: input.customerId?.trim() ? input.customerId.trim() : undefined,
     lines: offlineLines,
     payments: offlinePayments,
     billDiscountPaise: input.billDiscountPaise ?? 0,
     compliance: input.compliance,
-    medicalRepId: input.medicalRepId,
+    medicalRepId: input.medicalRepId?.trim() ? input.medicalRepId.trim() : undefined,
   };
 
   const pendingSale: OfflinePendingSale = {
     clientSaleId,
-    storeId: input.storeId,
-    deviceId: input.deviceId,
+    storeId: effectiveStoreId,
+    deviceId: effectiveDeviceId,
     status: "pending",
     createdAt: now,
     updatedAt: now,
@@ -133,7 +142,7 @@ export async function createOfflineSale(
 
     const allocations: OfflineProvisionalAllocation[] = input.lines.map((l, i) => ({
       id: `${clientSaleId}-line-${i}`,
-      storeId: input.storeId,
+      storeId: effectiveStoreId,
       batchId: l.batchId,
       clientSaleId,
       qty: totals.lines[i].baseQty,

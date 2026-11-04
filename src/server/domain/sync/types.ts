@@ -18,6 +18,7 @@ export const SyncEntityPageParamSchema = z.object({
       "doctors",
       "schemes",
       "storeMedicineSettings",
+      "storeSettings",
     ])
     .optional(),
   cursor: z.string().max(100).optional(),
@@ -34,7 +35,8 @@ export interface SyncEntityPageParam {
     | "customers"
     | "doctors"
     | "schemes"
-    | "storeMedicineSettings";
+    | "storeMedicineSettings"
+    | "storeSettings";
   cursor?: string;
   limit?: number;
 }
@@ -80,10 +82,16 @@ export interface ReserveNumbersResponse {
   sampleEndInvoiceNo: string;
 }
 
+const OptionalUuidSchema = z
+  .string()
+  .nullish()
+  .transform((v) => (v && v.trim().length > 0 ? v.trim() : undefined))
+  .pipe(z.string().uuid().optional());
+
 export const OfflineSaleLineSchema = z
   .object({
-    batchId: z.string().uuid().optional(),
-    medicineId: z.string().uuid().optional(),
+    batchId: OptionalUuidSchema,
+    medicineId: OptionalUuidSchema,
     qty: z.number().int().positive().optional(),
     packQty: z.number().int().min(0).optional(),
     looseQty: z.number().int().min(0).optional(),
@@ -131,15 +139,15 @@ export const OfflineSaleSchema = z.object({
   invoiceNo: z.string().min(1).max(16),
   fiscalYear: z.string().regex(/^\d{4}-\d{4}$/),
   sequenceNumber: z.number().int().positive(),
-  reservationId: z.string().uuid().optional(),
+  reservationId: OptionalUuidSchema,
   createdBy: z.string().uuid(),
   completedAt: z.string().datetime(),
-  customerId: z.string().uuid().optional(),
+  customerId: OptionalUuidSchema,
   lines: z.array(OfflineSaleLineSchema).min(1, "At least one sale line required"),
   payments: z.array(OfflineSalePaymentSchema).default([]),
   billDiscountPaise: z.number().int().min(0).default(0),
   compliance: ComplianceDetailsSchema.optional(),
-  medicalRepId: z.string().uuid().optional(),
+  medicalRepId: OptionalUuidSchema,
 });
 
 export interface OfflineSale {
