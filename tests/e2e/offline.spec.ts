@@ -176,6 +176,7 @@ test.describe("Offline POS Counter E2E Smoke & Integration Suite (Task A4.8)", (
     } catch {
       await page.goto("/dashboard/sales/pos");
     }
+    await expect(page.getByPlaceholder(/search medicine/i)).toBeVisible({ timeout: 15000 });
     await triggerDexieSync(page);
 
     // Await automatic sync completion

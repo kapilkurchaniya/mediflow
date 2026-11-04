@@ -106,48 +106,58 @@ export async function primeDexieSync(page: Page): Promise<void> {
  * Triggers a synchronization cycle in browser Dexie to flush outbox sales to server.
  */
 export async function triggerDexieSync(page: Page): Promise<void> {
-  await page.evaluate(async () => {
-    const db = window.__posDb;
-    if (!db) return;
-    const runSync = (window as unknown as { __runSyncCycle?: (db: unknown, cfg?: unknown, fn?: unknown, force?: boolean) => Promise<unknown> }).__runSyncCycle;
-    if (runSync) {
-      await runSync(db, undefined, undefined, true);
-    }
-  });
+  try {
+    await page.evaluate(async () => {
+      const db = window.__posDb;
+      if (!db) return;
+      const runSync = (window as unknown as { __runSyncCycle?: (db: unknown, cfg?: unknown, fn?: unknown, force?: boolean) => Promise<unknown> }).__runSyncCycle;
+      if (runSync) {
+        await runSync(db, undefined, undefined, true);
+      }
+    });
+  } catch (err: unknown) {
+    if (err instanceof Error && err.message.includes("Execution context was destroyed")) return;
+    throw err;
+  }
 }
 
 /**
  * Retrieves all pending outbox sales from browser Dexie with IndexedDB fallback when on static offline shell.
  */
 export async function getDexiePendingSales(page: Page): Promise<OfflinePendingSale[]> {
-  return await page.evaluate(async () => {
-    if (window.__posDb) {
-      return await window.__posDb.pendingSales.toArray();
-    }
-    return new Promise<OfflinePendingSale[]>((resolve) => {
-      if (typeof indexedDB === "undefined") return resolve([]);
-      const req = indexedDB.open("mediflow-pos");
-      req.onerror = () => resolve([]);
-      req.onsuccess = () => {
-        const idb = req.result;
-        if (!idb.objectStoreNames.contains("pendingSales")) {
-          idb.close();
-          return resolve([]);
-        }
-        const tx = idb.transaction("pendingSales", "readonly");
-        const store = tx.objectStore("pendingSales");
-        const getAllReq = store.getAll();
-        getAllReq.onsuccess = () => {
-          idb.close();
-          resolve(getAllReq.result || []);
+  try {
+    return await page.evaluate(async () => {
+      if (window.__posDb) {
+        return await window.__posDb.pendingSales.toArray();
+      }
+      return new Promise<OfflinePendingSale[]>((resolve) => {
+        if (typeof indexedDB === "undefined") return resolve([]);
+        const req = indexedDB.open("mediflow-pos");
+        req.onerror = () => resolve([]);
+        req.onsuccess = () => {
+          const idb = req.result;
+          if (!idb.objectStoreNames.contains("pendingSales")) {
+            idb.close();
+            return resolve([]);
+          }
+          const tx = idb.transaction("pendingSales", "readonly");
+          const store = tx.objectStore("pendingSales");
+          const getAllReq = store.getAll();
+          getAllReq.onsuccess = () => {
+            idb.close();
+            resolve(getAllReq.result || []);
+          };
+          getAllReq.onerror = () => {
+            idb.close();
+            resolve([]);
+          };
         };
-        getAllReq.onerror = () => {
-          idb.close();
-          resolve([]);
-        };
-      };
+      });
     });
-  });
+  } catch (err: unknown) {
+    if (err instanceof Error && err.message.includes("Execution context was destroyed")) return [];
+    throw err;
+  }
 }
 
 /**
