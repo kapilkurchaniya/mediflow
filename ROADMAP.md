@@ -825,7 +825,7 @@ Full map in `.github/CODEOWNERS` and [ADR 0004](docs/adr/0004-two-lane-ownership
 - ➕ `tests/e2e/offline.spec.ts`, scenario in docs/10 "Test plan".
 - **Progress:** completed in `lane-a/a4-8-offline-e2e`. Implemented end-to-end integration and smoke suite in `tests/e2e/offline.spec.ts` with dedicated modular helpers (`offline-fixture.ts`, `offline-db.ts`, `offline-server-assertions.ts`). Validated 3 consecutive offline checkouts (Cash, UPI, Split Tender) under GST Rule 46(b) formatting derived from authoritative server-issued number blocks, Service Worker offline fallback (`/offline.html`) with verified outbox payload hash survival across reload, offline capability restrictions with allowlist disaster-recovery JSON export, and multi-device concurrent conflict reconciliation creating durable `stockConflictCases` and `stockConflictContributions` records. All files $\le 300$ lines.
 
-#### A4.9 🤝 Desktop POS App (Tauri, SQLite & Hardware Print Bridge) ⏱ 3 days
+#### [x] A4.9 🤝 Desktop POS App (Tauri, SQLite & Hardware Print Bridge) ⏱ 3 days
 - **Why:** Chrome browser popups block fast counter billing. Chemists with dot-matrix printers (Epson LX-300) and thermal printers require direct, silent raw printing and zero-latency local SQLite billing.
 - **Files:** ➕ `desktop/` (Tauri 2.x shell wrapping the React POS), ➕ `src/desktop/hardware-bridge.ts`, ➕ `src/desktop/print-service.ts`.
 - **How:**
@@ -834,6 +834,7 @@ Full map in `.github/CODEOWNERS` and [ADR 0004](docs/adr/0004-two-lane-ownership
   - Native print manager with direct ESC/POS (thermal) and Epson ESC/P (dot-matrix 80-col) printer commands.
   - Direct USB barcode scanner input and automatic cash drawer kick.
 - **Done when:** bills print silently to an 80-col dot-matrix printer or thermal printer in under 1 second without browser print preview dialogs 🧪.
+- **Progress:** completed in `lane-a/a4-9-desktop-pos`. Built Tauri 2.x native shell container with Rust direct raw spooling bridge (`desktop/src-tauri/`) supporting Windows Winspool RAW and Linux CUPS. Implemented pure ESC/POS binary command builder (`src/desktop/escpos.ts`) for 58mm/80mm thermal receipts with dynamic UPI QR code generator and cash drawer solenoid pulses. Implemented pure Epson ESC/P binary builder (`src/desktop/escp.ts`) for 80-column continuous tractor-feed tax invoices with Form Feed page advancement (`0x0C`). Implemented global hardware USB HID barcode scanner listener (`src/desktop/hardware-bridge.ts`) capturing high-speed burst keystrokes (<35ms interval) even when search input is unfocused. Implemented sub-second silent print orchestrator (`src/desktop/print-service.ts`), local durable SQLite WAL mode storage engine (`src/desktop/sqlite-storage.ts`), React bridge hooks (`useHardwareBridge`, `usePosBarcodeBridge`), and integrated silent raw printing with cash drawer kick into `OfflineReceiptModal` and `RetailPosTerminal`. Added 6 comprehensive test suites (22 unit tests) with 100% pass rate. All files $\le 300$ lines.
 
 ### Lane B · Phase 4
 
@@ -1061,7 +1062,7 @@ Tick items in PRs. One line per task, in the same order as above.
 **Phase 1** — A: [x] A1.1 [x] A1.2 [x] A1.3 [x] A1.4 [x] A1.5 [x] A1.6 [x] A1.7 · B: [x] B1.1 [x] B1.2 [x] B1.3 [x] B1.4 [x] B1.5 [x] B1.6 [x] B1.7
 **Phase 2** — A: [x] A2.1 [x] A2.2 [x] A2.3 [x] A2.4 [x] A2.5 [x] A2.6 [x] A2.7 [x] A2.8 [x] A2.9 [x] A2.10 [x] A2.11 [x] A2.12 · B: [x] B2.1 [x] B2.2 [x] B2.3 [x] B2.4 [x] B2.5 [x] B2.6 [x] B2.7 [x] B2.8
 **Phase 3** — A: [x] A3.1 [x] A3.2 [x] A3.3 [x] A3.4 [x] A3.5 [x] A3.6 · B: [x] B3.1 [x] B3.2 [x] B3.3 [x] B3.4 [x] B3.5 [x] B3.6 [x] B3.7
-**Phase 4** — A: [x] A4.1 [x] A4.2 [x] A4.3 [x] A4.4 [x] A4.5 [x] A4.6 [x] A4.7 [x] A4.8 [ ] A4.9 · B: [x] B4.1 [x] B4.2 [x] B4.3 [x] B4.4 [x] B4.5 [x] B4.6
+**Phase 4** — A: [x] A4.1 [x] A4.2 [x] A4.3 [x] A4.4 [x] A4.5 [x] A4.6 [x] A4.7 [x] A4.8 [x] A4.9 · B: [x] B4.1 [x] B4.2 [x] B4.3 [x] B4.4 [x] B4.5 [x] B4.6
 **Phase 5** — A: [ ] A5.1 [ ] A5.2 [ ] A5.3 [ ] A5.4 [ ] A5.5 [ ] A5.6 [ ] A5.7 · B: [ ] B5.1 [ ] B5.2 [ ] B5.3 [ ] B5.4 [ ] B5.5 [ ] B5.6 [ ] B5.7
 **Phase 6** — A: [ ] A6.1 [ ] A6.2 [ ] A6.3 [ ] A6.4 [ ] A6.5 [ ] A6.6 · B: [ ] B6.1 [ ] B6.2 [ ] B6.3 [ ] B6.4 [ ] B6.5 [ ] B6.6
 

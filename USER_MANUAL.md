@@ -333,6 +333,24 @@ During internet and broadband outages, MediFlow POS terminals continue billing w
 - **Service Worker Resilience:** If the browser page is accidentally refreshed while offline, the Service Worker immediately serves the precached offline bootstrap screen (`/offline.html`), preventing blank screen errors while preserving the local database unmutated.
 - **Automatic Reconnection Sync:** Once internet connectivity returns, the terminal automatically pushes pending sales to the central server. The outbox clears, sales are written to the central PostgreSQL ledger, and inventory is reconciled.
 
+### 5.1f Desktop POS Application, Silent Raw Printing & Hardware Bridge (Phase 4)
+
+For peak-rush pharmacy counters requiring maximum checkout speed and zero latency, MediFlow provides a lightweight native desktop container built on Tauri 2.x and Rust:
+
+1. **Sub-Second Silent Raw Printing (< 1.0s SLA)**:
+   - **No Browser Popups**: Unlike web browsers which launch OS print preview dialogs requiring mouse clicks, the desktop bridge spools binary escape codes directly to the printer spooler (Windows `winspool.drv` RAW or Linux CUPS/character device).
+   - **ESC/POS Thermal Receipts (58mm & 80mm)**: Generates native ESC/POS commands with pharmacy header, DL numbers (Form 20/21), GSTIN, HSN summary, and dynamic UPI QR codes.
+   - **Epson ESC/P 80-Column Dot-Matrix Invoices**: Formats continuous tractor-feed tax invoices for Epson LX-300+II, TVS MSP 240, and FX-890 printers in crisp 10 CPI draft character mode. Automatically appends a Form Feed (`0x0C`) byte to advance tractor stationery exactly to the next perforation without manual wheel adjustments.
+   - **Automatic Cash Drawer Kick**: Automatically fires a solenoid pulse (`ESC p 0 25 250`) on bill completion or cash drawer shortcut (`Alt + D`), opening the cash drawer instantly.
+
+2. **Global Hardware USB HID Barcode Scanner Intercept**:
+   - Hardware USB barcode scanners emit keystrokes in high-speed bursts (inter-character intervals $< 35$ms).
+   - The desktop hardware bridge listens globally for rapid barcode sequences. If a barcode is scanned while focus is on a dropdown, table row, or button, MediFlow prevents unintended shortcut triggering, searches the scanned barcode, and automatically adds the in-stock batch to the active cart with an audio confirmation beep.
+
+3. **Local Durable SQLite WAL Storage**:
+   - In desktop environments, counter transactions and synced medicine catalogs are securely persisted in an embedded SQLite database configured in WAL (Write-Ahead Logging) mode (`PRAGMA synchronous = NORMAL;`).
+   - Syncs incrementally with central servers via `/api/sync/pull` and `/api/sync/sales`, guaranteeing immunity against browser storage eviction under disk pressure.
+
 ### 5.2 What MediFlow does for you when you complete a bill
 
 - Takes the quantity out of the **exact batch** sold (so stock is always right).
