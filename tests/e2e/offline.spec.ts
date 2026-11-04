@@ -243,7 +243,10 @@ test.describe("Offline POS Counter E2E Smoke & Integration Suite (Task A4.8)", (
     // 2. Disconnect Context 1 & bill all 10 units offline
     await page.context().setOffline(true);
     await page.getByPlaceholder(/search medicine/i).fill(medicine.name);
-    await page.getByRole("button", { name: "+ Add" }).first().click();
+    const conflictRow = page.locator("tr", { hasText: batch.batchNo });
+    await expect(conflictRow).toBeVisible({ timeout: 5000 });
+    await conflictRow.getByRole("button", { name: "+ Add" }).click();
+    await expect(page.locator("table.data-table tr", { hasText: batch.batchNo })).toBeVisible({ timeout: 5000 });
 
     // Ensure packQty is 1 (1 pack = 10 units)
     const packInput = page.locator('input[data-cart-input="pack"]').first();
@@ -253,9 +256,11 @@ test.describe("Offline POS Counter E2E Smoke & Integration Suite (Task A4.8)", (
     const receiptModal = page.getByRole("heading", { name: /offline sale recorded/i });
     await expect(receiptModal).toBeVisible({ timeout: 5000 });
     const pendingSales = await getDexiePendingSales(page);
-    const pending = pendingSales.find((s) => s.payload.lines?.some((l) => l.batchId === batch.id)) ?? pendingSales[pendingSales.length - 1];
-    const offlineInv = pending.invoiceNo;
+    const pending = pendingSales.find((s) => s.payload.lines?.some((l) => l.batchId === batch.id));
+    expect(pending).toBeDefined();
+    const offlineInv = pending!.invoiceNo;
     await page.getByTitle("Close").click();
+    await expect(receiptModal).not.toBeVisible({ timeout: 5000 });
 
     // 3. Context 2: Server concurrently depletes batch to 0 before Context 1 reconnects
     await depleteBatchStock({
