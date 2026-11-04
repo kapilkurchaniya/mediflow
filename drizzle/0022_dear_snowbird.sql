@@ -20,6 +20,4 @@ ALTER TABLE "gst_documents" ADD COLUMN "cancelled_reason" text;--> statement-bre
 ALTER TABLE "gst_documents" ADD COLUMN "cancelled_remarks" text;--> statement-breakpoint
 ALTER TABLE "tenant_gsp_credentials" ADD CONSTRAINT "tenant_gsp_credentials_tenant_id_tenants_id_fk" FOREIGN KEY ("tenant_id") REFERENCES "public"."tenants"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 CREATE INDEX "gsp_creds_tenant_idx" ON "tenant_gsp_credentials" USING btree ("tenant_id");--> statement-breakpoint
-CREATE INDEX "gsp_creds_store_idx" ON "tenant_gsp_credentials" USING btree ("store_id");--> statement-breakpoint
-CREATE INDEX "journal_tenant_store_date_idx" ON "journal_entries" USING btree ("tenant_id","store_id","entry_date");--> statement-breakpoint
-CREATE INDEX "journal_lines_tenant_party_idx" ON "journal_lines" USING btree ("tenant_id","party_type","party_id");
+CREATE INDEX "gsp_creds_store_idx" ON "tenant_gsp_credentials" USING btree ("store_id");

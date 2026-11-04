@@ -10,12 +10,10 @@ describe("QR Code Generator (ISO/IEC 18004)", () => {
     expect(matrix[3]![3]).toBe(true);
   });
 
-  it("scales dynamically for large signed JWT payloads", () => {
-    // Typical NIC signed QR payload is a 400-500 char JWT
-    const mockJwt = "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9." +
-      "eyJkYXRhIjoic2VsbGVyR3N0aW49MjdHU1BURTA5ODVGMVo1LGJ1eWVyR3N0aW49MjRBQUFDQzEyMDZEMVpNLGRvY05vPUlOVi0yMDI2LTAwMSxkb2NEYXRlPTA0LzExLzIwMjYsdG90VmFsPTE0OTkuOTksaXJuPTZENjE1RjE5M0FFNTQyOUU5RUEzNjQ3QkI5RDQxNDM1RTE0REU2NzE5RkU4NTFDQkZGNjg4RTA0Q0EyMTU5QkMifQ." +
-      "c2lnbmF0dXJlX2J5dGVzX3NhbXBsZV9mb3JfdGVzdF9wdXJwb3Nlc19vbmx5X3BsYWNlaG9sZGVy";
-    const matrix = generateQrMatrix(mockJwt);
+  it("scales dynamically for large signed QR payloads", () => {
+    // Typical NIC signed QR payload is a 400-500 char string
+    const mockPayload = "MEDIFLOW-NIC-SIGNED-QR-" + "A".repeat(450);
+    const matrix = generateQrMatrix(mockPayload);
     // Large payloads require version > 10 (size > 57x57)
     expect(matrix.length).toBeGreaterThanOrEqual(57);
     expect(matrix[0]!.length).toBe(matrix.length);
