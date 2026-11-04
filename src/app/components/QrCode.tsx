@@ -26,23 +26,19 @@ export function QrCode({
 }: QrCodeProps) {
   if (!value) return null;
 
+  let svgHtml: string | null = null;
   try {
-    const svgHtml = generateQrSvg(value, {
+    svgHtml = generateQrSvg(value, {
       size,
       color,
       bgColor,
       margin: 2,
     });
-
-    return (
-      <div
-        className={`inline-block select-none ${className}`}
-        style={{ width: size, height: size }}
-        dangerouslySetInnerHTML={{ __html: svgHtml }}
-      />
-    );
   } catch (err) {
     console.error("Failed to render QR Code SVG:", err);
+  }
+
+  if (!svgHtml) {
     return (
       <div
         className={`border border-dashed border-ink-300 flex items-center justify-center text-[10px] text-ink-500 font-mono ${className}`}
@@ -52,4 +48,13 @@ export function QrCode({
       </div>
     );
   }
+
+  return (
+    <div
+      className={`inline-block select-none ${className}`}
+      style={{ width: size, height: size }}
+      dangerouslySetInnerHTML={{ __html: svgHtml }}
+    />
+  );
 }
+
