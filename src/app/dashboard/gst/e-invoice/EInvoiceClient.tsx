@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import {
-  QrCode,
+  QrCode as QrCodeIcon,
   Truck,
   CheckCircle2,
   AlertCircle,
@@ -19,6 +19,7 @@ import {
   cancelEInvoiceAction,
   generateEWayBillAction,
 } from "@/app/actions/gst";
+import { QrCode as QrCodePreview } from "@/app/components/QrCode";
 
 export interface GstDocItem {
   id: string;
@@ -36,6 +37,7 @@ export interface GstDocItem {
   ackNo: string | null;
   ackDate: Date | string | null;
   signedQrCode: string | null;
+  einvoiceProvider?: string | null;
   eWayBillNo: string | null;
   eWayBillDate: Date | string | null;
   eWayBillValidTill: Date | string | null;
@@ -225,9 +227,19 @@ export function EInvoiceClient({ invoices }: { invoices: GstDocItem[] }) {
                           <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-emerald-100 text-emerald-800">
                             <CheckCircle2 className="h-3 w-3" /> Generated
                           </span>
-                          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold bg-rose-100 text-rose-700 border border-rose-200" title="Simulated IRP: Not legally valid for tax compliance">
-                            <AlertCircle className="h-2.5 w-2.5" /> SIMULATED – NOT VALID
-                          </span>
+                          {inv.einvoiceProvider === "SANDBOX_GSP" ? (
+                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold bg-sky-100 text-sky-800 border border-sky-200">
+                              SANDBOX VERIFIED
+                            </span>
+                          ) : inv.einvoiceProvider === "PRODUCTION_GSP" ? (
+                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                              NIC LIVE ACTIVE
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold bg-rose-100 text-rose-700 border border-rose-200" title="Simulated IRP: Not legally valid for tax compliance">
+                              <AlertCircle className="h-2.5 w-2.5" /> SIMULATED – NOT VALID
+                            </span>
+                          )}
                         </div>
                       ) : (
                         <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-100 text-amber-800">
@@ -263,7 +275,7 @@ export function EInvoiceClient({ invoices }: { invoices: GstDocItem[] }) {
                             {loadingId === inv.id ? (
                               <Loader2 className="h-3 w-3 animate-spin mr-1" />
                             ) : (
-                              <QrCode className="h-3 w-3 mr-1" />
+                              <QrCodeIcon className="h-3 w-3 mr-1" />
                             )}
                             Generate IRN
                           </button>

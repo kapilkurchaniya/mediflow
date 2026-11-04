@@ -59,7 +59,6 @@ function calculateReedSolomon(data: Uint8Array, ecCount: number): Uint8Array {
 }
 
 // Error Correction Level Low (L) - suitable for max data density
-// Capacity and block configuration table: [totalCodewords, ecCodewordsPerBlock, blockCountGroup1, dataPerBlock1, blockCountGroup2, dataPerBlock2]
 interface VersionConfig {
   version: number;
   totalCodewords: number;
@@ -102,7 +101,6 @@ function selectVersion(dataLen: number): VersionConfig {
       (sum, b) => sum + b.count * b.dataCodewords,
       0
     );
-    // 4 bits mode + (version >= 10 ? 16 : 8) bits count + dataLen*8 <= totalDataCapacity*8
     const countBits = cfg.version >= 10 ? 16 : 8;
     const requiredBytes = Math.ceil((4 + countBits + dataLen * 8) / 8);
     if (requiredBytes <= totalDataCapacity) {
@@ -211,7 +209,6 @@ export function generateQrMatrix(text: string): boolean[][] {
     Array.from({ length: size }, () => null)
   );
 
-  // Helper to place finder pattern
   function setFinder(row: number, col: number) {
     for (let r = -1; r <= 7; r++) {
       for (let c = -1; c <= 7; c++) {
@@ -232,7 +229,6 @@ export function generateQrMatrix(text: string): boolean[][] {
     }
   }
 
-  // Place 3 Finder Patterns
   setFinder(0, 0);
   setFinder(0, size - 7);
   setFinder(size - 7, 0);
@@ -249,7 +245,6 @@ export function generateQrMatrix(text: string): boolean[][] {
     for (let c = 0; c < pos.length; c++) {
       const ar = pos[r]!;
       const ac = pos[c]!;
-      // Skip if collides with finder patterns
       if (
         (ar <= 8 && ac <= 8) ||
         (ar <= 8 && ac >= size - 8) ||
@@ -292,7 +287,7 @@ export function generateQrMatrix(text: string): boolean[][] {
   let upward = true;
 
   for (let right = size - 1; right > 0; right -= 2) {
-    if (right === 6) right--; // Skip vertical timing column
+    if (right === 6) right--;
     const rows = upward
       ? Array.from({ length: size }, (_, i) => size - 1 - i)
       : Array.from({ length: size }, (_, i) => i);
@@ -306,7 +301,6 @@ export function generateQrMatrix(text: string): boolean[][] {
             bit = ((byte >>> (7 - (bitIdx % 8))) & 1) === 1;
             bitIdx++;
           }
-          // Mask Pattern 0: (row + col) % 2 === 0
           const mask = (row + col) % 2 === 0;
           matrix[row]![col] = bit !== mask;
         }
@@ -315,19 +309,16 @@ export function generateQrMatrix(text: string): boolean[][] {
     upward = !upward;
   }
 
-  // 6. Format Information (Level L, Mask 0: 0x77C4 ^ 0x5465 = 0x23A1 => 0010001110100001)
-  // Official BCH(15, 5) format string for L-0: 0b111011111000100
+  // 6. Format Information (Level L, Mask 0: 0x77C4 ^ 0x5465 = 0x23A1)
   const formatBits = 0x77c4 ^ 0x5465;
   for (let i = 0; i < 15; i++) {
     const bit = ((formatBits >>> (14 - i)) & 1) === 1;
-    // Top-left finder
     if (i <= 5) matrix[8]![i] = bit;
     else if (i === 6) matrix[8]![7] = bit;
     else if (i === 7) matrix[8]![8] = bit;
     else if (i === 8) matrix[7]![8] = bit;
     else matrix[14 - i]![8] = bit;
 
-    // Split around other finders
     if (i < 8) matrix[size - 1 - i]![8] = bit;
     else matrix[8]![size - 15 + i] = bit;
   }
