@@ -1,5 +1,6 @@
 import { getTrialBalance, getJournalLines } from "@/app/actions/accounting";
 import {
+  BookOpen,
   BookOpenText,
   Scale,
   ArrowDownLeft,
@@ -26,6 +27,20 @@ import { requirePagePermission } from "@/server/rbac";
 export const metadata = { title: "Accounting" };
 
 const FINANCIAL_STATEMENTS = [
+  {
+    href: "/dashboard/accounting/day-book",
+    title: "Day Book",
+    desc: "Chronological posted journal register across all transactions",
+    icon: BookOpen,
+    tone: "text-blue-600 bg-blue-50 border-blue-200",
+  },
+  {
+    href: "/dashboard/accounting/ledger",
+    title: "Account Ledgers",
+    desc: "Account-wise running balance statements & subledgers",
+    icon: FileSpreadsheet,
+    tone: "text-teal-600 bg-teal-50 border-teal-200",
+  },
   {
     href: "/dashboard/accounting/trial-balance",
     title: "Trial Balance",
