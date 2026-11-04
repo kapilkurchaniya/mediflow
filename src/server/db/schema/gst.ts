@@ -3,6 +3,7 @@ import {
   boolean,
   date,
   index,
+  integer,
   jsonb,
   pgTable,
   text,
@@ -45,6 +46,11 @@ export const gstDocuments = pgTable(
     eWayBillNo: text("e_way_bill_no"),
     eWayBillDate: timestamp("e_way_bill_date", { withTimezone: true }),
     eWayBillValidTill: timestamp("e_way_bill_valid_till", { withTimezone: true }),
+    vehicleNo: text("vehicle_no"),
+    transporterId: text("transporter_id"),
+    transporterName: text("transporter_name"),
+    transportMode: text("transport_mode"), // "1": Road, "2": Rail, "3": Air, "4": Ship
+    distanceKm: integer("distance_km"),
     status: text("status").notNull().default("active"), // active | cancelled | amended
     cancelledReason: text("cancelled_reason"), // 1: Duplicate | 2: Data entry mistake | 3: Order cancelled | 4: Other
     cancelledRemarks: text("cancelled_remarks"),

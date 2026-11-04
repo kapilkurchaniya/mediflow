@@ -14,6 +14,7 @@ import type {
   IRNResult,
   EWayBillInput,
   EWayBillResult,
+  UpdateVehicleInput,
 } from "./einvoice-types";
 
 /**
@@ -100,8 +101,30 @@ export class SimulatedIRPProvider implements IRPProvider {
     };
   }
 
-  async cancelEWayBill(ewayBillNo: string, reason: string) {
-    return { success: true };
+  async updateEWayBillVehicle(
+    ewayBillNo: string,
+    input: UpdateVehicleInput
+  ): Promise<{ success: boolean; validUpto: string }> {
+    if (!ewayBillNo) {
+      throw new Error("E-Way Bill Number is required for updating vehicle");
+    }
+    const now = new Date();
+    // Transshipment or vehicle update preserves / extends validity by 1 day
+    const validUptoDate = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+    return {
+      success: true,
+      validUpto: validUptoDate.toISOString(),
+    };
+  }
+
+  async cancelEWayBill(ewayBillNo: string, reason: string): Promise<{ success: boolean; cancelledDate: string }> {
+    if (!ewayBillNo) {
+      throw new Error("E-Way Bill Number is required for cancellation");
+    }
+    return {
+      success: true,
+      cancelledDate: new Date().toISOString(),
+    };
   }
 }
 

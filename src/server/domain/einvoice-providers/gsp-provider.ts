@@ -20,6 +20,7 @@ import type {
   IRNResult,
   EWayBillInput,
   EWayBillResult,
+  UpdateVehicleInput,
 } from "../einvoice-types";
 
 export interface GspProviderConfig {
@@ -312,6 +313,50 @@ export class GspIRPProvider implements IRPProvider {
     return {
       ewayBillNo: String(data.EwbNo || data.ewayBillNo),
       ewayBillDate: data.EwbDt || data.ewayBillDate || new Date().toISOString(),
+      validUpto: data.EwbValidTill || data.validUpto || new Date().toISOString(),
+    };
+  }
+
+  /**
+   * Updates Part-B vehicle details for an active E-Way Bill.
+   */
+  async updateEWayBillVehicle(
+    ewayBillNo: string,
+    input: UpdateVehicleInput
+  ): Promise<{ success: boolean; validUpto: string }> {
+    const token = await this.getAuthToken();
+    const url = `${this.getBaseUrl()}/ewaybill/updatepartb`;
+
+    const body = {
+      EwbNo: ewayBillNo,
+      VehNo: input.vehicleNo,
+      FromPlace: input.fromPlace,
+      FromState: input.fromState,
+      ReasonCode: input.reasonCode || "2",
+      ReasonRmrk: input.reasonRemark || "",
+      TransMode: input.transportMode || "1",
+    };
+
+    const res = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+        "client-id": this.config.clientId,
+      },
+      body: JSON.stringify(body),
+    });
+
+    if (!res.ok) {
+      const err = await res.text();
+      throw new Error(`E-Way Bill vehicle update failed (${res.status}): ${err}`);
+    }
+
+    const json = await res.json();
+    const data = json.data || json;
+
+    return {
+      success: true,
       validUpto: data.EwbValidTill || data.validUpto || new Date().toISOString(),
     };
   }

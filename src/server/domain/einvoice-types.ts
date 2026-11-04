@@ -104,13 +104,23 @@ export interface EWayBillResult {
   validUpto: string;
 }
 
+export interface UpdateVehicleInput {
+  vehicleNo: string;
+  fromPlace: string;
+  fromState: string;
+  reasonCode: "1" | "2" | "3" | "4"; // 1: Due to Break Down, 2: Due to Transshipment, 3: Others, 4: First Time
+  reasonRemark?: string;
+  transportMode?: "1" | "2" | "3" | "4";
+}
+
 export interface IRPProvider {
   name: string;
   generateIRN(payload: EInvoicePayload): Promise<IRNResult>;
   cancelIRN(irn: string, reasonCode: string, remarks: string): Promise<{ success: boolean; cancelledDate: string }>;
   getIRNDetails?(irn: string): Promise<IRNResult>;
   generateEWayBill(irn: string, details: EWayBillInput): Promise<EWayBillResult>;
-  cancelEWayBill(ewayBillNo: string, reason: string): Promise<{ success: boolean }>;
+  updateEWayBillVehicle?(ewayBillNo: string, input: UpdateVehicleInput): Promise<{ success: boolean; validUpto: string }>;
+  cancelEWayBill(ewayBillNo: string, reason: string): Promise<{ success: boolean; cancelledDate?: string }>;
 }
 
 /** Valid EINVOICE_MODE values */
