@@ -113,8 +113,7 @@ test.describe("Offline POS Counter E2E Smoke & Integration Suite (Task A4.8)", (
     await searchInput.fill("Paracetamol");
     await page.getByRole("button", { name: "+ Add" }).first().click();
     await page.getByRole("button", { name: /split tender/i }).click();
-    await page.getByLabel("Cash tender amount").fill("5.00");
-    await page.getByLabel("UPI tender amount").fill("10.00");
+    await page.getByLabel("Cash tender amount").fill("5.00"); await page.getByLabel("UPI tender amount").fill("10.00");
     await page.getByRole("button", { name: /complete sale/i }).click();
 
     await expect(receiptModal).toBeVisible({ timeout: 5000 });
@@ -171,10 +170,12 @@ test.describe("Offline POS Counter E2E Smoke & Integration Suite (Task A4.8)", (
 
     // Reconnect & return to POS
     await page.context().setOffline(false);
-    try {
-      await page.waitForURL("**/dashboard/sales/pos**", { timeout: 5000 });
-    } catch {
-      await page.goto("/dashboard/sales/pos");
+    const retryBtn = page.locator("#retryBtn, a:has-text('Retry POS Connection')");
+    if (await retryBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
+      await retryBtn.click().catch(() => {});
+    }
+    if (!page.url().includes("/dashboard/sales/pos")) {
+      await page.goto("/dashboard/sales/pos").catch(() => {});
     }
     await expect(page.getByPlaceholder(/search medicine/i)).toBeVisible({ timeout: 15000 });
     await triggerDexieSync(page);
