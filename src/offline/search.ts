@@ -94,6 +94,14 @@ export async function searchMedicines(
         const genericMatch = m.genericName ? m.genericName.toLowerCase().includes(q) : false;
         return nameMatch || genericMatch;
       })
+      .sort((a, b) => {
+        const aName = a.name.toLowerCase();
+        const bName = b.name.toLowerCase();
+        const aRank = aName === q ? 0 : aName.startsWith(q) ? 1 : aName.includes(q) ? 2 : 3;
+        const bRank = bName === q ? 0 : bName.startsWith(q) ? 1 : bName.includes(q) ? 2 : 3;
+        if (aRank !== bRank) return aRank - bRank;
+        return a.name.localeCompare(b.name);
+      })
       .slice(0, limit);
   }
 
