@@ -92,7 +92,7 @@ describe("E-Invoice Payload Builder (NIC Schema v1.03 Compliance)", () => {
 
       const mockDb = {
         select: vi.fn().mockImplementation(() => ({
-          from: vi.fn().mockImplementation((table: any) => {
+          from: vi.fn().mockImplementation((_table: unknown) => {
             return {
               where: vi.fn().mockImplementation(() => {
                 // Return appropriate mock data based on query structure
@@ -104,7 +104,7 @@ describe("E-Invoice Payload Builder (NIC Schema v1.03 Compliance)", () => {
             };
           }),
         })),
-      } as any;
+      } as unknown as Parameters<typeof buildEInvoicePayload>[0];
 
       // Mock sequence of selects: doc -> store -> tenant -> saleItems
       let selectCount = 0;
@@ -162,3 +162,4 @@ describe("E-Invoice Payload Builder (NIC Schema v1.03 Compliance)", () => {
     });
   });
 });
+

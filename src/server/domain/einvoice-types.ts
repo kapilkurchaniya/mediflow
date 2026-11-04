@@ -124,3 +124,4 @@ export function getEInvoiceMode(): EInvoiceMode {
   }
   return "disabled";
 }
+
