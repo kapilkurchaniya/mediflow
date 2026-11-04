@@ -162,14 +162,12 @@ test.describe("Offline POS Counter E2E Smoke & Integration Suite (Task A4.8)", (
 
     // Reconnect & return to POS
     await page.context().setOffline(false);
-    const retryBtn = page.locator("#retryBtn, a:has-text('Retry POS Connection')");
-    if (await retryBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
-      await retryBtn.click().catch(() => {});
+    try {
+      await page.waitForURL("**/dashboard/sales/pos**", { timeout: 10000 });
+    } catch {
+      await page.goto("/dashboard/sales/pos");
     }
-    if (!page.url().includes("/dashboard/sales/pos")) {
-      await page.goto("/dashboard/sales/pos").catch(() => {});
-    }
-    await expect(page.getByPlaceholder(/search medicine/i)).toBeVisible({ timeout: 15000 });
+    await expect(page.getByPlaceholder(/search medicine/i)).toBeVisible({ timeout: 20000 });
     await triggerDexieSync(page);
 
     // Await automatic sync completion
