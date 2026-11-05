@@ -11,7 +11,8 @@ import {
   uuid,
 } from "drizzle-orm/pg-core";
 import { id, money, createdAt, updatedAt } from "./_helpers";
-import { storeId, tenantId } from "./platform";
+import { storeId, tenantId, users } from "./platform";
+import { purchases } from "./purchasing";
 
 export const gstDocuments = pgTable(
   "gst_documents",
@@ -106,9 +107,78 @@ export const tenantGspCredentials = pgTable(
   ],
 );
 
+export const gst2bImports = pgTable(
+  "gst_2b_imports",
+  {
+    id: id(),
+    tenantId: tenantId(),
+    gstin: text("gstin").notNull(),
+    returnPeriod: text("return_period").notNull(), // "YYYY-MM" e.g. "2026-10"
+    fileName: text("file_name").notNull(),
+    fileSize: integer("file_size"),
+    totalInvoices: integer("total_invoices").notNull().default(0),
+    totalTaxableAmount: money("total_taxable_amount").notNull().default(0),
+    totalCgst: money("total_cgst").notNull().default(0),
+    totalSgst: money("total_sgst").notNull().default(0),
+    totalIgst: money("total_igst").notNull().default(0),
+    totalCess: money("total_cess").notNull().default(0),
+    status: text("status").notNull().default("imported"), // imported | reconciling | reconciled | archived
+    uploadedBy: uuid("uploaded_by").notNull().references(() => users.id),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    index("gst2b_imports_tenant_period_idx").on(t.tenantId, t.returnPeriod),
+    index("gst2b_imports_gstin_idx").on(t.gstin),
+  ],
+);
+
+export const gst2bLines = pgTable(
+  "gst_2b_lines",
+  {
+    id: id(),
+    tenantId: tenantId(),
+    importId: uuid("import_id")
+      .notNull()
+      .references(() => gst2bImports.id, { onDelete: "cascade" }),
+    supplierGstin: text("supplier_gstin").notNull(),
+    supplierName: text("supplier_name"),
+    docType: text("doc_type").notNull().default("invoice"), // invoice | credit_note | debit_note
+    invoiceNo: text("invoice_no").notNull(),
+    invoiceDate: date("invoice_date").notNull(),
+    taxableAmount: money("taxable_amount").notNull().default(0),
+    cgst: money("cgst").notNull().default(0),
+    sgst: money("sgst").notNull().default(0),
+    igst: money("igst").notNull().default(0),
+    cess: money("cess").notNull().default(0),
+    totalAmount: money("total_amount").notNull().default(0),
+    itcAvailability: text("itc_availability").notNull().default("Y"), // Y | N
+    itcReason: text("itc_reason"),
+    // Reconciliation Status
+    matchStatus: text("match_status").notNull().default("unmatched"), // exact_match | tolerance_match | mismatch | missing_in_books | missing_in_2b
+    matchedPurchaseId: uuid("matched_purchase_id").references(() => purchases.id),
+    matchVarianceAmount: money("match_variance_amount").default(0),
+    matchNotes: text("match_notes"),
+    // IMS Action (Invoice Management System)
+    imsAction: text("ims_action").notNull().default("pending"), // pending | accept | reject | reset
+    imsActionDate: timestamp("ims_action_date", { withTimezone: true }),
+    imsActionBy: uuid("ims_action_by").references(() => users.id),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    index("gst2b_lines_import_idx").on(t.importId),
+    index("gst2b_lines_supplier_inv_idx").on(t.supplierGstin, t.invoiceNo),
+    index("gst2b_lines_match_status_idx").on(t.tenantId, t.matchStatus),
+  ],
+);
+
 export type GstDocument = typeof gstDocuments.$inferSelect;
 export type NewGstDocument = typeof gstDocuments.$inferInsert;
 export type EInvoiceLog = typeof eInvoiceLogs.$inferSelect;
 export type NewEInvoiceLog = typeof eInvoiceLogs.$inferInsert;
 export type TenantGspCredential = typeof tenantGspCredentials.$inferSelect;
 export type NewTenantGspCredential = typeof tenantGspCredentials.$inferInsert;
+export type Gst2bImport = typeof gst2bImports.$inferSelect;
+export type NewGst2bImport = typeof gst2bImports.$inferInsert;
+export type Gst2bLine = typeof gst2bLines.$inferSelect;
+export type NewGst2bLine = typeof gst2bLines.$inferInsert;
