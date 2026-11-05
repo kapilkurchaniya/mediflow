@@ -15,6 +15,7 @@ import {
   ChevronRight,
   ArrowRight,
   ReceiptText,
+  Lock,
 } from "lucide-react";
 import Link from "next/link";
 import { format } from "date-fns";
@@ -82,6 +83,13 @@ const FINANCIAL_STATEMENTS = [
     desc: "Vouchers, till payouts, rent, utilities & overheads",
     icon: ReceiptText,
     tone: "text-violet-600 bg-violet-50 border-violet-200",
+  },
+  {
+    href: "/dashboard/accounting/periods",
+    title: "Accounting Periods",
+    desc: "Monthly period locks, closing snapshots & audit trail",
+    icon: Lock,
+    tone: "text-amber-700 bg-amber-50 border-amber-200",
   },
 ];
 

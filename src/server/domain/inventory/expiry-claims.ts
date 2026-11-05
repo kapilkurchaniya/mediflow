@@ -4,6 +4,7 @@ import { DomainError } from "@/server/errors";
 import { nextDocNumber } from "@/server/domain/sequence";
 import { format } from "date-fns";
 import { postPurchaseReturnJournalEntry, getOrSeedAccounts } from "@/server/domain/accounting";
+import { assertAccountingPeriodOpen } from "@/server/domain/accounting-periods";
 
 export interface QuarantineBatchInput {
   tenantId: string;
@@ -435,6 +436,9 @@ export async function settleSupplierExpiryClaim(
   if (settlementType === "written_off" && claim.totalPaise > 0) {
     const accounts = await getOrSeedAccounts(tx, tenantId);
     const entryNo = await nextDocNumber(tx, tenantId, storeId, "journal", "JV");
+    const entryDateStr = format(now, "yyyy-MM-dd");
+
+    await assertAccountingPeriodOpen(tx, { tenantId, entryDate: entryDateStr, storeId });
 
     const [jv] = await tx
       .insert(schema.journalEntries)
@@ -442,7 +446,7 @@ export async function settleSupplierExpiryClaim(
         tenantId,
         storeId,
         entryNo,
-        entryDate: format(now, "yyyy-MM-dd"),
+        entryDate: entryDateStr,
         narration: `Loss on Expired Goods - Claim ${claim.claimNo} rejected/written-off`,
         refType: "claim_writeoff",
         refId: claimId,

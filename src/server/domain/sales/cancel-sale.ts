@@ -9,6 +9,7 @@ import { nextDocNumber } from "@/server/domain/sequence";
 import { cancelGstDocumentForSale } from "@/server/domain/gst";
 import { LoyaltyService } from "@/server/domain/loyalty";
 import { writeAudit } from "@/server/audit";
+import { assertAccountingPeriodOpen } from "@/server/domain/accounting-periods";
 
 /**
  * Input schema for sale cancellation.
@@ -222,6 +223,10 @@ export async function cancelSale(
 
     const entryNo = await nextDocNumber(tx, ctx.tenantId, ctx.storeId, "journal", "JV");
     const entryDateStr = format(now, "yyyy-MM-dd");
+
+    // Guard: Both the original sale's period and current cancellation period must be open
+    await assertAccountingPeriodOpen(tx, { tenantId: ctx.tenantId, entryDate: originalEntry.entryDate, storeId: ctx.storeId });
+    await assertAccountingPeriodOpen(tx, { tenantId: ctx.tenantId, entryDate: entryDateStr, storeId: ctx.storeId });
 
     const [reversalEntry] = await tx
       .insert(schema.journalEntries)

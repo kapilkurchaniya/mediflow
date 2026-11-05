@@ -7,6 +7,7 @@ import { getOrSeedAccounts } from "@/server/domain/accounting";
 import { writeAudit } from "@/server/audit";
 import { calculateReconciliationDelta } from "./reconcile";
 import type { ApproveAuditSessionParams } from "./types";
+import { assertAccountingPeriodOpen } from "@/server/domain/accounting-periods";
 
 /**
  * Reconciles and posts an approved physical stocktake audit session.
@@ -184,13 +185,8 @@ export async function approveStockAuditSession(
   const todayStr = format(now, "yyyy-MM-dd");
 
   if (Math.abs(netFinancialImpactPaise) > 0) {
-    const entryNo = await nextDocNumber(
-      tx,
-      tenantId,
-      storeId,
-      "journal",
-      "JV"
-    );
+    await assertAccountingPeriodOpen(tx, { tenantId, entryDate: todayStr, storeId });
+    const entryNo = await nextDocNumber(tx, tenantId, storeId, "journal", "JV");
 
     const narration = netFinancialImpactPaise < 0
       ? `Physical stocktake shortage loss for session ${session.sessionNo}`

@@ -3,6 +3,7 @@ import { eq, and, sql } from "drizzle-orm";
 import type { DbOrTx, Tx } from "@/server/db";
 import { nextDocNumber } from "./sequence";
 import { format } from "date-fns";
+import { assertAccountingPeriodOpen } from "./accounting-periods";
 
 /**
  * Standard pharmacy system accounts configuration.
@@ -134,6 +135,8 @@ export async function postSaleJournalEntry(params: PostSaleJournalParams) {
   const accounts = await getOrSeedAccounts(tx, tenantId);
   const entryNo = await nextDocNumber(tx, tenantId, storeId, "journal", "JV");
   const entryDateStr = format(invoiceDate, "yyyy-MM-dd");
+
+  await assertAccountingPeriodOpen(tx, { tenantId, entryDate: entryDateStr, storeId });
 
   const [entry] = await tx
     .insert(schema.journalEntries)
@@ -323,6 +326,8 @@ export async function postPurchaseJournalEntry(params: PostPurchaseJournalParams
   const accounts = await getOrSeedAccounts(tx, tenantId);
   const entryNo = await nextDocNumber(tx, tenantId, storeId, "journal", "JV");
 
+  await assertAccountingPeriodOpen(tx, { tenantId, entryDate: invoiceDate, storeId });
+
   const [entry] = await tx
     .insert(schema.journalEntries)
     .values({
@@ -500,6 +505,8 @@ export async function postPurchaseReturnJournalEntry(params: PostPurchaseReturnJ
 
   const accounts = await getOrSeedAccounts(tx, tenantId);
   const entryNo = await nextDocNumber(tx, tenantId, storeId, "journal", "JV");
+
+  await assertAccountingPeriodOpen(tx, { tenantId, entryDate: returnDate, storeId });
 
   const [entry] = await tx
     .insert(schema.journalEntries)
@@ -681,6 +688,8 @@ export async function postSaleReturnJournalEntry(params: PostSaleReturnJournalPa
   const accounts = await getOrSeedAccounts(tx, tenantId);
   const entryNo = await nextDocNumber(tx, tenantId, storeId, "journal", "JV");
   const entryDateStr = format(returnDate, "yyyy-MM-dd");
+
+  await assertAccountingPeriodOpen(tx, { tenantId, entryDate: entryDateStr, storeId });
 
   const [entry] = await tx
     .insert(schema.journalEntries)
