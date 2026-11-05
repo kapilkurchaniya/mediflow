@@ -1,5 +1,6 @@
 import { db, schema } from "@/server/db";
-import { eq, and } from "drizzle-orm";
+import { eq, and, sql } from "drizzle-orm";
+import { decryptSecret } from "@/server/crypto";
 
 export interface MetaWebhookPayload {
   object?: string;
@@ -18,6 +19,7 @@ export interface MetaWebhookPayload {
           status?: string;
           timestamp?: string;
           recipient_id?: string;
+          errors?: Array<{ code?: number; title?: string; message?: string }>;
         }>;
         contacts?: Array<{ profile?: { name?: string }; wa_id?: string }>;
         messages?: Array<{
@@ -36,7 +38,6 @@ export interface MetaWebhookPayload {
     }>;
   }>;
 }
-import { decryptSecret } from "@/server/crypto";
 
 export interface WhatsAppSendParams {
   tenantId: string;
@@ -45,6 +46,8 @@ export interface WhatsAppSendParams {
   customerId?: string | null;
   templateName?: string;
   templateId?: string | null;
+  templateParameters?: string[];
+  templateLanguage?: string;
   messageType?: "text" | "template" | "document" | "image";
   messageBody: string;
   mediaUrl?: string;
@@ -75,6 +78,29 @@ export class WhatsAppService {
   }
 
   /**
+   * Checks whether an inbound customer message was received within the 24-hour service window
+   */
+  static async isWithin24HourWindow(tenantId: string, customerPhone: string): Promise<boolean> {
+    const cleanPhone = customerPhone.replace(/\D/g, "").slice(-10);
+    const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+
+    const [inbound] = await db
+      .select({ id: schema.whatsappMessages.id })
+      .from(schema.whatsappMessages)
+      .where(
+        and(
+          eq(schema.whatsappMessages.tenantId, tenantId),
+          eq(schema.whatsappMessages.direction, "inbound"),
+          sql`${schema.whatsappMessages.customerPhone} LIKE ${`%${cleanPhone}`}`,
+          sql`${schema.whatsappMessages.createdAt} >= ${twentyFourHoursAgo}`
+        )
+      )
+      .limit(1);
+
+    return !!inbound;
+  }
+
+  /**
    * Send WhatsApp text or template message via Meta Graph API (or simulator if unconfigured)
    */
   static async sendMessage(params: WhatsAppSendParams): Promise<SendResult> {
@@ -102,7 +128,20 @@ export class WhatsAppService {
           payload.type = "template";
           payload.template = {
             name: params.templateName,
-            language: { code: "en" },
+            language: { code: params.templateLanguage || "en" },
+            ...(params.templateParameters && params.templateParameters.length > 0
+              ? {
+                  components: [
+                    {
+                      type: "body",
+                      parameters: params.templateParameters.map((p) => ({
+                        type: "text",
+                        text: p,
+                      })),
+                    },
+                  ],
+                }
+              : {}),
           };
         } else if (params.messageType === "document" && params.mediaUrl) {
           payload.type = "document";
@@ -111,6 +150,7 @@ export class WhatsAppService {
             caption: params.messageBody,
           };
         } else {
+          // If outside 24h window and template is supplied, prefer template
           payload.type = "text";
           payload.text = { body: params.messageBody };
         }
@@ -169,7 +209,7 @@ export class WhatsAppService {
   }
 
   /**
-   * Send Invoice Receipt on WhatsApp
+   * Send Invoice Receipt on WhatsApp (with public receipt link and template parameters)
    */
   static async sendInvoiceReceipt(opts: {
     tenantId: string;
@@ -180,19 +220,42 @@ export class WhatsAppService {
     patientName?: string | null;
     totalAmountPaise: number;
     pdfUrl?: string;
+    publicReceiptUrl?: string;
   }): Promise<SendResult> {
     const formattedAmount = (opts.totalAmountPaise / 100).toFixed(2);
     const greeting = opts.patientName ? `Dear ${opts.patientName},` : `Dear Valued Customer,`;
-    const message = `${greeting}\n\nThank you for visiting MediFlow Pharmacy! Your tax invoice *#${opts.invoiceNo}* for *₹${formattedAmount}* has been generated.\n\n${
-      opts.pdfUrl ? `View & Download Invoice: ${opts.pdfUrl}\n\n` : ""
-    }For any queries or medicine guidance, please reply to this message. Wishing you good health!`;
+
+    const receiptUrlPart = opts.publicReceiptUrl
+      ? `\n\nView & Download Official Digital Invoice:\n${opts.publicReceiptUrl}\n\n`
+      : opts.pdfUrl
+      ? `\n\nView & Download Invoice: ${opts.pdfUrl}\n\n`
+      : "\n\n";
+
+    const message = `${greeting}\n\nThank you for shopping with us! Your tax invoice *#${opts.invoiceNo}* for *₹${formattedAmount}* is ready.${receiptUrlPart}Wishing you good health!`;
+
+    // Check if within 24-hr session window
+    const inWindow = await this.isWithin24HourWindow(opts.tenantId, opts.customerPhone);
+    const config = await this.getConfig(opts.tenantId);
+
+    // If configured with Meta API and outside 24h window, dispatch using registered template
+    const useTemplate = !!config?.accessToken && !inWindow;
 
     return this.sendMessage({
       tenantId: opts.tenantId,
       storeId: opts.storeId,
       customerPhone: opts.customerPhone,
       customerId: opts.customerId,
-      messageType: opts.pdfUrl ? "document" : "text",
+      messageType: useTemplate ? "template" : opts.pdfUrl ? "document" : "text",
+      templateName: useTemplate ? "invoice_receipt" : undefined,
+      templateParameters: useTemplate
+        ? [
+            opts.patientName || "Valued Customer",
+            "MediFlow Pharmacy",
+            opts.invoiceNo,
+            formattedAmount,
+            opts.publicReceiptUrl || "",
+          ]
+        : undefined,
       messageBody: message,
       mediaUrl: opts.pdfUrl,
     });
@@ -213,12 +276,25 @@ export class WhatsAppService {
     const greeting = opts.customerName ? `Dear ${opts.customerName},` : `Hello,`;
     const message = `${greeting}\n\nThis is a friendly health reminder from MediFlow Pharmacy. Your prescription for *${opts.medicineName}* is due for refill soon.\n\nTo reserve your medicine for pickup or doorstep delivery, reply *YES* or call us.`;
 
+    const inWindow = await this.isWithin24HourWindow(opts.tenantId, opts.customerPhone);
+    const config = await this.getConfig(opts.tenantId);
+    const useTemplate = !!config?.accessToken && !inWindow;
+
     return this.sendMessage({
       tenantId: opts.tenantId,
       storeId: opts.storeId,
       customerPhone: opts.customerPhone,
       customerId: opts.customerId,
-      messageType: "text",
+      messageType: useTemplate ? "template" : "text",
+      templateName: useTemplate ? "refill_reminder" : undefined,
+      templateParameters: useTemplate
+        ? [
+            opts.customerName || "Customer",
+            "MediFlow Pharmacy",
+            opts.medicineName,
+            opts.expiryDaysRemaining ? `${opts.expiryDaysRemaining} days` : "soon",
+          ]
+        : undefined,
       messageBody: message,
     });
   }
@@ -237,12 +313,24 @@ export class WhatsAppService {
     const formattedAmount = (opts.outstandingPaise / 100).toFixed(2);
     const message = `Dear ${opts.customerName},\n\nThis is a gentle payment reminder from MediFlow Pharmacy. Your current outstanding ledger balance is *₹${formattedAmount}*.\n\nPlease clear the dues via UPI or at the pharmacy counter at your earliest convenience. Thank you!`;
 
+    const inWindow = await this.isWithin24HourWindow(opts.tenantId, opts.customerPhone);
+    const config = await this.getConfig(opts.tenantId);
+    const useTemplate = !!config?.accessToken && !inWindow;
+
     return this.sendMessage({
       tenantId: opts.tenantId,
       storeId: opts.storeId,
       customerPhone: opts.customerPhone,
       customerId: opts.customerId,
-      messageType: "text",
+      messageType: useTemplate ? "template" : "text",
+      templateName: useTemplate ? "payment_reminder" : undefined,
+      templateParameters: useTemplate
+        ? [
+            opts.customerName,
+            "MediFlow Pharmacy",
+            formattedAmount,
+          ]
+        : undefined,
       messageBody: message,
     });
   }
@@ -282,9 +370,14 @@ export class WhatsAppService {
           };
           const mappedStatus = statusMap[st.status];
           if (mappedStatus) {
+            const errorMsg = st.errors?.[0]?.message || (mappedStatus === "failed" ? "Meta delivery failed" : null);
+
             await db
               .update(schema.whatsappMessages)
-              .set({ status: mappedStatus })
+              .set({
+                status: mappedStatus,
+                ...(errorMsg ? { errorCode: errorMsg } : {}),
+              })
               .where(eq(schema.whatsappMessages.metaMessageId, st.id));
           }
         }
