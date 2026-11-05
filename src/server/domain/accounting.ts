@@ -23,6 +23,7 @@ export const DEFAULT_ACCOUNTS = [
   { code: "3010", name: "Sales Account", type: "income", systemKey: "sales" },
   { code: "3020", name: "Discount Received", type: "income", systemKey: "discounts" },
   { code: "3030", name: "Stock Adjustment Surplus", type: "income", systemKey: "stock_gain" },
+  { code: "3999", name: "Opening Balance Equity", type: "equity", systemKey: "opening_balance_equity" },
   { code: "4010", name: "Purchase Account", type: "expense", systemKey: "purchases" },
   { code: "4090", name: "Round Off Account", type: "expense", systemKey: "roundoff" },
   { code: "5030", name: "Stock Shortage & Loss", type: "expense", systemKey: "stock_loss" },
@@ -278,6 +279,7 @@ export async function postSaleJournalEntry(params: PostSaleJournalParams) {
 
   return entry.id;
 }
+
 
 export interface PostPurchaseJournalParams {
   tx: Tx;
@@ -629,6 +631,7 @@ export async function postPurchaseReturnJournalEntry(params: PostPurchaseReturnJ
   return entry.id;
 }
 
+
 export interface PostSaleReturnJournalParams {
   tx: Tx;
   tenantId: string;
@@ -841,3 +844,6 @@ export async function postSaleReturnJournalEntry(params: PostSaleReturnJournalPa
 
   return entry.id;
 }
+
+export * from "./accounting-opening-balances";
+
