@@ -146,24 +146,3 @@ AFTER INSERT OR UPDATE OR DELETE ON journal_lines
 DEFERRABLE INITIALLY DEFERRED
 FOR EACH ROW EXECUTE FUNCTION fn_validate_journal_double_entry();
 
--- 5. Deferred Guard on Journal Header to Ensure Every Committed Header Has Valid Lines
-CREATE OR REPLACE FUNCTION fn_validate_journal_entry_header()
-RETURNS TRIGGER AS $$
-DECLARE
-  v_count integer;
-BEGIN
-  IF EXISTS (SELECT 1 FROM journal_entries WHERE id = NEW.id) THEN
-    SELECT COUNT(*) INTO v_count FROM journal_lines WHERE entry_id = NEW.id;
-    IF v_count < 2 THEN
-      RAISE EXCEPTION 'Committed journal entry % must have at least 2 lines (found %)', NEW.id, v_count;
-    END IF;
-  END IF;
-  RETURN NULL;
-END;
-$$ LANGUAGE plpgsql;
-
-DROP TRIGGER IF EXISTS trg_validate_journal_entry_header ON journal_entries;
-CREATE CONSTRAINT TRIGGER trg_validate_journal_entry_header
-AFTER INSERT OR UPDATE ON journal_entries
-DEFERRABLE INITIALLY DEFERRED
-FOR EACH ROW EXECUTE FUNCTION fn_validate_journal_entry_header();
