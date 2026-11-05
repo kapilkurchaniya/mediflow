@@ -35,11 +35,11 @@ describe("Public Receipt Privacy & Masking", () => {
     };
 
     // Confirm that internal cost fields do not exist on the public item
-    expect((sampleItem as Record<string, unknown>).unitCost).toBeUndefined();
-    expect((sampleItem as Record<string, unknown>).costPrice).toBeUndefined();
-    expect((sampleItem as Record<string, unknown>).purchaseRate).toBeUndefined();
-    expect((sampleItem as Record<string, unknown>).margin).toBeUndefined();
-    expect((sampleItem as Record<string, unknown>).supplierId).toBeUndefined();
+    expect((sampleItem as unknown as Record<string, unknown>).unitCost).toBeUndefined();
+    expect((sampleItem as unknown as Record<string, unknown>).costPrice).toBeUndefined();
+    expect((sampleItem as unknown as Record<string, unknown>).purchaseRate).toBeUndefined();
+    expect((sampleItem as unknown as Record<string, unknown>).margin).toBeUndefined();
+    expect((sampleItem as unknown as Record<string, unknown>).supplierId).toBeUndefined();
 
     const sampleReceipt: PublicReceiptData = {
       sale: {
@@ -81,7 +81,7 @@ describe("Public Receipt Privacy & Masking", () => {
       pharmacyBrandName: "MediFlow Pharmacy",
     };
 
-    expect((sampleReceipt.sale as Record<string, unknown>).costAmount).toBeUndefined();
+    expect((sampleReceipt.sale as unknown as Record<string, unknown>).costAmount).toBeUndefined();
     expect(sampleReceipt.sale.isCancelled).toBe(false);
   });
 
