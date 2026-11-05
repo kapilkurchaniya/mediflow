@@ -42,6 +42,7 @@ export const customers = pgTable(
     stateCode: text("state_code"),
     groupId: uuid("group_id").references(() => customerGroups.id),
     creditLimit: money("credit_limit"),
+    creditDays: integer("credit_days").notNull().default(30),
     openingBalance: money("opening_balance"),
     loyaltyPoints: integer("loyalty_points").notNull().default(0),
     notes: text("notes"),
@@ -55,6 +56,7 @@ export const customers = pgTable(
   },
   (t) => [
     index("customers_tenant_idx").on(t.tenantId),
+    index("customers_tenant_credit_idx").on(t.tenantId, t.creditLimit),
     index("customers_phone_idx").on(t.tenantId, t.phone),
     index("customers_group_idx").on(t.groupId),
     index("customers_tenant_updated_idx").on(t.tenantId, t.updatedAt, t.id),

@@ -65,6 +65,8 @@ export const sales = pgTable(
     uniqueIndex("sales_store_invoice_uq").on(t.storeId, t.invoiceNo).where(sql`${t.invoiceNo} is not null`),
     index("sales_store_completed_idx").on(t.storeId, t.completedAt),
     index("sales_customer_idx").on(t.customerId),
+    index("sales_tenant_cust_credit_idx").on(t.tenantId, t.customerId, t.creditAmount),
+    index("sales_tenant_store_completed_idx").on(t.tenantId, t.storeId, t.completedAt),
   ],
 );
 

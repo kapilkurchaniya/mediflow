@@ -13,6 +13,7 @@ import { handlers } from "./handlers";
 
 export type OutboxType =
   | "whatsapp.receipt"
+  | "whatsapp.payment_reminder"
   | "sms.send"
   | "reminder.send"
   | "gst.doc_retry"

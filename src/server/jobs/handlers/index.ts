@@ -1,5 +1,6 @@
 import type { OutboxType } from "../outbox";
 import { handleWhatsAppReceipt } from "./whatsapp-receipt";
+import { handleWhatsAppPaymentReminder } from "./payment-reminder";
 import { handleSmsSend } from "./sms-send";
 import { handleReminderSend } from "./reminder-send";
 import { handleGstDocRetry } from "./gst-doc-retry";
@@ -10,6 +11,7 @@ export const handlers: Record<
   (event: { tenantId: string; payload: Record<string, unknown> }) => Promise<void>
 > = {
   "whatsapp.receipt": handleWhatsAppReceipt,
+  "whatsapp.payment_reminder": handleWhatsAppPaymentReminder,
   "sms.send": handleSmsSend,
   "reminder.send": handleReminderSend,
   "gst.doc_retry": handleGstDocRetry,

@@ -70,9 +70,9 @@ const FINANCIAL_STATEMENTS = [
     tone: "text-amber-600 bg-amber-50 border-amber-200",
   },
   {
-    href: "/dashboard/accounting/outstanding",
-    title: "Outstanding & Ageing",
-    desc: "Customer credit debtors & supplier payables",
+    href: "/dashboard/accounting/receivables",
+    title: "Receivables & Credit Control",
+    desc: "Customer credit limits, ageing & debt collection",
     icon: Users,
     tone: "text-rose-600 bg-rose-50 border-rose-200",
   },
