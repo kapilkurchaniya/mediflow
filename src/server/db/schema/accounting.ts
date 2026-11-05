@@ -5,12 +5,15 @@ import {
   boolean,
   date,
   index,
+  integer,
+  jsonb,
   pgTable,
   text,
+  timestamp,
   uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
-import { id, money, createdAt } from "./_helpers";
+import { id, money, createdAt, updatedAt } from "./_helpers";
 import { storeId, tenantId } from "./platform";
 
 export const accounts = pgTable(
@@ -126,5 +129,58 @@ export const paymentAllocations = pgTable(
   (t) => [
     index("payment_alloc_tenant_payment_idx").on(t.tenantId, t.paymentId),
     index("payment_alloc_tenant_ref_idx").on(t.tenantId, t.refType, t.refId),
+  ],
+);
+
+/** Monthly accounting periods with hierarchical scope (tenant-wide master lock, optional GSTIN secondary lock). */
+export const accountingPeriods = pgTable(
+  "accounting_periods",
+  {
+    id: id(),
+    tenantId: tenantId(),
+    gstin: text("gstin"),
+    periodKey: text("period_key").notNull(), // 'YYYY-MM'
+    startDate: date("start_date").notNull(),
+    endDate: date("end_date").notNull(),
+    financialYear: text("financial_year").notNull(), // e.g. '2026-2027'
+    status: text("status").notNull().default("open"), // 'open' | 'locked'
+    lockedAt: timestamp("locked_at", { withTimezone: true }),
+    lockedBy: uuid("locked_by"),
+    lockNote: text("lock_note"),
+    closingSnapshot: jsonb("closing_snapshot"),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    uniqueIndex("acct_periods_tenant_global_uq")
+      .on(t.tenantId, t.periodKey)
+      .where(sql`${t.gstin} is null`),
+    uniqueIndex("acct_periods_tenant_gstin_uq")
+      .on(t.tenantId, t.gstin, t.periodKey)
+      .where(sql`${t.gstin} is not null`),
+    index("acct_periods_tenant_fy_idx").on(t.tenantId, t.financialYear),
+    index("acct_periods_tenant_status_idx").on(t.tenantId, t.status),
+  ],
+);
+
+/** Immutable audit event log for period lock & reopen transitions. */
+export const accountingPeriodEvents = pgTable(
+  "accounting_period_events",
+  {
+    id: id(),
+    tenantId: tenantId(),
+    periodId: uuid("period_id")
+      .notNull()
+      .references(() => accountingPeriods.id, { onDelete: "restrict" }),
+    eventType: text("event_type").notNull(), // 'lock' | 'reopen'
+    eventSequence: integer("event_sequence").notNull(),
+    reason: text("reason").notNull(),
+    snapshot: jsonb("snapshot").notNull(),
+    performedBy: uuid("performed_by").notNull(),
+    performedAt: timestamp("performed_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index("acct_period_events_period_seq_idx").on(t.periodId, t.eventSequence),
+    index("acct_period_events_tenant_idx").on(t.tenantId, t.performedAt),
   ],
 );

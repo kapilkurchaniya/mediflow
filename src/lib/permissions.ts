@@ -25,6 +25,8 @@ export const PERMISSIONS = {
   "customer.credit": "Allow credit sales",
   "accounting.view": "View accounts",
   "accounting.post": "Post payments/receipts/vouchers",
+  "accounting.period.lock": "Lock accounting periods",
+  "accounting.period.reopen": "Reopen locked accounting periods",
   "gst.view": "View GST reports",
   "report.view": "View reports",
   "report.export": "Export reports",
@@ -62,7 +64,17 @@ export const SYSTEM_ROLES: RoleTemplate[] = [
     name: "Store Manager",
     description: "Inventory, staff and operational reports",
     permissions: ALL_PERMISSIONS.filter(
-      (p) => !["user.manage", "settings.manage", "store.manage", "store.switch_any", "report.all_stores", "api_key.manage"].includes(p),
+      (p) =>
+        ![
+          "user.manage",
+          "settings.manage",
+          "store.manage",
+          "store.switch_any",
+          "report.all_stores",
+          "api_key.manage",
+          "accounting.period.lock",
+          "accounting.period.reopen",
+        ].includes(p),
     ),
   },
   {

@@ -8,6 +8,7 @@ import { writeAudit } from "@/server/audit";
 import { formatINR } from "@/lib/format";
 import { getOrSeedAccounts } from "./accounting";
 import { nextDocNumber } from "./sequence";
+import { assertAccountingPeriodOpen } from "./accounting-periods";
 
 /**
  * 🤝 CONTRACT (ROADMAP A2.9): receipts and payment vouchers.
@@ -192,6 +193,12 @@ export async function postPayment(tx: Tx, ctx: AuthCtx, input: PostPaymentInput)
       paidFromTill = true;
     }
   }
+
+  await assertAccountingPeriodOpen(tx, {
+    tenantId: ctx.tenantId,
+    entryDate: input.paymentDate,
+    storeId: ctx.storeId,
+  });
 
   const [payment] = await tx
     .insert(schema.payments)
