@@ -1,11 +1,12 @@
 "use server";
 
 import { db, schema } from "@/server/db";
-import { eq, and, desc, gte, lte, sql, ilike, inArray } from "drizzle-orm";
+import { eq, and, desc, gte, lte, sql, ilike, inArray, isNull, or } from "drizzle-orm";
 import { requireAuth } from "@/server/auth";
 import { requirePermission } from "@/server/rbac";
 import { revalidatePath } from "next/cache";
 import { isValidGstRateBp, type GstRateBp, GST_RATES_BP } from "@/lib/regulatory";
+import { encryptSecret } from "@/server/crypto";
 import {
   buildGstr1Data,
   buildGstr2Data,
@@ -19,7 +20,10 @@ import {
   generateEInvoiceForDocument,
   cancelEInvoiceForDocument,
   generateEWayBillForDocument,
+  updateVehicleForEWayBill,
+  cancelEWayBillForDocument,
   type EWayBillInput,
+  type UpdateVehicleInput,
 } from "@/server/domain/e-invoice";
 import { writeAudit } from "@/server/audit";
 
@@ -273,6 +277,7 @@ export async function generateEWayBillAction(
 
     revalidatePath("/dashboard/gst");
     revalidatePath("/dashboard/gst/e-invoice");
+    revalidatePath("/dashboard/gst/e-way-bill");
     return {
       success: true,
       ewayBillNo: result.ewayBillNo,
@@ -281,6 +286,324 @@ export async function generateEWayBillAction(
   } catch (err: unknown) {
     return { error: err instanceof Error ? err.message : String(err) };
   }
+}
+
+export async function updateEWayBillVehicleAction(
+  gstDocumentId: string,
+  input: UpdateVehicleInput
+) {
+  const ctx = await requirePermission("accounting.post");
+
+  try {
+    const result = await updateVehicleForEWayBill(db, {
+      gstDocumentId,
+      tenantId: ctx.tenantId,
+      vehicleDetails: input,
+    });
+
+    await writeAudit(db, ctx, {
+      action: "update",
+      entityType: "eway_bill_vehicle",
+      entityId: gstDocumentId,
+      newValue: { vehicleNo: input.vehicleNo, validUpto: result.validUpto },
+    });
+
+    revalidatePath("/dashboard/gst");
+    revalidatePath("/dashboard/gst/e-way-bill");
+    return { success: true, validUpto: result.validUpto };
+  } catch (err: unknown) {
+    return { error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
+export async function cancelEWayBillAction(
+  gstDocumentId: string,
+  reasonCode: "1" | "2" | "3" | "4",
+  remarks?: string
+) {
+  const ctx = await requirePermission("accounting.post");
+
+  try {
+    const result = await cancelEWayBillForDocument(db, {
+      gstDocumentId,
+      tenantId: ctx.tenantId,
+      reasonCode,
+      remarks,
+    });
+
+    await writeAudit(db, ctx, {
+      action: "cancel",
+      entityType: "eway_bill",
+      entityId: gstDocumentId,
+      newValue: { reasonCode, remarks },
+    });
+
+    revalidatePath("/dashboard/gst");
+    revalidatePath("/dashboard/gst/e-way-bill");
+    return { success: true };
+  } catch (err: unknown) {
+    return { error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
+export async function getEWayBillsAction(params?: {
+  status?: "all" | "active" | "expiring_soon" | "expired" | "cancelled";
+  search?: string;
+  limit?: number;
+  offset?: number;
+}) {
+  const ctx = await requirePermission("gst.view");
+  const limit = params?.limit ?? 50;
+  const offset = params?.offset ?? 0;
+  const statusFilter = params?.status ?? "all";
+  const search = params?.search?.trim();
+
+  const conditions = [
+    eq(schema.gstDocuments.tenantId, ctx.tenantId),
+    sql`${schema.gstDocuments.eWayBillNo} is not null`,
+  ];
+
+  if (search) {
+    const term = `%${search}%`;
+    conditions.push(
+      or(
+        ilike(schema.gstDocuments.eWayBillNo, term),
+        ilike(schema.gstDocuments.docNo, term),
+        ilike(schema.gstDocuments.partyName, term),
+        ilike(schema.gstDocuments.partyGstin, term),
+        ilike(schema.gstDocuments.vehicleNo, term)
+      )!
+    );
+  }
+
+  const now = new Date();
+  const twelveHoursLater = new Date(now.getTime() + 12 * 60 * 60 * 1000);
+
+  if (statusFilter === "active") {
+    conditions.push(
+      eq(schema.gstDocuments.status, "active"),
+      gte(schema.gstDocuments.eWayBillValidTill, now)
+    );
+  } else if (statusFilter === "expiring_soon") {
+    conditions.push(
+      eq(schema.gstDocuments.status, "active"),
+      gte(schema.gstDocuments.eWayBillValidTill, now),
+      lte(schema.gstDocuments.eWayBillValidTill, twelveHoursLater)
+    );
+  } else if (statusFilter === "expired") {
+    conditions.push(
+      eq(schema.gstDocuments.status, "active"),
+      sql`${schema.gstDocuments.eWayBillValidTill} < ${now}`
+    );
+  } else if (statusFilter === "cancelled") {
+    conditions.push(eq(schema.gstDocuments.status, "cancelled"));
+  }
+
+  const [totalCount] = await db
+    .select({ count: sql<number>`count(*)` })
+    .from(schema.gstDocuments)
+    .where(and(...conditions));
+
+  const list = await db
+    .select({
+      id: schema.gstDocuments.id,
+      docNo: schema.gstDocuments.docNo,
+      docType: schema.gstDocuments.docType,
+      docDate: schema.gstDocuments.docDate,
+      partyName: schema.gstDocuments.partyName,
+      partyGstin: schema.gstDocuments.partyGstin,
+      total: schema.gstDocuments.total,
+      taxableAmount: schema.gstDocuments.taxableAmount,
+      eWayBillNo: schema.gstDocuments.eWayBillNo,
+      eWayBillDate: schema.gstDocuments.eWayBillDate,
+      eWayBillValidTill: schema.gstDocuments.eWayBillValidTill,
+      vehicleNo: schema.gstDocuments.vehicleNo,
+      transporterId: schema.gstDocuments.transporterId,
+      transporterName: schema.gstDocuments.transporterName,
+      transportMode: schema.gstDocuments.transportMode,
+      distanceKm: schema.gstDocuments.distanceKm,
+      status: schema.gstDocuments.status,
+      cancelledReason: schema.gstDocuments.cancelledReason,
+      refType: schema.gstDocuments.refType,
+      refId: schema.gstDocuments.refId,
+      storeId: schema.gstDocuments.storeId,
+      storeName: schema.stores.name,
+    })
+    .from(schema.gstDocuments)
+    .leftJoin(schema.stores, eq(schema.gstDocuments.storeId, schema.stores.id))
+    .where(and(...conditions))
+    .orderBy(desc(schema.gstDocuments.eWayBillDate), desc(schema.gstDocuments.createdAt))
+    .limit(limit)
+    .offset(offset);
+
+  return {
+    items: list,
+    total: Number(totalCount?.count ?? 0),
+  };
+}
+
+export async function getEWayBillDetailAction(gstDocumentId: string) {
+  const ctx = await requirePermission("gst.view");
+
+  const [doc] = await db
+    .select({
+      id: schema.gstDocuments.id,
+      docNo: schema.gstDocuments.docNo,
+      docType: schema.gstDocuments.docType,
+      docDate: schema.gstDocuments.docDate,
+      partyName: schema.gstDocuments.partyName,
+      partyGstin: schema.gstDocuments.partyGstin,
+      partyStateCode: schema.gstDocuments.partyStateCode,
+      placeOfSupply: schema.gstDocuments.placeOfSupply,
+      supplyType: schema.gstDocuments.supplyType,
+      taxableAmount: schema.gstDocuments.taxableAmount,
+      cgst: schema.gstDocuments.cgst,
+      sgst: schema.gstDocuments.sgst,
+      igst: schema.gstDocuments.igst,
+      cess: schema.gstDocuments.cess,
+      total: schema.gstDocuments.total,
+      eWayBillNo: schema.gstDocuments.eWayBillNo,
+      eWayBillDate: schema.gstDocuments.eWayBillDate,
+      eWayBillValidTill: schema.gstDocuments.eWayBillValidTill,
+      vehicleNo: schema.gstDocuments.vehicleNo,
+      transporterId: schema.gstDocuments.transporterId,
+      transporterName: schema.gstDocuments.transporterName,
+      transportMode: schema.gstDocuments.transportMode,
+      distanceKm: schema.gstDocuments.distanceKm,
+      status: schema.gstDocuments.status,
+      cancelledReason: schema.gstDocuments.cancelledReason,
+      cancelledRemarks: schema.gstDocuments.cancelledRemarks,
+      refType: schema.gstDocuments.refType,
+      refId: schema.gstDocuments.refId,
+      irn: schema.gstDocuments.irn,
+      signedQrCode: schema.gstDocuments.signedQrCode,
+      storeId: schema.gstDocuments.storeId,
+    })
+    .from(schema.gstDocuments)
+    .where(
+      and(
+        eq(schema.gstDocuments.id, gstDocumentId),
+        eq(schema.gstDocuments.tenantId, ctx.tenantId)
+      )
+    );
+
+  if (!doc) {
+    return { error: "E-Way Bill / GST document not found" };
+  }
+
+  const [store] = await db
+    .select()
+    .from(schema.stores)
+    .where(eq(schema.stores.id, doc.storeId));
+
+  const [tenant] = await db
+    .select()
+    .from(schema.tenants)
+    .where(eq(schema.tenants.id, ctx.tenantId));
+
+  const logs = await db
+    .select()
+    .from(schema.eInvoiceLogs)
+    .where(
+      and(
+        eq(schema.eInvoiceLogs.tenantId, ctx.tenantId),
+        eq(schema.eInvoiceLogs.gstDocumentId, gstDocumentId)
+      )
+    )
+    .orderBy(desc(schema.eInvoiceLogs.createdAt));
+
+  let items: Array<{
+    name: string;
+    hsn?: string | null;
+    qty: number;
+    unitPrice: number;
+    taxableAmount: number;
+    gstRateBp: number;
+    cgst: number;
+    sgst: number;
+    igst: number;
+    total: number;
+    batchNo?: string | null;
+  }> = [];
+
+  if (doc.refType === "sale" && doc.refId) {
+    const saleItems = await db
+      .select({
+        id: schema.saleItems.id,
+        medicineName: schema.saleItems.medicineName,
+        hsn: schema.medicines.hsn,
+        qty: schema.saleItems.qty,
+        unitPrice: schema.saleItems.rate,
+        taxableAmount: schema.saleItems.taxableAmount,
+        cgst: schema.saleItems.cgst,
+        sgst: schema.saleItems.sgst,
+        igst: schema.saleItems.igst,
+        total: schema.saleItems.totalAmount,
+        batchNo: schema.saleItems.batchNo,
+      })
+      .from(schema.saleItems)
+      .leftJoin(schema.medicines, eq(schema.saleItems.medicineId, schema.medicines.id))
+      .where(eq(schema.saleItems.saleId, doc.refId));
+
+    items = saleItems.map((si) => ({
+      name: si.medicineName,
+      hsn: si.hsn,
+      qty: si.qty,
+      unitPrice: si.unitPrice ?? 0,
+      taxableAmount: si.taxableAmount ?? 0,
+      gstRateBp: 0,
+      cgst: si.cgst ?? 0,
+      sgst: si.sgst ?? 0,
+      igst: si.igst ?? 0,
+      total: si.total ?? 0,
+      batchNo: si.batchNo,
+    }));
+  } else if (doc.refType === "transfer" && doc.refId) {
+    const transferItems = await db
+      .select({
+        id: schema.stockTransferItems.id,
+        medicineName: schema.medicines.name,
+        hsn: schema.stockTransferItems.hsn,
+        qty: schema.stockTransferItems.qty,
+        qtyDispatched: schema.stockTransferItems.qtyDispatched,
+        unitCost: schema.stockTransferItems.unitCost,
+        gstRateBp: schema.stockTransferItems.gstRateBp,
+        batchNo: schema.stockTransferItems.batchNo,
+      })
+      .from(schema.stockTransferItems)
+      .innerJoin(schema.medicines, eq(schema.stockTransferItems.medicineId, schema.medicines.id))
+      .where(eq(schema.stockTransferItems.transferId, doc.refId));
+
+    items = transferItems.map((ti) => {
+      const q = ti.qtyDispatched > 0 ? ti.qtyDispatched : ti.qty;
+      const unit = ti.unitCost ?? 0;
+      const taxable = q * unit;
+      const rateBp = ti.gstRateBp ?? 0;
+      const tax = Math.round((taxable * rateBp) / 10000);
+      return {
+        name: ti.medicineName,
+        hsn: ti.hsn,
+        qty: q,
+        unitPrice: unit,
+        taxableAmount: taxable,
+        gstRateBp: rateBp,
+        cgst: Math.round(tax / 2),
+        sgst: Math.round(tax / 2),
+        igst: 0,
+        total: taxable + tax,
+        batchNo: ti.batchNo,
+      };
+    });
+  }
+
+  return {
+    success: true,
+    document: doc,
+    store,
+    tenant,
+    logs,
+    items,
+  };
 }
 
 export async function downloadGstr1JsonAction(month: number, year: number, selectedGstin?: string) {
@@ -514,5 +837,145 @@ export async function bulkUpdateGstRates(params: {
     return {
       error: err instanceof Error ? err.message : String(err) || "Failed to update GST rates",
     };
+  }
+}
+
+/**
+ * Saves multi-tenant GSP / NIC API credentials securely encrypted at rest (B5.1).
+ */
+export async function saveGspCredentialsAction(input: {
+  provider: string;
+  clientId: string;
+  clientSecret: string;
+  portalUsername: string;
+  portalPassword: string;
+  isSandbox: boolean;
+  storeId?: string | null;
+}) {
+  const ctx = await requirePermission("accounting.post");
+
+  try {
+    const clientIdEnc = encryptSecret(input.clientId.trim());
+    const clientSecretEnc = encryptSecret(input.clientSecret.trim());
+    const portalUsernameEnc = encryptSecret(input.portalUsername.trim());
+    const portalPasswordEnc = encryptSecret(input.portalPassword.trim());
+
+    const conditions = [
+      eq(schema.tenantGspCredentials.tenantId, ctx.tenantId),
+      eq(schema.tenantGspCredentials.isSandbox, input.isSandbox),
+    ];
+    if (input.storeId) {
+      conditions.push(eq(schema.tenantGspCredentials.storeId, input.storeId));
+    } else {
+      conditions.push(isNull(schema.tenantGspCredentials.storeId));
+    }
+
+    const [existing] = await db
+      .select({ id: schema.tenantGspCredentials.id })
+      .from(schema.tenantGspCredentials)
+      .where(and(...conditions))
+      .limit(1);
+
+    let credentialId: string;
+    if (existing) {
+      credentialId = existing.id;
+      await db
+        .update(schema.tenantGspCredentials)
+        .set({
+          provider: input.provider.trim(),
+          clientIdEnc,
+          clientSecretEnc,
+          portalUsernameEnc,
+          portalPasswordEnc,
+          cachedAuthTokenEnc: null,
+          tokenExpiresAt: null,
+          updatedAt: new Date(),
+        })
+        .where(eq(schema.tenantGspCredentials.id, existing.id));
+    } else {
+      const [inserted] = await db
+        .insert(schema.tenantGspCredentials)
+        .values({
+          tenantId: ctx.tenantId,
+          storeId: input.storeId || null,
+          provider: input.provider.trim(),
+          clientIdEnc,
+          clientSecretEnc,
+          portalUsernameEnc,
+          portalPasswordEnc,
+          isSandbox: input.isSandbox,
+        })
+        .returning({ id: schema.tenantGspCredentials.id });
+      credentialId = inserted!.id;
+    }
+
+    await writeAudit(db, ctx, {
+      action: "update",
+      entityType: "gsp_credentials",
+      entityId: credentialId,
+      newValue: {
+        provider: input.provider.trim(),
+        isSandbox: input.isSandbox,
+        storeId: input.storeId || null,
+      },
+    });
+
+    revalidatePath("/dashboard/settings/gst");
+    revalidatePath("/dashboard/gst/e-invoice");
+    return { success: true };
+  } catch (err: unknown) {
+    return { error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
+/**
+ * Returns configured GSP integration settings per tenant (without plaintext secrets).
+ */
+export async function getGspSettingsAction() {
+  const ctx = await requirePermission("gst.view");
+
+  const creds = await db
+    .select({
+      id: schema.tenantGspCredentials.id,
+      storeId: schema.tenantGspCredentials.storeId,
+      provider: schema.tenantGspCredentials.provider,
+      isSandbox: schema.tenantGspCredentials.isSandbox,
+      hasToken: sql<boolean>`${schema.tenantGspCredentials.cachedAuthTokenEnc} is not null`,
+      tokenExpiresAt: schema.tenantGspCredentials.tokenExpiresAt,
+      updatedAt: schema.tenantGspCredentials.updatedAt,
+    })
+    .from(schema.tenantGspCredentials)
+    .where(eq(schema.tenantGspCredentials.tenantId, ctx.tenantId));
+
+  return creds;
+}
+
+/**
+ * Tests authentication handshake with the GSP / NIC API using supplied credentials.
+ */
+export async function testGspConnectionAction(input: {
+  provider: string;
+  clientId: string;
+  clientSecret: string;
+  portalUsername: string;
+  portalPassword: string;
+  isSandbox: boolean;
+}) {
+  await requirePermission("accounting.post");
+
+  try {
+    const { GspIRPProvider } = await import("@/server/domain/einvoice-providers/gsp-provider");
+    const testProvider = new GspIRPProvider({
+      clientId: input.clientId.trim(),
+      clientSecret: input.clientSecret.trim(),
+      portalUsername: input.portalUsername.trim(),
+      portalPassword: input.portalPassword.trim(),
+      isSandbox: input.isSandbox,
+    });
+
+    const token = await testProvider.getAuthToken();
+    return { success: true, tokenPreview: `${token.slice(0, 8)}...${token.slice(-4)}` };
+  } catch (err: unknown) {
+    return { error: err instanceof Error ? err.message : String(err) };
   }
 }

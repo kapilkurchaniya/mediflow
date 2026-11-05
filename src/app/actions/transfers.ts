@@ -136,3 +136,31 @@ export async function getTransferBatchesAction(storeId: string, search?: string)
     return { success: false, error: err instanceof Error ? err.message : "Failed to fetch batches" };
   }
 }
+
+export async function generateTransferEWayBillAction(
+  transferId: string,
+  transportDetails: {
+    transporterId?: string;
+    transporterName?: string;
+    transportMode?: "1" | "2" | "3" | "4";
+    vehicleNo?: string;
+    distanceKm: number;
+    vehicleType?: "R" | "O";
+  }
+) {
+  try {
+    const ctx = await requirePermission("inventory.transfer");
+    const { generateEWayBillForTransfer } = await import("@/server/domain/transfers-eway");
+    const result = await generateEWayBillForTransfer(db, {
+      tenantId: ctx.tenantId,
+      transferId,
+      transportDetails,
+    });
+    revalidatePath("/dashboard/inventory/transfers");
+    revalidatePath(`/dashboard/inventory/transfers/${transferId}`);
+    revalidatePath("/dashboard/gst/e-way-bill");
+    return result;
+  } catch (err: unknown) {
+    return { success: false, error: err instanceof Error ? err.message : "Failed to generate transfer E-Way Bill" };
+  }
+}

@@ -7,6 +7,7 @@ import PrintButton from "./PrintButton";
 import { formatINR, formatItemQuantity, formatItemQuantityCompact } from "@/lib/format";
 import { requirePagePermission } from "@/server/rbac";
 import { buildWhatsAppDirectUrl, buildInvoiceWhatsAppMessage } from "@/lib/whatsapp";
+import { QrCode } from "@/app/components/QrCode";
 
 export default async function PrintInvoicePage({
   params,
@@ -24,6 +25,7 @@ export default async function PrintInvoicePage({
   if (!data) return notFound();
 
   const { sale, items, customer, store, tenant, gstDoc } = data;
+  const isSimulated = !gstDoc?.einvoiceProvider || gstDoc.einvoiceProvider === "SIMULATOR";
 
   const customerPhone = customer?.phone || sale.customerPhone;
   const whatsappUrl = customerPhone
@@ -202,8 +204,29 @@ export default async function PrintInvoicePage({
             </div>
           </div>
 
+          {/* Thermal E-Invoice Section */}
+          {gstDoc?.irn && (
+            <div className="py-2.5 my-2 border-t border-dashed border-black text-center space-y-1">
+              <div className="text-[8px] font-mono font-bold uppercase tracking-wider text-gray-800">
+                {isSimulated ? "[SIMULATED E-INVOICE]" : "GST E-INVOICE QR"}
+              </div>
+              <div className="flex justify-center my-1">
+                {isSimulated ? (
+                  <div className="p-2 border border-dashed border-gray-400 text-[8px] font-mono text-gray-500">
+                    [SIMULATED QR]
+                  </div>
+                ) : (
+                  <QrCode value={gstDoc.signedQrCode || gstDoc.irn} size={84} />
+                )}
+              </div>
+              <div className="text-[7.5px] font-mono text-gray-700 break-all leading-tight">
+                IRN: {gstDoc.irn.slice(0, 24)}...
+              </div>
+            </div>
+          )}
+
           {/* Thermal Footer */}
-          <div className="text-center pt-3 mt-2 border-t border-dashed border-black text-[9px] space-y-1">
+          <div className="text-center pt-2 border-t border-dashed border-black text-[9px] space-y-1">
             <p>Thank you! Get well soon.</p>
             <p className="font-sans text-[8px] text-gray-500">MediFlow Cloud POS</p>
           </div>
@@ -249,25 +272,56 @@ export default async function PrintInvoicePage({
             </div>
           </div>
 
-          {/* Simulated E-Invoice Banner for A4 Format */}
+          {/* E-Invoice Verification & QR Section for A4 Format */}
           {gstDoc?.irn && (
-            <div className="mb-6 p-3 rounded-lg border border-dashed border-rose-300 bg-rose-50 text-xs flex flex-col md:flex-row items-start md:items-center justify-between gap-3">
-              <div>
-                <div className="flex items-center gap-1.5 font-bold text-rose-800 text-xs uppercase tracking-wide">
-                  <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
-                  <span>SIMULATED IRN – NOT A VALID E-INVOICE</span>
+            <div
+              className={`mb-6 p-4 rounded-xl border text-xs flex flex-col md:flex-row items-start md:items-center justify-between gap-4 ${
+                isSimulated
+                  ? "border-dashed border-rose-300 bg-rose-50/70"
+                  : "border-brand-200 bg-brand-50/40 shadow-xs"
+              }`}
+            >
+              <div className="flex-1 space-y-1">
+                <div className="flex items-center gap-1.5 font-bold text-xs uppercase tracking-wide">
+                  {isSimulated ? (
+                    <>
+                      <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+                      <span className="text-rose-800">SIMULATED IRN – NOT A VALID E-INVOICE</span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block shrink-0 animate-pulse" />
+                      <span className="text-brand-900 font-extrabold tracking-tight">
+                        NIC GST E-INVOICE SYSTEM · AUTHENTICATED
+                      </span>
+                      {gstDoc.einvoiceProvider && (
+                        <span className="ml-2 px-1.5 py-0.5 rounded text-[10px] font-mono bg-brand-100 text-brand-800 border border-brand-200">
+                          {gstDoc.einvoiceProvider}
+                        </span>
+                      )}
+                    </>
+                  )}
                 </div>
-                <p className="font-mono text-[11px] text-ink-800 break-all mt-1">
-                  <span className="font-semibold text-ink-900">IRN:</span> {gstDoc.irn}
+                <p className="font-mono text-[11px] text-ink-900 break-all pt-0.5">
+                  <span className="font-bold text-ink-700">IRN:</span> {gstDoc.irn}
                 </p>
                 {gstDoc.ackNo && (
-                  <p className="text-[11px] text-ink-600 mt-0.5">
-                    Ack No: <span className="font-mono">{gstDoc.ackNo}</span> | Date: {gstDoc.ackDate ? format(new Date(gstDoc.ackDate), "dd/MM/yyyy HH:mm") : "N/A"}
+                  <p className="text-[11px] text-ink-600">
+                    Ack No: <span className="font-mono font-semibold text-ink-900">{gstDoc.ackNo}</span> | Date:{" "}
+                    {gstDoc.ackDate ? format(new Date(gstDoc.ackDate), "dd/MM/yyyy HH:mm") : "N/A"}
                   </p>
                 )}
               </div>
-              <div className="shrink-0 bg-white px-2 py-1 rounded border border-rose-200 text-center">
-                <span className="text-[10px] font-mono text-rose-700 font-bold block uppercase">[Simulated IRN / QR]</span>
+              <div className="shrink-0 bg-white p-2 rounded-lg border border-ink-200 text-center shadow-2xs">
+                {isSimulated ? (
+                  <div className="px-3 py-4 text-center">
+                    <span className="text-[10px] font-mono text-rose-700 font-bold block uppercase leading-snug">
+                      [Simulated<br />IRN / QR]
+                    </span>
+                  </div>
+                ) : (
+                  <QrCode value={gstDoc.signedQrCode || gstDoc.irn} size={96} />
+                )}
               </div>
             </div>
           )}

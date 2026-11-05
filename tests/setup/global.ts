@@ -18,7 +18,7 @@ export default async function setup() {
   try {
     const base = baseDbName();
     let initClient: pg.Client | null = null;
-    for (const maintenanceDb of ["mediflow", "postgres"]) {
+    for (const maintenanceDb of ["postgres", "mediflow_test", "mediflow"]) {
       try {
         const client = new pg.Client({ connectionString: urlFor(maintenanceDb) });
         await client.connect();
