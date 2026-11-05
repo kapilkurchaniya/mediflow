@@ -876,10 +876,10 @@ Full map in `.github/CODEOWNERS` and [ADR 0004](docs/adr/0004-two-lane-ownership
 #### A5.1 Expenses ⏱ 1.5 days [COMPLETED]
 - ➕ `src/app/dashboard/accounting/expenses/{page,new/page}.tsx` using `postPayment({ direction: "out", partyType: "expense", expenseAccountId })`. Expense categories are accounts of type `expense` (seeded: Rent, Salary, Electricity, Transport, Misc), and the user can add more.
 
-#### A5.2 Day book & account ledgers ⏱ 2 days [IN PROGRESS]
+#### A5.2 Day book & account ledgers ⏱ 2 days [COMPLETED]
 - ➕ `src/app/dashboard/accounting/day-book/page.tsx` (all journal entries for a date, drill-down to the source document). ➕ `src/app/dashboard/accounting/ledger/[accountId]/page.tsx` (running balance; party filter for customer and supplier sub-ledgers). Export via `report.export`.
 
-#### A5.3 Credit control & receivables ageing ⏱ 2 days
+#### A5.3 Credit control & receivables ageing ⏱ 2 days [COMPLETED]
 - Enforce `customers.credit_limit` in `createSale`, with an override requiring `customer.credit` + `sale.discount_override`-style manager approval. Family groups (`customer_groups.credit_limit`) are pooled limits; 🤝 Lane B's `FamilyLedgerService` exposes `getGroupOutstanding`. ➕ `src/app/dashboard/accounting/receivables/page.tsx` (0–30 / 31–60 / 61–90 / 90+ days ageing) with a "Send payment reminder" action (Lane B outbox `whatsapp.payment_reminder`).
 
 #### A5.4 Period lock ⏱ 1.5 days
@@ -1063,7 +1063,7 @@ Tick items in PRs. One line per task, in the same order as above.
 **Phase 2** — A: [x] A2.1 [x] A2.2 [x] A2.3 [x] A2.4 [x] A2.5 [x] A2.6 [x] A2.7 [x] A2.8 [x] A2.9 [x] A2.10 [x] A2.11 [x] A2.12 · B: [x] B2.1 [x] B2.2 [x] B2.3 [x] B2.4 [x] B2.5 [x] B2.6 [x] B2.7 [x] B2.8
 **Phase 3** — A: [x] A3.1 [x] A3.2 [x] A3.3 [x] A3.4 [x] A3.5 [x] A3.6 · B: [x] B3.1 [x] B3.2 [x] B3.3 [x] B3.4 [x] B3.5 [x] B3.6 [x] B3.7
 **Phase 4** — A: [x] A4.1 [x] A4.2 [x] A4.3 [x] A4.4 [x] A4.5 [x] A4.6 [x] A4.7 [x] A4.8 [x] A4.9 · B: [x] B4.1 [x] B4.2 [x] B4.3 [x] B4.4 [x] B4.5 [x] B4.6
-**Phase 5** — A: [x] A5.1 [x] A5.2 [ ] A5.3 [ ] A5.4 [ ] A5.5 [ ] A5.6 [ ] A5.7 · B: [x] B5.1 [x] B5.2 [ ] B5.3 [ ] B5.4 [ ] B5.5 [ ] B5.6 [ ] B5.7
+**Phase 5** — A: [x] A5.1 [x] A5.2 [x] A5.3 [ ] A5.4 [ ] A5.5 [ ] A5.6 [ ] A5.7 · B: [x] B5.1 [x] B5.2 [ ] B5.3 [ ] B5.4 [ ] B5.5 [ ] B5.6 [ ] B5.7
 **Phase 6** — A: [ ] A6.1 [ ] A6.2 [ ] A6.3 [ ] A6.4 [ ] A6.5 [ ] A6.6 · B: [ ] B6.1 [ ] B6.2 [ ] B6.3 [ ] B6.4 [ ] B6.5 [ ] B6.6
 
 ---

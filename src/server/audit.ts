@@ -12,6 +12,7 @@ export type AuditAction =
   | "permission_change"
   | "bulk_update"
   | "discount_override"
+  | "credit_override"
   | "fefo_override"
   | "store_switch"
   | "store_medicine_settings_update"

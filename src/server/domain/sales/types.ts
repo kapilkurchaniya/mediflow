@@ -74,6 +74,12 @@ export const SaleInput = z.object({
   redeemPoints: z.number().int().min(0).default(0),
   compliance: ComplianceDetailsSchema.optional(),
   medicalRepId: z.string().uuid().optional(),
+  creditOverride: z
+    .object({
+      managerId: z.string().uuid().optional(),
+      reason: z.string().trim().min(1),
+    })
+    .optional(),
 });
 export type SaleInput = z.infer<typeof SaleInput>;
 /** What callers may pass (defaults not applied yet). */

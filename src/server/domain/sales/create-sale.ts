@@ -1,10 +1,9 @@
-import { and, eq, inArray, sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { format } from "date-fns";
 import { schema, type Tx } from "@/server/db";
 import { can, type AuthCtx } from "@/server/rbac";
 import { DomainError } from "@/server/errors";
 import { computeSaleTotals, type SaleLineInput } from "@/lib/money";
-import { formatINR } from "@/lib/format";
 import { recordStockMovement } from "@/server/domain/stock";
 import { nextDocNumber } from "@/server/domain/sequence";
 import { postSaleJournalEntry } from "@/server/domain/accounting";
@@ -20,6 +19,7 @@ import { enqueue } from "@/server/jobs/outbox";
 import { writeAudit } from "@/server/audit";
 import { allocateFefoBatches } from "./allocate-fefo";
 import { canStoreUsePos } from "@/server/domain/stores";
+import { assertCreditSaleAllowed, evaluateCreditSale } from "@/server/domain/receivables";
 import type { CreateSaleOptions, CreateSaleResult, SaleInput } from "./types";
 
 /** Money methods a customer can hand over. "Credit" is not a method: it is whatever is left unpaid. */
@@ -284,26 +284,30 @@ export async function createSale(
   const paidAmount = kept.reduce((s, p) => s + p.amount, 0);
   const creditAmount = Math.max(totals.total - paidAmount, 0);
   if (creditAmount > 0) {
-    if (!input.customerId || !customer) {
-      throw new DomainError("CREDIT_NEEDS_CUSTOMER", "Choose a customer to put the unpaid amount on credit, or collect the full amount.");
-    }
-    if (!can(ctx, "customer.credit")) {
-      throw new DomainError("CREDIT_NOT_ALLOWED", 'You don\'t have permission to sell on credit (permission "customer.credit"). Collect the full amount.');
-    }
-    const limit = customer.creditLimit ?? 0;
-    if (limit <= 0) {
-      throw new DomainError("NO_CREDIT_LIMIT", `${customer.name} has no credit limit. Set one on the customer's profile, or collect the full amount.`);
-    }
-    const [owed] = await tx
-      .select({ due: sql<number>`coalesce(sum(${schema.sales.creditAmount}), 0)::bigint` })
-      .from(schema.sales)
-      .where(and(eq(schema.sales.tenantId, ctx.tenantId), eq(schema.sales.customerId, input.customerId), eq(schema.sales.status, "completed")));
-    const outstanding = Number(owed?.due ?? 0);
-    if (outstanding + creditAmount > limit) {
-      throw new DomainError(
-        "CREDIT_LIMIT",
-        `Credit limit exceeded: ${customer.name} already owes ${formatINR(outstanding)} and the limit is ${formatINR(limit)}. Collect more now.`,
-      );
+    if (opts.source === "offline") {
+      const evalRes = await evaluateCreditSale(tx, ctx, {
+        customerId: input.customerId,
+        creditPaise: creditAmount,
+        override: input.creditOverride,
+      });
+      if (!evalRes.allowed) {
+        await writeAudit(tx, ctx, {
+          action: "credit_override",
+          entityType: "sale",
+          newValue: {
+            source: "offline_sync",
+            creditPaise: creditAmount,
+            reason: evalRes.reason,
+          },
+          reason: "Offline sale exceeded credit limit; recorded during synchronization",
+        });
+      }
+    } else {
+      await assertCreditSaleAllowed(tx, ctx, {
+        customerId: input.customerId,
+        creditPaise: creditAmount,
+        override: input.creditOverride,
+      });
     }
   }
 
