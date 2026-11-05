@@ -40,6 +40,7 @@ export const batches = pgTable(
   },
   (t) => [
     uniqueIndex("batches_store_med_batch_uq").on(t.storeId, t.medicineId, t.batchNo),
+    uniqueIndex("batches_tenant_store_id_uq").on(t.tenantId, t.storeId, t.id),
     index("batches_store_med_idx").on(t.storeId, t.medicineId),
     index("batches_expiry_idx").on(t.tenantId, t.expiryDate),
     index("batches_store_updated_idx").on(t.storeId, t.updatedAt, t.id),
@@ -67,6 +68,7 @@ export const stockMovements = pgTable(
     createdAt: createdAt(),
   },
   (t) => [
+    uniqueIndex("stock_movements_tenant_store_id_uq").on(t.tenantId, t.storeId, t.id),
     index("stock_mov_batch_idx").on(t.batchId, t.id),
     index("stock_mov_store_created_idx").on(t.storeId, t.createdAt),
     index("stock_mov_med_idx").on(t.medicineId, t.createdAt),

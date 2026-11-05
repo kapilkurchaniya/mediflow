@@ -106,11 +106,13 @@ async function seedVictim() {
   const [gstDoc] = await t.db.insert(schema.gstDocuments).values({ tenantId: tid, storeId: s.store.id, docType: "invoice", docNo: `${MARK}/DOC1`, docDate: "2026-10-01", supplyType: "B2B", partyName: `${MARK} Party`, taxableAmount: 1000, total: 1050, refType: "sale", refId: sale.id }).returning();
   await t.db.insert(schema.auditLogs).values({ tenantId: tid, userId: s.user.id, action: "create", entityType: `${MARK}_thing` });
   const [acct] = await t.db.insert(schema.accounts).values({ tenantId: tid, code: "9999", name: `${MARK} Account`, type: "asset" }).returning();
-  const [je] = await t.db.insert(schema.journalEntries).values({ tenantId: tid, storeId: s.store.id, entryNo: "JV/9", entryDate: "2026-10-01", narration: `${MARK} narration` }).returning();
-  await t.db.insert(schema.journalLines).values([
-    { tenantId: tid, entryId: je.id, accountId: acct.id, debit: 100, credit: 0 },
-    { tenantId: tid, entryId: je.id, accountId: acct.id, debit: 0, credit: 100 },
-  ]);
+  await t.db.transaction(async (tx) => {
+    const [je] = await tx.insert(schema.journalEntries).values({ tenantId: tid, storeId: s.store.id, entryNo: "JV/9", entryDate: "2026-10-01", narration: `${MARK} narration` }).returning();
+    await tx.insert(schema.journalLines).values([
+      { tenantId: tid, entryId: je.id, accountId: acct.id, debit: 100, credit: 0 },
+      { tenantId: tid, entryId: je.id, accountId: acct.id, debit: 0, credit: 100 },
+    ]);
+  });
   return { ...s, maker, cat, rack, medicine, batch, customer, supplier, sale, purchase, doctor, rx, order, promise, rep, scheme, reminder, group, stmt, line, apiKey, gstDoc };
 }
 

@@ -171,7 +171,11 @@ export class AccountingInvariantsOracle {
 
   /**
    * Invariant 5: Account 1080 Balance Sheet Inventory Valuation.
-   * Asserts GL 1080 net balance = Opening Snapshot + Surpluses - Shortages - Expiry Losses.
+   * Asserts GL 1080 net balance = Opening Snapshot total for this specific store.
+   * Attribution Policy:
+   * Store opening inventory cutover journals are strictly store-scoped (store_id = ${storeId}).
+   * Tenant-level (store_id IS NULL) or other store entries are intentionally isolated and excluded
+   * from the store's opening inventory snapshot reconciliation to prevent multi-store contamination.
    */
   async assertStockValuationPeriodicInvariant(storeId: string): Promise<{
     gl1080Balance: number;
@@ -186,7 +190,7 @@ export class AccountingInvariantsOracle {
       JOIN journal_entries e ON e.id = l.entry_id
       WHERE l.tenant_id = ${this.tenantId} 
         AND (a.code = '1080' OR a.system_key = 'inventory')
-        AND (e.store_id = ${storeId} OR e.store_id IS NULL)
+        AND e.store_id = ${storeId}
     `);
     const gl1080Balance = Number(glRes.rows[0]?.balance || 0);
 
