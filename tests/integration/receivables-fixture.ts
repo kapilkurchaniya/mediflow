@@ -81,22 +81,24 @@ export async function setupReceivablesFixture(d: DbOrTx): Promise<ReceivablesFix
     .returning();
   const sale1Id = s1.id;
 
-  const [j1] = await d
-    .insert(schema.journalEntries)
-    .values({
-      tenantId,
-      storeId: storeA,
-      entryNo: "JV-S1",
-      entryDate: "2026-09-25",
-      narration: "Credit sale INV-A1",
-      refType: "sale",
-      refId: s1.id,
-    })
-    .returning();
-  await d.insert(schema.journalLines).values([
-    { tenantId, entryId: j1.id, accountId: accounts.debtors, debit: 600000, credit: 0, partyType: "customer", partyId: customer1Id },
-    { tenantId, entryId: j1.id, accountId: accounts.sales, debit: 0, credit: 600000 },
-  ]);
+  await d.transaction(async (tx) => {
+    const [j1] = await tx
+      .insert(schema.journalEntries)
+      .values({
+        tenantId,
+        storeId: storeA,
+        entryNo: "JV-S1",
+        entryDate: "2026-09-25",
+        narration: "Credit sale INV-A1",
+        refType: "sale",
+        refId: s1.id,
+      })
+      .returning();
+    await tx.insert(schema.journalLines).values([
+      { tenantId, entryId: j1.id, accountId: accounts.debtors, debit: 600000, credit: 0, partyType: "customer", partyId: customer1Id },
+      { tenantId, entryId: j1.id, accountId: accounts.sales, debit: 0, credit: 600000 },
+    ]);
+  });
 
   // Sale 2: Store A, completed 5 days ago, total ₹4,000, credit ₹4,000
   const [s2] = await d
@@ -116,22 +118,24 @@ export async function setupReceivablesFixture(d: DbOrTx): Promise<ReceivablesFix
     .returning();
   const sale2Id = s2.id;
 
-  const [j2] = await d
-    .insert(schema.journalEntries)
-    .values({
-      tenantId,
-      storeId: storeA,
-      entryNo: "JV-S2",
-      entryDate: "2026-10-30",
-      narration: "Credit sale INV-A2",
-      refType: "sale",
-      refId: s2.id,
-    })
-    .returning();
-  await d.insert(schema.journalLines).values([
-    { tenantId, entryId: j2.id, accountId: accounts.debtors, debit: 400000, credit: 0, partyType: "customer", partyId: customer1Id },
-    { tenantId, entryId: j2.id, accountId: accounts.sales, debit: 0, credit: 400000 },
-  ]);
+  await d.transaction(async (tx) => {
+    const [j2] = await tx
+      .insert(schema.journalEntries)
+      .values({
+        tenantId,
+        storeId: storeA,
+        entryNo: "JV-S2",
+        entryDate: "2026-10-30",
+        narration: "Credit sale INV-A2",
+        refType: "sale",
+        refId: s2.id,
+      })
+      .returning();
+    await tx.insert(schema.journalLines).values([
+      { tenantId, entryId: j2.id, accountId: accounts.debtors, debit: 400000, credit: 0, partyType: "customer", partyId: customer1Id },
+      { tenantId, entryId: j2.id, accountId: accounts.sales, debit: 0, credit: 400000 },
+    ]);
+  });
 
   // Sale 3: Store B, Rajesh Mehta, completed 10 days ago, total ₹12,000 credit
   const [s3] = await d
@@ -150,22 +154,24 @@ export async function setupReceivablesFixture(d: DbOrTx): Promise<ReceivablesFix
     })
     .returning();
 
-  const [j3] = await d
-    .insert(schema.journalEntries)
-    .values({
-      tenantId,
-      storeId: storeB,
-      entryNo: "JV-S3",
-      entryDate: "2026-10-25",
-      narration: "Credit sale INV-B1",
-      refType: "sale",
-      refId: s3.id,
-    })
-    .returning();
-  await d.insert(schema.journalLines).values([
-    { tenantId, entryId: j3.id, accountId: accounts.debtors, debit: 1200000, credit: 0, partyType: "customer", partyId: customer2Id },
-    { tenantId, entryId: j3.id, accountId: accounts.sales, debit: 0, credit: 1200000 },
-  ]);
+  await d.transaction(async (tx) => {
+    const [j3] = await tx
+      .insert(schema.journalEntries)
+      .values({
+        tenantId,
+        storeId: storeB,
+        entryNo: "JV-S3",
+        entryDate: "2026-10-25",
+        narration: "Credit sale INV-B1",
+        refType: "sale",
+        refId: s3.id,
+      })
+      .returning();
+    await tx.insert(schema.journalLines).values([
+      { tenantId, entryId: j3.id, accountId: accounts.debtors, debit: 1200000, credit: 0, partyType: "customer", partyId: customer2Id },
+      { tenantId, entryId: j3.id, accountId: accounts.sales, debit: 0, credit: 1200000 },
+    ]);
+  });
 
   return {
     tenantId,

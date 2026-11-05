@@ -1,9 +1,11 @@
 /** Accounting: chart of accounts, double-entry journal, receipts/payments. (Lane A) */
 import { sql } from "drizzle-orm";
 import {
+  bigint,
   bigserial,
   boolean,
   date,
+  foreignKey,
   index,
   integer,
   jsonb,
@@ -14,7 +16,8 @@ import {
   uuid,
 } from "drizzle-orm/pg-core";
 import { id, money, createdAt, updatedAt } from "./_helpers";
-import { storeId, tenantId } from "./platform";
+import { storeId, tenantId, stores } from "./platform";
+import { batches, stockMovements } from "./inventory";
 
 export const accounts = pgTable(
   "accounts",
@@ -49,6 +52,7 @@ export const journalEntries = pgTable(
     createdAt: createdAt(),
   },
   (t) => [
+    uniqueIndex("journal_entries_tenant_id_uq").on(t.tenantId, t.id),
     index("journal_tenant_date_idx").on(t.tenantId, t.entryDate),
     index("journal_ref_idx").on(t.refType, t.refId),
     index("journal_tenant_store_date_idx").on(t.tenantId, t.storeId, t.entryDate),
@@ -72,6 +76,11 @@ export const journalLines = pgTable(
     index("journal_lines_party_idx").on(t.partyType, t.partyId),
     index("journal_lines_tenant_party_idx").on(t.tenantId, t.partyType, t.partyId),
     index("journal_lines_entry_idx").on(t.entryId),
+    foreignKey({
+      columns: [t.tenantId, t.entryId],
+      foreignColumns: [journalEntries.tenantId, journalEntries.id],
+      name: "journal_lines_tenant_entry_fk",
+    }).onDelete("cascade"),
   ],
 );
 
@@ -184,3 +193,5 @@ export const accountingPeriodEvents = pgTable(
     index("acct_period_events_tenant_idx").on(t.tenantId, t.performedAt),
   ],
 );
+
+export * from "./opening-balances";

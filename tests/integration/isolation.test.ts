@@ -86,55 +86,33 @@ async function seedVictim() {
   const batch = await makeBatch(t.db, { tenantId: tid, storeId: s.store.id, medicineId: medicine.id, qtyOnHand: 10, batchNo: `${MARK}-B1` });
   const customer = await makeCustomer(t.db, tid, { name: `${MARK} Customer`, phone: "9000000001" });
   const supplier = await makeSupplier(t.db, tid, { name: `${MARK} Supplier` });
-  const [sale] = await t.db
-    .insert(schema.sales)
-    .values({ tenantId: tid, storeId: s.store.id, invoiceNo: `${MARK}/1`, status: "completed", customerId: customer.id, totalAmount: 10000, paidAmount: 10000, creditAmount: 0, createdBy: s.user.id, completedAt: new Date() })
-    .returning();
-  const [purchase] = await t.db
-    .insert(schema.purchases)
-    .values({ tenantId: tid, storeId: s.store.id, purchaseNo: "P/1", supplierId: supplier.id, supplierInvoiceNo: `${MARK}-SB1`, invoiceDate: "2026-10-01", totalAmount: 5000, paidAmount: 0, createdBy: s.user.id })
-    .returning();
+  const [sale] = await t.db.insert(schema.sales).values({ tenantId: tid, storeId: s.store.id, invoiceNo: `${MARK}/1`, status: "completed", customerId: customer.id, totalAmount: 10000, paidAmount: 10000, creditAmount: 0, createdBy: s.user.id, completedAt: new Date() }).returning();
+  const [purchase] = await t.db.insert(schema.purchases).values({ tenantId: tid, storeId: s.store.id, purchaseNo: "P/1", supplierId: supplier.id, supplierInvoiceNo: `${MARK}-SB1`, invoiceDate: "2026-10-01", totalAmount: 5000, paidAmount: 0, createdBy: s.user.id }).returning();
   const [doctor] = await t.db.insert(schema.doctors).values({ tenantId: tid, name: `Dr ${MARK}`, regNo: `${MARK}-REG` }).returning();
-  const [rx] = await t.db
-    .insert(schema.prescriptions)
-    .values({ tenantId: tid, storeId: s.store.id, patientName: `${MARK} Patient`, doctorName: `Dr ${MARK}`, prescriptionDate: "2026-10-01" })
-    .returning();
-  const [order] = await t.db
-    .insert(schema.externalOrders)
-    .values({ tenantId: tid, orderNo: `${MARK}-ORD`, customerName: `${MARK} Buyer`, customerPhone: "9000000002", items: [{ name: "x", qty: 1 }], status: "received" })
-    .returning();
-  const [promise] = await t.db
-    .insert(schema.promiseOrders)
-    .values({ tenantId: tid, storeId: s.store.id, customerName: `${MARK} Promisee`, customerPhone: "9000000003", medicineName: `${MARK} Drug`, qtyRequested: 2, createdBy: s.user.id })
-    .returning();
+  const [rx] = await t.db.insert(schema.prescriptions).values({ tenantId: tid, storeId: s.store.id, patientName: `${MARK} Patient`, doctorName: `Dr ${MARK}`, prescriptionDate: "2026-10-01" }).returning();
+  const [order] = await t.db.insert(schema.externalOrders).values({ tenantId: tid, orderNo: `${MARK}-ORD`, customerName: `${MARK} Buyer`, customerPhone: "9000000002", items: [{ name: "x", qty: 1 }], status: "received" }).returning();
+  const [promise] = await t.db.insert(schema.promiseOrders).values({ tenantId: tid, storeId: s.store.id, customerName: `${MARK} Promisee`, customerPhone: "9000000003", medicineName: `${MARK} Drug`, qtyRequested: 2, createdBy: s.user.id }).returning();
   const [rep] = await t.db.insert(schema.medicalReps).values({ tenantId: tid, name: `${MARK} Rep`, isActive: true }).returning();
   const [scheme] = await t.db.insert(schema.schemes).values({ tenantId: tid, name: `${MARK} Scheme`, schemeType: "free_qty", isActive: true }).returning();
-  const [reminder] = await t.db
-    .insert(schema.reminders)
-    .values({ tenantId: tid, customerPhone: "9000000004", scheduledDate: "2026-12-01", message: `${MARK} reminder` })
-    .returning();
+  const [reminder] = await t.db.insert(schema.reminders).values({ tenantId: tid, customerPhone: "9000000004", scheduledDate: "2026-12-01", message: `${MARK} reminder` }).returning();
   const [group] = await t.db.insert(schema.customerGroups).values({ tenantId: tid, name: `${MARK} Family` }).returning();
   await t.db.insert(schema.whatsappMessages).values({ tenantId: tid, customerPhone: "9000000005", messageBody: `${MARK} hello` });
   await t.db.insert(schema.whatsappTemplates).values({ tenantId: tid, name: `${MARK}_tmpl`, body: `${MARK} body` });
   await t.db.insert(schema.whatsappConfigs).values({ tenantId: tid, phoneNumberId: `${MARK}-PHONE` });
   await t.db.insert(schema.smsConfigs).values({ tenantId: tid, senderId: `${MARK}` });
-  const [stmt] = await t.db
-    .insert(schema.bankStatements)
-    .values({ tenantId: tid, bankName: `${MARK} Bank`, accountNo: "123", statementDate: "2026-10-01" })
-    .returning();
-  const [line] = await t.db
-    .insert(schema.bankStatementLines)
-    .values({ tenantId: tid, statementId: stmt.id, transactionDate: "2026-10-01", description: `${MARK} line` })
-    .returning();
+  const [stmt] = await t.db.insert(schema.bankStatements).values({ tenantId: tid, bankName: `${MARK} Bank`, accountNo: "123", statementDate: "2026-10-01" }).returning();
+  const [line] = await t.db.insert(schema.bankStatementLines).values({ tenantId: tid, statementId: stmt.id, transactionDate: "2026-10-01", description: `${MARK} line` }).returning();
   const [apiKey] = await t.db.insert(schema.apiKeys).values({ tenantId: tid, name: `${MARK} key`, keyHash: `${MARK}hash` }).returning();
-  const [gstDoc] = await t.db
-    .insert(schema.gstDocuments)
-    .values({ tenantId: tid, storeId: s.store.id, docType: "invoice", docNo: `${MARK}/DOC1`, docDate: "2026-10-01", supplyType: "B2B", partyName: `${MARK} Party`, taxableAmount: 1000, total: 1050, refType: "sale", refId: sale.id })
-    .returning();
+  const [gstDoc] = await t.db.insert(schema.gstDocuments).values({ tenantId: tid, storeId: s.store.id, docType: "invoice", docNo: `${MARK}/DOC1`, docDate: "2026-10-01", supplyType: "B2B", partyName: `${MARK} Party`, taxableAmount: 1000, total: 1050, refType: "sale", refId: sale.id }).returning();
   await t.db.insert(schema.auditLogs).values({ tenantId: tid, userId: s.user.id, action: "create", entityType: `${MARK}_thing` });
   const [acct] = await t.db.insert(schema.accounts).values({ tenantId: tid, code: "9999", name: `${MARK} Account`, type: "asset" }).returning();
-  const [je] = await t.db.insert(schema.journalEntries).values({ tenantId: tid, storeId: s.store.id, entryNo: "JV/9", entryDate: "2026-10-01", narration: `${MARK} narration` }).returning();
-  await t.db.insert(schema.journalLines).values({ tenantId: tid, entryId: je.id, accountId: acct.id, debit: 100, credit: 0 });
+  await t.db.transaction(async (tx) => {
+    const [je] = await tx.insert(schema.journalEntries).values({ tenantId: tid, storeId: s.store.id, entryNo: "JV/9", entryDate: "2026-10-01", narration: `${MARK} narration` }).returning();
+    await tx.insert(schema.journalLines).values([
+      { tenantId: tid, entryId: je.id, accountId: acct.id, debit: 100, credit: 0 },
+      { tenantId: tid, entryId: je.id, accountId: acct.id, debit: 0, credit: 100 },
+    ]);
+  });
   return { ...s, maker, cat, rack, medicine, batch, customer, supplier, sale, purchase, doctor, rx, order, promise, rep, scheme, reminder, group, stmt, line, apiKey, gstDoc };
 }
 
@@ -149,22 +127,18 @@ const leaks = (result: unknown) => JSON.stringify(result ?? null).includes(MARK)
 
 /** The caller got nothing useful: it threw, or returned null / empty / an error. */
 async function denied(call: () => Promise<unknown>) {
-  let r: unknown;
   try {
-    r = await call();
+    const r = await call();
+    if (r == null) return true;
+    if (Array.isArray(r)) return r.length === 0;
+    if (typeof r === "object") {
+      const o = r as Record<string, unknown>;
+      return Boolean(o.error || o.serverError || o.validationErrors || o.success === false);
+    }
+    return false;
   } catch {
-    return true; // refused with an exception
+    return true;
   }
-  if (r == null) return true;
-  if (Array.isArray(r)) return r.length === 0;
-  if (typeof r === "object") {
-    const o = r as Record<string, unknown>;
-    if ("error" in o && o.error) return true;
-    if ("serverError" in o && o.serverError) return true;
-    if ("validationErrors" in o && o.validationErrors) return true;
-    if ("success" in o && o.success === false) return true;
-  }
-  return false;
 }
 
 const form = (fields: Record<string, string> = {}) => {
@@ -226,6 +200,7 @@ describe("pharmacy B cannot READ pharmacy A's lists", () => {
 /** A compact picture of everything an attacker could try to change in A's data. */
 async function snapshotOfA() {
   const pick = async (table: PgTable & { id: AnyPgColumn }, id: string) => (await t.db.select().from(table).where(eq(table.id, id)))[0];
+  const cnt = async (table: PgTable & { tenantId: AnyPgColumn }) => (await t.db.select().from(table).where(eq(table.tenantId, A.tenant.id))).length;
   return JSON.stringify({
     supplier: await pick(schema.suppliers, A.supplier.id),
     customer: await pick(schema.customers, A.customer.id),
@@ -242,12 +217,11 @@ async function snapshotOfA() {
     group: await pick(schema.customerGroups, A.group.id),
     gstDoc: await pick(schema.gstDocuments, A.gstDoc.id),
     line: await pick(schema.bankStatementLines, A.line.id),
-    batches: (await t.db.select().from(schema.batches).where(eq(schema.batches.tenantId, A.tenant.id))).length,
-    movements: (await t.db.select().from(schema.stockMovements).where(eq(schema.stockMovements.tenantId, A.tenant.id))).length,
-    loyalty: (await t.db.select().from(schema.loyaltyTransactions).where(eq(schema.loyaltyTransactions.tenantId, A.tenant.id))).length,
-    audit: (await t.db.select().from(schema.auditLogs).where(eq(schema.auditLogs.tenantId, A.tenant.id))).length,
-    // rows created in A's name
-    medicines: (await t.db.select().from(schema.medicines).where(eq(schema.medicines.tenantId, A.tenant.id))).length,
+    batches: await cnt(schema.batches),
+    movements: await cnt(schema.stockMovements),
+    loyalty: await cnt(schema.loyaltyTransactions),
+    audit: await cnt(schema.auditLogs),
+    medicines: await cnt(schema.medicines),
   });
 }
 

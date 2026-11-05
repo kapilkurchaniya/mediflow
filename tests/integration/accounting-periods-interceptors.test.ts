@@ -3,17 +3,12 @@ import { and, eq, sql } from "drizzle-orm";
 import * as schema from "@/server/db/schema";
 import { createTestDb } from "../setup/db";
 import {
-  ensureFinancialYearPeriods,
-  closeAccountingPeriod,
-  PeriodLockedError,
-  formatPeriodKey,
-  getPeriodDateRange,
+  ensureFinancialYearPeriods, closeAccountingPeriod, PeriodLockedError,
+  formatPeriodKey, getPeriodDateRange,
 } from "@/server/domain/accounting-periods";
 import {
-  postSaleJournalEntry,
-  postPurchaseJournalEntry,
-  postSaleReturnJournalEntry,
-  postPurchaseReturnJournalEntry,
+  postSaleJournalEntry, postPurchaseJournalEntry,
+  postSaleReturnJournalEntry, postPurchaseReturnJournalEntry,
 } from "@/server/domain/accounting";
 import { cancelSale } from "@/server/domain/sales/cancel-sale";
 import { postPayment } from "@/server/domain/payments";
@@ -51,15 +46,8 @@ describe("Accounting Period Lock — 8/8 Interceptor Integration Tests", () => {
 
     // Lock the master period so all 8 interceptor paths can be verified
     const [master] = await t.db
-      .select()
-      .from(schema.accountingPeriods)
-      .where(
-        and(
-          eq(schema.accountingPeriods.tenantId, f.tenantId),
-          eq(schema.accountingPeriods.periodKey, testPeriodKey),
-          sql`${schema.accountingPeriods.gstin} IS NULL`,
-        ),
-      );
+      .select().from(schema.accountingPeriods)
+      .where(and(eq(schema.accountingPeriods.tenantId, f.tenantId), eq(schema.accountingPeriods.periodKey, testPeriodKey), sql`${schema.accountingPeriods.gstin} IS NULL`));
 
     await closeAccountingPeriod(t.db, {
       tenantId: f.tenantId,
@@ -197,15 +185,24 @@ describe("Accounting Period Lock — 8/8 Interceptor Integration Tests", () => {
       })
       .returning();
 
-    await t.db.insert(schema.journalEntries).values({
-      tenantId: f.tenantId,
-      storeId: f.storeA,
-      entryNo: "JV-CAN-01",
-      entryDate: testDate,
-      narration: "Original sale",
-      refType: "sale",
-      refId: sale.id,
-      createdBy: f.userId,
+    await t.db.transaction(async (tx) => {
+      const [je] = await tx
+        .insert(schema.journalEntries)
+        .values({
+          tenantId: f.tenantId,
+          storeId: f.storeA,
+          entryNo: "JV-CAN-01",
+          entryDate: testDate,
+          narration: "Original sale",
+          refType: "sale",
+          refId: sale.id,
+          createdBy: f.userId,
+        })
+        .returning();
+      await tx.insert(schema.journalLines).values([
+        { tenantId: f.tenantId, entryId: je.id, accountId: f.accounts.debtors, debit: 1000, credit: 0 },
+        { tenantId: f.tenantId, entryId: je.id, accountId: f.accounts.sales, debit: 0, credit: 1000 },
+      ]);
     });
 
     const ctx = makeAuthCtx();
