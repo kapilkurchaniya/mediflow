@@ -13,7 +13,7 @@ import {
   uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
-import { id, createdAt } from "./_helpers";
+import { id, createdAt, updatedAt } from "./_helpers";
 import { medicines } from "./catalog";
 import { customers } from "./crm";
 import { stores, tenantId } from "./platform";
@@ -115,6 +115,30 @@ export const smsConfigs = pgTable("sms_configs", {
   createdAt: createdAt(),
 });
 
+export const smsTemplates = pgTable(
+  "sms_templates",
+  {
+    id: id(),
+    tenantId: tenantId(),
+    name: text("name").notNull(), // e.g. "invoice_receipt", "refill_reminder", "payment_reminder", "otp"
+    senderId: text("sender_id").notNull(), // 6-character alphabetic header e.g. "MEDFLW"
+    dltTemplateId: text("dlt_template_id").notNull(), // Approved 19-digit DLT Content Template ID e.g. "1107161234567890123"
+    entityId: text("entity_id"), // Principal Entity ID (PE ID) e.g. "1101123456789012345"
+    category: text("category").notNull().default("service_implicit"), // service_implicit | service_explicit | promotional
+    body: text("body").notNull(), // e.g. "Dear {#var#}, your tax invoice #{#var#} for Rs {#var#} is ready. View bill: {#var#}. MediFlow"
+    variables: jsonb("variables").$type<string[]>().notNull().default([]), // ["customerName", "invoiceNo", "amount", "receiptUrl"]
+    description: text("description"),
+    isActive: boolean("is_active").notNull().default(true),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    index("sms_templates_tenant_idx").on(t.tenantId),
+    index("sms_templates_tenant_name_idx").on(t.tenantId, t.name),
+    uniqueIndex("sms_templates_tenant_dlt_uq").on(t.tenantId, t.dltTemplateId),
+  ],
+);
+
 export const reminders = pgTable(
   "reminders",
   {
@@ -147,5 +171,7 @@ export type WhatsAppMessage = typeof whatsappMessages.$inferSelect;
 export type NewWhatsAppMessage = typeof whatsappMessages.$inferInsert;
 export type SmsConfig = typeof smsConfigs.$inferSelect;
 export type NewSmsConfig = typeof smsConfigs.$inferInsert;
+export type SmsTemplate = typeof smsTemplates.$inferSelect;
+export type NewSmsTemplate = typeof smsTemplates.$inferInsert;
 export type Reminder = typeof reminders.$inferSelect;
 export type NewReminder = typeof reminders.$inferInsert;
