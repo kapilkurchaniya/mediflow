@@ -1,6 +1,7 @@
-  import { db, schema } from "@/server/db";
+import { db, schema } from "@/server/db";
 import { eq } from "drizzle-orm";
 import { WhatsAppService } from "@/server/domain/whatsapp";
+import { generateReceiptToken } from "@/lib/receipt-token";
 
 export async function handleWhatsAppReceipt(event: {
   tenantId: string;
@@ -35,24 +36,25 @@ export async function handleWhatsAppReceipt(event: {
     return;
   }
 
-  const [store] = await db
-    .select({ name: schema.stores.name })
-    .from(schema.stores)
-    .where(eq(schema.stores.id, sale.storeId))
-    .limit(1);
+  // Generate cryptographically signed public receipt link
+  const token = generateReceiptToken({
+    saleId: sale.id,
+    tenantId: event.tenantId,
+    expiresInDays: 90,
+  });
 
-  const storeName = store?.name || "MediFlow Pharmacy";
-  const amountRupees = ((sale.totalAmount || 0) / 100).toFixed(2);
+  const appBaseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://app.mediflow.in";
+  const publicReceiptUrl = `${appBaseUrl}/r/${token}`;
 
-  const messageBody = `Dear ${customerName},\n\nThank you for shopping at ${storeName}!\n\nTax Invoice: #${sale.invoiceNo}\nTotal Amount: ₹${amountRupees}\nStatus: Paid\n\nWishing you good health!`;
-
-  const res = await WhatsAppService.sendMessage({
+  const res = await WhatsAppService.sendInvoiceReceipt({
     tenantId: event.tenantId,
     storeId: sale.storeId,
     customerPhone: phone,
     customerId: sale.customerId,
-    messageBody,
-    messageType: "text",
+    invoiceNo: sale.invoiceNo || "INV-COUNTER",
+    patientName: customerName,
+    totalAmountPaise: sale.totalAmount || 0,
+    publicReceiptUrl,
   });
 
   if (!res.success && res.status === "failed") {
