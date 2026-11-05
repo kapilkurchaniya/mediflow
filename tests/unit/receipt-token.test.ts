@@ -84,3 +84,4 @@ describe("Public Receipt Token (HMAC-SHA256)", () => {
     expect(verifyReceiptToken("part1.part2.part3").valid).toBe(false);
   });
 });
+
