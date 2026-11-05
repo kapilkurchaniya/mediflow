@@ -122,3 +122,4 @@ export function verifyReceiptToken(token: string): TokenVerificationResult {
     exp: payload.exp,
   };
 }
+
