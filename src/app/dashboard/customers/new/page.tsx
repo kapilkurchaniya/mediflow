@@ -100,6 +100,46 @@ export default function NewCustomerPage() {
               <textarea id="notes" name="notes" rows={2} className="input" placeholder="Prefers generics, diabetic — monthly refill…" />
             </Field>
           </FormSection>
+
+          <FormSection
+            title="Data Privacy & Consent (DPDP Act 2023)"
+            description="Manage patient consent for automated reminders and communications."
+          >
+            <div className="sm:col-span-2 space-y-2">
+              <label className="flex items-center gap-2.5 p-3 rounded-lg border border-ink-150 bg-ink-50/50 cursor-pointer hover:border-ink-300">
+                <input
+                  type="checkbox"
+                  name="consentReminders"
+                  defaultChecked
+                  className="checkbox"
+                />
+                <div>
+                  <span className="text-xs font-semibold text-ink-900 block">
+                    Prescription Refill &amp; Health Reminders
+                  </span>
+                  <span className="text-[11px] text-ink-500 block">
+                    Patient consents to WhatsApp and SMS alerts for due prescription refills and medication schedules.
+                  </span>
+                </div>
+              </label>
+
+              <label className="flex items-center gap-2.5 p-3 rounded-lg border border-ink-150 bg-ink-50/50 cursor-pointer hover:border-ink-300">
+                <input
+                  type="checkbox"
+                  name="consentMarketing"
+                  className="checkbox"
+                />
+                <div>
+                  <span className="text-xs font-semibold text-ink-900 block">
+                    Pharmacy Offers &amp; Health Updates
+                  </span>
+                  <span className="text-[11px] text-ink-500 block">
+                    Patient consents to seasonal healthcare notices, discounts, and wellness promotions.
+                  </span>
+                </div>
+              </label>
+            </div>
+          </FormSection>
         </div>
 
         <div className="flex items-center justify-end gap-2 rounded-b-xl border-t border-ink-150 bg-ink-50/60 px-6 py-3.5">
