@@ -11,7 +11,7 @@ import {
 } from "drizzle-orm/pg-core";
 import { id, money, createdAt, updatedAt } from "./_helpers";
 import { medicines } from "./catalog";
-import { storeId, stores, tenantId } from "./platform";
+import { storeId, stores, tenantId, users } from "./platform";
 import { purchaseOrders } from "./purchasing";
 import { sales } from "./sales";
 
@@ -159,6 +159,46 @@ export const externalOrders = pgTable(
   ],
 );
 
+export const customerConsents = pgTable(
+  "customer_consents",
+  {
+    id: id(),
+    tenantId: tenantId(),
+    customerId: uuid("customer_id")
+      .notNull()
+      .references(() => customers.id, { onDelete: "cascade" }),
+    purpose: text("purpose").notNull(), // 'transactional' | 'marketing' | 'reminders'
+    granted: boolean("granted").notNull().default(true),
+    source: text("source").notNull().default("pos"), // 'pos' | 'whatsapp' | 'web' | 'manual' | 'privacy_portal'
+    capturedBy: uuid("captured_by").references(() => users.id),
+    notes: text("notes"),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    index("customer_consents_tenant_idx").on(t.tenantId),
+    index("customer_consents_customer_idx").on(t.customerId, t.purpose),
+    index("customer_consents_tenant_purpose_idx").on(t.tenantId, t.purpose, t.granted),
+  ],
+);
+
+export const privacyNotices = pgTable(
+  "privacy_notices",
+  {
+    id: id(),
+    tenantId: tenantId(),
+    title: text("title").notNull().default("Pharmacy Patient Privacy Notice"),
+    noticeText: text("notice_text").notNull(),
+    dpoName: text("dpo_name"),
+    dpoContact: text("dpo_contact"),
+    retentionPolicySummary: text("retention_policy_summary"),
+    version: integer("version").notNull().default(1),
+    isActive: boolean("is_active").notNull().default(true),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [index("privacy_notices_tenant_idx").on(t.tenantId)],
+);
+
 export type PromiseOrder = typeof promiseOrders.$inferSelect;
 export type NewPromiseOrder = typeof promiseOrders.$inferInsert;
 export type MedicalRep = typeof medicalReps.$inferSelect;
@@ -171,3 +211,7 @@ export type LoyaltyTransaction = typeof loyaltyTransactions.$inferSelect;
 export type NewLoyaltyTransaction = typeof loyaltyTransactions.$inferInsert;
 export type ExternalOrder = typeof externalOrders.$inferSelect;
 export type NewExternalOrder = typeof externalOrders.$inferInsert;
+export type CustomerConsent = typeof customerConsents.$inferSelect;
+export type NewCustomerConsent = typeof customerConsents.$inferInsert;
+export type PrivacyNotice = typeof privacyNotices.$inferSelect;
+export type NewPrivacyNotice = typeof privacyNotices.$inferInsert;
