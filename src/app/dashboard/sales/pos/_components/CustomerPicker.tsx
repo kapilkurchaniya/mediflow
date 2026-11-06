@@ -25,6 +25,7 @@ export function CustomerPicker({
   const [isQuickAddOpen, setIsQuickAddOpen] = useState(false);
   const [newName, setNewName] = useState("");
   const [newPhone, setNewPhone] = useState("");
+  const [consentReminders, setConsentReminders] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
 
@@ -75,7 +76,7 @@ export function CustomerPicker({
     setIsSaving(true);
     setErrorMsg("");
     try {
-      const res = await dataSource.createQuickCustomer(newName.trim(), newPhone.trim() || undefined);
+      const res = await dataSource.createQuickCustomer(newName.trim(), newPhone.trim() || undefined, consentReminders);
       if (res.error) {
         setErrorMsg(res.error);
         return;
@@ -91,6 +92,7 @@ export function CustomerPicker({
         setIsQuickAddOpen(false);
         setNewName("");
         setNewPhone("");
+        setConsentReminders(true);
       }
     } finally {
       setIsSaving(false);
@@ -232,6 +234,19 @@ export function CustomerPicker({
                   placeholder="10-digit mobile number"
                   className="input !py-1.5 text-xs font-mono"
                 />
+              </div>
+              <div className="pt-1">
+                <label className="flex items-start gap-2 cursor-pointer text-[11px] text-ink-600">
+                  <input
+                    type="checkbox"
+                    checked={consentReminders}
+                    onChange={(e) => setConsentReminders(e.target.checked)}
+                    className="checkbox mt-0.5"
+                  />
+                  <span>
+                    Patient consents to refill alerts &amp; WhatsApp updates (DPDP Opt-in)
+                  </span>
+                </label>
               </div>
               <div className="flex justify-end gap-2 pt-2">
                 <button

@@ -97,7 +97,7 @@ export interface PosDataSource {
   searchItems(query: string): Promise<SearchResult[]>;
   findSubstitutes(genericName: string): Promise<SubstituteItem[]>;
   getCustomers(query?: string): Promise<CustomerRow[]>;
-  createQuickCustomer(name: string, phone?: string): Promise<{ customer?: CustomerRow; error?: string }>;
+  createQuickCustomer(name: string, phone?: string, consentReminders?: boolean): Promise<{ customer?: CustomerRow; error?: string }>;
   getCustomerRedeemablePoints(customerId: string): Promise<{ points: number; valuePaise: number }>;
   getDoctors(query?: string): Promise<DoctorRow[]>;
   getMedicalReps(): Promise<MedicalRepRow[]>;
@@ -138,10 +138,10 @@ export const defaultPosDataSource: PosDataSource = {
   async getCustomers(query?: string) {
     return (await getCustomers(query)) as unknown as CustomerRow[];
   },
-  async createQuickCustomer(name: string, phone?: string) {
-    const res = await createQuickCustomer(name, phone);
+  async createQuickCustomer(name: string, phone?: string, consentReminders?: boolean) {
+    const res = await createQuickCustomer(name, phone, consentReminders);
     if ("error" in res && res.error) return { error: res.error };
-    return { customer: res as unknown as CustomerRow };
+    return { customer: (res.customer || res) as unknown as CustomerRow };
   },
   async getCustomerRedeemablePoints(customerId: string) {
     return getCustomerRedeemablePoints(customerId);
