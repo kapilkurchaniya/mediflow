@@ -237,4 +237,32 @@ describe("Mobile Concurrency & Multi-Connection Suite", () => {
     `);
     expect((countRes.rows[0] as Record<string, unknown>).cnt).toBe(1);
   });
+
+  it("serializes 3-way parallel refresh race: exactly one succeeds and losers detect replay", async () => {
+    const devUuid = `dev_conc_3way_${Date.now()}`;
+    const dev = await registerDevice(db, { tenantId, userId: ownerUserId, deviceName: "3Way Device", platform: "ios", deviceUuid: devUuid });
+    await approveDevice(db, tenantId, dev.id);
+
+    const loginRes = await loginMobile(db, {
+      email: ownerEmail,
+      password: "pass123",
+      deviceUuid: devUuid,
+      deviceName: "3Way Device",
+      platform: "ios",
+    });
+
+    const token = loginRes.refreshToken;
+
+    const [r1, r2, r3] = await Promise.allSettled([
+      refreshMobileSession(db1, { refreshToken: token }),
+      refreshMobileSession(db2, { refreshToken: token }),
+      refreshMobileSession(db, { refreshToken: token }),
+    ]);
+
+    const successes = [r1, r2, r3].filter((r) => r.status === "fulfilled");
+    const rejections = [r1, r2, r3].filter((r) => r.status === "rejected");
+
+    expect(successes.length).toBe(1);
+    expect(rejections.length).toBe(2);
+  });
 });

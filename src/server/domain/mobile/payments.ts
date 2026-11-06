@@ -2,16 +2,14 @@
 import crypto from "crypto";
 import { format } from "date-fns";
 import { sql, and, eq } from "drizzle-orm";
-import { db as defaultDb, type DbOrTx } from "../../db";
-import {
-  deliveryOrders,
-  deliveryPaymentIntents,
-  deliveryPaymentWebhooks,
-  deliveryEvents,
-} from "../../db/schema/mobile";
+import { db as defaultDb } from "../../db";
+import { deliveryOrders, deliveryPaymentIntents, deliveryPaymentWebhooks, deliveryEvents } from "../../db/schema/mobile";
 import { postPayment } from "../payments";
 import { sha256 } from "./auth";
 import type { AuthCtx } from "../../rbac";
+import { createRazorpayQrCode, verifyRazorpaySignature } from "./razorpay-client";
+
+export { verifyRazorpaySignature };
 
 const makePaymentAuthCtx = (tenantId: string, storeId: string, userId: string): AuthCtx => ({
   tenantId, storeId, userId,
@@ -19,18 +17,6 @@ const makePaymentAuthCtx = (tenantId: string, storeId: string, userId: string): 
   permissions: new Set(["accounting.post", "sale.create", "sale.view"] as const),
   allowedStoreIds: "all",
 });
-const RAZORPAY_KEY_ID = process.env.RAZORPAY_KEY_ID || "rzp_test_mediflow";
-const RAZORPAY_WEBHOOK_SECRET = process.env.RAZORPAY_WEBHOOK_SECRET || "mediflow_rzp_webhook_secret_test";
-const DEFAULT_UPI_VPA = process.env.MEDIFLOW_UPI_VPA || "mediflow@icici";
-
-export function verifyRazorpaySignature(rawBody: string, signature: string, secret = RAZORPAY_WEBHOOK_SECRET): boolean {
-  try {
-    const expected = crypto.createHmac("sha256", secret).update(rawBody).digest("hex");
-    return crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expected));
-  } catch {
-    return false;
-  }
-}
 
 export async function createDeliveryUpiIntent(
   db: typeof defaultDb,
@@ -56,11 +42,18 @@ export async function createDeliveryUpiIntent(
 
   const orderIdStr = order.id as string;
   const orderRef = `MPAY-${orderIdStr.slice(0, 8)}-${Date.now()}`;
-  const providerQrId = `qr_${crypto.randomUUID()}`;
-  const amountRupees = (outstandingPaise / 100).toFixed(2);
   const invoiceNo = (order.invoice_no as string) || orderIdStr.slice(0, 8);
-  const qrPayload = `upi://pay?pa=${DEFAULT_UPI_VPA}&pn=MediFlowPharmacy&am=${amountRupees}&tr=${orderRef}&tn=Order-${invoiceNo}&cu=INR&mc=5912`;
   const expiresAt = new Date(Date.now() + 30 * 60 * 1000); // 30 minutes
+  const closeByEpoch = Math.floor(expiresAt.getTime() / 1000);
+
+  // Invoke authentic Razorpay Payments QR Code API (POST /v1/payments/qr_codes)
+  const qrRes = await createRazorpayQrCode({
+    amountPaise: outstandingPaise,
+    orderRef,
+    description: `Order ${invoiceNo}`,
+    closeByEpochSeconds: closeByEpoch,
+    notes: { tenant_id: input.tenantId, delivery_order_id: orderIdStr, provider_order_ref: orderRef },
+  });
 
   const [intent] = await db
     .insert(deliveryPaymentIntents)
@@ -68,10 +61,10 @@ export async function createDeliveryUpiIntent(
       tenantId: input.tenantId,
       deliveryOrderId: orderIdStr,
       provider: "razorpay",
-      providerQrId,
-      providerOrderRef: orderRef,
+      providerQrId: qrRes.id,
+      providerOrderRef: qrRes.providerOrderRef,
       amountPaise: outstandingPaise,
-      qrPayload,
+      qrPayload: qrRes.qrPayload,
       status: "pending",
       expiresAt,
     })
@@ -82,7 +75,7 @@ export async function createDeliveryUpiIntent(
     .set({ paymentStatus: "intent_created" })
     .where(eq(deliveryOrders.id, orderIdStr));
 
-  return { intent, qrPayload, amountPaise: outstandingPaise, expiresAt };
+  return { intent, qrPayload: qrRes.qrPayload, amountPaise: outstandingPaise, expiresAt };
 }
 
 export async function ingestRazorpayWebhook(
@@ -182,6 +175,9 @@ export async function processRazorpayWebhook(
       const paidPaise = Number(paymentEntity.amount || intent.amount_paise);
       if (paymentEntity.currency && paymentEntity.currency !== "INR") {
         throw new Error(`UNSUPPORTED_CURRENCY: Expected INR, got ${paymentEntity.currency}`);
+      }
+      if (paymentEntity.amount && Number(paymentEntity.amount) !== Number(intent.amount_paise)) {
+        throw new Error(`AMOUNT_MISMATCH: Expected ${intent.amount_paise}, got ${paymentEntity.amount}`);
       }
 
       await postPayment(

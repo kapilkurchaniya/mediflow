@@ -14,6 +14,7 @@ import {
 import {
   createDeliveryUpiIntent,
   ingestRazorpayWebhook,
+  collectCashForDelivery,
 } from "../../src/server/domain/mobile/payments";
 import { getMobileDashboardMetrics } from "../../src/server/domain/mobile/dashboard";
 
@@ -201,5 +202,71 @@ describe("Mobile Delivery, Settlement & Dashboard Suite", () => {
     expect(metrics2.sales.grossSalesPaise).toBe(150000);
     expect(metrics2.receivables.periodCreditSalesPaise).toBe(50000);
     expect(metrics2.receivables.cumulativeOutstandingArPaise).toBe(50000);
+  });
+
+  it("rejects proof upload completion when file magic bytes do not match declared MIME", async () => {
+    const proofInit = await initiateProofUpload(db, {
+      tenantId,
+      deliveryOrderId,
+      proofType: "delivery_photo",
+      fileType: "image/jpeg",
+      uploadedBy: staffUserId,
+      idempotencyKey: `bad_magic_${Date.now()}`,
+    });
+
+    // Plain text buffer purporting to be JPEG
+    const invalidBuffer = Buffer.from("<html><body>Malicious HTML File</body></html>");
+
+    await expect(
+      completeProofUpload(db, {
+        tenantId,
+        proofId: proofInit.proof.id,
+        fileBuffer: invalidBuffer,
+        fileSizeBytes: invalidBuffer.length,
+        fileType: "image/jpeg",
+        actorUserId: staffUserId,
+      }),
+    ).rejects.toThrow("MIME_MAGIC_MISMATCH");
+  });
+
+  it("records doorstep cash collection via postPayment and updates payment status", async () => {
+    const cashSaleId = crypto.randomUUID();
+    const cashDeliveryId = crypto.randomUUID();
+
+    await db.execute(sql`
+      INSERT INTO sales (id, tenant_id, store_id, invoice_no, status, total_amount, paid_amount, cost_amount, credit_amount, customer_id, created_by, completed_at)
+      VALUES (${cashSaleId}::uuid, ${tenantId}::uuid, ${storeId}::uuid, 'INV-CASH-1', 'completed', 35000, 0, 20000, 35000, ${customerId}::uuid, ${ownerUserId}::uuid, now())
+    `);
+    await db.execute(sql`
+      INSERT INTO delivery_orders (id, tenant_id, store_id, sale_id, delivery_status, payment_status, delivery_address, recipient_name, recipient_phone)
+      VALUES (${cashDeliveryId}::uuid, ${tenantId}::uuid, ${storeId}::uuid, ${cashSaleId}::uuid, 'in_transit', 'pending', '12 Cash Lane', 'Cash Buyer', '9876543210')
+    `);
+
+    const cashRes = await collectCashForDelivery(db, {
+      tenantId,
+      deliveryOrderId: cashDeliveryId,
+      amountPaise: 35000,
+      actorUserId: staffUserId,
+    });
+    expect(cashRes.success).toBe(true);
+    expect(cashRes.paymentStatus).toBe("collected");
+
+    const orderRow = await db.execute(sql`SELECT payment_status FROM delivery_orders WHERE id = ${cashDeliveryId}::uuid`);
+    expect((orderRow.rows[0] as Record<string, unknown>).payment_status).toBe("collected");
+
+    const payRow = await db.execute(sql`SELECT amount, method FROM payments WHERE tenant_id = ${tenantId}::uuid AND method = 'cash' ORDER BY created_at DESC LIMIT 1`);
+    expect(Number((payRow.rows[0] as Record<string, unknown>).amount)).toBe(35000);
+  });
+
+  it("strictly prohibits illegal backward transitions in delivery state machine", async () => {
+    // Attempting to move delivered order back to in_transit
+    await expect(
+      transitionDeliveryOrder(db, {
+        tenantId,
+        deliveryOrderId,
+        toStatus: "in_transit",
+        actorUserId: staffUserId,
+      }),
+    ).rejects.toThrow("ILLEGAL_DELIVERY_TRANSITION");
   });
 });
