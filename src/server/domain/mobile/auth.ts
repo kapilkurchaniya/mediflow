@@ -138,6 +138,7 @@ export async function loginMobile(
 
   const rawRefreshToken = crypto.randomBytes(32).toString("hex");
   const refreshTokenHash = sha256(rawRefreshToken);
+  const familyId = crypto.randomUUID();
   const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 days
 
   const [session] = await db
@@ -146,6 +147,7 @@ export async function loginMobile(
       tenantId: membership.tenantId,
       userId: user.id,
       deviceId: device.id,
+      familyId,
       refreshTokenHash,
       isConsumed: "false",
       expiresAt,
