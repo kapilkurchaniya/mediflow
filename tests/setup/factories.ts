@@ -1,16 +1,19 @@
 import { randomBytes } from "node:crypto";
 import * as schema from "@/server/db/schema";
+import type { DbOrTx } from "@/server/db";
 import type { TestDb } from "./db";
+
+type AnyDb = TestDb | DbOrTx;
 
 const rand = () => randomBytes(4).toString("hex");
 
-export async function makeTenant(db: TestDb, over: Partial<typeof schema.tenants.$inferInsert> = {}) {
+export async function makeTenant(db: AnyDb, over: Partial<typeof schema.tenants.$inferInsert> = {}) {
   const [row] = await db.insert(schema.tenants).values({ name: `Pharmacy ${rand()}`, ...over }).returning();
   return row;
 }
 
 export async function makeStore(
-  db: TestDb,
+  db: AnyDb,
   tenantId: string,
   over: Partial<typeof schema.stores.$inferInsert> = {},
 ) {
@@ -18,10 +21,37 @@ export async function makeStore(
     .insert(schema.stores)
     .values({ tenantId, name: "Main Store", code: rand().slice(0, 4).toUpperCase(), stateCode: "27", ...over })
     .returning();
+
+  try {
+    await db.insert(schema.yearEndPeriodControls).values([
+      {
+        tenantId,
+        storeId: row.id,
+        fiscalYear: "2026-2027",
+        cutoffDate: new Date("2027-03-31T18:29:59.000Z"),
+        status: "open",
+      },
+      {
+        tenantId,
+        storeId: row.id,
+        fiscalYear: "2025-2026",
+        cutoffDate: new Date("2026-03-31T18:29:59.000Z"),
+        status: "open",
+      },
+      {
+        tenantId,
+        storeId: row.id,
+        fiscalYear: "2024-2025",
+        cutoffDate: new Date("2025-03-31T18:29:59.000Z"),
+        status: "open",
+      },
+    ]);
+  } catch {}
+
   return row;
 }
 
-export async function makeUser(db: TestDb, over: Partial<typeof schema.users.$inferInsert> = {}) {
+export async function makeUser(db: AnyDb, over: Partial<typeof schema.users.$inferInsert> = {}) {
   const [row] = await db
     .insert(schema.users)
     .values({ name: "Test User", email: `u_${rand()}@example.test`, passwordHash: "x", ...over })
@@ -30,7 +60,7 @@ export async function makeUser(db: TestDb, over: Partial<typeof schema.users.$in
 }
 
 export async function makeMedicine(
-  db: TestDb,
+  db: AnyDb,
   tenantId: string,
   over: Partial<typeof schema.medicines.$inferInsert> = {},
 ) {
@@ -42,7 +72,7 @@ export async function makeMedicine(
 }
 
 export async function makeBatch(
-  db: TestDb,
+  db: AnyDb,
   p: { tenantId: string; storeId: string; medicineId: string } & Partial<typeof schema.batches.$inferInsert>,
 ) {
   const [row] = await db
@@ -52,18 +82,18 @@ export async function makeBatch(
   return row;
 }
 
-export async function makeCustomer(db: TestDb, tenantId: string, over: Partial<typeof schema.customers.$inferInsert> = {}) {
+export async function makeCustomer(db: AnyDb, tenantId: string, over: Partial<typeof schema.customers.$inferInsert> = {}) {
   const [row] = await db.insert(schema.customers).values({ tenantId, name: `Customer ${rand()}`, ...over }).returning();
   return row;
 }
 
-export async function makeSupplier(db: TestDb, tenantId: string, over: Partial<typeof schema.suppliers.$inferInsert> = {}) {
+export async function makeSupplier(db: AnyDb, tenantId: string, over: Partial<typeof schema.suppliers.$inferInsert> = {}) {
   const [row] = await db.insert(schema.suppliers).values({ tenantId, name: `Supplier ${rand()}`, ...over }).returning();
   return row;
 }
 
 /** A tenant + store + user + medicine, the minimum most tests need. */
-export async function makeWorld(db: TestDb) {
+export async function makeWorld(db: AnyDb) {
   const tenant = await makeTenant(db);
   const store = await makeStore(db, tenant.id);
   const user = await makeUser(db);

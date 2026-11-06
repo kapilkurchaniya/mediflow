@@ -23,7 +23,14 @@ import { env } from "../../env";
 // Reuse the pool across hot reloads in development.
 const pool =
   globalThis.__mediflowPool ??
-  new pg.Pool({ connectionString: env.DATABASE_URL, max: 10, idleTimeoutMillis: 30_000 });
+  new pg.Pool({
+    connectionString: env.DATABASE_URL,
+    max: env.DB_POOL_MAX,
+    min: env.DB_POOL_MIN,
+    idleTimeoutMillis: env.DB_POOL_IDLE_TIMEOUT_MS,
+    connectionTimeoutMillis: env.DB_POOL_CONNECTION_TIMEOUT_MS,
+    statement_timeout: env.DB_STATEMENT_TIMEOUT_MS,
+  });
 if (env.NODE_ENV !== "production") globalThis.__mediflowPool = pool;
 
 export const db: DB = drizzle(pool, { schema });

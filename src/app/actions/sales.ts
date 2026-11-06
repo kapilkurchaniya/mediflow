@@ -1,7 +1,7 @@
 "use server";
 
 import { db, schema } from "@/server/db";
-import { eq, and, asc, desc, gt, gte, lte, ilike, or, sql, inArray, ne } from "drizzle-orm";
+import { eq, and, asc, desc, gt, gte, lte, ilike, sql, inArray, ne } from "drizzle-orm";
 import { checkPermission, requirePermission } from "@/server/rbac";
 import { revalidatePath } from "next/cache";
 import { format } from "date-fns";
@@ -20,6 +20,7 @@ import {
   getReturnableSaleDetails,
   type ReturnSaleInput,
 } from "@/server/domain/sales/return-sale";
+import { searchPosMedicines } from "@/server/domain/pos/search";
 
 export async function getSales(dateFrom?: string | null, dateTo?: string | null) {
   const ctx = await requirePermission("sale.view");
@@ -52,84 +53,7 @@ export async function getSales(dateFrom?: string | null, dateTo?: string | null)
 // POS Search: Returns medicines with their nearest expiry batches that have stock
 export async function searchPosItems(query: string) {
   const ctx = await requirePermission("sale.create");
-  
-  if (!query || query.length < 2) return [];
-
-  const lowerQuery = query.toLowerCase();
-  const todayStr = format(new Date(), 'yyyy-MM-dd');
-
-  // Find medicines matching query (by name, barcode, or generic composition)
-  const medicines = await db
-    .select({
-      medicine: schema.medicines,
-      rackCode: schema.racks.code,
-      rackName: schema.racks.name,
-      overridePrice: schema.storeMedicineSettings.salePriceOverride,
-    })
-    .from(schema.medicines)
-    .leftJoin(
-      schema.storeMedicineSettings,
-      and(
-        eq(schema.storeMedicineSettings.medicineId, schema.medicines.id),
-        eq(schema.storeMedicineSettings.storeId, ctx.storeId),
-        eq(schema.storeMedicineSettings.tenantId, ctx.tenantId),
-      ),
-    )
-    .leftJoin(
-      schema.racks,
-      and(
-        eq(schema.racks.id, schema.storeMedicineSettings.rackId),
-        eq(schema.racks.storeId, ctx.storeId),
-        eq(schema.racks.tenantId, ctx.tenantId),
-      ),
-    )
-    .where(
-      and(
-        eq(schema.medicines.tenantId, ctx.tenantId),
-        eq(schema.medicines.isActive, true),
-        or(
-          ilike(schema.medicines.name, `%${lowerQuery}%`),
-          ilike(schema.medicines.barcode, `%${lowerQuery}%`),
-          ilike(schema.medicines.genericName, `%${lowerQuery}%`),
-        ),
-      ),
-    )
-    .limit(25);
-
-  if (medicines.length === 0) return [];
-
-  const medicineIds = medicines.map((m) => m.medicine.id);
-
-  // Get active batches for these medicines, ordered by expiry (nearest first)
-  // Ensure we don't sell expired stock
-  const batches = await db
-    .select()
-    .from(schema.batches)
-    .where(
-      and(
-        eq(schema.batches.storeId, ctx.storeId),
-        gt(schema.batches.qtyOnHand, 0),
-        gt(schema.batches.expiryDate, todayStr),
-        inArray(schema.batches.medicineId, medicineIds),
-      ),
-    )
-    .orderBy(asc(schema.batches.expiryDate), asc(schema.batches.createdAt), asc(schema.batches.id));
-
-  // Group batches by medicine
-  const results = medicines.map(({ medicine, rackCode, rackName, overridePrice }) => {
-    const medBatches = batches.filter((b) => b.medicineId === medicine.id);
-    return {
-      medicine: {
-        ...medicine,
-        rackCode: rackCode ?? null,
-        rackName: rackName ?? null,
-        salePrice: overridePrice !== null && overridePrice !== undefined ? overridePrice : medicine.salePrice,
-      },
-      batches: medBatches,
-    };
-  }); // Keep all so cashiers can see if an item is out of stock and find substitutes
-
-  return results;
+  return searchPosMedicines(db, ctx, query);
 }
 
 // Find substitutes with identical generic composition in stock
