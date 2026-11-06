@@ -65,10 +65,12 @@ export const stockMovements = pgTable(
     refId: uuid("ref_id"),
     note: text("note"),
     userId: uuid("user_id"),
+    effectiveAt: timestamp("effective_at", { withTimezone: true }).notNull().defaultNow(),
     createdAt: createdAt(),
   },
   (t) => [
     uniqueIndex("stock_movements_tenant_store_id_uq").on(t.tenantId, t.storeId, t.id),
+    index("stock_mov_tenant_store_effective_idx").on(t.tenantId, t.storeId, t.effectiveAt),
     index("stock_mov_batch_idx").on(t.batchId, t.id),
     index("stock_mov_store_created_idx").on(t.storeId, t.createdAt),
     index("stock_mov_med_idx").on(t.medicineId, t.createdAt),
