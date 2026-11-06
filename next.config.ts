@@ -2,6 +2,7 @@ import type { NextConfig } from "next";
 import { PHASE_PRODUCTION_BUILD } from "next/constants";
 
 const nextConfig: NextConfig = {
+  output: "standalone",
   experimental: {
     // Enables forbidden() (403 page) used by requirePagePermission in src/server/rbac.ts.
     authInterrupts: true,
@@ -18,6 +19,13 @@ const nextConfig: NextConfig = {
           { key: "Cache-Control", value: "no-cache, no-store, must-revalidate" },
           { key: "Service-Worker-Allowed", value: "/" },
           { key: "Content-Type", value: "application/javascript; charset=utf-8" },
+        ],
+      },
+      {
+        // Disable proxy buffering for streaming API routes (SSE / AI chat)
+        source: "/api/:path*",
+        headers: [
+          { key: "X-Accel-Buffering", value: "no" },
         ],
       },
     ];

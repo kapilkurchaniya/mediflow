@@ -48,6 +48,11 @@ const envSchema = z
      */
     CRON_SECRET: z.string().optional(),
 
+    /**
+     * Consistent 32-byte key (base64) for multi-instance Server Functions encryption (Next.js self-hosting).
+     */
+    NEXT_SERVER_ACTIONS_ENCRYPTION_KEY: z.string().optional(),
+
     // ─── WhatsApp ─────────────────────────────────────────────────────────────
     /**
      * Token used during Meta webhook verification handshake.
