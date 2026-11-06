@@ -1,7 +1,8 @@
- import { db, schema } from "@/server/db";
+import { db, schema } from "@/server/db";
 import { eq } from "drizzle-orm";
 import { WhatsAppService } from "@/server/domain/whatsapp";
 import { getSmsProvider } from "@/server/domain/sms";
+import { ConsentService } from "@/server/domain/privacy";
 
 export async function handleReminderSend(event: {
   tenantId: string;
@@ -17,8 +18,22 @@ export async function handleReminderSend(event: {
     .limit(1);
 
   if (!reminder) throw new Error(`Reminder ${reminderId} not found`);
-  if (reminder.status === "sent" || reminder.status === "dismissed") {
+  if (reminder.status === "sent" || reminder.status === "cancelled") {
     return; // Already processed
+  }
+
+  // DPDP Consent Gatekeeper: Check if customer has granted consent for reminders
+  if (reminder.customerId) {
+    const hasConsent = await ConsentService.hasConsent(event.tenantId, reminder.customerId, "reminders");
+    if (!hasConsent) {
+      await db
+        .update(schema.reminders)
+        .set({
+          status: "cancelled",
+        })
+        .where(eq(schema.reminders.id, reminderId));
+      return; // Do not dispatch to patients without active DPDP reminder consent
+    }
   }
 
   if (reminder.channel === "whatsapp") {
