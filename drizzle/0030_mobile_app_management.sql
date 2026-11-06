@@ -195,6 +195,7 @@ CREATE TABLE IF NOT EXISTS delivery_payment_intents (
   expires_at TIMESTAMPTZ NOT NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   CONSTRAINT uq_delivery_order_ref UNIQUE (tenant_id, provider_order_ref),
+  CONSTRAINT uq_mobile_intent_provider_payment UNIQUE (tenant_id, provider_payment_id),
   CONSTRAINT fk_intent_order FOREIGN KEY (tenant_id, delivery_order_id) REFERENCES delivery_orders(tenant_id, id)
 );
 
@@ -210,6 +211,7 @@ CREATE TABLE IF NOT EXISTS delivery_payment_webhooks (
   status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'processing', 'processed', 'ignored', 'failed')),
   error_message TEXT,
   retry_count INT NOT NULL DEFAULT 0,
+  lease_token TEXT,
   lease_expires_at TIMESTAMPTZ,
   processed_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),

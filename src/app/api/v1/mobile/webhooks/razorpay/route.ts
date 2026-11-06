@@ -10,20 +10,28 @@ export async function POST(req: NextRequest) {
     const signature = req.headers.get("x-razorpay-signature") || "";
     const tenantIdHeader = req.headers.get("x-mediflow-tenant-id");
 
-    // In production multi-tenant routing, tenant is resolved via custom header or webhook secret mapping
-    let tenantId = tenantIdHeader;
-    if (!tenantId) {
-      try {
-        const parsed = JSON.parse(rawBody);
-        const notes = parsed.payload?.payment?.entity?.notes || parsed.payment?.entity?.notes;
-        tenantId = notes?.tenant_id;
-      } catch {}
-    }
+    // Authoritatively resolve tenant from payload notes or matching payment intent
+    let tenantId = "";
+    try {
+      const parsed = JSON.parse(rawBody);
+      const paymentEntity = parsed.payload?.payment?.entity || parsed.payment?.entity;
+      const qrEntity = parsed.payload?.qr_code?.entity || parsed.qr_code?.entity;
+      const notes = paymentEntity?.notes || qrEntity?.notes;
+      if (notes?.tenant_id) {
+        tenantId = String(notes.tenant_id);
+      } else {
+        const orderRef = (notes?.provider_order_ref || qrEntity?.id || paymentEntity?.qr_code_id) as string;
+        if (orderRef) {
+          const intent = await db.query.deliveryPaymentIntents.findFirst({
+            where: (t, { eq, or }) => or(eq(t.providerOrderRef, orderRef), eq(t.providerQrId, orderRef)),
+          });
+          if (intent) tenantId = intent.tenantId;
+        }
+      }
+    } catch {}
 
     if (!tenantId) {
-      // Fallback to primary tenant if not in payload notes
-      const firstTenant = await db.query.tenants.findFirst();
-      tenantId = firstTenant?.id || "";
+      return NextResponse.json({ status: "error", error: "UNRESOLVED_TENANT" }, { status: 400 });
     }
 
     const result = await ingestRazorpayWebhook(db, {

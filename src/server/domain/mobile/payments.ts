@@ -105,13 +105,11 @@ export async function processRazorpayWebhook(
   db: typeof defaultDb,
   input: { tenantId: string; webhookId: string },
 ) {
-  // Claim lease
+  const leaseToken = crypto.randomUUID();
   const claimRes = await db.execute(sql`
     UPDATE delivery_payment_webhooks
-    SET status = 'processing',
-        lease_expires_at = now() + interval '60 seconds'
-    WHERE id = ${input.webhookId}::uuid
-      AND status IN ('pending', 'failed')
+    SET status = 'processing', lease_token = ${leaseToken}, lease_expires_at = now() + interval '60 seconds'
+    WHERE id = ${input.webhookId}::uuid AND status IN ('pending', 'failed')
       AND (lease_expires_at IS NULL OR lease_expires_at < now())
     RETURNING *
   `);
@@ -137,22 +135,28 @@ export async function processRazorpayWebhook(
       if (!orderRef && !providerQrId) {
         throw new Error("MISSING_PAYMENT_IDENTIFIERS: Webhook payload missing both provider_order_ref and provider_qr_id");
       }
+      if (paymentEntity.status && paymentEntity.status !== "captured") {
+        throw new Error(`PAYMENT_NOT_CAPTURED: Payment status is ${paymentEntity.status}`);
+      }
 
       const intentRes = await tx.execute(sql`
-        SELECT i.id, i.tenant_id, i.delivery_order_id, i.amount_paise, i.status,
-               d.store_id, d.sale_id,
-               s.customer_id, s.total_amount, s.paid_amount
+        SELECT i.id, i.tenant_id, i.delivery_order_id, i.amount_paise, i.status, i.provider_order_ref, i.provider_qr_id, i.expires_at,
+               d.store_id, d.sale_id, s.customer_id, s.total_amount, s.paid_amount
         FROM delivery_payment_intents i
         JOIN delivery_orders d ON i.delivery_order_id = d.id
         JOIN sales s ON d.sale_id = s.id
         WHERE ((${orderRef || null}::text IS NOT NULL AND i.provider_order_ref = ${orderRef || ""})
            OR (${providerQrId || null}::text IS NOT NULL AND i.provider_qr_id = ${providerQrId || ""}))
           AND i.tenant_id = ${input.tenantId}::uuid
-        FOR UPDATE OF i
+        FOR UPDATE OF i, s
       `);
       const intent = intentRes.rows[0] as Record<string, unknown> | undefined;
       if (!intent) throw new Error("INTENT_NOT_FOUND");
       if (intent.status === "verified") return; // already settled
+      if (new Date(intent.expires_at as string) <= new Date()) throw new Error("INTENT_EXPIRED");
+
+      if (orderRef && intent.provider_order_ref !== orderRef) throw new Error(`ORDER_REF_MISMATCH: ${intent.provider_order_ref} vs ${orderRef}`);
+      if (providerQrId && intent.provider_qr_id !== providerQrId) throw new Error(`QR_ID_MISMATCH: ${intent.provider_qr_id} vs ${providerQrId}`);
 
       if (!paymentEntity.currency || paymentEntity.currency !== "INR") {
         throw new Error(`UNSUPPORTED_CURRENCY: Expected INR, got ${paymentEntity.currency || "none"}`);
@@ -173,12 +177,8 @@ export async function processRazorpayWebhook(
         tx as unknown as Parameters<typeof postPayment>[0],
         makePaymentAuthCtx(intent.tenant_id as string, intent.store_id as string, (intent.customer_id as string) || (intent.tenant_id as string)),
         {
-          direction: "in",
-          partyType: "customer",
-          partyId: intent.customer_id as string,
-          amount: paidPaise,
-          method: "upi",
-          paymentDate: format(new Date(), "yyyy-MM-dd"),
+          direction: "in", partyType: "customer", partyId: intent.customer_id as string,
+          amount: paidPaise, method: "upi", paymentDate: format(new Date(), "yyyy-MM-dd"),
           reference: providerPaymentId.slice(0, 64),
           note: `Doorstep delivery UPI payment via Razorpay (${providerPaymentId})`,
           allocations: [{ refType: "sale", refId: intent.sale_id as string, amount: paidPaise }],
@@ -191,15 +191,11 @@ export async function processRazorpayWebhook(
         SET status = 'verified', verified_at = now(), provider_payment_id = ${providerPaymentId}
         WHERE id = ${intent.id}::uuid
       `);
-      await tx.execute(sql`
-        UPDATE delivery_orders
-        SET payment_status = 'verified'
-        WHERE id = ${intent.delivery_order_id}::uuid
-      `);
+      await tx.execute(sql`UPDATE delivery_orders SET payment_status = 'verified' WHERE id = ${intent.delivery_order_id}::uuid`);
       await tx.execute(sql`
         UPDATE delivery_payment_webhooks
-        SET status = 'processed', processed_at = now(), lease_expires_at = NULL
-        WHERE id = ${webhook.id}::uuid
+        SET status = 'processed', processed_at = now(), lease_token = NULL, lease_expires_at = NULL
+        WHERE id = ${webhook.id}::uuid AND lease_token = ${leaseToken}
       `);
 
       settlementSuccess = true;
@@ -212,11 +208,9 @@ export async function processRazorpayWebhook(
   if (!settlementSuccess && settlementError) {
     await db.execute(sql`
       UPDATE delivery_payment_webhooks
-      SET status = 'failed',
-          error_message = ${settlementError},
-          retry_count = retry_count + 1,
-          lease_expires_at = NULL
-      WHERE id = ${webhook.id}::uuid
+      SET status = 'failed', error_message = ${settlementError}, retry_count = retry_count + 1,
+          lease_token = NULL, lease_expires_at = NULL
+      WHERE id = ${webhook.id}::uuid AND lease_token = ${leaseToken}
     `);
     return { processed: false, error: settlementError };
   }

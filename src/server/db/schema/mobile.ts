@@ -258,6 +258,7 @@ export const deliveryPaymentIntents = pgTable(
   },
   (t) => [
     uniqueIndex("uq_delivery_order_ref").on(t.tenantId, t.providerOrderRef),
+    uniqueIndex("uq_mobile_intent_provider_payment").on(t.tenantId, t.providerPaymentId),
     check("chk_intent_provider", sql`${t.provider} IN ('razorpay', 'mock')`),
     check("chk_intent_status", sql`${t.status} IN ('pending', 'verified', 'failed', 'expired')`),
     foreignKey({
@@ -282,6 +283,7 @@ export const deliveryPaymentWebhooks = pgTable(
     status: text("status").notNull().default("pending"), // 'pending' | 'processing' | 'processed' | 'ignored' | 'failed'
     errorMessage: text("error_message"),
     retryCount: integer("retry_count").notNull().default(0),
+    leaseToken: text("lease_token"),
     leaseExpiresAt: timestamp("lease_expires_at", { withTimezone: true }),
     processedAt: timestamp("processed_at", { withTimezone: true }),
     createdAt: createdAt(),
