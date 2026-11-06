@@ -81,6 +81,11 @@ const envSchema = z
     GSP_PORTAL_USERNAME: z.string().optional(),
     GSP_PORTAL_PASSWORD: z.string().optional(),
 
+    // ─── Observability (Phase 6.1) ──────────────────────────────────────────
+    LOG_LEVEL: z.enum(["debug", "info", "warn", "error"]).default("info"),
+    HEALTH_SECRET: z.string().optional(),
+    SENTRY_DSN: z.string().optional(),
+
     // ─── AI providers (all optional) ─────────────────────────────────────────
     GEMINI_API_KEY: z.string().optional(),
     GROQ_API_KEY: z.string().optional(),
