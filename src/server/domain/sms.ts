@@ -9,27 +9,68 @@ export interface SmsSendResult {
   error?: string;
 }
 
+export interface SendSmsParams {
+  to: string;
+  message: string;
+  dltTemplateId?: string;
+  senderId?: string;
+  entityId?: string;
+}
+
+export function resolveSendParams(
+  toOrParams: string | SendSmsParams,
+  message?: string,
+  options?: { dltTemplateId?: string; senderId?: string; entityId?: string }
+): SendSmsParams {
+  if (typeof toOrParams === "object" && toOrParams !== null) {
+    return toOrParams;
+  }
+  return {
+    to: toOrParams,
+    message: message ?? "",
+    dltTemplateId: options?.dltTemplateId,
+    senderId: options?.senderId,
+    entityId: options?.entityId,
+  };
+}
+
 export interface SmsProvider {
-  sendSms(to: string, message: string): Promise<SmsSendResult>;
+  sendSms(
+    toOrParams: string | SendSmsParams,
+    message?: string,
+    options?: { dltTemplateId?: string; senderId?: string; entityId?: string }
+  ): Promise<SmsSendResult>;
 }
 
 export class Msg91Provider implements SmsProvider {
   constructor(private apiKey: string, private senderId?: string) {}
 
-  async sendSms(to: string, message: string): Promise<SmsSendResult> {
+  async sendSms(
+    toOrParams: string | SendSmsParams,
+    message?: string,
+    options?: { dltTemplateId?: string; senderId?: string; entityId?: string }
+  ): Promise<SmsSendResult> {
+    const params = resolveSendParams(toOrParams, message, options);
     try {
       // MSG91 API integration
-      const cleanPhone = to.replace(/\D/g, "").slice(-10);
+      const cleanPhone = params.to.replace(/\D/g, "").slice(-10);
+      const sender = params.senderId || this.senderId || "MEDFLW";
+      const payload: Record<string, unknown> = {
+        sender,
+        recipients: [{ mobiles: `91${cleanPhone}`, message: params.message }],
+      };
+      if (params.dltTemplateId) {
+        payload.template_id = params.dltTemplateId;
+        payload.dlt_te_id = params.dltTemplateId;
+      }
+
       const res = await fetch("https://control.msg91.com/api/v5/flow/", {
         method: "POST",
         headers: {
           authkey: this.apiKey,
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          sender: this.senderId || "MEDFLW",
-          recipients: [{ mobiles: `91${cleanPhone}`, message }],
-        }),
+        body: JSON.stringify(payload),
       });
 
       const data = await res.json();
@@ -46,17 +87,27 @@ export class Msg91Provider implements SmsProvider {
 export class TextLocalProvider implements SmsProvider {
   constructor(private apiKey: string, private senderId?: string) {}
 
-  async sendSms(to: string, message: string): Promise<SmsSendResult> {
+  async sendSms(
+    toOrParams: string | SendSmsParams,
+    message?: string,
+    options?: { dltTemplateId?: string; senderId?: string; entityId?: string }
+  ): Promise<SmsSendResult> {
+    const params = resolveSendParams(toOrParams, message, options);
     try {
-      const cleanPhone = to.replace(/\D/g, "").slice(-10);
-      const params = new URLSearchParams({
+      const cleanPhone = params.to.replace(/\D/g, "").slice(-10);
+      const sender = params.senderId || this.senderId || "TXTLCL";
+      const queryParams = new URLSearchParams({
         apikey: this.apiKey,
         numbers: `91${cleanPhone}`,
-        sender: this.senderId || "TXTLCL",
-        message: encodeURIComponent(message),
+        sender,
+        message: encodeURIComponent(params.message),
       });
+      if (params.dltTemplateId) {
+        queryParams.set("custom", params.dltTemplateId);
+        queryParams.set("dlt_template_id", params.dltTemplateId);
+      }
 
-      const res = await fetch(`https://api.textlocal.in/send/?${params.toString()}`);
+      const res = await fetch(`https://api.textlocal.in/send/?${queryParams.toString()}`);
       const data = await res.json();
 
       if (data.status === "success") {
@@ -70,8 +121,15 @@ export class TextLocalProvider implements SmsProvider {
 }
 
 export class MockSmsProvider implements SmsProvider {
-  async sendSms(to: string, message: string): Promise<SmsSendResult> {
-    console.log(`[SMS Simulator] Sent to ${to}: "${message}"`);
+  async sendSms(
+    toOrParams: string | SendSmsParams,
+    message?: string,
+    options?: { dltTemplateId?: string; senderId?: string; entityId?: string }
+  ): Promise<SmsSendResult> {
+    const params = resolveSendParams(toOrParams, message, options);
+    console.log(
+      `[SMS Simulator] Sent to ${params.to} (Sender: ${params.senderId || "DEFAULT"}, DLT: ${params.dltTemplateId || "NONE"}): "${params.message}"`
+    );
     return {
       success: true,
       messageId: `mock_sms_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
@@ -102,3 +160,7 @@ export async function getSmsProvider(tenantId: string): Promise<SmsProvider> {
 
   return new MockSmsProvider();
 }
+
+// Re-export DLT domain modules
+export * from "./sms/dlt-validator";
+export * from "./sms/dlt-service";
