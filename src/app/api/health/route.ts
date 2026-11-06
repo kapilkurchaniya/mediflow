@@ -20,6 +20,7 @@ function isValidSecret(provided: string | null, expected?: string): boolean {
 export async function GET(req?: NextRequest) {
   const secretHeader = req?.headers?.get ? req.headers.get("x-health-secret") : null;
   const configuredSecret = env.HEALTH_SECRET || env.CRON_SECRET;
+  const probeType = req?.nextUrl?.searchParams?.get("probe");
 
   // Anti-caching headers for health probes
   const headers = {
@@ -44,20 +45,35 @@ export async function GET(req?: NextRequest) {
     });
   }
 
-  // Case 2: Public liveness probe
-  const dbProbe = await checkDatabase(db);
-  const isHealthy = dbProbe.status === "up";
+  // Case 2: Database readiness probe (?probe=readiness)
+  // Evaluates whether essential backing infrastructure (PostgreSQL) is ready to serve requests.
+  if (probeType === "readiness") {
+    const dbProbe = await checkDatabase(db);
+    const isReady = dbProbe.status === "up";
+    return NextResponse.json(
+      {
+        status: isReady ? "healthy" : "degraded",
+        database: isReady ? "connected" : "unreachable",
+        latencyMs: dbProbe.latencyMs,
+      },
+      {
+        status: isReady ? 200 : 503,
+        headers,
+      },
+    );
+  }
 
+  // Case 3: Public liveness probe (default or ?probe=liveness)
+  // Determines if process is running. Strictly independent of database availability
+  // so orchestrators do not restart healthy application instances during DB outages.
   return NextResponse.json(
     {
-      status: isHealthy ? "healthy" : "degraded",
+      status: "healthy",
       timestamp: new Date().toISOString(),
       uptimeSeconds: Math.floor(process.uptime()),
-      database: isHealthy ? "connected" : "unreachable",
-      latencyMs: dbProbe.latencyMs,
     },
     {
-      status: isHealthy ? 200 : 503,
+      status: 200,
       headers,
     },
   );

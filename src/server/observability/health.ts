@@ -16,6 +16,13 @@ export interface OutboxProbeResult {
   lastProcessedAt?: string | null;
 }
 
+export interface MobileWebhooksProbeResult {
+  status: "healthy" | "degraded";
+  pendingCount: number;
+  expiredLeasesCount: number;
+  failedCount: number;
+}
+
 export interface WorkerProbeResult {
   status: "ok" | "running" | "stale" | "failed" | "idle";
   lastHeartbeatAt?: string | null;
@@ -30,6 +37,7 @@ export interface HealthDiagnostics {
   database: DatabaseProbeResult;
   outbox: OutboxProbeResult;
   workers: Record<string, WorkerProbeResult>;
+  mobileWebhooks: MobileWebhooksProbeResult;
 }
 
 export interface PublicHealthResponse {
@@ -144,15 +152,52 @@ export async function checkWorkerHeartbeats(
 }
 
 /**
+ * Checks event-driven mobile payment webhooks for excessive queue backlog or expired leases.
+ */
+export async function checkMobileWebhooks(
+  db: typeof defaultDb,
+): Promise<MobileWebhooksProbeResult> {
+  try {
+    const res = await db.execute(sql`
+      SELECT
+        count(*) FILTER (WHERE status = 'pending') AS pending_count,
+        count(*) FILTER (WHERE status = 'processing' AND lease_expires_at < now()) AS expired_leases_count,
+        count(*) FILTER (WHERE status = 'failed') AS failed_count
+      FROM delivery_payment_webhooks
+    `);
+    const row = res.rows[0] as Record<string, unknown> | undefined;
+    const pendingCount = Number(row?.pending_count || 0);
+    const expiredLeasesCount = Number(row?.expired_leases_count || 0);
+    const failedCount = Number(row?.failed_count || 0);
+    const isDegraded = expiredLeasesCount > 10 || failedCount > 50;
+
+    return {
+      status: isDegraded ? "degraded" : "healthy",
+      pendingCount,
+      expiredLeasesCount,
+      failedCount,
+    };
+  } catch {
+    return {
+      status: "healthy",
+      pendingCount: 0,
+      expiredLeasesCount: 0,
+      failedCount: 0,
+    };
+  }
+}
+
+/**
  * Aggregates all probes into complete operational diagnostics.
  */
 export async function runHealthDiagnostics(
   db: typeof defaultDb = defaultDb,
 ): Promise<HealthDiagnostics> {
-  const [database, outbox, workers] = await Promise.all([
+  const [database, outbox, workers, mobileWebhooks] = await Promise.all([
     checkDatabase(db),
     checkOutbox(db),
     checkWorkerHeartbeats(db),
+    checkMobileWebhooks(db),
   ]);
 
   let overallStatus: HealthDiagnostics["status"] = "healthy";
@@ -161,6 +206,7 @@ export async function runHealthDiagnostics(
     overallStatus = "unhealthy";
   } else if (
     outbox.status === "degraded" ||
+    mobileWebhooks.status === "degraded" ||
     Object.values(workers).some((w) => w.status === "stale" || w.status === "failed")
   ) {
     overallStatus = "degraded";
@@ -173,5 +219,6 @@ export async function runHealthDiagnostics(
     database,
     outbox,
     workers,
+    mobileWebhooks,
   };
 }

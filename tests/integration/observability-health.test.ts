@@ -44,10 +44,12 @@ describe("Observability Health & Heartbeats Integration Suite (Phase 6.1)", () =
       expect(body.timestamp).toBeDefined();
       expect(body.uptimeSeconds).toBeGreaterThanOrEqual(0);
 
-      // Verify strict privacy: zero disclosure of outbox backlog or background workers
-      expect(body.database).toBe("connected");
+      // Verify strict privacy: zero disclosure of database, latency, outbox, workers, or mobile webhooks
+      expect(body.database).toBeUndefined();
+      expect(body.latencyMs).toBeUndefined();
       expect(body.outbox).toBeUndefined();
       expect(body.workers).toBeUndefined();
+      expect(body.mobileWebhooks).toBeUndefined();
     });
   });
 
@@ -92,6 +94,13 @@ describe("Observability Health & Heartbeats Integration Suite (Phase 6.1)", () =
       // Worker probe details
       expect(body.workers).toBeDefined();
       expect(typeof body.workers).toBe("object");
+
+      // Mobile webhooks probe details
+      expect(body.mobileWebhooks).toBeDefined();
+      expect(["healthy", "degraded"]).toContain(body.mobileWebhooks.status);
+      expect(typeof body.mobileWebhooks.pendingCount).toBe("number");
+      expect(typeof body.mobileWebhooks.expiredLeasesCount).toBe("number");
+      expect(typeof body.mobileWebhooks.failedCount).toBe("number");
     });
   });
 

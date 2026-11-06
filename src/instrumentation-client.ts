@@ -12,6 +12,14 @@ let isInitialized = false;
 
 export function initClientInstrumentation(): void {
   if (typeof window === "undefined" || isInitialized) return;
+
+  // Avoid duplicate telemetry if Sentry browser SDK is already active
+  const hasSentry = Boolean(
+    (window as unknown as { __SENTRY__?: unknown }).__SENTRY__ ||
+    (window as unknown as { Sentry?: unknown }).Sentry,
+  );
+  if (hasSentry) return;
+
   isInitialized = true;
 
   window.addEventListener("error", (event: ErrorEvent) => {
