@@ -109,8 +109,9 @@ export async function processRazorpayWebhook(
   const claimRes = await db.execute(sql`
     UPDATE delivery_payment_webhooks
     SET status = 'processing', lease_token = ${leaseToken}, lease_expires_at = now() + interval '60 seconds'
-    WHERE id = ${input.webhookId}::uuid AND status IN ('pending', 'failed')
-      AND (lease_expires_at IS NULL OR lease_expires_at < now())
+    WHERE id = ${input.webhookId}::uuid
+      AND tenant_id = ${input.tenantId}::uuid
+      AND (status IN ('pending', 'failed') OR (status = 'processing' AND lease_expires_at < now()))
     RETURNING *
   `);
   const webhook = claimRes.rows[0] as Record<string, unknown> | undefined;
@@ -122,6 +123,15 @@ export async function processRazorpayWebhook(
   try {
     // SETTLEMENT TRANSACTION (TX 1)
     await db.transaction(async (tx) => {
+      // 1. Lock webhook row with active lease verification
+      const lockWh = await tx.execute(sql`
+        SELECT id FROM delivery_payment_webhooks
+        WHERE id = ${webhook.id}::uuid AND tenant_id = ${input.tenantId}::uuid
+          AND lease_token = ${leaseToken} AND lease_expires_at > now()
+        FOR UPDATE
+      `);
+      if (!lockWh.rows[0]) throw new Error("LEASE_LOST_OR_EXPIRED");
+
       const raw = (webhook.payload || {}) as Record<string, unknown>;
       const nested = (raw.payload || raw) as Record<string, Record<string, unknown>>;
       const paymentEntity = (nested.payment?.entity || {}) as Record<string, unknown>;
@@ -130,13 +140,16 @@ export async function processRazorpayWebhook(
       const qrNotes = (qrEnt.notes || {}) as Record<string, unknown>;
       const orderRef = (pNotes.provider_order_ref || qrNotes.provider_order_ref) as string | undefined;
       const providerQrId = (qrEnt.id || paymentEntity.qr_code_id) as string | undefined;
-      const providerPaymentId = (paymentEntity.id || webhook.provider_payment_id || `pay_${crypto.randomUUID()}`) as string;
+      const providerPaymentId = paymentEntity.id as string | undefined;
 
       if (!orderRef && !providerQrId) {
         throw new Error("MISSING_PAYMENT_IDENTIFIERS: Webhook payload missing both provider_order_ref and provider_qr_id");
       }
-      if (paymentEntity.status && paymentEntity.status !== "captured") {
-        throw new Error(`PAYMENT_NOT_CAPTURED: Payment status is ${paymentEntity.status}`);
+      if (!paymentEntity.status || paymentEntity.status !== "captured") {
+        throw new Error(`PAYMENT_NOT_CAPTURED: Payment status is ${paymentEntity.status || "missing"}`);
+      }
+      if (!providerPaymentId || typeof providerPaymentId !== "string" || !providerPaymentId.trim()) {
+        throw new Error("MISSING_PROVIDER_PAYMENT_ID: Provider payment id is required");
       }
 
       const intentRes = await tx.execute(sql`
@@ -192,11 +205,12 @@ export async function processRazorpayWebhook(
         WHERE id = ${intent.id}::uuid
       `);
       await tx.execute(sql`UPDATE delivery_orders SET payment_status = 'verified' WHERE id = ${intent.delivery_order_id}::uuid`);
-      await tx.execute(sql`
+      const compRes = await tx.execute(sql`
         UPDATE delivery_payment_webhooks
         SET status = 'processed', processed_at = now(), lease_token = NULL, lease_expires_at = NULL
         WHERE id = ${webhook.id}::uuid AND lease_token = ${leaseToken}
       `);
+      if (compRes.rowCount !== 1) throw new Error("LEASE_COMPLETION_FAILED");
 
       settlementSuccess = true;
     });

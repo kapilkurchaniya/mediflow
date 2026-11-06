@@ -162,6 +162,7 @@ describe("Mobile Delivery, Settlement & Dashboard Suite", () => {
             id: `pay_${Date.now()}`,
             amount: 100000,
             currency: "INR",
+            status: "captured",
             notes: { provider_order_ref: intentRes.intent.providerOrderRef, tenant_id: tenantId },
           },
         },

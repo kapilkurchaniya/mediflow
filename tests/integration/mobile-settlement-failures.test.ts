@@ -36,21 +36,9 @@ describe("Mobile Settlement Failures, Two-Transaction Recovery & Subledger Suite
     await db.execute(sql`INSERT INTO customers (id, tenant_id, name, phone) VALUES (${customerId}::uuid, ${tenantId}::uuid, 'Fail Cust', '9999988888')`);
 
     await db.execute(sql`INSERT INTO roles (id, tenant_id, key, name, is_system) VALUES (gen_random_uuid(), ${tenantId}::uuid, 'owner', 'Owner', true) ON CONFLICT DO NOTHING`);
-    await db.execute(sql`
-      INSERT INTO memberships (id, tenant_id, user_id, role_id, status, all_stores, store_ids)
-      SELECT gen_random_uuid(), ${tenantId}::uuid, ${ownerUserId}::uuid, id, 'active', true, ARRAY[${storeId}::uuid]
-      FROM roles WHERE tenant_id = ${tenantId}::uuid AND key = 'owner'
-    `);
-
-    await db.execute(sql`
-      INSERT INTO sales (id, tenant_id, store_id, invoice_no, status, total_amount, paid_amount, cost_amount, credit_amount, customer_id, created_by, completed_at)
-      VALUES (${saleId}::uuid, ${tenantId}::uuid, ${storeId}::uuid, 'INV-FAIL-1', 'completed', 75000, 0, 45000, 75000, ${customerId}::uuid, ${ownerUserId}::uuid, now())
-    `);
-
-    await db.execute(sql`
-      INSERT INTO delivery_orders (id, tenant_id, store_id, sale_id, delivery_status, payment_status, delivery_address, recipient_name, recipient_phone)
-      VALUES (${deliveryOrderId}::uuid, ${tenantId}::uuid, ${storeId}::uuid, ${saleId}::uuid, 'in_transit', 'pending', '456 Fail St', 'Cust', '9999988888')
-    `);
+    await db.execute(sql`INSERT INTO memberships (id, tenant_id, user_id, role_id, status, all_stores, store_ids) SELECT gen_random_uuid(), ${tenantId}::uuid, ${ownerUserId}::uuid, id, 'active', true, ARRAY[${storeId}::uuid] FROM roles WHERE tenant_id = ${tenantId}::uuid AND key = 'owner'`);
+    await db.execute(sql`INSERT INTO sales (id, tenant_id, store_id, invoice_no, status, total_amount, paid_amount, cost_amount, credit_amount, customer_id, created_by, completed_at) VALUES (${saleId}::uuid, ${tenantId}::uuid, ${storeId}::uuid, 'INV-FAIL-1', 'completed', 75000, 0, 45000, 75000, ${customerId}::uuid, ${ownerUserId}::uuid, now())`);
+    await db.execute(sql`INSERT INTO delivery_orders (id, tenant_id, store_id, sale_id, delivery_status, payment_status, delivery_address, recipient_name, recipient_phone) VALUES (${deliveryOrderId}::uuid, ${tenantId}::uuid, ${storeId}::uuid, ${saleId}::uuid, 'in_transit', 'pending', '456 Fail St', 'Cust', '9999988888')`);
   });
 
   afterAll(async () => {
@@ -92,6 +80,7 @@ describe("Mobile Settlement Failures, Two-Transaction Recovery & Subledger Suite
             id: `pay_curr_${Date.now()}`,
             amount: 75000,
             currency: "USD", // Illegal currency
+            status: "captured",
             notes: { provider_order_ref: intentRes.intent.providerOrderRef, tenant_id: tenantId },
           },
         },
@@ -123,10 +112,11 @@ describe("Mobile Settlement Failures, Two-Transaction Recovery & Subledger Suite
   it("recovers failed webhook when worker re-processes after lease expiration", async () => {
     const eventId = `evt_retry_${Date.now()}`;
     const orderRef = `MPAY-RETRY-${Date.now()}`;
+    const qrId = `qr_retry_${Date.now()}`;
     const rawWebhook = JSON.stringify({
       id: eventId,
       event: "payment.captured",
-      payload: { payment: { entity: { id: `pay_retry_${Date.now()}`, amount: 75000, currency: "INR", notes: { provider_order_ref: orderRef, tenant_id: tenantId } } } },
+      payload: { payment: { entity: { id: `pay_retry_${Date.now()}`, amount: 75000, currency: "INR", status: "captured", notes: { provider_order_ref: orderRef, tenant_id: tenantId } } } },
     });
     const secret = process.env.RAZORPAY_WEBHOOK_SECRET || "mediflow_rzp_webhook_secret_test";
     const sig = crypto.createHmac("sha256", secret).update(rawWebhook).digest("hex");
@@ -141,7 +131,7 @@ describe("Mobile Settlement Failures, Two-Transaction Recovery & Subledger Suite
     // Now insert the matching intent
     await db.execute(sql`
       INSERT INTO delivery_payment_intents (id, tenant_id, delivery_order_id, provider, provider_qr_id, provider_order_ref, amount_paise, qr_payload, status, expires_at)
-      VALUES (gen_random_uuid(), ${tenantId}::uuid, ${deliveryOrderId}::uuid, 'razorpay', 'qr_retry', ${orderRef}, 75000, 'upi://pay?...', 'pending', now() + interval '30 minutes')
+      VALUES (gen_random_uuid(), ${tenantId}::uuid, ${deliveryOrderId}::uuid, 'razorpay', ${qrId}, ${orderRef}, 75000, 'upi://pay?...', 'pending', now() + interval '30 minutes')
     `);
 
     // Worker reclaims lease and successfully processes
@@ -198,6 +188,7 @@ describe("Mobile Settlement Failures, Two-Transaction Recovery & Subledger Suite
             id: `pay_mis_${Date.now()}`,
             amount: 25000, // Intent expected 50000, received 25000
             currency: "INR",
+            status: "captured",
             notes: { provider_order_ref: intentRes.intent.providerOrderRef, tenant_id: tenantId },
           },
         },
@@ -242,6 +233,7 @@ describe("Mobile Settlement Failures, Two-Transaction Recovery & Subledger Suite
             id: providerPaymentId,
             amount: 60000,
             currency: "INR",
+            status: "captured",
             notes: { provider_order_ref: intentRes.intent.providerOrderRef, tenant_id: tenantId },
           },
         },
@@ -278,6 +270,7 @@ describe("Mobile Settlement Failures, Two-Transaction Recovery & Subledger Suite
             id: `pay_unk_${Date.now()}`,
             amount: 10000,
             currency: "INR",
+            status: "captured",
             notes: { provider_order_ref: "NON_EXISTENT_REF_999", tenant_id: tenantId },
           },
         },

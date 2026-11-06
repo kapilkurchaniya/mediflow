@@ -258,6 +258,7 @@ export const deliveryPaymentIntents = pgTable(
   },
   (t) => [
     uniqueIndex("uq_delivery_order_ref").on(t.tenantId, t.providerOrderRef),
+    uniqueIndex("uq_mobile_intent_provider_qr").on(t.provider, t.providerQrId),
     uniqueIndex("uq_mobile_intent_provider_payment").on(t.tenantId, t.providerPaymentId),
     check("chk_intent_provider", sql`${t.provider} IN ('razorpay', 'mock')`),
     check("chk_intent_status", sql`${t.status} IN ('pending', 'verified', 'failed', 'expired')`),

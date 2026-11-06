@@ -46,7 +46,7 @@ export async function POST(req: NextRequest) {
     if (msg.includes("INVALID_WEBHOOK_SIGNATURE")) {
       return NextResponse.json({ status: "error", error: "INVALID_SIGNATURE" }, { status: 400 });
     }
-    // Return 200 with error log for unprocessable bodies to prevent continuous webhook hammering
-    return NextResponse.json({ status: "error_logged", error: msg }, { status: 200 });
+    // Return retryable 500 for ingestion failures so payment provider retries delivery
+    return NextResponse.json({ status: "error", error: msg }, { status: 500 });
   }
 }

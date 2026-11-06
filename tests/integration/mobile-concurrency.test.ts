@@ -214,6 +214,7 @@ describe("Mobile Concurrency & Multi-Connection Suite", () => {
             id: `pay_conc_${Date.now()}`,
             amount: 80000,
             currency: "INR",
+            status: "captured",
             notes: { provider_order_ref: intentRes.intent.providerOrderRef, tenant_id: tenantId },
           },
         },
