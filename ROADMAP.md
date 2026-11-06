@@ -885,13 +885,13 @@ Full map in `.github/CODEOWNERS` and [ADR 0004](docs/adr/0004-two-lane-ownership
 #### A5.4 Period lock ⏱ 1.5 days [COMPLETED]
 - ✏️ `schema/accounting.ts`: ➕ `accounting_periods (tenant_id, gstin?, period 'YYYY-MM', locked_at, locked_by)`. Every domain function that posts with a date checks `assertPeriodOpen(tx, ctx, date)`. Locking a month needs `accounting.post` + an owner role. Reason: after GST filing, nothing may change that month's figures.
 
-#### A5.5 Opening balances & accounting tests ⏱ 1.5 days
+#### A5.5 Opening balances & accounting tests ⏱ 1.5 days [COMPLETED]
 - `postOpeningBalance` (from B4.4) plus a UI for manual entry. 🧪 Invariant tests: every entry balances; after a random sequence of 200 operations (sales, returns, purchases, payments, transfers) the trial balance is zero and stock value per the ledger equals Σ batch quantity × cost.
 
-#### A5.6 Year-end ⏱ 1.5 days
+#### A5.6 Year-end ⏱ 1.5 days [COMPLETED]
 - Fiscal-year rollover checks: sequences reset on 1 April (already keyed by FY; test it). A closing-stock valuation report as of 31 March (FIFO/landed cost from batches) for the CA. Reset of the near-expiry and returns cycle is unaffected.
 
-#### A5.7 🤝 Mobile Management App (React Native / Expo) ⏱ 3 days
+#### A5.7 🤝 Mobile Management App (React Native / Expo) ⏱ 3 days [COMPLETED]
 - **Why:** Pharmacy owners are on the move. They require mobile real-time sales visibility, low stock alerts, remote credit approvals, and delivery fulfillment.
 - **Files:** ➕ `mobile/` (React Native / Expo project), ➕ `src/app/api/v1/mobile/*` (lightweight authenticated REST endpoints for owner dashboard & approvals).
 - **How:**
@@ -1063,7 +1063,7 @@ Tick items in PRs. One line per task, in the same order as above.
 **Phase 2** — A: [x] A2.1 [x] A2.2 [x] A2.3 [x] A2.4 [x] A2.5 [x] A2.6 [x] A2.7 [x] A2.8 [x] A2.9 [x] A2.10 [x] A2.11 [x] A2.12 · B: [x] B2.1 [x] B2.2 [x] B2.3 [x] B2.4 [x] B2.5 [x] B2.6 [x] B2.7 [x] B2.8
 **Phase 3** — A: [x] A3.1 [x] A3.2 [x] A3.3 [x] A3.4 [x] A3.5 [x] A3.6 · B: [x] B3.1 [x] B3.2 [x] B3.3 [x] B3.4 [x] B3.5 [x] B3.6 [x] B3.7
 **Phase 4** — A: [x] A4.1 [x] A4.2 [x] A4.3 [x] A4.4 [x] A4.5 [x] A4.6 [x] A4.7 [x] A4.8 [x] A4.9 · B: [x] B4.1 [x] B4.2 [x] B4.3 [x] B4.4 [x] B4.5 [x] B4.6
-**Phase 5** — A: [x] A5.1 [x] A5.2 [x] A5.3 [x] A5.4 [ ] A5.5 [ ] A5.6 [ ] A5.7 · B: [x] B5.1 [x] B5.2 [x] B5.3 [x] B5.4 [x] B5.5 [ ] B5.6 [ ] B5.7
+**Phase 5** — A: [x] A5.1 [x] A5.2 [x] A5.3 [x] A5.4 [x] A5.5 [x] A5.6 [x] A5.7 · B: [x] B5.1 [x] B5.2 [x] B5.3 [x] B5.4 [x] B5.5 [ ] B5.6 [ ] B5.7
 **Phase 6** — A: [ ] A6.1 [ ] A6.2 [ ] A6.3 [ ] A6.4 [ ] A6.5 [ ] A6.6 · B: [ ] B6.1 [ ] B6.2 [ ] B6.3 [ ] B6.4 [ ] B6.5 [ ] B6.6
 
 ---
