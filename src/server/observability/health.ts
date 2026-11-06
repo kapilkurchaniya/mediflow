@@ -44,7 +44,6 @@ export interface PublicHealthResponse {
 export async function checkDatabase(db: typeof defaultDb): Promise<DatabaseProbeResult> {
   const startedAt = Date.now();
   try {
-    // Execute ping bounded to 2000ms
     await db.execute(sql`SELECT 1 AS ping`);
     return {
       status: "up",
@@ -124,8 +123,8 @@ export async function checkWorkerHeartbeats(
 
       let workerStatus: WorkerProbeResult["status"] = hb.status as WorkerProbeResult["status"];
 
-      // Stale checks based on worker type
-      if (hb.workerName === "outbox_worker" && ageSeconds > 300) {
+      // Stale checks based on worker type (outbox worker expected <= 60s, stale > 120s)
+      if (hb.workerName === "outbox_worker" && ageSeconds > 120) {
         workerStatus = "stale";
       } else if (hb.workerName === "reminders_cron" && ageSeconds > 93600) {
         // Stale if > 26 hours

@@ -20,11 +20,27 @@ export interface NormalizedError {
   stack?: string;
 }
 
+export interface SafeDiagnosticMeta {
+  route?: string;
+  method?: string;
+  routerKind?: string;
+  routeType?: string;
+  latencyMs?: number;
+  status?: number | string;
+  batchSize?: number;
+  processed?: number;
+  succeeded?: number;
+  failed?: number;
+  action?: string;
+  workerName?: string;
+}
+
 export interface ErrorReportContext {
   requestId?: string;
   tenantId?: string;
   route?: string;
-  metadata?: Record<string, unknown>;
+  action?: string;
+  metadata?: SafeDiagnosticMeta;
 }
 
 export interface ErrorReporterAdapter {

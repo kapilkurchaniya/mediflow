@@ -142,7 +142,7 @@ describe("Observability & Logging Unit Suite (Phase 6.1)", () => {
       expect(() => {
         captureException(new Error("Test failure"), {
           route: "/api/test",
-          metadata: { phone: "9876543210", action: "test_action" },
+          metadata: { action: "test_action", status: 500 },
         });
       }).not.toThrow();
 

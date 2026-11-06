@@ -1,6 +1,6 @@
 import { type Instrumentation } from "next";
 import { captureException } from "@/server/observability/error-reporter";
-import { rootLogger } from "@/server/logging/logger";
+import { logInfo } from "@/server/logging/logger";
 
 /**
  * Next.js server instrumentation registration hook.
@@ -8,7 +8,7 @@ import { rootLogger } from "@/server/logging/logger";
  */
 export async function register() {
   if (process.env.NEXT_RUNTIME === "nodejs") {
-    rootLogger.info(
+    logInfo(
       {
         action: "server_boot",
         nodeVersion: process.version,

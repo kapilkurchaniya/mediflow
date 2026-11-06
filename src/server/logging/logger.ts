@@ -39,19 +39,39 @@ export const rootLogger: Logger = pino({
 
 export type LogLevel = "debug" | "info" | "warn" | "error";
 
-export interface LogEventMeta {
+export interface SafeLogMeta {
   action: string;
   requestId?: string;
   tenantId?: string;
   latencyMs?: number;
   status?: string | number;
-  [key: string]: unknown;
+  workerName?: string;
+  batchSize?: number;
+  processed?: number;
+  succeeded?: number;
+  failed?: number;
+  route?: string;
+  method?: string;
+  nodeVersion?: string;
+  env?: string;
+  runtime?: string;
 }
 
 /**
- * Helper to log an allowlisted structured event cleanly.
- * Guarantees standard fields (`action`, `latencyMs`, `status`) and applies redaction.
+ * Strictly allowlisted structured logging helpers preventing arbitrary object dumps.
  */
-export function logEvent(level: LogLevel, meta: LogEventMeta, message: string): void {
+export function logInfo(meta: SafeLogMeta, message: string): void {
+  rootLogger.info(meta, message);
+}
+
+export function logWarn(meta: SafeLogMeta, message: string): void {
+  rootLogger.warn(meta, message);
+}
+
+export function logError(meta: SafeLogMeta, message: string, err?: unknown): void {
+  rootLogger.error({ ...meta, err }, message);
+}
+
+export function logEvent(level: LogLevel, meta: SafeLogMeta, message: string): void {
   rootLogger[level](meta, message);
 }
