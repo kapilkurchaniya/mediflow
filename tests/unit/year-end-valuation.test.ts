@@ -127,6 +127,40 @@ describe("Year-End Stock Valuation & Rollover Unit Tests (A5.6)", () => {
       expect(res.finalValuationPaisePerUnit).toBe(8000);
       expect(res.provisionPaisePerUnit).toBe(0);
     });
+
+    it("supports evidenced partial supplier recovery for expired stock", () => {
+      const res = calculate6TierNrv(
+        {
+          expiryDate: "2026-03-31",
+          landedCostPaise: 15000,
+          catalogSaleRatePaise: 20000,
+          evidencedSupplierClaimPaise: 9000, // 60% partial recovery
+        },
+        cutoffDate,
+      );
+      expect(res.classification).toBe("expired");
+      expect(res.estimatedNrvPaise).toBe(9000);
+      expect(res.finalValuationPaisePerUnit).toBe(9000);
+      expect(res.provisionPaisePerUnit).toBe(6000);
+      expect(res.nrvBasis).toBe("supplier_claim_evidence");
+    });
+
+    it("supports configurable near-expiry and critical discount haircuts", () => {
+      const res = calculate6TierNrv(
+        {
+          expiryDate: "2026-05-15",
+          landedCostPaise: 10000,
+          catalogSaleRatePaise: 10000,
+          policyNearExpiryDiscountPct: 35, // custom 35% discount
+        },
+        cutoffDate,
+      );
+      expect(res.classification).toBe("near_expiry");
+      // 9800 * (1 - 0.35) = 6370
+      expect(res.estimatedNrvPaise).toBe(6370);
+      expect(res.finalValuationPaisePerUnit).toBe(6370);
+      expect(res.nrvBasis).toBe("near_expiry_35pct_discount");
+    });
   });
 
   describe("Sequence Rollover & GST Rule 46(b) Invariants", () => {

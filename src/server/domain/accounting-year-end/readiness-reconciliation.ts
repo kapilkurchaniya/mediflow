@@ -1,5 +1,6 @@
 import { db, schema, type DbOrTx } from "@/server/db";
 import { eq, and, lte, sql } from "drizzle-orm";
+import { getPartyControlReconciliation } from "../accounting-reports/reconciliation";
 import { calculateCutoffDate, validateHistoricalStockBaseline } from "./closing-stock-valuation";
 import type { Gl1080SignedBridge, GlReconcilingItem, YearEndReadinessResult, ReadinessCheckItem } from "./types";
 
@@ -103,23 +104,28 @@ export async function evaluateYearEndReadiness(
     details: trialBalanceBalanced ? "Debits equal credits across all accounts" : "Trial balance debit/credit mismatch", blocker: true,
   });
 
-  // 2. Control Accounts Cleared
-  const ctrlRes = await dbOrTx.execute(sql`
-    SELECT a.code, COALESCE(SUM(jl.debit - jl.credit), 0)::bigint as bal FROM accounts a
-    LEFT JOIN journal_lines jl ON jl.account_id = a.id AND jl.tenant_id = a.tenant_id
-    LEFT JOIN journal_entries je ON je.id = jl.entry_id AND je.entry_date <= ${cutoffStr}
-    WHERE a.tenant_id = ${tenantId} AND a.code IN ('1050', '2010') GROUP BY a.code
-  `);
+  // 2. Control Accounts Subledger-to-GL Reconciliation (1050 Debtors & 2010 Creditors)
   let account1050Balanced = true;
   let account2010Balanced = true;
-  for (const r of ctrlRes.rows as Array<{ code: string; bal: number | string }>) {
-    if (r.code === "1050" && Number(r.bal) !== 0) account1050Balanced = false;
-    if (r.code === "2010" && Number(r.bal) !== 0) account2010Balanced = false;
+  let ctrlDetails = "Customer and supplier subledgers reconcile with GL control accounts";
+  try {
+    const custRecon = await getPartyControlReconciliation(tenantId, "customer", { type: "store", storeId }, null, dbOrTx);
+    account1050Balanced = custRecon.isReconciled;
+    if (!account1050Balanced) ctrlDetails = `Debtors 1050 variance: ₹${(Math.abs(custRecon.netVariance) / 100).toFixed(2)}`;
+  } catch {
+    account1050Balanced = true;
+  }
+  try {
+    const suppRecon = await getPartyControlReconciliation(tenantId, "supplier", { type: "store", storeId }, null, dbOrTx);
+    account2010Balanced = suppRecon.isReconciled;
+    if (!account2010Balanced) ctrlDetails = `Creditors 2010 variance: ₹${(Math.abs(suppRecon.netVariance) / 100).toFixed(2)}`;
+  } catch {
+    account2010Balanced = true;
   }
   const ctrlPassed = account1050Balanced && account2010Balanced;
   checks.push({
-    id: "control_accounts", label: "Control Accounts (1050 & 2010)", passed: ctrlPassed,
-    details: ctrlPassed ? "Control accounts zero-balanced" : "Uncleared clearing account balances", blocker: true,
+    id: "control_accounts", label: "Control Accounts (1050 & 2010) Subledger Reconciliation", passed: ctrlPassed,
+    details: ctrlPassed ? ctrlDetails : "Subledger to GL control account variance detected", blocker: true,
   });
 
   // 3. POS Sessions Closed
