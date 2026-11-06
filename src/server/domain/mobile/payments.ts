@@ -55,26 +55,13 @@ export async function createDeliveryUpiIntent(
     notes: { tenant_id: input.tenantId, delivery_order_id: orderIdStr, provider_order_ref: orderRef },
   });
 
-  const [intent] = await db
-    .insert(deliveryPaymentIntents)
-    .values({
-      tenantId: input.tenantId,
-      deliveryOrderId: orderIdStr,
-      provider: "razorpay",
-      providerQrId: qrRes.id,
-      providerOrderRef: qrRes.providerOrderRef,
-      amountPaise: outstandingPaise,
-      qrPayload: qrRes.qrPayload,
-      status: "pending",
-      expiresAt,
-    })
-    .returning();
+  const [intent] = await db.insert(deliveryPaymentIntents).values({
+    tenantId: input.tenantId, deliveryOrderId: orderIdStr, provider: "razorpay",
+    providerQrId: qrRes.id, providerOrderRef: qrRes.providerOrderRef,
+    amountPaise: outstandingPaise, qrPayload: qrRes.qrPayload, status: "pending", expiresAt,
+  }).returning();
 
-  await db
-    .update(deliveryOrders)
-    .set({ paymentStatus: "intent_created" })
-    .where(eq(deliveryOrders.id, orderIdStr));
-
+  await db.update(deliveryOrders).set({ paymentStatus: "intent_created" }).where(eq(deliveryOrders.id, orderIdStr));
   return { intent, qrPayload: qrRes.qrPayload, amountPaise: outstandingPaise, expiresAt };
 }
 
@@ -98,20 +85,10 @@ export async function ingestRazorpayWebhook(
   const providerPaymentId = paymentEntity?.id ? String(paymentEntity.id) : null;
 
   // Insert into durable inbox deduplicating on (provider, provider_event_id)
-  const [ingested] = await db
-    .insert(deliveryPaymentWebhooks)
-    .values({
-      tenantId: input.tenantId,
-      provider: "razorpay",
-      providerEventId: eventId,
-      providerPaymentId,
-      eventType,
-      payloadSha256: payloadHash,
-      payload,
-      status: "pending",
-    })
-    .onConflictDoNothing()
-    .returning();
+  const [ingested] = await db.insert(deliveryPaymentWebhooks).values({
+    tenantId: input.tenantId, provider: "razorpay", providerEventId: eventId,
+    providerPaymentId, eventType, payloadSha256: payloadHash, payload, status: "pending",
+  }).onConflictDoNothing().returning();
 
   const webhookId = ingested ? ingested.id : (await db.query.deliveryPaymentWebhooks.findFirst({
     where: and(eq(deliveryPaymentWebhooks.provider, "razorpay"), eq(deliveryPaymentWebhooks.providerEventId, eventId)),
@@ -153,9 +130,13 @@ export async function processRazorpayWebhook(
       const qrEnt = (nested.qr_code?.entity || {}) as Record<string, unknown>;
       const pNotes = (paymentEntity.notes || {}) as Record<string, unknown>;
       const qrNotes = (qrEnt.notes || {}) as Record<string, unknown>;
-      const orderRef = (pNotes.provider_order_ref || qrNotes.provider_order_ref) as string;
-      const providerQrId = (qrEnt.id || paymentEntity.qr_code_id) as string;
+      const orderRef = (pNotes.provider_order_ref || qrNotes.provider_order_ref) as string | undefined;
+      const providerQrId = (qrEnt.id || paymentEntity.qr_code_id) as string | undefined;
       const providerPaymentId = (paymentEntity.id || webhook.provider_payment_id || `pay_${crypto.randomUUID()}`) as string;
+
+      if (!orderRef && !providerQrId) {
+        throw new Error("MISSING_PAYMENT_IDENTIFIERS: Webhook payload missing both provider_order_ref and provider_qr_id");
+      }
 
       const intentRes = await tx.execute(sql`
         SELECT i.id, i.tenant_id, i.delivery_order_id, i.amount_paise, i.status,
@@ -164,7 +145,8 @@ export async function processRazorpayWebhook(
         FROM delivery_payment_intents i
         JOIN delivery_orders d ON i.delivery_order_id = d.id
         JOIN sales s ON d.sale_id = s.id
-        WHERE (i.provider_order_ref = ${orderRef || ""} OR i.provider_qr_id = ${providerQrId || ""})
+        WHERE ((${orderRef || null}::text IS NOT NULL AND i.provider_order_ref = ${orderRef || ""})
+           OR (${providerQrId || null}::text IS NOT NULL AND i.provider_qr_id = ${providerQrId || ""}))
           AND i.tenant_id = ${input.tenantId}::uuid
         FOR UPDATE OF i
       `);
@@ -172,12 +154,19 @@ export async function processRazorpayWebhook(
       if (!intent) throw new Error("INTENT_NOT_FOUND");
       if (intent.status === "verified") return; // already settled
 
-      const paidPaise = Number(paymentEntity.amount || intent.amount_paise);
-      if (paymentEntity.currency && paymentEntity.currency !== "INR") {
-        throw new Error(`UNSUPPORTED_CURRENCY: Expected INR, got ${paymentEntity.currency}`);
+      if (!paymentEntity.currency || paymentEntity.currency !== "INR") {
+        throw new Error(`UNSUPPORTED_CURRENCY: Expected INR, got ${paymentEntity.currency || "none"}`);
       }
-      if (paymentEntity.amount && Number(paymentEntity.amount) !== Number(intent.amount_paise)) {
-        throw new Error(`AMOUNT_MISMATCH: Expected ${intent.amount_paise}, got ${paymentEntity.amount}`);
+      const paidPaise = Number(paymentEntity.amount);
+      if (!paidPaise || isNaN(paidPaise) || paidPaise <= 0) {
+        throw new Error(`INVALID_PAYMENT_AMOUNT: Received ${paymentEntity.amount}`);
+      }
+      if (paidPaise !== Number(intent.amount_paise)) {
+        throw new Error(`AMOUNT_MISMATCH: Expected ${intent.amount_paise}, got ${paidPaise}`);
+      }
+      const outstandingSalePaise = Math.max(0, Number(intent.total_amount) - Number(intent.paid_amount));
+      if (paidPaise > outstandingSalePaise) {
+        throw new Error(`PAYMENT_EXCEEDS_OUTSTANDING: Paid ${paidPaise} exceeds outstanding ${outstandingSalePaise}`);
       }
 
       await postPayment(
