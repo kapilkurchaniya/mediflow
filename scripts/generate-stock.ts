@@ -1,52 +1,50 @@
+/**
+ * CLI Entrypoint for Performance Stock and Ledger Seeding (Phase 6.2).
+ * Usage:
+ *   npx tsx scripts/generate-stock.ts --preset benchmark
+ *   npx tsx scripts/generate-stock.ts --preset full
+ */
+
 import "dotenv/config";
-import { db, schema } from "../src/server/db/index";
-import { eq, isNull } from "drizzle-orm";
+import { runSeederEngine } from "./perf/seeder-engine";
 
-async function generateStock() {
-  console.log("Fetching first tenant and store...");
-  const tenants = await db.select().from(schema.tenants).limit(1);
-  const tenantId = tenants[0].id;
-  
-  const stores = await db.select().from(schema.stores).where(eq(schema.stores.tenantId, tenantId)).limit(1);
-  const storeId = stores[0].id;
+async function main() {
+  const args = process.argv.slice(2);
+  const presetArg = args.find((a) => a.startsWith("--preset="));
+  const presetFlagIdx = args.indexOf("--preset");
 
-  console.log(`Generating fake stock for Tenant: ${tenantId}, Store: ${storeId}`);
-
-  // Fetch all medicines that don't have a batch yet
-  const medicines = await db.select({ id: schema.medicines.id, mrp: schema.medicines.mrp })
-    .from(schema.medicines);
-
-  const existingBatches = await db.select({ medicineId: schema.batches.medicineId }).from(schema.batches);
-  const medIdsWithBatches = new Set(existingBatches.map(b => b.medicineId));
-
-  const medsToStock = medicines.filter(m => !medIdsWithBatches.has(m.id));
-
-  console.log(`Found ${medsToStock.length} medicines without stock. Generating...`);
-
-  const BATCH_SIZE = 1000;
-  let inserted = 0;
-
-  for (let i = 0; i < medsToStock.length; i += BATCH_SIZE) {
-    const chunk = medsToStock.slice(i, i + BATCH_SIZE);
-    
-    const batchesToInsert = chunk.map(med => ({
-      tenantId,
-      storeId,
-      medicineId: med.id,
-      batchNo: `B-GEN-${Math.floor(Math.random() * 90000) + 10000}`,
-      expiryDate: "2027-12-31",
-      qtyOnHand: Math.floor(Math.random() * 50) + 10,
-      mrp: med.mrp || 10000, // default 100 Rs
-      purchaseRate: Math.round((med.mrp || 10000) * 0.7),
-      saleRate: med.mrp || 10000,
-    }));
-
-    await db.insert(schema.batches).values(batchesToInsert);
-    inserted += chunk.length;
-    console.log(`Generated stock for ${inserted} medicines...`);
+  let preset: "full" | "benchmark" = "full";
+  if (presetArg) {
+    preset = presetArg.split("=")[1] === "benchmark" ? "benchmark" : "full";
+  } else if (presetFlagIdx !== -1 && args[presetFlagIdx + 1]) {
+    preset = args[presetFlagIdx + 1] === "benchmark" ? "benchmark" : "full";
   }
 
-  console.log("Done!");
+  const forceSeed = args.includes("--force-seed");
+  const connectionString = process.env.DATABASE_URL;
+
+  if (!connectionString) {
+    console.error("❌ Error: DATABASE_URL environment variable is unset.");
+    process.exit(1);
+  }
+
+  try {
+    const res = await runSeederEngine({
+      connectionString,
+      preset,
+      forceSeed,
+    });
+
+    console.log("\nSummary:");
+    console.log(`- Medicines: ${res.medicinesCount.toLocaleString()}`);
+    console.log(`- Batches:   ${res.batchesCount.toLocaleString()}`);
+    console.log(`- Movements: ${res.movementsCount.toLocaleString()}`);
+    console.log(`- Time:      ${(res.durationMs / 1000).toFixed(2)}s\n`);
+    process.exit(0);
+  } catch (err) {
+    console.error("\n❌ Seeding failed:", err instanceof Error ? err.message : err);
+    process.exit(1);
+  }
 }
 
-generateStock().then(() => process.exit(0)).catch(e => { console.error(e); process.exit(1); });
+main();

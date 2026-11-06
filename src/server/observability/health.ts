@@ -2,6 +2,7 @@ import "server-only";
 import { sql } from "drizzle-orm";
 import { db as defaultDb } from "@/server/db";
 import { getAllWorkerHeartbeats } from "./heartbeat";
+import { getPoolMetrics, type PoolMetrics } from "./pool";
 
 export interface DatabaseProbeResult {
   status: "up" | "down";
@@ -38,6 +39,7 @@ export interface HealthDiagnostics {
   outbox: OutboxProbeResult;
   workers: Record<string, WorkerProbeResult>;
   mobileWebhooks: MobileWebhooksProbeResult;
+  pool?: PoolMetrics;
 }
 
 export interface PublicHealthResponse {
@@ -220,5 +222,6 @@ export async function runHealthDiagnostics(
     outbox,
     workers,
     mobileWebhooks,
+    pool: getPoolMetrics(),
   };
 }

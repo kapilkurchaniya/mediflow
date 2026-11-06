@@ -1,4 +1,5 @@
 /** Inventory: batches and the immutable stock ledger. (Lane A) */
+import { sql } from "drizzle-orm";
 import {
   bigserial,
   boolean,
@@ -44,6 +45,9 @@ export const batches = pgTable(
     index("batches_store_med_idx").on(t.storeId, t.medicineId),
     index("batches_expiry_idx").on(t.tenantId, t.expiryDate),
     index("batches_store_updated_idx").on(t.storeId, t.updatedAt, t.id),
+    index("batches_store_med_active_idx")
+      .on(t.storeId, t.medicineId, t.expiryDate, t.id)
+      .where(sql`${t.qtyOnHand} > 0`),
   ],
 );
 
@@ -71,6 +75,7 @@ export const stockMovements = pgTable(
   (t) => [
     uniqueIndex("stock_movements_tenant_store_id_uq").on(t.tenantId, t.storeId, t.id),
     index("stock_mov_tenant_store_effective_idx").on(t.tenantId, t.storeId, t.effectiveAt),
+    index("stock_mov_tenant_store_batch_effective_idx").on(t.tenantId, t.storeId, t.batchId, t.effectiveAt),
     index("stock_mov_batch_idx").on(t.batchId, t.id),
     index("stock_mov_store_created_idx").on(t.storeId, t.createdAt),
     index("stock_mov_med_idx").on(t.medicineId, t.createdAt),

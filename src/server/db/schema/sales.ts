@@ -67,6 +67,7 @@ export const sales = pgTable(
     index("sales_customer_idx").on(t.customerId),
     index("sales_tenant_cust_credit_idx").on(t.tenantId, t.customerId, t.creditAmount),
     index("sales_tenant_store_completed_idx").on(t.tenantId, t.storeId, t.completedAt),
+    index("sales_tenant_store_status_created_idx").on(t.tenantId, t.storeId, t.status, t.createdAt),
   ],
 );
 
@@ -102,7 +103,11 @@ export const saleItems = pgTable(
     totalAmount: money("total_amount"),
     unitCost: money("unit_cost"),
   },
-  (t) => [index("sale_items_sale_idx").on(t.saleId), index("sale_items_med_idx").on(t.medicineId)],
+  (t) => [
+    index("sale_items_sale_idx").on(t.saleId),
+    index("sale_items_med_idx").on(t.medicineId),
+    index("sale_items_tenant_med_sale_idx").on(t.tenantId, t.medicineId, t.saleId),
+  ],
 );
 
 export const salePayments = pgTable(

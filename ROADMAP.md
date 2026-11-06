@@ -943,10 +943,10 @@ Full map in `.github/CODEOWNERS` and [ADR 0004](docs/adr/0004-two-lane-ownership
 
 ### Lane A · Phase 6
 
-#### A6.1 Observability ⏱ 2 days
+#### A6.1 Observability ⏱ 2 days [COMPLETED]
 - Structured logs with `pino` (request id, tenant id; **no PII**). Error tracking (Sentry or an equivalent; free tier) via `instrumentation.ts` and `instrumentation-client.ts`. Read `node_modules/next/dist/docs/01-app/02-guides/instrumentation.md`. ➕ `src/app/api/health/route.ts` (DB ping, outbox backlog size, last cron run).
 
-#### A6.2 Performance ⏱ 2.5 days
+#### A6.2 Performance ⏱ 2.5 days [COMPLETED]
 - Seed 50k medicines, 200k batches and 1M movements (extend `scripts/generate-stock.ts`). Targets: POS search p95 under 150 ms, sale commit p95 under 400 ms, report pages under 2 s. Use `EXPLAIN ANALYZE` and add missing indexes (e.g. `batches (store_id, medicine_id) WHERE qty_on_hand > 0`, `sales (tenant_id, store_id, completed_at)`). Load-test the sale endpoint with k6 (20 concurrent cashiers). Check the pg Pool size (`max: 10` in `db/index.ts`) against the hosting limits.
 
 #### A6.3 Deployment ⏱ 3 days
@@ -1064,7 +1064,7 @@ Tick items in PRs. One line per task, in the same order as above.
 **Phase 3** — A: [x] A3.1 [x] A3.2 [x] A3.3 [x] A3.4 [x] A3.5 [x] A3.6 · B: [x] B3.1 [x] B3.2 [x] B3.3 [x] B3.4 [x] B3.5 [x] B3.6 [x] B3.7
 **Phase 4** — A: [x] A4.1 [x] A4.2 [x] A4.3 [x] A4.4 [x] A4.5 [x] A4.6 [x] A4.7 [x] A4.8 [x] A4.9 · B: [x] B4.1 [x] B4.2 [x] B4.3 [x] B4.4 [x] B4.5 [x] B4.6
 **Phase 5** — A: [x] A5.1 [x] A5.2 [x] A5.3 [x] A5.4 [x] A5.5 [x] A5.6 [x] A5.7 · B: [x] B5.1 [x] B5.2 [x] B5.3 [x] B5.4 [x] B5.5 [ ] B5.6 [ ] B5.7
-**Phase 6** — A: [ ] A6.1 [ ] A6.2 [ ] A6.3 [ ] A6.4 [ ] A6.5 [ ] A6.6 · B: [ ] B6.1 [ ] B6.2 [ ] B6.3 [ ] B6.4 [ ] B6.5 [ ] B6.6
+**Phase 6** — A: [x] A6.1 [x] A6.2 [ ] A6.3 [ ] A6.4 [ ] A6.5 [ ] A6.6 · B: [ ] B6.1 [ ] B6.2 [ ] B6.3 [ ] B6.4 [ ] B6.5 [ ] B6.6
 
 ---
 
