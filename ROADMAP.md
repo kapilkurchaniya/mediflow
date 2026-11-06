@@ -949,7 +949,7 @@ Full map in `.github/CODEOWNERS` and [ADR 0004](docs/adr/0004-two-lane-ownership
 #### A6.2 Performance ⏱ 2.5 days [COMPLETED]
 - Seed 50k medicines, 200k batches and 1M movements (extend `scripts/generate-stock.ts`). Targets: POS search p95 under 150 ms, sale commit p95 under 400 ms, report pages under 2 s. Use `EXPLAIN ANALYZE` and add missing indexes (e.g. `batches (store_id, medicine_id) WHERE qty_on_hand > 0`, `sales (tenant_id, store_id, completed_at)`). Load-test the sale endpoint with k6 (20 concurrent cashiers). Check the pg Pool size (`max: 10` in `db/index.ts`) against the hosting limits.
 
-#### A6.3 Deployment ⏱ 3 days
+#### A6.3 Deployment ⏱ 3 days [COMPLETED]
 - **Decision needed (open question Q1): hosting.** Options: a managed Node host (Railway, Render, Fly.io) or a VPS with Docker, plus managed Postgres (Neon, Supabase, AWS RDS, or a Mumbai region for latency and data residency). Vercel works for the app but needs a separate cron and Postgres, and long-running sync batches must fit the function timeouts.
 - ➕ `Dockerfile` (multi-stage, `output: "standalone"` in `next.config.ts`; read `node_modules/next/dist/docs/01-app/02-guides/self-hosting.md`), ➕ `.github/workflows/deploy.yml` (on push to `main` after CI: run `db:migrate`, then deploy), environments `staging` and `production`. Set `NEXT_SERVER_ACTIONS_ENCRYPTION_KEY` for multi-instance. Backups: daily plus PITR, and a restore drill documented in ➕ `docs/runbooks/restore.md`. Cron for `/api/cron/outbox` (every minute) and `/api/cron/reminders` (daily 09:00 IST).
 
@@ -1064,7 +1064,7 @@ Tick items in PRs. One line per task, in the same order as above.
 **Phase 3** — A: [x] A3.1 [x] A3.2 [x] A3.3 [x] A3.4 [x] A3.5 [x] A3.6 · B: [x] B3.1 [x] B3.2 [x] B3.3 [x] B3.4 [x] B3.5 [x] B3.6 [x] B3.7
 **Phase 4** — A: [x] A4.1 [x] A4.2 [x] A4.3 [x] A4.4 [x] A4.5 [x] A4.6 [x] A4.7 [x] A4.8 [x] A4.9 · B: [x] B4.1 [x] B4.2 [x] B4.3 [x] B4.4 [x] B4.5 [x] B4.6
 **Phase 5** — A: [x] A5.1 [x] A5.2 [x] A5.3 [x] A5.4 [x] A5.5 [x] A5.6 [x] A5.7 · B: [x] B5.1 [x] B5.2 [x] B5.3 [x] B5.4 [x] B5.5 [ ] B5.6 [ ] B5.7
-**Phase 6** — A: [x] A6.1 [x] A6.2 [ ] A6.3 [ ] A6.4 [ ] A6.5 [ ] A6.6 · B: [ ] B6.1 [ ] B6.2 [ ] B6.3 [ ] B6.4 [ ] B6.5 [ ] B6.6
+**Phase 6** — A: [x] A6.1 [x] A6.2 [x] A6.3 [ ] A6.4 [ ] A6.5 [ ] A6.6 · B: [ ] B6.1 [ ] B6.2 [ ] B6.3 [ ] B6.4 [ ] B6.5 [ ] B6.6
 
 ---
 

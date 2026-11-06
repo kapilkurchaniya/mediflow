@@ -45,9 +45,9 @@ export async function GET(req?: NextRequest) {
     });
   }
 
-  // Case 2: Database readiness probe (?probe=readiness)
+  // Case 2: Database readiness probe (?probe=readiness or ?ready=1)
   // Evaluates whether essential backing infrastructure (PostgreSQL) is ready to serve requests.
-  if (probeType === "readiness") {
+  if (probeType === "readiness" || req?.nextUrl?.searchParams?.get("ready") === "1") {
     const dbProbe = await checkDatabase(db);
     const isReady = dbProbe.status === "up";
     return NextResponse.json(
