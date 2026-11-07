@@ -41,7 +41,7 @@ export function buildContentSecurityPolicy(isDev: boolean = process.env.NODE_ENV
     "default-src 'self'",
     `script-src ${scriptDirectives.join(" ")}`,
     "style-src 'self' 'unsafe-inline'",
-    "img-src 'self' blob: data: https:",
+    "img-src 'self' blob: data:",
     "font-src 'self' data:",
     `connect-src ${connectDirectives.join(" ")}`,
     "object-src 'none'",

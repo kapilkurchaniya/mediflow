@@ -68,7 +68,23 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Dependency Vulnerability Audit (non-blocking)
-        run: npm audit --audit-level=high || true
+        run: |
+          set +e
+          AUDIT_OUTPUT=$(npm audit --audit-level=high 2>&1)
+          AUDIT_EXIT=$?
+          set -e
+          echo "### 🛡️ Dependency Vulnerability Audit Summary" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          echo "$AUDIT_OUTPUT" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          if [ $AUDIT_EXIT -eq 0 ]; then
+            echo "✅ npm audit passed with zero high/critical vulnerabilities."
+          elif [ $AUDIT_EXIT -eq 1 ]; then
+            echo "::warning::npm audit reported high/critical vulnerabilities (non-blocking - see Step Summary)"
+          else
+            echo "::error::npm audit encountered unexpected fatal execution error (code $AUDIT_EXIT)"
+            exit $AUDIT_EXIT
+          fi
 
       - name: Security Headers Verification
         run: npx tsx scripts/verify-security-headers.ts
