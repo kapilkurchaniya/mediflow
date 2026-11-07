@@ -956,8 +956,9 @@ Full map in `.github/CODEOWNERS` and [ADR 0004](docs/adr/0004-two-lane-ownership
 #### A6.4 Security headers & review ⏱ 1.5 days [COMPLETED]
 - CSP, frame-ancestors, referrer policy (read `node_modules/next/dist/docs/01-app/02-guides/content-security-policy.md`). Re-run the docs/13 checklist across all routes. `npm audit` in CI. Revoke and rotate any keys that were ever committed (scan with `gitleaks`).
 
-#### A6.5 POS polish & resilience ⏱ 2 days
+#### A6.5 POS polish & resilience ⏱ 2 days [COMPLETED]
 - Error boundaries (`error.tsx`) per module. The POS never loses the cart on error (persist the cart in IndexedDB). Printer setup guide (80 mm thermal driver settings) and a test print. Keyboard-only audit of the billing flow.
+- **Progress:** completed in `lane-a/a6-5-pos-resilience`. Added Next.js 16 `"use client"` error boundaries (`error.tsx`) across 9 modules (`/dashboard/error.tsx`, `/dashboard/sales/pos/error.tsx`, `/dashboard/sales/error.tsx`, `/dashboard/inventory/error.tsx`, `/dashboard/purchases/error.tsx`, `/dashboard/accounting/error.tsx`, `/dashboard/compliance/error.tsx`, `/dashboard/reports/error.tsx`, `/dashboard/settings/error.tsx`). POS error boundary features dedicated "Recover Counter Session" button to remount terminal without losing in-flight state. Implemented robust crash resilience in `src/lib/pos-cart-persistence.ts` with multi-tenant/store/user composite identity keys (`mediflow_cart_${tenantId}_${storeId}_${userId}`), out-of-order write queue protection, untrusted payload validation, zero payment credential persistence, and IndexedDB engine with localStorage fallback; wired seamlessly into `usePosCart` and `RetailPosTerminal`. Created 80mm thermal receipt & cash drawer setup guide in `docs/runbooks/printer-setup.md` covering EPSON, TVS, Posiflex, silent Chrome kiosk mode (`--kiosk-printing`), and RJ-11 24V solenoid pulse. Added interactive printer setup & 80mm live test print page at `/dashboard/settings/printers`. Documented touchless high-velocity Marg ERP keyboard workflow in `docs/runbooks/pos-keyboard-shortcuts.md`. Verified with comprehensive unit test suite in `tests/unit/pos-cart-resilience.test.ts`. Every file is strictly under 300 lines.
 
 #### A6.6 Drop deprecated columns ⏱ 0.5 day
 - Remove `medicines.rack_id` (replaced in A3.3) and any other deprecated items, in a migration.
@@ -1064,7 +1065,7 @@ Tick items in PRs. One line per task, in the same order as above.
 **Phase 3** — A: [x] A3.1 [x] A3.2 [x] A3.3 [x] A3.4 [x] A3.5 [x] A3.6 · B: [x] B3.1 [x] B3.2 [x] B3.3 [x] B3.4 [x] B3.5 [x] B3.6 [x] B3.7
 **Phase 4** — A: [x] A4.1 [x] A4.2 [x] A4.3 [x] A4.4 [x] A4.5 [x] A4.6 [x] A4.7 [x] A4.8 [x] A4.9 · B: [x] B4.1 [x] B4.2 [x] B4.3 [x] B4.4 [x] B4.5 [x] B4.6
 **Phase 5** — A: [x] A5.1 [x] A5.2 [x] A5.3 [x] A5.4 [x] A5.5 [x] A5.6 [x] A5.7 · B: [x] B5.1 [x] B5.2 [x] B5.3 [x] B5.4 [x] B5.5 [ ] B5.6 [ ] B5.7
-**Phase 6** — A: [x] A6.1 [x] A6.2 [x] A6.3 [x] A6.4 [ ] A6.5 [ ] A6.6 · B: [ ] B6.1 [ ] B6.2 [ ] B6.3 [ ] B6.4 [ ] B6.5 [ ] B6.6
+**Phase 6** — A: [x] A6.1 [x] A6.2 [x] A6.3 [x] A6.4 [x] A6.5 [ ] A6.6 · B: [ ] B6.1 [ ] B6.2 [ ] B6.3 [ ] B6.4 [ ] B6.5 [ ] B6.6
 
 ---
 

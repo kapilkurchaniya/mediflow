@@ -16,6 +16,7 @@ interface DashboardShellProps {
   userName: string;
   userEmail: string;
   userId?: string;
+  tenantId?: string | null;
   storeName: string;
   currentStore?: AllowedStoreItem | null;
   allowedStores?: AllowedStoreItem[];
@@ -140,6 +141,7 @@ export function DashboardShell(props: DashboardShellProps) {
       userName={props.userName}
       userEmail={props.userEmail}
       userId={props.userId}
+      tenantId={props.tenantId}
       permissions={props.permissions}
     >
       <DashboardShellContent {...props} />

@@ -2,6 +2,7 @@ import * as schema from "@/server/db/schema";
 import type { TestDb } from "../setup/db";
 import { getOrSeedAccounts } from "@/server/domain/accounting";
 import { getCurrentIndianFY } from "@/server/domain/accounting-periods";
+import { calculateCutoffDate } from "@/server/domain/accounting-year-end/closing-stock-valuation";
 
 export interface AccountingPeriodsFixture {
   tenantId: string;
@@ -133,8 +134,18 @@ export async function setupAccountingPeriodsFixture(db: TestDb): Promise<Account
     })
     .returning();
 
-  // 6. Seed system accounts
+  // 6. Seed system accounts & year-end period controls for stock movements
   const accounts = await getOrSeedAccounts(db, tenant.id);
+
+  for (const st of [storeA, storeB, storeNoGstin]) {
+    await db.insert(schema.yearEndPeriodControls).values({
+      tenantId: tenant.id,
+      storeId: st.id,
+      fiscalYear: currentFY,
+      cutoffDate: calculateCutoffDate(currentFY),
+      status: "open",
+    }).onConflictDoNothing();
+  }
 
   return {
     tenantId: tenant.id,
