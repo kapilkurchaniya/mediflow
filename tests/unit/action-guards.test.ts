@@ -19,6 +19,7 @@ const PUBLIC_BY_DESIGN: Record<string, string> = {
   createExternalOrderForTenant: "server-only helper called by /api/v1/orders after API-key auth",
   switchStoreAction: "any signed-in user switches their active store (enforces membership storeIds and store.switch_any)",
   getAllowedStoresAction: "any signed-in user retrieves their permitted active stores",
+  logClientBoundaryError: "client error telemetry: reports caught React boundary exceptions with PII scrub",
 };
 
 const KNOWN_UNGUARDED: Record<string, string> = {

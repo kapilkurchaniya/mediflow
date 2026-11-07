@@ -1,7 +1,9 @@
 "use client";
 
+import { useEffect } from "react";
 import Link from "next/link";
 import { AlertTriangle, RotateCcw, ShieldCheck, ArrowLeft } from "lucide-react";
+import { reportBoundaryError } from "@/lib/telemetry";
 
 export default function PosErrorBoundary({
   error,
@@ -10,6 +12,9 @@ export default function PosErrorBoundary({
   error: Error & { digest?: string };
   reset: () => void;
 }) {
+  useEffect(() => {
+    reportBoundaryError("pos", error);
+  }, [error]);
   return (
     <div className="min-h-[70vh] flex items-center justify-center p-4">
       <div className="w-full max-w-lg bg-white rounded-2xl border border-ink-100 shadow-xl overflow-hidden animate-enter">

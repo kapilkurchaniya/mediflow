@@ -11,6 +11,7 @@ import {
 } from "@/lib/pos-cart-persistence";
 import { posCartReducer, initialPosState } from "@/app/dashboard/sales/pos/_state/usePosCart";
 import type { PosCartLine } from "@/app/dashboard/sales/pos/_state/types";
+import { reportBoundaryError } from "@/lib/telemetry";
 
 describe("POS Cart Resilience & Persistence", () => {
   beforeEach(async () => {
@@ -83,7 +84,8 @@ describe("POS Cart Resilience & Persistence", () => {
     expect(valid?.lines).toHaveLength(1);
     expect(valid?.lines[0].medicineName).toBe("Paracetamol 650mg");
     expect(valid?.customer?.name).toBe("Rahul Sharma");
-    expect(valid?.compliance.doctorName).toBe("Dr. A. Verma");
+    expect(valid?.compliance.doctorId).toBe("doc_1");
+    expect(valid?.compliance.doctorName).toBe("");
     expect(valid?.compliance.doctorAddress).toBe("");
     expect(valid?.compliance.patientAddress).toBe("");
     expect(valid?.compliance.prescriptionRef).toBe("");
@@ -149,7 +151,8 @@ describe("POS Cart Resilience & Persistence", () => {
     expect(loaded?.lines).toHaveLength(1);
     expect(loaded?.lines[0].batchNo).toBe("PCM-2024");
     expect(loaded?.customer?.name).toBe("Rahul Sharma");
-    expect(loaded?.compliance.doctorName).toBe("Dr. A. Verma");
+    expect(loaded?.compliance.doctorId).toBe("doc_1");
+    expect(loaded?.compliance.doctorName).toBe("");
 
     const cleared = await clearDraftCart(identity);
     expect(cleared).toBe(true);
@@ -164,6 +167,39 @@ describe("POS Cart Resilience & Persistence", () => {
     const p1 = saveDraftCart(identity, samplePayload);
     const p2 = clearDraftCart(identity);
     await Promise.all([p1, p2]);
+
+    const loaded = await loadDraftCart(identity);
+    expect(loaded).toBeNull();
+  });
+
+  it("permits immediate new save after clear without rejection (P0 monotonic generation)", async () => {
+    const identity = { tenantId: "tenant_gen", storeId: "store_gen", userId: "cashier_gen" };
+    const payloadB: DraftCartPayload = {
+      ...samplePayload,
+      lines: [{ ...sampleLine, batchId: "batch_next_sale", medicineName: "Amoxicillin 500mg" }],
+    };
+
+    // 1. Save draft A
+    await saveDraftCart(identity, samplePayload);
+    // 2. Complete sale and clear draft
+    await clearDraftCart(identity);
+    // 3. Cashier immediately starts next sale and saves draft B
+    const savedB = await saveDraftCart(identity, payloadB);
+    expect(savedB).toBe(true);
+
+    // 4. Draft B is restored without being blocked
+    const loadedB = await loadDraftCart(identity);
+    expect(loadedB).not.toBeNull();
+    expect(loadedB?.lines[0].medicineName).toBe("Amoxicillin 500mg");
+  });
+
+  it("aborts delayed in-flight save when overtaken by clear", async () => {
+    const identity = { tenantId: "tenant_abort", storeId: "store_abort", userId: "cashier_abort" };
+
+    // Fire save and clear concurrently
+    const savePromise = saveDraftCart(identity, samplePayload);
+    const clearPromise = clearDraftCart(identity);
+    await Promise.all([savePromise, clearPromise]);
 
     const loaded = await loadDraftCart(identity);
     expect(loaded).toBeNull();
@@ -211,5 +247,12 @@ describe("POS Cart Resilience & Persistence", () => {
     const resetState = posCartReducer(modifiedState, { type: "RESET_SALE" });
     expect(resetState.cart).toHaveLength(0);
     expect(resetState.soundEnabled).toBe(false);
+  });
+
+  it("records boundary telemetry safely without throwing or exposing PII", () => {
+    const error = new Error("Test client error with token=secret123") as Error & { digest?: string };
+    error.digest = "DIGEST_XYZ";
+
+    expect(() => reportBoundaryError("pos", error)).not.toThrow();
   });
 });

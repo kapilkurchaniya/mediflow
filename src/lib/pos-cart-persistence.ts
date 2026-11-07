@@ -60,18 +60,13 @@ export function validateAndSanitizeDraft(raw: unknown): PersistedDraftCart | nul
     const totalQty = Math.max(1, Math.floor(Number(l.qty) || packQty * unitsPerPack + looseQty));
 
     sanitizedLines.push({
-      batchId,
-      medicineId,
-      medicineName,
+      batchId, medicineId, medicineName,
       genericName: typeof l.genericName === "string" ? l.genericName : null,
       batchNo: typeof l.batchNo === "string" ? l.batchNo : "DEFAULT",
       expiryDate: typeof l.expiryDate === "string" ? l.expiryDate : "",
       mrp: Math.max(0, Math.floor(Number(l.mrp) || 0)),
       saleRate: Math.max(0, Math.floor(Number(l.saleRate ?? l.mrp) || 0)),
-      packQty,
-      looseQty,
-      qty: totalQty,
-      unitsPerPack,
+      packQty, looseQty, qty: totalQty, unitsPerPack,
       packUnit: typeof l.packUnit === "string" ? l.packUnit : "strip",
       looseUnit: typeof l.looseUnit === "string" ? l.looseUnit : "tablet",
       qtyOnHand: Math.floor(Number(l.qtyOnHand) || 0),
@@ -94,26 +89,18 @@ export function validateAndSanitizeDraft(raw: unknown): PersistedDraftCart | nul
     if (typeof c.id === "string" && typeof c.name === "string") {
       customer = {
         id: c.id, name: c.name, phone: typeof c.phone === "string" ? c.phone : null,
-        loyaltyPoints: typeof c.loyaltyPoints === "number" ? c.loyaltyPoints : 0,
-        creditLimit: typeof c.creditLimit === "number" ? c.creditLimit : null,
-        redeemablePoints: typeof c.redeemablePoints === "number" ? c.redeemablePoints : 0,
-        redeemableValuePaise: typeof c.redeemableValuePaise === "number" ? c.redeemableValuePaise : 0,
+        loyaltyPoints: 0, creditLimit: null, redeemablePoints: 0, redeemableValuePaise: 0,
       };
     }
   }
 
   const rawComp = (obj.compliance && typeof obj.compliance === "object" ? obj.compliance : {}) as Record<string, unknown>;
   const compliance: ComplianceState = {
-    doctorId: typeof rawComp.doctorId === "string" ? rawComp.doctorId : "",
-    doctorName: typeof rawComp.doctorName === "string" ? rawComp.doctorName : "",
-    doctorRegNo: typeof rawComp.doctorRegNo === "string" ? rawComp.doctorRegNo : "",
-    doctorAddress: "", // Data minimization: sensitive address stripped from client storage
-    patientAge: typeof rawComp.patientAge === "number" ? rawComp.patientAge : "",
-    patientGender: typeof rawComp.patientGender === "string" ? rawComp.patientGender : "male",
-    patientAddress: "", // Data minimization: sensitive patient address stripped from client storage
-    prescriptionRef: "", // Data minimization: prescription references not persisted in local storage
-    prescriptionDate: new Date().toISOString().slice(0, 10),
-    medicalRepId: typeof rawComp.medicalRepId === "string" ? rawComp.medicalRepId : "",
+    doctorId: typeof rawComp.doctorId === "string" ? rawComp.doctorId.trim() : "",
+    doctorName: "", doctorRegNo: "", doctorAddress: "",
+    patientAge: "", patientGender: "male", patientAddress: "",
+    prescriptionRef: "", prescriptionDate: new Date().toISOString().slice(0, 10),
+    medicalRepId: typeof rawComp.medicalRepId === "string" ? rawComp.medicalRepId.trim() : "",
   };
 
   // Restored drafts ALWAYS start tender selection fresh (zero prior authorization or tender carryover)
@@ -165,15 +152,28 @@ function getIndexedDB(): Promise<IDBDatabase> {
   return dbPromise;
 }
 
-const writeQueues = new Map<string, Promise<unknown>>();
-const lastSavedTimestamps = new Map<string, number>();
+interface QueueState {
+  currentSaveGen: number;
+  lastClearGen: number;
+  queue: Promise<unknown>;
+}
+
+const keyQueueStates = new Map<string, QueueState>();
+
+function getQueueState(key: string): QueueState {
+  let state = keyQueueStates.get(key);
+  if (!state) {
+    state = { currentSaveGen: 0, lastClearGen: 0, queue: Promise.resolve() };
+    keyQueueStates.set(key, state);
+  }
+  return state;
+}
 
 export async function saveDraftCart(identity: CartIdentity, payload: DraftCartPayload): Promise<boolean> {
   const key = buildCartStorageKey(identity);
+  const state = getQueueState(key);
+  const myGen = ++state.currentSaveGen;
   const now = Date.now();
-  const lastTime = lastSavedTimestamps.get(key) ?? 0;
-  if (now < lastTime) return false;
-  lastSavedTimestamps.set(key, now);
 
   const draft: PersistedDraftCart = {
     version: 1,
@@ -182,9 +182,10 @@ export async function saveDraftCart(identity: CartIdentity, payload: DraftCartPa
     ...payload,
   };
 
-  const queue = writeQueues.get(key) ?? Promise.resolve();
-  const nextWrite = queue.then(async () => {
-    if (now < (lastSavedTimestamps.get(key) ?? 0)) return false;
+  const nextWrite = state.queue.then(async () => {
+    if (myGen < state.lastClearGen || myGen < state.currentSaveGen) {
+      return false;
+    }
     try {
       const db = await getIndexedDB();
       await new Promise<void>((resolve, reject) => {
@@ -209,7 +210,7 @@ export async function saveDraftCart(identity: CartIdentity, payload: DraftCartPa
     }
   });
 
-  writeQueues.set(key, nextWrite.catch(() => false));
+  state.queue = nextWrite.catch(() => false);
   return (await nextWrite) as boolean;
 }
 
@@ -253,11 +254,11 @@ export async function loadDraftCart(identity: CartIdentity): Promise<PersistedDr
 
 export async function clearDraftCart(identity: CartIdentity): Promise<boolean> {
   const key = buildCartStorageKey(identity);
-  const clearTimestamp = Date.now() + 1000000;
-  lastSavedTimestamps.set(key, clearTimestamp);
+  const state = getQueueState(key);
+  // Monotonically invalidate any save operations queued prior to this clear
+  state.lastClearGen = ++state.currentSaveGen;
 
-  const queue = writeQueues.get(key) ?? Promise.resolve();
-  const nextClear = queue.then(async () => {
+  const nextClear = state.queue.then(async () => {
     let idbSuccess = false;
     try {
       const db = await getIndexedDB();
@@ -283,13 +284,12 @@ export async function clearDraftCart(identity: CartIdentity): Promise<boolean> {
     return idbSuccess;
   });
 
-  writeQueues.set(key, nextClear.catch(() => false));
+  state.queue = nextClear.catch(() => false);
   return (await nextClear) as boolean;
 }
 
 export function resetCartPersistenceDb(): void {
   dbPromise = null;
-  writeQueues.clear();
-  lastSavedTimestamps.clear();
+  keyQueueStates.clear();
 }
 

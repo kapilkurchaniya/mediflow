@@ -1,7 +1,9 @@
 "use client";
 
+import { useEffect } from "react";
 import Link from "next/link";
 import { Settings, RotateCcw, LayoutDashboard } from "lucide-react";
+import { reportBoundaryError } from "@/lib/telemetry";
 
 export default function SettingsErrorBoundary({
   error,
@@ -10,6 +12,9 @@ export default function SettingsErrorBoundary({
   error: Error & { digest?: string };
   reset: () => void;
 }) {
+  useEffect(() => {
+    reportBoundaryError("settings", error);
+  }, [error]);
   return (
     <div className="min-h-[55vh] flex items-center justify-center p-6">
       <div className="w-full max-w-md bg-white rounded-2xl border border-ink-100 shadow-lg p-6 space-y-5 animate-enter">

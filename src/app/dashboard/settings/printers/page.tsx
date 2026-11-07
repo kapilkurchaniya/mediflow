@@ -13,7 +13,7 @@ import {
 
 export default function PrintersSettingsPage() {
   const [format, setFormat] = useState<"80mm" | "58mm" | "a4">("80mm");
-  const [cutPaper, setCutPaper] = useState(true);
+  const cutPaper = true;
   const [drawerStatus, setDrawerStatus] = useState<string | null>(null);
 
   const handlePrintTest = () => {
@@ -95,18 +95,23 @@ export default function PrintersSettingsPage() {
               </button>
             </div>
 
-            <div className="pt-2 border-t border-ink-100 flex flex-col gap-1 text-xs">
-              <label className="flex items-center gap-2 cursor-pointer text-ink-800">
-                <input
-                  type="checkbox"
-                  checked={cutPaper}
-                  onChange={(e) => setCutPaper(e.target.checked)}
-                  className="rounded border-ink-300 text-brand-600 focus:ring-brand-500"
-                />
-                Auto-cut paper at end of print job (ESC/POS GS V 66 0)
-              </label>
+            <div className="pt-2 border-t border-ink-100 flex flex-col gap-1.5 text-xs">
+              <div className="flex items-center justify-between">
+                <label className="flex items-center gap-2 text-ink-600 select-none">
+                  <input
+                    type="checkbox"
+                    checked={cutPaper}
+                    disabled
+                    className="rounded border-ink-300 text-brand-600 focus:ring-brand-500 opacity-60 cursor-not-allowed"
+                  />
+                  Hardware Auto-Cutter (ESC/POS GS V 66 0)
+                </label>
+                <span className="text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded bg-ink-100 text-ink-600">
+                  Driver-Managed
+                </span>
+              </div>
               <p className="text-[11px] text-ink-500 pl-6">
-                Hardware notice: Paper cutting requires physical auto-cutter hardware and driver support.
+                Web browsers cannot send raw binary ESC/POS escape sequences directly via <code className="font-mono text-ink-700">window.print()</code>. Auto-cut must be enabled in the thermal printer&apos;s OS driver settings (CUPS / Windows Spooler &gt; Device Settings &gt; Cut Paper).
               </p>
             </div>
           </div>
