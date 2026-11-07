@@ -107,12 +107,12 @@ export function validateAndSanitizeDraft(raw: unknown): PersistedDraftCart | nul
     doctorId: typeof rawComp.doctorId === "string" ? rawComp.doctorId : "",
     doctorName: typeof rawComp.doctorName === "string" ? rawComp.doctorName : "",
     doctorRegNo: typeof rawComp.doctorRegNo === "string" ? rawComp.doctorRegNo : "",
-    doctorAddress: typeof rawComp.doctorAddress === "string" ? rawComp.doctorAddress : "",
+    doctorAddress: "", // Data minimization: sensitive address stripped from client storage
     patientAge: typeof rawComp.patientAge === "number" ? rawComp.patientAge : "",
     patientGender: typeof rawComp.patientGender === "string" ? rawComp.patientGender : "male",
-    patientAddress: typeof rawComp.patientAddress === "string" ? rawComp.patientAddress : "",
-    prescriptionRef: typeof rawComp.prescriptionRef === "string" ? rawComp.prescriptionRef : "",
-    prescriptionDate: typeof rawComp.prescriptionDate === "string" ? rawComp.prescriptionDate : new Date().toISOString().slice(0, 10),
+    patientAddress: "", // Data minimization: sensitive patient address stripped from client storage
+    prescriptionRef: "", // Data minimization: prescription references not persisted in local storage
+    prescriptionDate: new Date().toISOString().slice(0, 10),
     medicalRepId: typeof rawComp.medicalRepId === "string" ? rawComp.medicalRepId : "",
   };
 
@@ -184,6 +184,7 @@ export async function saveDraftCart(identity: CartIdentity, payload: DraftCartPa
 
   const queue = writeQueues.get(key) ?? Promise.resolve();
   const nextWrite = queue.then(async () => {
+    if (now < (lastSavedTimestamps.get(key) ?? 0)) return false;
     try {
       const db = await getIndexedDB();
       await new Promise<void>((resolve, reject) => {
@@ -252,33 +253,38 @@ export async function loadDraftCart(identity: CartIdentity): Promise<PersistedDr
 
 export async function clearDraftCart(identity: CartIdentity): Promise<boolean> {
   const key = buildCartStorageKey(identity);
-  lastSavedTimestamps.delete(key);
+  const clearTimestamp = Date.now() + 1000000;
+  lastSavedTimestamps.set(key, clearTimestamp);
 
-  let idbSuccess = false;
-  try {
-    const db = await getIndexedDB();
-    await new Promise<void>((resolve, reject) => {
-      const tx = db.transaction(STORE_NAME, "readwrite");
-      const store = tx.objectStore(STORE_NAME);
-      const req = store.delete(key);
-      req.onsuccess = () => resolve();
-      req.onerror = () => reject(req.error);
-    });
-    idbSuccess = true;
-  } catch {
-    idbSuccess = false;
-  }
-
-  try {
-    const storage = getFallbackStorage();
-    if (storage) {
-      storage.removeItem(key);
+  const queue = writeQueues.get(key) ?? Promise.resolve();
+  const nextClear = queue.then(async () => {
+    let idbSuccess = false;
+    try {
+      const db = await getIndexedDB();
+      await new Promise<void>((resolve, reject) => {
+        const tx = db.transaction(STORE_NAME, "readwrite");
+        const store = tx.objectStore(STORE_NAME);
+        const req = store.delete(key);
+        req.onsuccess = () => resolve();
+        req.onerror = () => reject(req.error);
+      });
+      idbSuccess = true;
+    } catch {
+      idbSuccess = false;
     }
-  } catch {
-    // ignore localStorage errors
-  }
 
-  return idbSuccess;
+    try {
+      const storage = getFallbackStorage();
+      if (storage) storage.removeItem(key);
+    } catch {
+      // ignore localStorage errors
+    }
+
+    return idbSuccess;
+  });
+
+  writeQueues.set(key, nextClear.catch(() => false));
+  return (await nextClear) as boolean;
 }
 
 export function resetCartPersistenceDb(): void {

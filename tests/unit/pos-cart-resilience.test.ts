@@ -46,8 +46,8 @@ describe("POS Cart Resilience & Persistence", () => {
     lines: [sampleLine],
     customer: { id: "cust_1", name: "Rahul Sharma", phone: "9876543210" },
     compliance: {
-      doctorId: "", doctorName: "Dr. A. Verma", doctorRegNo: "MCI-9988", doctorAddress: "",
-      patientAge: 35, patientGender: "male", patientAddress: "Pune",
+      doctorId: "doc_1", doctorName: "Dr. A. Verma", doctorRegNo: "MCI-9988", doctorAddress: "123 Clinic Road",
+      patientAge: 35, patientGender: "male", patientAddress: "Flat 4, Pune",
       prescriptionRef: "RX-4411", prescriptionDate: "2026-11-07", medicalRepId: "",
     },
     splitPayments: { cash: "500", upi: "40", card: "" },
@@ -68,7 +68,7 @@ describe("POS Cart Resilience & Persistence", () => {
     expect(key1).not.toBe(key2);
   });
 
-  it("validates and sanitizes untrusted drafts safely", () => {
+  it("validates and sanitizes untrusted drafts safely with data minimization", () => {
     const valid = validateAndSanitizeDraft({
       updatedAt: Date.now(),
       lines: [sampleLine],
@@ -83,6 +83,10 @@ describe("POS Cart Resilience & Persistence", () => {
     expect(valid?.lines).toHaveLength(1);
     expect(valid?.lines[0].medicineName).toBe("Paracetamol 650mg");
     expect(valid?.customer?.name).toBe("Rahul Sharma");
+    expect(valid?.compliance.doctorName).toBe("Dr. A. Verma");
+    expect(valid?.compliance.doctorAddress).toBe("");
+    expect(valid?.compliance.patientAddress).toBe("");
+    expect(valid?.compliance.prescriptionRef).toBe("");
   });
 
   it("rejects expired drafts older than 24 hours", () => {
@@ -127,9 +131,9 @@ describe("POS Cart Resilience & Persistence", () => {
 
     const sanitized = validateAndSanitizeDraft(draftWithSecrets);
     expect(sanitized).not.toBeNull();
-    // Payment tender is always reset fresh to prevent silent unauthorized charges
     expect(sanitized?.splitPayments).toEqual({ cash: "", upi: "", card: "" });
     expect(sanitized?.paymentMethod).toBe("cash");
+    expect(sanitized?.redeemPoints).toBe(0);
     expect(((sanitized?.splitPayments as unknown) as Record<string, unknown>).token).toBeUndefined();
     expect(((sanitized?.splitPayments as unknown) as Record<string, unknown>).authHeader).toBeUndefined();
   });
@@ -152,6 +156,17 @@ describe("POS Cart Resilience & Persistence", () => {
 
     const afterClear = await loadDraftCart(identity);
     expect(afterClear).toBeNull();
+  });
+
+  it("guarantees serialized save and clear ordering (save-clear race prevention)", async () => {
+    const identity = { tenantId: "tenant_racing", storeId: "store_race", userId: "cashier_race" };
+
+    const p1 = saveDraftCart(identity, samplePayload);
+    const p2 = clearDraftCart(identity);
+    await Promise.all([p1, p2]);
+
+    const loaded = await loadDraftCart(identity);
+    expect(loaded).toBeNull();
   });
 
   it("isolates drafts across different stores and cashiers", async () => {
