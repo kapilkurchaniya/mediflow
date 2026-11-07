@@ -1,5 +1,6 @@
 import type { NextConfig } from "next";
 import { PHASE_PRODUCTION_BUILD } from "next/constants";
+import { getSecurityHeaders } from "./src/server/security/headers";
 
 const nextConfig: NextConfig = {
   output: "standalone",
@@ -13,6 +14,10 @@ const nextConfig: NextConfig = {
   },
   async headers() {
     return [
+      {
+        source: "/(.*)",
+        headers: getSecurityHeaders(),
+      },
       {
         source: "/sw.js",
         headers: [

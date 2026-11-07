@@ -1,0 +1,9 @@
+# Gitleaks Baseline Ignore File (Phase 6.4 - A6.4)
+# Enforces fingerprint-specific ignores for reviewed historic synthetic fixtures and placeholders.
+# Each line is an immutable finding fingerprint: commit:file:rule:line.
+
+3ae8a88bbf6604c86e422e57543b4b7dd3365537:tests/integration/observability-health.test.ts:generic-api-key:69
+359fb1e3af2738f2e9452ba21580930a84a195e3:tests/integration/observability-health.test.ts:generic-api-key:67
+8de58905c1e83569bba606dc6b44195b4d4d9348:.github/workflows/ci.yml:generic-api-key:100
+8de58905c1e83569bba606dc6b44195b4d4d9348:.github/workflows/ci.yml:generic-api-key:106
+8de58905c1e83569bba606dc6b44195b4d4d9348:.github/workflows/ci.yml:generic-api-key:118

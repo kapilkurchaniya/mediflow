@@ -1,0 +1,15 @@
+# Gitleaks Secret Detection Policy (Phase 6.4 - A6.4)
+# Configures strict secret scanning using standard built-in rules.
+# Individual historic findings are tracked exclusively via fingerprint in .gitleaksignore.
+
+title = "MediFlow Secret Detection Policy"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Whitelisted synthetic mock test tokens"
+stopwords = [
+  "smoke-cron-secret-123456789012345",
+  "0123456789abcdef0123456789abcdef",
+]
