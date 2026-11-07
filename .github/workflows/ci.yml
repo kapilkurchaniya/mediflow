@@ -62,6 +62,17 @@ jobs:
       - name: Build Verification
         run: npm run build
 
+      - name: Gitleaks Secret Scan
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Dependency Vulnerability Audit (non-blocking)
+        run: npm audit --audit-level=high || true
+
+      - name: Security Headers Verification
+        run: npx tsx scripts/verify-security-headers.ts
+
   e2e:
     name: Playwright E2E Smoke Tests
     runs-on: ubuntu-latest

@@ -1,0 +1,18 @@
+# Gitleaks Security Scanning Configuration (Phase 6.4 - A6.4)
+# Enforces zero committed secrets across repository git history while allowing
+# non-secret synthetic mock test fixtures and workflow placeholders.
+
+title = "MediFlow Secret Detection Policy"
+
+[allowlist]
+description = "Whitelisted test fixtures and synthetic mock tokens"
+paths = [
+  '''tests/integration/.*''',
+  '''tests/security/.*''',
+  '''tests/setup/.*''',
+  '''.github/workflows/ci\.yml''',
+]
+regexes = [
+  '''0123456789abcdef0123456789abcdef''',
+  '''smoke-cron-secret-123456789012345''',
+]
