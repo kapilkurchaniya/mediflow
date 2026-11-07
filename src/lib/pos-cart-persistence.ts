@@ -30,8 +30,8 @@ export function buildCartStorageKey(identity: CartIdentity = {}): string {
   const tenant = identity.tenantId?.trim() || "default";
   const store = identity.storeId?.trim() || "default";
   const user = identity.userId?.trim() || "default";
-  const terminal = identity.terminalId?.trim() ? `_${identity.terminalId.trim()}` : "";
-  return `mediflow_cart_${tenant}_${store}_${user}${terminal}`;
+  const term = identity.terminalId?.trim() || "default";
+  return `mediflow_cart:tenant=${encodeURIComponent(tenant)}:store=${encodeURIComponent(store)}:user=${encodeURIComponent(user)}:term=${encodeURIComponent(term)}`;
 }
 
 export function validateAndSanitizeDraft(raw: unknown): PersistedDraftCart | null {
@@ -116,20 +116,14 @@ export function validateAndSanitizeDraft(raw: unknown): PersistedDraftCart | nul
     medicalRepId: typeof rawComp.medicalRepId === "string" ? rawComp.medicalRepId : "",
   };
 
-  const rawSplit = (obj.splitPayments && typeof obj.splitPayments === "object" ? obj.splitPayments : {}) as Record<string, unknown>;
-  const splitPayments: SplitPayments = {
-    cash: typeof rawSplit.cash === "string" ? rawSplit.cash : "",
-    upi: typeof rawSplit.upi === "string" ? rawSplit.upi : "",
-    card: typeof rawSplit.card === "string" ? rawSplit.card : "",
-  };
-
-  const paymentMethod = typeof obj.paymentMethod === "string" && ["cash", "upi", "card", "credit", "split"].includes(obj.paymentMethod)
-    ? obj.paymentMethod : "cash";
+  // Restored drafts ALWAYS start tender selection fresh (zero prior authorization or tender carryover)
+  const splitPayments: SplitPayments = { cash: "", upi: "", card: "" };
+  const paymentMethod = "cash";
 
   return {
     version: 1, storageKey: typeof obj.storageKey === "string" ? obj.storageKey : "",
     updatedAt, lines: sanitizedLines, customer, compliance, splitPayments, paymentMethod,
-    redeemPoints: Math.max(0, Math.floor(Number(obj.redeemPoints) || 0)),
+    redeemPoints: 0,
   };
 }
 

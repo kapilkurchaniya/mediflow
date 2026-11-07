@@ -61,10 +61,10 @@ describe("POS Cart Resilience & Persistence", () => {
     const key3 = buildCartStorageKey({ tenantId: "t1", storeId: "s1", userId: "u2", terminalId: "pos_1" });
     const keyDefault = buildCartStorageKey();
 
-    expect(key1).toBe("mediflow_cart_t1_s1_u1");
-    expect(key2).toBe("mediflow_cart_t1_s2_u1");
-    expect(key3).toBe("mediflow_cart_t1_s1_u2_pos_1");
-    expect(keyDefault).toBe("mediflow_cart_default_default_default");
+    expect(key1).toBe("mediflow_cart:tenant=t1:store=s1:user=u1:term=default");
+    expect(key2).toBe("mediflow_cart:tenant=t1:store=s2:user=u1:term=default");
+    expect(key3).toBe("mediflow_cart:tenant=t1:store=s1:user=u2:term=pos_1");
+    expect(keyDefault).toBe("mediflow_cart:tenant=default:store=default:user=default:term=default");
     expect(key1).not.toBe(key2);
   });
 
@@ -112,7 +112,7 @@ describe("POS Cart Resilience & Persistence", () => {
     expect(completelyCorrupt).toBeNull();
   });
 
-  it("never persists or restores payment credentials or secrets", () => {
+  it("never persists or restores payment credentials or secrets, and resets tender fresh", () => {
     const draftWithSecrets = {
       updatedAt: Date.now(),
       lines: [sampleLine],
@@ -127,7 +127,9 @@ describe("POS Cart Resilience & Persistence", () => {
 
     const sanitized = validateAndSanitizeDraft(draftWithSecrets);
     expect(sanitized).not.toBeNull();
-    expect(sanitized?.splitPayments).toEqual({ cash: "100", upi: "200", card: "300" });
+    // Payment tender is always reset fresh to prevent silent unauthorized charges
+    expect(sanitized?.splitPayments).toEqual({ cash: "", upi: "", card: "" });
+    expect(sanitized?.paymentMethod).toBe("cash");
     expect(((sanitized?.splitPayments as unknown) as Record<string, unknown>).token).toBeUndefined();
     expect(((sanitized?.splitPayments as unknown) as Record<string, unknown>).authHeader).toBeUndefined();
   });
