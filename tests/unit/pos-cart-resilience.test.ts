@@ -12,6 +12,7 @@ import {
 import { posCartReducer, initialPosState } from "@/app/dashboard/sales/pos/_state/usePosCart";
 import type { PosCartLine } from "@/app/dashboard/sales/pos/_state/types";
 import { reportBoundaryError } from "@/lib/telemetry";
+import { logClientBoundaryError } from "@/app/actions/telemetry";
 
 describe("POS Cart Resilience & Persistence", () => {
   beforeEach(async () => {
@@ -84,6 +85,7 @@ describe("POS Cart Resilience & Persistence", () => {
     expect(valid?.lines).toHaveLength(1);
     expect(valid?.lines[0].medicineName).toBe("Paracetamol 650mg");
     expect(valid?.customer?.name).toBe("Rahul Sharma");
+    expect(valid?.customer?.phone).toBeNull();
     expect(valid?.compliance.doctorId).toBe("doc_1");
     expect(valid?.compliance.doctorName).toBe("");
     expect(valid?.compliance.doctorAddress).toBe("");
@@ -249,10 +251,33 @@ describe("POS Cart Resilience & Persistence", () => {
     expect(resetState.soundEnabled).toBe(false);
   });
 
-  it("records boundary telemetry safely without throwing or exposing PII", () => {
-    const error = new Error("Test client error with token=secret123") as Error & { digest?: string };
-    error.digest = "DIGEST_XYZ";
+  it("records boundary telemetry safely without throwing or exposing PII", async () => {
+    const error = new Error("CRITICAL SQL syntax error: SELECT * FROM users WHERE token=secret_token_123") as Error & { digest?: string };
+    error.digest = "DIGEST_XYZ_123";
 
+    // 1. reportBoundaryError sends only module & digest; never error.message or raw exception
     expect(() => reportBoundaryError("pos", error)).not.toThrow();
+
+    // 2. Server action validates allowlisted modules and codes
+    const validResult = await logClientBoundaryError({
+      module: "pos",
+      digest: "DIGEST_XYZ_123",
+      code: "REACT_BOUNDARY_FAILURE",
+    });
+    expect(validResult.recorded).toBe(true);
+
+    // 3. Rejects unknown module
+    const invalidModResult = await logClientBoundaryError({
+      module: "malicious-injected-module" as unknown as "pos",
+      digest: "test",
+    });
+    expect(invalidModResult.recorded).toBe(false);
+
+    // 4. Rejects invalid diagnostic code
+    const invalidCodeResult = await logClientBoundaryError({
+      module: "pos",
+      code: "INJECT_SQL" as unknown as "REACT_BOUNDARY_FAILURE",
+    });
+    expect(invalidCodeResult.recorded).toBe(false);
   });
 });

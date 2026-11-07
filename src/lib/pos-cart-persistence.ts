@@ -88,7 +88,9 @@ export function validateAndSanitizeDraft(raw: unknown): PersistedDraftCart | nul
     const c = obj.customer as Record<string, unknown>;
     if (typeof c.id === "string" && typeof c.name === "string") {
       customer = {
-        id: c.id, name: c.name, phone: typeof c.phone === "string" ? c.phone : null,
+        id: c.id,
+        name: typeof c.name === "string" ? c.name : "",
+        phone: null, // Data minimization: sensitive contact phone stripped from client storage
         loyaltyPoints: 0, creditLimit: null, redeemablePoints: 0, redeemableValuePaise: 0,
       };
     }
