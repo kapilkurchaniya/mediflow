@@ -962,6 +962,7 @@ Full map in `.github/CODEOWNERS` and [ADR 0004](docs/adr/0004-two-lane-ownership
 
 #### A6.6 Drop deprecated columns ⏱ 0.5 day
 - Remove `medicines.rack_id` (replaced in A3.3) and any other deprecated items, in a migration.
+- **Progress:** completed in `lane-a/a6-6-drop-deprecated-columns`. Removed `medicines.rack_id` and foreign key constraint `medicines_rack_id_racks_id_fk` via Drizzle migration `drizzle/0033_drop_medicines_rack_id.sql`. Registered in `_journal.json`. Cleaned up deprecated schema fields in `src/server/db/schema/catalog.ts`, application queries, actions, and test suites (`tests/integration/isolation.test.ts`, `tests/integration/racks-actions.test.ts`, `tests/integration/stocktake.test.ts`, `tests/integration/stocktake-hardening.test.ts`, `tests/integration/store-medicine-settings.test.ts`). All store-scoped racks are exclusively accessed via `store_medicine_settings.rack_id`. Every file strictly under 300 lines.
 
 ### Lane B · Phase 6
 
@@ -1065,7 +1066,7 @@ Tick items in PRs. One line per task, in the same order as above.
 **Phase 3** — A: [x] A3.1 [x] A3.2 [x] A3.3 [x] A3.4 [x] A3.5 [x] A3.6 · B: [x] B3.1 [x] B3.2 [x] B3.3 [x] B3.4 [x] B3.5 [x] B3.6 [x] B3.7
 **Phase 4** — A: [x] A4.1 [x] A4.2 [x] A4.3 [x] A4.4 [x] A4.5 [x] A4.6 [x] A4.7 [x] A4.8 [x] A4.9 · B: [x] B4.1 [x] B4.2 [x] B4.3 [x] B4.4 [x] B4.5 [x] B4.6
 **Phase 5** — A: [x] A5.1 [x] A5.2 [x] A5.3 [x] A5.4 [x] A5.5 [x] A5.6 [x] A5.7 · B: [x] B5.1 [x] B5.2 [x] B5.3 [x] B5.4 [x] B5.5 [ ] B5.6 [ ] B5.7
-**Phase 6** — A: [x] A6.1 [x] A6.2 [x] A6.3 [x] A6.4 [x] A6.5 [ ] A6.6 · B: [ ] B6.1 [ ] B6.2 [ ] B6.3 [ ] B6.4 [ ] B6.5 [ ] B6.6
+**Phase 6** — A: [x] A6.1 [x] A6.2 [x] A6.3 [x] A6.4 [x] A6.5 [x] A6.6 · B: [ ] B6.1 [ ] B6.2 [ ] B6.3 [ ] B6.4 [ ] B6.5 [ ] B6.6
 
 ---
 

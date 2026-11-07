@@ -203,7 +203,6 @@ export async function createMedicine(formData: FormData) {
       genericName: genericName || null,
       manufacturerId: manufacturerId || null,
       categoryId: categoryId || null,
-      rackId: null,
       unit: packUnit,
       unitsPerPack,
       packUnit,
