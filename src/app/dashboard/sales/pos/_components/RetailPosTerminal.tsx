@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { usePosDataSource } from "@/offline/usePosDataSource";
 import { PendingBillsDrawer } from "./PendingBillsDrawer";
@@ -24,8 +24,9 @@ import type { CurrentShiftStats } from "@/server/domain/cash-sessions";
 export function RetailPosTerminal() {
   const router = useRouter();
   const searchInputRef = useRef<HTMLInputElement>(null);
-  const { state, dispatch, totals, loyaltyDiscountPaise, rxWarning, controlledItems, playSound } = usePosCart();
-  const { toggleCalculator, setShortcutsOpen, calculatorOpen, shortcutsOpen, currentStore, setStoreSwitcherOpen, userId } = useShell();
+  const { toggleCalculator, setShortcutsOpen, calculatorOpen, shortcutsOpen, currentStore, setStoreSwitcherOpen, userId, tenantId } = useShell();
+  const cartIdentity = useMemo(() => ({ tenantId, storeId: currentStore?.id, userId }), [tenantId, currentStore?.id, userId]);
+  const { state, dispatch, totals, loyaltyDiscountPaise, rxWarning, controlledItems, playSound } = usePosCart(cartIdentity);
 
   const posDs = usePosDataSource({ storeId: currentStore?.id, cashierId: userId });
   const ds = posDs.dataSource;

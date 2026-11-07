@@ -84,4 +84,5 @@ export type PosAction =
   | { type: "SET_REDEEM_POINTS"; payload: number }
   | { type: "SET_SOUND_ENABLED"; payload: boolean }
   | { type: "HYDRATE_HELD_SALE"; payload: { heldSaleId: string; lines: PosCartLine[]; customer?: SelectedCustomer | null; doctorName?: string } }
+  | { type: "HYDRATE_DRAFT_CART"; payload: { lines: PosCartLine[]; customer?: SelectedCustomer | null; compliance?: Partial<ComplianceState>; paymentMethod?: string; splitPayments?: Partial<SplitPayments>; redeemPoints?: number } }
   | { type: "RESET_SALE" };
