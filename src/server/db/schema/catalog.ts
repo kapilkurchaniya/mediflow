@@ -62,11 +62,6 @@ export const medicines = pgTable(
     looseUnit: text("loose_unit").notNull().default("tablet"),
     manufacturerId: uuid("manufacturer_id").references(() => manufacturers.id),
     categoryId: uuid("category_id").references(() => categories.id),
-    /**
-     * @deprecated Since Phase 3 (Task A3.3). Racks belong to individual stores.
-     * Use `store_medicine_settings.rack_id` instead. This column will be dropped in Phase 6.
-     */
-    rackId: uuid("rack_id").references(() => racks.id),
     barcode: text("barcode"),
     hsn: text("hsn"),
     gstRateBp: integer("gst_rate_bp").notNull().default(500), // GST 2.0: most pharma HSN 3003/3004 @ 5%

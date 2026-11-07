@@ -32,7 +32,7 @@ describe("Task A3.6 Hardening: Idempotency & Blind Protection", () => {
     const store = await makeStore(t.db, tenant.id, { name: "Retail Branch", code: "RET-2" });
     const user = await makeUser(t.db);
 
-    const med = await makeMedicine(t.db, tenant.id, { name: "Metformin 500", rackId: null });
+    const med = await makeMedicine(t.db, tenant.id, { name: "Metformin 500" });
     const batch = await makeBatch(t.db, {
       tenantId: tenant.id,
       storeId: store.id,
@@ -95,7 +95,7 @@ describe("Task A3.6 Hardening: Idempotency & Blind Protection", () => {
     const store = await makeStore(t.db, tenant.id, { name: "Retail Branch", code: "RET-3" });
     const user = await makeUser(t.db);
 
-    const med = await makeMedicine(t.db, tenant.id, { name: "Thyroxine 100", rackId: null });
+    const med = await makeMedicine(t.db, tenant.id, { name: "Thyroxine 100" });
     await makeBatch(t.db, {
       tenantId: tenant.id,
       storeId: store.id,

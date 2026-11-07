@@ -82,7 +82,8 @@ async function seedVictim() {
   const [maker] = await t.db.insert(schema.manufacturers).values({ tenantId: tid, name: `${MARK} Pharma` }).returning();
   const [cat] = await t.db.insert(schema.categories).values({ tenantId: tid, name: `${MARK} Category` }).returning();
   const [rack] = await t.db.insert(schema.racks).values({ tenantId: tid, storeId: s.store.id, code: "A-1", name: `${MARK} Rack` }).returning();
-  const medicine = await makeMedicine(t.db, tid, { name: `${MARK} Medicine`, manufacturerId: maker.id, categoryId: cat.id, rackId: rack.id });
+  const medicine = await makeMedicine(t.db, tid, { name: `${MARK} Medicine`, manufacturerId: maker.id, categoryId: cat.id });
+  await t.db.insert(schema.storeMedicineSettings).values({ tenantId: tid, storeId: s.store.id, medicineId: medicine.id, rackId: rack.id });
   const batch = await makeBatch(t.db, { tenantId: tid, storeId: s.store.id, medicineId: medicine.id, qtyOnHand: 10, batchNo: `${MARK}-B1` });
   const customer = await makeCustomer(t.db, tid, { name: `${MARK} Customer`, phone: "9000000001" });
   const supplier = await makeSupplier(t.db, tid, { name: `${MARK} Supplier` });
@@ -125,21 +126,6 @@ beforeAll(async () => {
 
 const leaks = (result: unknown) => JSON.stringify(result ?? null).includes(MARK);
 
-/** The caller got nothing useful: it threw, or returned null / empty / an error. */
-async function denied(call: () => Promise<unknown>) {
-  try {
-    const r = await call();
-    if (r == null) return true;
-    if (Array.isArray(r)) return r.length === 0;
-    if (typeof r === "object") {
-      const o = r as Record<string, unknown>;
-      return Boolean(o.error || o.serverError || o.validationErrors || o.success === false);
-    }
-    return false;
-  } catch {
-    return true;
-  }
-}
 
 const form = (fields: Record<string, string> = {}) => {
   const f = new FormData();
