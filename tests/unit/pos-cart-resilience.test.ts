@@ -279,5 +279,17 @@ describe("POS Cart Resilience & Persistence", () => {
       code: "INJECT_SQL" as unknown as "REACT_BOUNDARY_FAILURE",
     });
     expect(invalidCodeResult.recorded).toBe(false);
+
+    // 5. Sliding-window rate limiting prevents telemetry ingestion abuse
+    let blockedCount = 0;
+    for (let i = 0; i < 35; i++) {
+      const res = await logClientBoundaryError({
+        module: "pos",
+        digest: `DIGEST_${i}`,
+        code: "REACT_BOUNDARY_FAILURE",
+      });
+      if (!res.recorded) blockedCount++;
+    }
+    expect(blockedCount).toBeGreaterThan(0);
   });
 });

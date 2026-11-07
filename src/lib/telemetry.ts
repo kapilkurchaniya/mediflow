@@ -1,27 +1,20 @@
 "use client";
 
-import { logClientBoundaryError, type ClientBoundaryErrorPayload } from "@/app/actions/telemetry";
+import { logClientBoundaryError } from "@/app/actions/telemetry";
+import {
+  type AllowedBoundaryModule,
+  type AllowedEventCode,
+  type ClientBoundaryErrorPayload,
+  DIGEST_REGEX,
+} from "@/lib/telemetry-contract";
 
-export const ALLOWED_MODULES = [
-  "dashboard-root",
-  "pos",
-  "sales",
-  "inventory",
-  "purchases",
-  "accounting",
-  "compliance",
-  "reports",
-  "settings",
-] as const;
-
-export type AllowedBoundaryModule = (typeof ALLOWED_MODULES)[number];
-
-export const ALLOWED_EVENT_CODES = [
-  "REACT_BOUNDARY_FAILURE",
-  "MODULE_INITIALIZATION_ERROR",
-] as const;
-
-export type AllowedEventCode = (typeof ALLOWED_EVENT_CODES)[number];
+export {
+  ALLOWED_MODULES,
+  ALLOWED_EVENT_CODES,
+  type AllowedBoundaryModule,
+  type AllowedEventCode,
+  type ClientBoundaryErrorPayload,
+} from "@/lib/telemetry-contract";
 
 /**
  * Dispatches error boundary telemetry to both optional browser Sentry SDK
@@ -40,7 +33,7 @@ export function reportBoundaryError(
 ): void {
   try {
     const rawDigest = error?.digest;
-    const safeDigest = typeof rawDigest === "string" && /^[a-zA-Z0-9_-]{1,64}$/.test(rawDigest)
+    const safeDigest = typeof rawDigest === "string" && DIGEST_REGEX.test(rawDigest)
       ? rawDigest
       : undefined;
 
