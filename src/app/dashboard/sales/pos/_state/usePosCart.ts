@@ -4,7 +4,7 @@ import { useReducer, useMemo, useCallback, useEffect, useRef } from "react";
 import type { PosState, PosAction, PosCartLine, ComplianceState, SplitPayments } from "./types";
 import { computeSaleTotals } from "@/lib/money";
 import { playCounterSound } from "@/lib/sound";
-import { saveDraftCart, loadDraftCart, clearDraftCart, type CartIdentity } from "@/lib/pos-cart-persistence";
+import { saveDraftCart, loadDraftCart, clearDraftCart, buildCartStorageKey, type CartIdentity } from "@/lib/pos-cart-persistence";
 
 export const initialComplianceState: ComplianceState = {
   doctorId: "", doctorName: "", doctorRegNo: "", doctorAddress: "",
@@ -155,7 +155,15 @@ export function posCartReducer(state: PosState, action: PosAction): PosState {
 
 export function usePosCart(identity?: CartIdentity) {
   const [state, dispatch] = useReducer(posCartReducer, initialPosState);
-  const hasHydratedRef = useRef(false);
+  const tenantId = identity?.tenantId;
+  const storeId = identity?.storeId;
+  const userId = identity?.userId;
+  const terminalId = identity?.terminalId;
+  const storageKey = useMemo(
+    () => buildCartStorageKey({ tenantId, storeId, userId, terminalId }),
+    [tenantId, storeId, userId, terminalId]
+  );
+  const hydratedKeyRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -166,18 +174,24 @@ export function usePosCart(identity?: CartIdentity) {
 
   useEffect(() => {
     let active = true;
+    hydratedKeyRef.current = null;
+
     void loadDraftCart(identity ?? {}).then((draft) => {
       if (!active) return;
       if (draft && draft.lines.length > 0) {
         dispatch({ type: "HYDRATE_DRAFT_CART", payload: draft });
+      } else {
+        dispatch({ type: "RESET_SALE" });
       }
-      hasHydratedRef.current = true;
+      hydratedKeyRef.current = storageKey;
     });
+
     return () => { active = false; };
-  }, [identity?.tenantId, identity?.storeId, identity?.userId, identity?.terminalId, identity]);
+  }, [storageKey, identity]);
 
   useEffect(() => {
-    if (!hasHydratedRef.current) return;
+    if (hydratedKeyRef.current !== storageKey) return;
+
     if (state.cart.length > 0) {
       void saveDraftCart(identity ?? {}, {
         lines: state.cart, customer: state.customer, compliance: state.compliance,
@@ -187,7 +201,7 @@ export function usePosCart(identity?: CartIdentity) {
     } else {
       void clearDraftCart(identity ?? {});
     }
-  }, [state.cart, state.customer, state.compliance, state.paymentMethod, state.splitPayments, state.redeemPoints, identity]);
+  }, [state.cart, state.customer, state.compliance, state.paymentMethod, state.splitPayments, state.redeemPoints, storageKey, identity]);
 
   const loyaltyDiscountPaise = useMemo(() => {
     if (!state.customer || state.redeemPoints <= 0) return 0;

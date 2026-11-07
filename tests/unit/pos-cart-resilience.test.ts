@@ -11,6 +11,8 @@ import {
 } from "@/lib/pos-cart-persistence";
 import { posCartReducer, initialPosState } from "@/app/dashboard/sales/pos/_state/usePosCart";
 import type { PosCartLine } from "@/app/dashboard/sales/pos/_state/types";
+import { reportBoundaryError } from "@/lib/telemetry";
+import { logClientBoundaryError } from "@/app/actions/telemetry";
 
 describe("POS Cart Resilience & Persistence", () => {
   beforeEach(async () => {
@@ -46,8 +48,8 @@ describe("POS Cart Resilience & Persistence", () => {
     lines: [sampleLine],
     customer: { id: "cust_1", name: "Rahul Sharma", phone: "9876543210" },
     compliance: {
-      doctorId: "", doctorName: "Dr. A. Verma", doctorRegNo: "MCI-9988", doctorAddress: "",
-      patientAge: 35, patientGender: "male", patientAddress: "Pune",
+      doctorId: "doc_1", doctorName: "Dr. A. Verma", doctorRegNo: "MCI-9988", doctorAddress: "123 Clinic Road",
+      patientAge: 35, patientGender: "male", patientAddress: "Flat 4, Pune",
       prescriptionRef: "RX-4411", prescriptionDate: "2026-11-07", medicalRepId: "",
     },
     splitPayments: { cash: "500", upi: "40", card: "" },
@@ -68,7 +70,7 @@ describe("POS Cart Resilience & Persistence", () => {
     expect(key1).not.toBe(key2);
   });
 
-  it("validates and sanitizes untrusted drafts safely", () => {
+  it("validates and sanitizes untrusted drafts safely with data minimization", () => {
     const valid = validateAndSanitizeDraft({
       updatedAt: Date.now(),
       lines: [sampleLine],
@@ -83,6 +85,12 @@ describe("POS Cart Resilience & Persistence", () => {
     expect(valid?.lines).toHaveLength(1);
     expect(valid?.lines[0].medicineName).toBe("Paracetamol 650mg");
     expect(valid?.customer?.name).toBe("Rahul Sharma");
+    expect(valid?.customer?.phone).toBeNull();
+    expect(valid?.compliance.doctorId).toBe("doc_1");
+    expect(valid?.compliance.doctorName).toBe("");
+    expect(valid?.compliance.doctorAddress).toBe("");
+    expect(valid?.compliance.patientAddress).toBe("");
+    expect(valid?.compliance.prescriptionRef).toBe("");
   });
 
   it("rejects expired drafts older than 24 hours", () => {
@@ -127,9 +135,9 @@ describe("POS Cart Resilience & Persistence", () => {
 
     const sanitized = validateAndSanitizeDraft(draftWithSecrets);
     expect(sanitized).not.toBeNull();
-    // Payment tender is always reset fresh to prevent silent unauthorized charges
     expect(sanitized?.splitPayments).toEqual({ cash: "", upi: "", card: "" });
     expect(sanitized?.paymentMethod).toBe("cash");
+    expect(sanitized?.redeemPoints).toBe(0);
     expect(((sanitized?.splitPayments as unknown) as Record<string, unknown>).token).toBeUndefined();
     expect(((sanitized?.splitPayments as unknown) as Record<string, unknown>).authHeader).toBeUndefined();
   });
@@ -145,13 +153,58 @@ describe("POS Cart Resilience & Persistence", () => {
     expect(loaded?.lines).toHaveLength(1);
     expect(loaded?.lines[0].batchNo).toBe("PCM-2024");
     expect(loaded?.customer?.name).toBe("Rahul Sharma");
-    expect(loaded?.compliance.doctorName).toBe("Dr. A. Verma");
+    expect(loaded?.compliance.doctorId).toBe("doc_1");
+    expect(loaded?.compliance.doctorName).toBe("");
 
     const cleared = await clearDraftCart(identity);
     expect(cleared).toBe(true);
 
     const afterClear = await loadDraftCart(identity);
     expect(afterClear).toBeNull();
+  });
+
+  it("guarantees serialized save and clear ordering (save-clear race prevention)", async () => {
+    const identity = { tenantId: "tenant_racing", storeId: "store_race", userId: "cashier_race" };
+
+    const p1 = saveDraftCart(identity, samplePayload);
+    const p2 = clearDraftCart(identity);
+    await Promise.all([p1, p2]);
+
+    const loaded = await loadDraftCart(identity);
+    expect(loaded).toBeNull();
+  });
+
+  it("permits immediate new save after clear without rejection (P0 monotonic generation)", async () => {
+    const identity = { tenantId: "tenant_gen", storeId: "store_gen", userId: "cashier_gen" };
+    const payloadB: DraftCartPayload = {
+      ...samplePayload,
+      lines: [{ ...sampleLine, batchId: "batch_next_sale", medicineName: "Amoxicillin 500mg" }],
+    };
+
+    // 1. Save draft A
+    await saveDraftCart(identity, samplePayload);
+    // 2. Complete sale and clear draft
+    await clearDraftCart(identity);
+    // 3. Cashier immediately starts next sale and saves draft B
+    const savedB = await saveDraftCart(identity, payloadB);
+    expect(savedB).toBe(true);
+
+    // 4. Draft B is restored without being blocked
+    const loadedB = await loadDraftCart(identity);
+    expect(loadedB).not.toBeNull();
+    expect(loadedB?.lines[0].medicineName).toBe("Amoxicillin 500mg");
+  });
+
+  it("aborts delayed in-flight save when overtaken by clear", async () => {
+    const identity = { tenantId: "tenant_abort", storeId: "store_abort", userId: "cashier_abort" };
+
+    // Fire save and clear concurrently
+    const savePromise = saveDraftCart(identity, samplePayload);
+    const clearPromise = clearDraftCart(identity);
+    await Promise.all([savePromise, clearPromise]);
+
+    const loaded = await loadDraftCart(identity);
+    expect(loaded).toBeNull();
   });
 
   it("isolates drafts across different stores and cashiers", async () => {
@@ -196,5 +249,47 @@ describe("POS Cart Resilience & Persistence", () => {
     const resetState = posCartReducer(modifiedState, { type: "RESET_SALE" });
     expect(resetState.cart).toHaveLength(0);
     expect(resetState.soundEnabled).toBe(false);
+  });
+
+  it("records boundary telemetry safely without throwing or exposing PII", async () => {
+    const error = new Error("CRITICAL SQL syntax error: SELECT * FROM users WHERE token=secret_token_123") as Error & { digest?: string };
+    error.digest = "DIGEST_XYZ_123";
+
+    // 1. reportBoundaryError sends only module & digest; never error.message or raw exception
+    expect(() => reportBoundaryError("pos", error)).not.toThrow();
+
+    // 2. Server action validates allowlisted modules and codes
+    const validResult = await logClientBoundaryError({
+      module: "pos",
+      digest: "DIGEST_XYZ_123",
+      code: "REACT_BOUNDARY_FAILURE",
+    });
+    expect(validResult.recorded).toBe(true);
+
+    // 3. Rejects unknown module
+    const invalidModResult = await logClientBoundaryError({
+      module: "malicious-injected-module" as unknown as "pos",
+      digest: "test",
+    });
+    expect(invalidModResult.recorded).toBe(false);
+
+    // 4. Rejects invalid diagnostic code
+    const invalidCodeResult = await logClientBoundaryError({
+      module: "pos",
+      code: "INJECT_SQL" as unknown as "REACT_BOUNDARY_FAILURE",
+    });
+    expect(invalidCodeResult.recorded).toBe(false);
+
+    // 5. Sliding-window rate limiting prevents telemetry ingestion abuse
+    let blockedCount = 0;
+    for (let i = 0; i < 35; i++) {
+      const res = await logClientBoundaryError({
+        module: "pos",
+        digest: `DIGEST_${i}`,
+        code: "REACT_BOUNDARY_FAILURE",
+      });
+      if (!res.recorded) blockedCount++;
+    }
+    expect(blockedCount).toBeGreaterThan(0);
   });
 });

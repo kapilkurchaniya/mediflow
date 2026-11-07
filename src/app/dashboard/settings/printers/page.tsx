@@ -13,7 +13,7 @@ import {
 
 export default function PrintersSettingsPage() {
   const [format, setFormat] = useState<"80mm" | "58mm" | "a4">("80mm");
-  const [cutPaper, setCutPaper] = useState(true);
+  const cutPaper = true;
   const [drawerStatus, setDrawerStatus] = useState<string | null>(null);
 
   const handlePrintTest = () => {
@@ -22,9 +22,9 @@ export default function PrintersSettingsPage() {
 
   const handleTestCashDrawer = () => {
     setDrawerStatus(
-      "Signal simulated: In standard web browsers, drawer kicks are triggered automatically via printer driver settings ('Open before/after printing') or an ESC/POS desktop bridge."
+      "Pulse Simulated (Diagnostic): Direct USB RJ-11 solenoid kicks in web browsers operate via driver-level 'Open drawer before/after printing' or a local ESC/POS desktop bridge."
     );
-    setTimeout(() => setDrawerStatus(null), 8000);
+    setTimeout(() => setDrawerStatus(null), 9000);
   };
 
   return (
@@ -33,18 +33,17 @@ export default function PrintersSettingsPage() {
         <PageHeader
           eyebrow="Hardware Setup"
           title="Thermal Printer & Receipt Configuration"
-          description="Configure 80mm POS receipt layout, test silent kiosk printing, and verify cash drawer triggers."
+          description="Configure receipt paper format, preview live 80mm/58mm/A4 templates, and verify cash drawer triggers."
         />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 print:block">
         {/* Left Column: Hardware Settings & Actions */}
         <div className="lg:col-span-2 space-y-6 print:hidden">
-          {/* Format selection */}
           <div className="card p-5 space-y-4">
             <h2 className="text-sm font-semibold text-ink-900 flex items-center gap-2">
               <Printer className="h-4 w-4 text-brand-600" />
-              Receipt Paper Format
+              Receipt Paper Format (Active Preview & Print Mode)
             </h2>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
               <button
@@ -60,7 +59,7 @@ export default function PrintersSettingsPage() {
                   <span className="font-medium text-ink-900">80mm Continuous</span>
                   {format === "80mm" && <CheckCircle2 className="h-4 w-4 text-brand-600" />}
                 </div>
-                <p className="text-[11px] text-ink-500">Standard Indian retail pharmacy roll (3-inch / 48 columns).</p>
+                <p className="text-[11px] text-ink-500">Standard Indian retail roll (3-inch / 72mm printable width).</p>
               </button>
 
               <button
@@ -76,7 +75,7 @@ export default function PrintersSettingsPage() {
                   <span className="font-medium text-ink-900">58mm Mini Roll</span>
                   {format === "58mm" && <CheckCircle2 className="h-4 w-4 text-brand-600" />}
                 </div>
-                <p className="text-[11px] text-ink-500">Compact handheld Bluetooth & desktop thermal slips (2-inch).</p>
+                <p className="text-[11px] text-ink-500">Compact 2-inch handheld Bluetooth & desktop thermal slips.</p>
               </button>
 
               <button
@@ -92,24 +91,31 @@ export default function PrintersSettingsPage() {
                   <span className="font-medium text-ink-900">A4 GST Full Sheet</span>
                   {format === "a4" && <CheckCircle2 className="h-4 w-4 text-brand-600" />}
                 </div>
-                <p className="text-[11px] text-ink-500">Full-sheet invoice with complete HSN summary & bank details.</p>
+                <p className="text-[11px] text-ink-500">Full-sheet invoice with complete HSN breakdown & bank details.</p>
               </button>
             </div>
 
-            <div className="pt-2 border-t border-ink-100 flex items-center justify-between text-xs">
-              <label className="flex items-center gap-2 cursor-pointer text-ink-800">
-                <input
-                  type="checkbox"
-                  checked={cutPaper}
-                  onChange={(e) => setCutPaper(e.target.checked)}
-                  className="rounded border-ink-300 text-brand-600 focus:ring-brand-500"
-                />
-                Auto-cut paper at the end of print job (ESC/POS GS V 66 0)
-              </label>
+            <div className="pt-2 border-t border-ink-100 flex flex-col gap-1.5 text-xs">
+              <div className="flex items-center justify-between">
+                <label className="flex items-center gap-2 text-ink-600 select-none">
+                  <input
+                    type="checkbox"
+                    checked={cutPaper}
+                    disabled
+                    className="rounded border-ink-300 text-brand-600 focus:ring-brand-500 opacity-60 cursor-not-allowed"
+                  />
+                  Hardware Auto-Cutter (ESC/POS GS V 66 0)
+                </label>
+                <span className="text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded bg-ink-100 text-ink-600">
+                  Driver-Managed
+                </span>
+              </div>
+              <p className="text-[11px] text-ink-500 pl-6">
+                Web browsers cannot send raw binary ESC/POS escape sequences directly via <code className="font-mono text-ink-700">window.print()</code>. Auto-cut must be enabled in the thermal printer&apos;s OS driver settings (CUPS / Windows Spooler &gt; Device Settings &gt; Cut Paper).
+              </p>
             </div>
           </div>
 
-          {/* Action Triggers */}
           <div className="card p-5 space-y-4">
             <h2 className="text-sm font-semibold text-ink-900">Interactive Diagnostic Tests</h2>
             <div className="flex flex-wrap gap-3">
@@ -119,7 +125,7 @@ export default function PrintersSettingsPage() {
                 className="inline-flex items-center gap-2 px-4 py-2.5 bg-brand-600 hover:bg-brand-700 text-white font-medium text-xs rounded-xl shadow-sm transition active:scale-[0.98]"
               >
                 <Printer className="h-4 w-4" />
-                Print 80mm Test Receipt
+                Print {format === "80mm" ? "80mm" : format === "58mm" ? "58mm" : "A4"} Test Document
               </button>
               <button
                 type="button"
@@ -127,7 +133,7 @@ export default function PrintersSettingsPage() {
                 className="inline-flex items-center gap-2 px-4 py-2.5 bg-ink-100 hover:bg-ink-200 text-ink-800 font-medium text-xs rounded-xl transition"
               >
                 <DollarSign className="h-4 w-4 text-ink-600" />
-                Test RJ-11 Cash Drawer Pulse
+                Simulate RJ-11 Drawer Kick
               </button>
             </div>
 
@@ -142,13 +148,12 @@ export default function PrintersSettingsPage() {
             )}
           </div>
 
-          {/* Runbook link */}
           <div className="p-4 bg-sky-50 border border-sky-200 rounded-2xl flex items-center justify-between text-xs">
             <div className="flex items-center gap-3">
               <BookOpen className="w-5 h-5 text-sky-700 shrink-0" />
               <div>
                 <span className="font-semibold text-sky-950 block">80mm Driver & Kiosk Printing Guide</span>
-                Complete step-by-step instructions for Epson, TVS RP-3200, Posiflex, and silent Chrome kiosk flags.
+                Driver margins, silent Chrome kiosk mode (--kiosk-printing), and TVS/Epson configuration.
               </div>
             </div>
             <a
@@ -162,114 +167,90 @@ export default function PrintersSettingsPage() {
           </div>
         </div>
 
-        {/* Right Column: 80mm Receipt Live Preview */}
+        {/* Right Column: Live Template Preview */}
         <div className="space-y-3">
           <div className="text-xs font-semibold text-ink-600 uppercase tracking-wider print:hidden">
-            80mm Thermal Receipt Preview
+            Active Format Preview: {format === "80mm" ? "80mm Thermal" : format === "58mm" ? "58mm Thermal" : "A4 Sheet"}
           </div>
 
           <div
-            id="thermal-receipt"
-            className="w-full max-w-[340px] mx-auto bg-white border border-ink-200 shadow-md p-4 font-mono text-[11px] leading-tight text-ink-900 select-none print:border-none print:shadow-none print:p-0 print:m-0 print:w-[72mm]"
+            id="test-receipt"
+            className={`mx-auto bg-white border border-ink-200 shadow-md p-3 font-mono leading-tight text-ink-900 select-none print:border-none print:shadow-none print:p-0 print:m-0 ${
+              format === "58mm"
+                ? "w-[240px] text-[10px] print:w-[48mm]"
+                : format === "80mm"
+                ? "w-[320px] text-[11px] print:w-[72mm]"
+                : "w-full max-w-[580px] text-xs print:w-[210mm]"
+            }`}
           >
-            {/* Header */}
             <div className="text-center pb-2 border-b border-dashed border-ink-300">
-              <div className="font-bold text-sm tracking-tight text-ink-950">MEDIFLOW PHARMACY</div>
-              <div className="text-[10px] text-ink-600">Main Market Branch, MG Road</div>
-              <div className="text-[10px] text-ink-600">DL: 20B/12345/2024 · 21B/12346/2024</div>
-              <div className="text-[10px] text-ink-600 font-bold mt-0.5">GSTIN: 27AABCM1234F1Z5</div>
-              <div className="text-[10px] text-ink-600">Ph: +91 98765 43210</div>
+              <div className="font-bold text-sm text-ink-950">MEDIFLOW PHARMACY</div>
+              <div className="text-[10px] text-ink-600">Branch 1 · GSTIN: 27AABCM1234F1Z5</div>
+              <div className="text-[10px] text-ink-600">DL: 20B/12345/2024 · Ph: +91 98765 43210</div>
             </div>
 
-            {/* Bill Meta */}
             <div className="py-2 border-b border-dashed border-ink-300 text-[10px] space-y-0.5">
               <div className="flex justify-between">
-                <span>INVOICE: #TEST-80MM-001</span>
+                <span>INV: #TEST-{format.toUpperCase()}-001</span>
                 <span>CASH COUNTER</span>
               </div>
-              <div className="flex justify-between">
-                <span>DATE: {new Date().toLocaleDateString("en-IN")}</span>
-                <span>TIME: {new Date().toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}</span>
-              </div>
-              <div className="flex justify-between">
-                <span>CUST: WALK-IN PHARMACY</span>
-                <span>DR: SELF</span>
+              <div className="flex justify-between text-ink-500">
+                <span>{new Date().toLocaleDateString("en-IN")}</span>
+                <span>DR: WALK-IN / SELF</span>
               </div>
             </div>
 
-            {/* Items Table */}
             <div className="py-2 border-b border-dashed border-ink-300">
               <div className="flex justify-between font-bold text-[10px] pb-1 border-b border-ink-200">
-                <span className="w-1/2">ITEM / BATCH</span>
-                <span className="w-1/6 text-right">QTY</span>
-                <span className="w-1/6 text-right">MRP</span>
-                <span className="w-1/6 text-right">NET</span>
+                <span className="w-1/2">ITEM</span>
+                <span className="w-1/4 text-right">QTY</span>
+                <span className="w-1/4 text-right">NET</span>
               </div>
-
               <div className="py-1 space-y-1">
                 <div>
-                  <div className="font-semibold">PARACETAMOL 650MG TAB</div>
+                  <div className="font-semibold">PARACETAMOL 650MG</div>
                   <div className="flex justify-between text-[9px] text-ink-600">
-                    <span>B: PCM24 · E: 12/26</span>
+                    <span>B: PCM24</span>
                     <span className="text-right">10 Tab</span>
-                    <span className="text-right">₹30.00</span>
                     <span className="text-right font-semibold">₹27.00</span>
                   </div>
                 </div>
-
                 <div>
                   <div className="font-semibold">AZITHROMYCIN 500MG</div>
                   <div className="flex justify-between text-[9px] text-ink-600">
-                    <span>B: AZI99 · E: 08/27</span>
+                    <span>B: AZI99</span>
                     <span className="text-right">1 Strip</span>
-                    <span className="text-right">₹120.00</span>
                     <span className="text-right font-semibold">₹105.00</span>
                   </div>
                 </div>
               </div>
             </div>
 
-            {/* Totals */}
             <div className="py-2 border-b border-dashed border-ink-300 space-y-1 text-[10px]">
               <div className="flex justify-between">
                 <span>SUBTOTAL (2 ITEMS):</span>
                 <span>₹132.00</span>
               </div>
               <div className="flex justify-between text-emerald-700 font-semibold">
-                <span>TOTAL SAVINGS:</span>
+                <span>SAVINGS:</span>
                 <span>-₹18.00 (12%)</span>
               </div>
               <div className="flex justify-between font-bold text-xs pt-1 border-t border-ink-200">
                 <span>NET PAYABLE:</span>
                 <span>₹132.00</span>
               </div>
-              <div className="flex justify-between text-[9px] text-ink-500">
-                <span>TENDER: CASH</span>
-                <span>PAID: ₹132.00</span>
-              </div>
             </div>
 
-            {/* GST Summary */}
-            <div className="py-2 border-b border-dashed border-ink-300 text-[9px] text-ink-600">
-              <div className="flex justify-between font-semibold pb-0.5">
-                <span>TAX SLAB</span>
-                <span>TAXABLE</span>
-                <span>CGST</span>
-                <span>SGST</span>
-              </div>
+            <div className="py-1.5 border-b border-dashed border-ink-300 text-[9px] text-ink-600">
               <div className="flex justify-between">
-                <span>GST 12%</span>
-                <span>₹117.86</span>
-                <span>₹7.07</span>
-                <span>₹7.07</span>
+                <span>GST 12% INCLUDED:</span>
+                <span>₹14.14 (CGST 6% + SGST 6%)</span>
               </div>
             </div>
 
-            {/* Footer */}
-            <div className="pt-2 text-center text-[9px] text-ink-600 space-y-1">
-              <div className="font-semibold">** THANK YOU & GET WELL SOON **</div>
-              <div>Prescription required for Schedule H/H1 medicines</div>
-              <div className="text-[8px] text-ink-400">Powered by Mediflow Pharmacy ERP</div>
+            <div className="pt-2 text-center text-[9px] text-ink-500 space-y-0.5">
+              <div className="font-semibold text-ink-700">** THANK YOU & GET WELL SOON **</div>
+              <div>Schedule H/H1 drugs dispensed against valid prescription</div>
             </div>
           </div>
         </div>

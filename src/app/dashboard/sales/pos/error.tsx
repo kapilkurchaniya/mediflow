@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import Link from "next/link";
 import { AlertTriangle, RotateCcw, ShieldCheck, ArrowLeft } from "lucide-react";
+import { reportBoundaryError } from "@/lib/telemetry";
 
 export default function PosErrorBoundary({
   error,
@@ -12,9 +13,8 @@ export default function PosErrorBoundary({
   reset: () => void;
 }) {
   useEffect(() => {
-    console.error("POS Counter Error Boundary caught error:", error);
+    reportBoundaryError("pos", error);
   }, [error]);
-
   return (
     <div className="min-h-[70vh] flex items-center justify-center p-4">
       <div className="w-full max-w-lg bg-white rounded-2xl border border-ink-100 shadow-xl overflow-hidden animate-enter">
@@ -66,10 +66,11 @@ export default function PosErrorBoundary({
 
           <details className="text-[11px] text-ink-500 pt-2 border-t border-ink-100">
             <summary className="cursor-pointer hover:text-ink-800 font-medium select-none">
-              Diagnostic Information {error.digest && `(Digest: ${error.digest})`}
+              Diagnostic Reference {error.digest ? `(#${error.digest.slice(0, 10)})` : "(ERR_POS_RECOVERY)"}
             </summary>
-            <div className="mt-2 p-2.5 bg-ink-50 rounded-lg font-mono text-[10px] break-all text-ink-700 border border-ink-100">
-              {error.message || "No error message provided."}
+            <div className="mt-2 p-2.5 bg-ink-50 rounded-lg text-[11px] text-ink-700 border border-ink-100 leading-relaxed">
+              An unexpected terminal interruption was caught safely. Click &quot;Recover Counter Session&quot; to restore your in-flight cart from IndexedDB. If this persists, provide diagnostic reference code{" "}
+              <span className="font-mono font-semibold">{error.digest || "ERR_POS_RECOVERY"}</span> to your administrator.
             </div>
           </details>
         </div>

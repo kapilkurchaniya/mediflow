@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import Link from "next/link";
 import { AlertCircle, RotateCcw, Home } from "lucide-react";
+import { reportBoundaryError } from "@/lib/telemetry";
 
 export default function DashboardRootErrorBoundary({
   error,
@@ -12,9 +13,8 @@ export default function DashboardRootErrorBoundary({
   reset: () => void;
 }) {
   useEffect(() => {
-    console.error("Dashboard Root Error Boundary caught error:", error);
+    reportBoundaryError("dashboard-root", error);
   }, [error]);
-
   return (
     <div className="min-h-[60vh] flex items-center justify-center p-6">
       <div className="w-full max-w-md bg-white rounded-2xl border border-ink-100 shadow-lg p-6 space-y-5 animate-enter">
@@ -52,10 +52,10 @@ export default function DashboardRootErrorBoundary({
 
         <details className="text-[11px] text-ink-400 pt-2 border-t border-ink-100">
           <summary className="cursor-pointer hover:text-ink-600 font-medium select-none">
-            Error Details {error.digest && `(#${error.digest.slice(0, 8)})`}
+            Diagnostic Reference {error.digest ? `(#${error.digest.slice(0, 8)})` : "(ERR_DASHBOARD)"}
           </summary>
-          <p className="mt-1 font-mono text-[10px] text-ink-600 break-all">
-            {error.message || "Unknown error"}
+          <p className="mt-1 text-[11px] text-ink-600">
+            A rendering interruption occurred. Reference code: <span className="font-mono font-semibold">{error.digest || "ERR_DASHBOARD"}</span>.
           </p>
         </details>
       </div>

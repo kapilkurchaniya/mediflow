@@ -60,18 +60,13 @@ export function validateAndSanitizeDraft(raw: unknown): PersistedDraftCart | nul
     const totalQty = Math.max(1, Math.floor(Number(l.qty) || packQty * unitsPerPack + looseQty));
 
     sanitizedLines.push({
-      batchId,
-      medicineId,
-      medicineName,
+      batchId, medicineId, medicineName,
       genericName: typeof l.genericName === "string" ? l.genericName : null,
       batchNo: typeof l.batchNo === "string" ? l.batchNo : "DEFAULT",
       expiryDate: typeof l.expiryDate === "string" ? l.expiryDate : "",
       mrp: Math.max(0, Math.floor(Number(l.mrp) || 0)),
       saleRate: Math.max(0, Math.floor(Number(l.saleRate ?? l.mrp) || 0)),
-      packQty,
-      looseQty,
-      qty: totalQty,
-      unitsPerPack,
+      packQty, looseQty, qty: totalQty, unitsPerPack,
       packUnit: typeof l.packUnit === "string" ? l.packUnit : "strip",
       looseUnit: typeof l.looseUnit === "string" ? l.looseUnit : "tablet",
       qtyOnHand: Math.floor(Number(l.qtyOnHand) || 0),
@@ -93,27 +88,21 @@ export function validateAndSanitizeDraft(raw: unknown): PersistedDraftCart | nul
     const c = obj.customer as Record<string, unknown>;
     if (typeof c.id === "string" && typeof c.name === "string") {
       customer = {
-        id: c.id, name: c.name, phone: typeof c.phone === "string" ? c.phone : null,
-        loyaltyPoints: typeof c.loyaltyPoints === "number" ? c.loyaltyPoints : 0,
-        creditLimit: typeof c.creditLimit === "number" ? c.creditLimit : null,
-        redeemablePoints: typeof c.redeemablePoints === "number" ? c.redeemablePoints : 0,
-        redeemableValuePaise: typeof c.redeemableValuePaise === "number" ? c.redeemableValuePaise : 0,
+        id: c.id,
+        name: typeof c.name === "string" ? c.name : "",
+        phone: null, // Data minimization: sensitive contact phone stripped from client storage
+        loyaltyPoints: 0, creditLimit: null, redeemablePoints: 0, redeemableValuePaise: 0,
       };
     }
   }
 
   const rawComp = (obj.compliance && typeof obj.compliance === "object" ? obj.compliance : {}) as Record<string, unknown>;
   const compliance: ComplianceState = {
-    doctorId: typeof rawComp.doctorId === "string" ? rawComp.doctorId : "",
-    doctorName: typeof rawComp.doctorName === "string" ? rawComp.doctorName : "",
-    doctorRegNo: typeof rawComp.doctorRegNo === "string" ? rawComp.doctorRegNo : "",
-    doctorAddress: typeof rawComp.doctorAddress === "string" ? rawComp.doctorAddress : "",
-    patientAge: typeof rawComp.patientAge === "number" ? rawComp.patientAge : "",
-    patientGender: typeof rawComp.patientGender === "string" ? rawComp.patientGender : "male",
-    patientAddress: typeof rawComp.patientAddress === "string" ? rawComp.patientAddress : "",
-    prescriptionRef: typeof rawComp.prescriptionRef === "string" ? rawComp.prescriptionRef : "",
-    prescriptionDate: typeof rawComp.prescriptionDate === "string" ? rawComp.prescriptionDate : new Date().toISOString().slice(0, 10),
-    medicalRepId: typeof rawComp.medicalRepId === "string" ? rawComp.medicalRepId : "",
+    doctorId: typeof rawComp.doctorId === "string" ? rawComp.doctorId.trim() : "",
+    doctorName: "", doctorRegNo: "", doctorAddress: "",
+    patientAge: "", patientGender: "male", patientAddress: "",
+    prescriptionRef: "", prescriptionDate: new Date().toISOString().slice(0, 10),
+    medicalRepId: typeof rawComp.medicalRepId === "string" ? rawComp.medicalRepId.trim() : "",
   };
 
   // Restored drafts ALWAYS start tender selection fresh (zero prior authorization or tender carryover)
@@ -165,15 +154,28 @@ function getIndexedDB(): Promise<IDBDatabase> {
   return dbPromise;
 }
 
-const writeQueues = new Map<string, Promise<unknown>>();
-const lastSavedTimestamps = new Map<string, number>();
+interface QueueState {
+  currentSaveGen: number;
+  lastClearGen: number;
+  queue: Promise<unknown>;
+}
+
+const keyQueueStates = new Map<string, QueueState>();
+
+function getQueueState(key: string): QueueState {
+  let state = keyQueueStates.get(key);
+  if (!state) {
+    state = { currentSaveGen: 0, lastClearGen: 0, queue: Promise.resolve() };
+    keyQueueStates.set(key, state);
+  }
+  return state;
+}
 
 export async function saveDraftCart(identity: CartIdentity, payload: DraftCartPayload): Promise<boolean> {
   const key = buildCartStorageKey(identity);
+  const state = getQueueState(key);
+  const myGen = ++state.currentSaveGen;
   const now = Date.now();
-  const lastTime = lastSavedTimestamps.get(key) ?? 0;
-  if (now < lastTime) return false;
-  lastSavedTimestamps.set(key, now);
 
   const draft: PersistedDraftCart = {
     version: 1,
@@ -182,8 +184,10 @@ export async function saveDraftCart(identity: CartIdentity, payload: DraftCartPa
     ...payload,
   };
 
-  const queue = writeQueues.get(key) ?? Promise.resolve();
-  const nextWrite = queue.then(async () => {
+  const nextWrite = state.queue.then(async () => {
+    if (myGen < state.lastClearGen || myGen < state.currentSaveGen) {
+      return false;
+    }
     try {
       const db = await getIndexedDB();
       await new Promise<void>((resolve, reject) => {
@@ -208,7 +212,7 @@ export async function saveDraftCart(identity: CartIdentity, payload: DraftCartPa
     }
   });
 
-  writeQueues.set(key, nextWrite.catch(() => false));
+  state.queue = nextWrite.catch(() => false);
   return (await nextWrite) as boolean;
 }
 
@@ -252,38 +256,42 @@ export async function loadDraftCart(identity: CartIdentity): Promise<PersistedDr
 
 export async function clearDraftCart(identity: CartIdentity): Promise<boolean> {
   const key = buildCartStorageKey(identity);
-  lastSavedTimestamps.delete(key);
+  const state = getQueueState(key);
+  // Monotonically invalidate any save operations queued prior to this clear
+  state.lastClearGen = ++state.currentSaveGen;
 
-  let idbSuccess = false;
-  try {
-    const db = await getIndexedDB();
-    await new Promise<void>((resolve, reject) => {
-      const tx = db.transaction(STORE_NAME, "readwrite");
-      const store = tx.objectStore(STORE_NAME);
-      const req = store.delete(key);
-      req.onsuccess = () => resolve();
-      req.onerror = () => reject(req.error);
-    });
-    idbSuccess = true;
-  } catch {
-    idbSuccess = false;
-  }
-
-  try {
-    const storage = getFallbackStorage();
-    if (storage) {
-      storage.removeItem(key);
+  const nextClear = state.queue.then(async () => {
+    let idbSuccess = false;
+    try {
+      const db = await getIndexedDB();
+      await new Promise<void>((resolve, reject) => {
+        const tx = db.transaction(STORE_NAME, "readwrite");
+        const store = tx.objectStore(STORE_NAME);
+        const req = store.delete(key);
+        req.onsuccess = () => resolve();
+        req.onerror = () => reject(req.error);
+      });
+      idbSuccess = true;
+    } catch {
+      idbSuccess = false;
     }
-  } catch {
-    // ignore localStorage errors
-  }
 
-  return idbSuccess;
+    try {
+      const storage = getFallbackStorage();
+      if (storage) storage.removeItem(key);
+    } catch {
+      // ignore localStorage errors
+    }
+
+    return idbSuccess;
+  });
+
+  state.queue = nextClear.catch(() => false);
+  return (await nextClear) as boolean;
 }
 
 export function resetCartPersistenceDb(): void {
   dbPromise = null;
-  writeQueues.clear();
-  lastSavedTimestamps.clear();
+  keyQueueStates.clear();
 }
 
