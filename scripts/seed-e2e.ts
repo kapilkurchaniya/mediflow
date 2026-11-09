@@ -57,6 +57,31 @@ async function main() {
     })
     .returning();
 
+  // Ensure open year-end period controls exist for store to satisfy fail-closed stock movement trigger
+  await db.insert(schema.yearEndPeriodControls).values([
+    {
+      tenantId: tenant.id,
+      storeId: store.id,
+      fiscalYear: "2026-2027",
+      cutoffDate: new Date("2027-03-31T18:29:59.000Z"),
+      status: "open",
+    },
+    {
+      tenantId: tenant.id,
+      storeId: store.id,
+      fiscalYear: "2025-2026",
+      cutoffDate: new Date("2026-03-31T18:29:59.000Z"),
+      status: "open",
+    },
+    {
+      tenantId: tenant.id,
+      storeId: store.id,
+      fiscalYear: "2024-2025",
+      cutoffDate: new Date("2025-03-31T18:29:59.000Z"),
+      status: "open",
+    },
+  ]);
+
   // 6. Seed System Roles & Permissions
   const roleIds = await seedSystemRoles(db, tenant.id);
 

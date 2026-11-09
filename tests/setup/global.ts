@@ -45,6 +45,14 @@ export default async function setup() {
     await admin.query(`create database "${tpl}"`);
     await admin.end();
 
+    // Migrate base database so direct db consumers (e.g. tests using server/db directly) have schema
+    const basePool = new pg.Pool({ connectionString: urlFor(base), max: 1 });
+    await basePool.query("create extension if not exists pg_trgm");
+    await basePool.query('create extension if not exists "pgcrypto"');
+    await migrate(drizzle(basePool), { migrationsFolder: "./drizzle" });
+    await basePool.end();
+
+    // Migrate template database so createTestDb() can clone it per test file
     const pool = new pg.Pool({ connectionString: urlFor(tpl), max: 1 });
     await pool.query("create extension if not exists pg_trgm");
     await pool.query('create extension if not exists "pgcrypto"');
