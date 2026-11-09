@@ -12,4 +12,5 @@ description = "Whitelisted synthetic mock test tokens"
 stopwords = [
   "smoke-cron-secret-123456789012345",
   "0123456789abcdef0123456789abcdef",
+  "test_health_secret_0123456789abcdef",
 ]

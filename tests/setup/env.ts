@@ -18,5 +18,5 @@ if (!process.env.CRON_SECRET) {
 }
 
 if (!process.env.HEALTH_SECRET) {
-  process.env.HEALTH_SECRET = "test_health_secret_0123456789abcdef";
+  process.env.HEALTH_SECRET = process.env.CRON_SECRET;
 }
