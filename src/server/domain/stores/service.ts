@@ -1,5 +1,5 @@
 import { and, asc, count, eq, ilike, or, sql } from "drizzle-orm";
-import { schema, type DbOrTx, type Tx } from "@/server/db";
+import { schema, type DbOrTx } from "@/server/db";
 import { DomainError } from "@/server/errors";
 import { writeAudit } from "@/server/audit";
 import { isValidGstin } from "@/server/domain/gst";
@@ -88,6 +88,25 @@ export async function createStore(tx: DbOrTx, ctx: StoreActorCtx, rawInput: Crea
       settings: mergedSettings,
     })
     .returning();
+
+  // 4b. Initialize open fiscal period control for the new store (fail-closed trigger requirement)
+  const now = new Date();
+  const calYear = now.getUTCFullYear();
+  const calMonth = now.getUTCMonth() + 1;
+  const fyStart = calMonth >= 4 ? calYear : calYear - 1;
+  const currentFy = `${fyStart}-${fyStart + 1}`;
+  const cutoffDate = new Date(`${fyStart + 1}-03-31T18:29:59.000Z`);
+
+  await tx
+    .insert(schema.yearEndPeriodControls)
+    .values({
+      tenantId: ctx.tenantId,
+      storeId: newStore.id,
+      fiscalYear: currentFy,
+      cutoffDate,
+      status: "open",
+    })
+    .onConflictDoNothing();
 
   // 5. Append audit log
   await writeAudit(tx, { tenantId: ctx.tenantId, storeId: newStore.id, userId: ctx.userId }, {

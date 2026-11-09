@@ -3,6 +3,7 @@ import { db, schema } from "@/server/db";
 import { eq, and, lte } from "drizzle-orm";
 import { env } from "@/env";
 import { enqueue } from "@/server/jobs/outbox";
+import { recordWorkerSuccess, recordWorkerFailure } from "@/server/observability/heartbeat";
 
 export const dynamic = "force-dynamic";
 
@@ -42,12 +43,15 @@ export async function GET(req: Request) {
       }
     });
 
+    await recordWorkerSuccess(db, "reminders_cron", { enqueued: enqueuedCount }).catch(() => {});
+
     return NextResponse.json({
       success: true,
       timestamp: new Date().toISOString(),
       enqueued: enqueuedCount,
     });
   } catch (err: unknown) {
+    await recordWorkerFailure(db, "reminders_cron").catch(() => {});
     const message = err instanceof Error ? err.message : String(err);
     console.error("[cron/reminders] Error enqueuing reminders:", message);
     return NextResponse.json(

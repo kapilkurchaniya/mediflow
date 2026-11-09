@@ -45,8 +45,8 @@ describe("Task A3.6: Physical Stock Count & Rack Audits Integration", () => {
       .returning();
 
     // Medicines
-    const med1 = await makeMedicine(t.db, tenant.id, { name: "Dolo 650", rackId: null });
-    const med2 = await makeMedicine(t.db, tenant.id, { name: "Cetirizine 10", rackId: null });
+    const med1 = await makeMedicine(t.db, tenant.id, { name: "Dolo 650" });
+    const med2 = await makeMedicine(t.db, tenant.id, { name: "Cetirizine 10" });
 
     // Store Settings: In Store A, med1 is on Rack A1, med2 is unassigned
     await t.db.insert(schema.storeMedicineSettings).values({
@@ -105,7 +105,7 @@ describe("Task A3.6: Physical Stock Count & Rack Audits Integration", () => {
     const store = await makeStore(t.db, tenant.id, { name: "Retail Counter", code: "RET-1" });
     const user = await makeUser(t.db);
 
-    const med = await makeMedicine(t.db, tenant.id, { name: "Azithromycin 500", rackId: null });
+    const med = await makeMedicine(t.db, tenant.id, { name: "Azithromycin 500" });
     const batch = await makeBatch(t.db, {
       tenantId: tenant.id,
       storeId: store.id,

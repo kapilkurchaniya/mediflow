@@ -227,33 +227,62 @@ describe("Per-Store Medicine Settings (Integration - Task A3.3)", () => {
     expect(setting.reorderLevel).toBe(35);
   });
 
-  it("explicit rack unassignment (rackId: null) returns null without falling back to legacy medicines.rackId", async () => {
+  it("authoritatively assigns and unassigns store-scoped rack for a medicine", async () => {
     const tenant = await makeTenant(db);
     const store = await makeStore(db, tenant.id, { name: "Unassign Store", code: "UN01" });
     const user = await makeUser(db);
     const ctx = createAuthCtx(tenant.id, store.id, user.id);
 
-    const [legacyRack] = await db
+    const [rack] = await db
       .insert(schema.racks)
-      .values({ tenantId: tenant.id, storeId: store.id, code: "LEG-01", name: "Legacy Rack" })
+      .values({ tenantId: tenant.id, storeId: store.id, code: "RACK-01", name: "Store Rack" })
       .returning();
 
-    // Medicine has legacy medicines.rackId populated
     const med = await makeMedicine(db, tenant.id, {
-      name: "Old Drug With Legacy Rack",
-      rackId: legacyRack.id,
+      name: "Drug With Store Rack",
     });
+
+    await updateStoreMedicineSettings(db, ctx, store.id, med.id, {
+      rackId: rack.id,
+    });
+    const res1 = await getStoreMedicineSettings(db, ctx, store.id, [med.id]);
+    expect(res1.get(med.id)?.rackId).toBe(rack.id);
+    expect(res1.get(med.id)?.rackCode).toBe("RACK-01");
 
     // Explicitly unassign the rack in this store
     await updateStoreMedicineSettings(db, ctx, store.id, med.id, {
       rackId: null,
     });
 
-    // Effective resolver must return rackId: null, NOT the legacy rack!
-    const res = await getStoreMedicineSettings(db, ctx, store.id, [med.id]);
-    const setting = res.get(med.id);
+    const res2 = await getStoreMedicineSettings(db, ctx, store.id, [med.id]);
+    const setting = res2.get(med.id);
     expect(setting?.rackId).toBeNull();
     expect(setting?.rackCode).toBeNull();
-    expect(setting?.hasRackOverride).toBe(false);
+  });
+
+  it("multi-store isolation: Store A and Store B have independent racks, unassignment leaves other store intact", async () => {
+    const tenant = await makeTenant(db);
+    const storeA = await makeStore(db, tenant.id, { name: "Store A", code: "SA" });
+    const storeB = await makeStore(db, tenant.id, { name: "Store B", code: "SB" });
+    const user = await makeUser(db);
+    const ctxA = createAuthCtx(tenant.id, storeA.id, user.id);
+    const ctxB = createAuthCtx(tenant.id, storeB.id, user.id);
+
+    const [rackA] = await db.insert(schema.racks).values({ tenantId: tenant.id, storeId: storeA.id, code: "RA", name: "Rack A" }).returning();
+    const [rackB] = await db.insert(schema.racks).values({ tenantId: tenant.id, storeId: storeB.id, code: "RB", name: "Rack B" }).returning();
+    const med = await makeMedicine(db, tenant.id, { name: "MultiStore Med" });
+
+    await updateStoreMedicineSettings(db, ctxA, storeA.id, med.id, { rackId: rackA.id });
+    await updateStoreMedicineSettings(db, ctxB, storeB.id, med.id, { rackId: rackB.id });
+
+    // Store A unassigns rack
+    await updateStoreMedicineSettings(db, ctxA, storeA.id, med.id, { rackId: null });
+
+    const resA = await getStoreMedicineSettings(db, ctxA, storeA.id, [med.id]);
+    const resB = await getStoreMedicineSettings(db, ctxB, storeB.id, [med.id]);
+
+    expect(resA.get(med.id)?.rackId).toBeNull();
+    expect(resB.get(med.id)?.rackId).toBe(rackB.id);
+    expect(resB.get(med.id)?.rackCode).toBe("RB");
   });
 });

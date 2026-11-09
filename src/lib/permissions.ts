@@ -43,6 +43,8 @@ export const PERMISSIONS = {
   "inventory.transfer_receive": "Receive stock transfers",
   "report.all_stores": "View reports across all stores",
   "api_key.manage": "Create and revoke API keys",
+  "delivery.manage": "Manage doorstep delivery assignments and status",
+  "delivery.fulfill": "View assigned deliveries, submit proofs, and generate UPI QR",
 } as const;
 
 export type Permission = keyof typeof PERMISSIONS;
@@ -106,5 +108,11 @@ export const SYSTEM_ROLES: RoleTemplate[] = [
     name: "Auditor",
     description: "Read-only reports and audit logs",
     permissions: [...view, "sale.view", "purchase.view", "accounting.view", "gst.view", "report.view", "audit.view"],
+  },
+  {
+    key: "delivery_staff",
+    name: "Delivery Staff",
+    description: "Doorstep delivery fulfillment and collection",
+    permissions: ["delivery.fulfill"],
   },
 ];

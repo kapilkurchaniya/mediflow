@@ -3,6 +3,7 @@ import { id, createdAt } from "./_helpers";
 import { tenants, stores, users } from "./platform";
 import { journalEntries } from "./accounting";
 import { batches, stockMovements } from "./inventory";
+import { yearEndStockSnapshots } from "./year-end";
 
 /** Authoritative opening balance records for parties and accounts. */
 export const openingBalanceRecords = pgTable(
@@ -48,6 +49,7 @@ export const openingInventorySnapshots = pgTable(
     totalValuePaise: bigint("total_value_paise", { mode: "number" }).notNull().default(0),
     status: text("status").notNull().default("captured"), // 'captured' | 'posted'
     journalEntryId: uuid("journal_entry_id"),
+    sourceYearEndSnapshotId: uuid("source_year_end_snapshot_id"),
     createdBy: uuid("created_by").references(() => users.id),
     createdAt: createdAt(),
   },
@@ -55,6 +57,7 @@ export const openingInventorySnapshots = pgTable(
     uniqueIndex("opening_inv_snapshots_tenant_store_id_uq").on(t.tenantId, t.storeId, t.id),
     uniqueIndex("opening_inventory_snapshots_store_date_uq").on(t.tenantId, t.storeId, t.asOfDate),
     uniqueIndex("opening_inventory_snapshots_tenant_journal_uq").on(t.tenantId, t.journalEntryId),
+    uniqueIndex("opening_inv_source_year_end_uq").on(t.tenantId, t.storeId, t.sourceYearEndSnapshotId),
     foreignKey({
       columns: [t.tenantId, t.storeId],
       foreignColumns: [stores.tenantId, stores.id],
@@ -64,6 +67,11 @@ export const openingInventorySnapshots = pgTable(
       columns: [t.tenantId, t.journalEntryId],
       foreignColumns: [journalEntries.tenantId, journalEntries.id],
       name: "opening_inv_snapshots_tenant_journal_fk",
+    }).onDelete("restrict"),
+    foreignKey({
+      columns: [t.tenantId, t.storeId, t.sourceYearEndSnapshotId],
+      foreignColumns: [yearEndStockSnapshots.tenantId, yearEndStockSnapshots.storeId, yearEndStockSnapshots.id],
+      name: "opening_inv_source_year_end_fk",
     }).onDelete("restrict"),
   ],
 );

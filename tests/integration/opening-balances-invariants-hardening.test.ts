@@ -5,6 +5,8 @@ import { createTestDb } from "../setup/db";
 import { AccountingInvariantsOracle } from "./accounting-invariants-oracle";
 import { captureOpeningInventorySnapshot, postInventorySnapshotJournal } from "@/server/domain/accounting-opening-balances";
 import { getOrSeedAccounts } from "@/server/domain/accounting";
+import { getCurrentIndianFY } from "@/server/domain/accounting-periods";
+import { calculateCutoffDate } from "@/server/domain/accounting-year-end/closing-stock-valuation";
 
 describe("Accounting Invariants & Database Double-Entry Hardening (A5.5)", () => {
   let t: Awaited<ReturnType<typeof createTestDb>>;
@@ -45,6 +47,12 @@ describe("Accounting Invariants & Database Double-Entry Hardening (A5.5)", () =>
       tenantId: tenantA, storeId: storeA, medicineId, batchNo: "BATCH-H1", expiryDate: "2027-12-31", purchaseRate: 1000,
     }).returning();
     batchA = bA.id;
+
+    const currentFY = getCurrentIndianFY();
+    await t.db.insert(schema.yearEndPeriodControls).values([
+      { tenantId: tenantA, storeId: storeA, fiscalYear: currentFY, cutoffDate: calculateCutoffDate(currentFY), status: "open" },
+      { tenantId: tenantA, storeId: storeB, fiscalYear: currentFY, cutoffDate: calculateCutoffDate(currentFY), status: "open" },
+    ]).onConflictDoNothing();
 
     const [mA] = await t.db.insert(schema.stockMovements).values({
       tenantId: tenantA, storeId: storeA, batchId: batchA, medicineId, type: "opening", qtyChange: 10, balanceAfter: 10, unitCost: 1000,

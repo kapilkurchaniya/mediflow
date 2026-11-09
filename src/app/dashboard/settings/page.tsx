@@ -68,10 +68,16 @@ export default async function SettingsPage() {
               </div>
             </div>
 
-            <div className="pt-2 text-[12.5px] text-ink-500">
+            <div className="pt-2 flex flex-wrap items-center justify-between gap-2 text-[12.5px] text-ink-500">
               <p>
                 💡 Thermal 80mm is automatically optimized for standard receipt printers (TVS, Epson, NGX).
               </p>
+              <Link
+                href="/dashboard/settings/printers"
+                className="text-brand-600 hover:text-brand-700 font-medium shrink-0 inline-flex items-center gap-1"
+              >
+                Configure & Test Print <Printer className="w-3.5 h-3.5" />
+              </Link>
             </div>
           </div>
         </div>

@@ -1,39 +1,36 @@
 "use client";
 
-import { useReducer, useMemo, useCallback, useEffect } from "react";
+import { useReducer, useMemo, useCallback, useEffect, useRef } from "react";
 import type { PosState, PosAction, PosCartLine, ComplianceState, SplitPayments } from "./types";
 import { computeSaleTotals } from "@/lib/money";
 import { playCounterSound } from "@/lib/sound";
+import { saveDraftCart, loadDraftCart, clearDraftCart, buildCartStorageKey, type CartIdentity } from "@/lib/pos-cart-persistence";
 
 export const initialComplianceState: ComplianceState = {
-  doctorId: "",
-  doctorName: "",
-  doctorRegNo: "",
-  doctorAddress: "",
-  patientAge: "",
-  patientGender: "male",
-  patientAddress: "",
-  prescriptionRef: "",
-  prescriptionDate: new Date().toISOString().slice(0, 10),
+  doctorId: "", doctorName: "", doctorRegNo: "", doctorAddress: "",
+  patientAge: "", patientGender: "male", patientAddress: "",
+  prescriptionRef: "", prescriptionDate: new Date().toISOString().slice(0, 10),
   medicalRepId: "",
 };
 
-export const initialSplitPayments: SplitPayments = {
-  cash: "",
-  upi: "",
-  card: "",
-};
+export const initialSplitPayments: SplitPayments = { cash: "", upi: "", card: "" };
 
 export const initialPosState: PosState = {
-  cart: [],
-  customer: null,
-  compliance: initialComplianceState,
-  splitPayments: initialSplitPayments,
-  paymentMethod: "cash",
-  redeemPoints: 0,
-  resumedHeldId: null,
-  soundEnabled: true,
+  cart: [], customer: null, compliance: initialComplianceState,
+  splitPayments: initialSplitPayments, paymentMethod: "cash",
+  redeemPoints: 0, resumedHeldId: null, soundEnabled: true,
 };
+
+function normalizeQty(line: PosCartLine, rawPack: number, rawLoose: number) {
+  const upp = Math.max(1, line.unitsPerPack ?? 1);
+  let packQty = Math.max(0, rawPack);
+  let looseQty = Math.max(0, rawLoose);
+  if (upp > 1 && looseQty >= upp) {
+    packQty += Math.floor(looseQty / upp);
+    looseQty = looseQty % upp;
+  }
+  return { ...line, packQty, looseQty, qty: packQty * upp + looseQty };
+}
 
 export function posCartReducer(state: PosState, action: PosAction): PosState {
   switch (action.type) {
@@ -46,99 +43,54 @@ export function posCartReducer(state: PosState, action: PosAction): PosState {
         const nextCart = [...state.cart];
         const existing = nextCart[existingIdx];
         const nextPack = existing.packQty + 1;
-        const nextTotalQty = nextPack * existing.unitsPerPack + existing.looseQty;
-        nextCart[existingIdx] = { ...existing, packQty: nextPack, qty: nextTotalQty };
+        nextCart[existingIdx] = { ...existing, packQty: nextPack, qty: nextPack * existing.unitsPerPack + existing.looseQty };
         return { ...state, cart: nextCart };
       }
 
       const newLine: PosCartLine = {
-        batchId: batch.id,
-        medicineId: medicine.id,
-        medicineName: medicine.name,
-        genericName: medicine.genericName,
-        batchNo: batch.batchNo,
-        expiryDate: batch.expiryDate,
-        mrp: batch.mrp,
-        saleRate: batch.saleRate ?? batch.mrp,
-        packQty: 1,
-        looseQty: 0,
-        qty: unitsPerPack * 1,
-        unitsPerPack,
-        packUnit: medicine.packUnit ?? "strip",
-        looseUnit: medicine.looseUnit ?? "tablet",
-        qtyOnHand: batch.qtyOnHand,
+        batchId: batch.id, medicineId: medicine.id, medicineName: medicine.name,
+        genericName: medicine.genericName, batchNo: batch.batchNo, expiryDate: batch.expiryDate,
+        mrp: batch.mrp, saleRate: batch.saleRate ?? batch.mrp, packQty: 1, looseQty: 0,
+        qty: unitsPerPack * 1, unitsPerPack, packUnit: medicine.packUnit ?? "strip",
+        looseUnit: medicine.looseUnit ?? "tablet", qtyOnHand: batch.qtyOnHand,
         totalAvailableStock: allBatches?.reduce((s, b) => s + b.qtyOnHand, 0) ?? batch.qtyOnHand,
-        discountBp: 0,
-        gstRateBp: medicine.gstRateBp,
-        rxRequired: medicine.rxRequired,
-        schedule: medicine.schedule,
-        schemeText,
-        autoFefo: true,
-        availableBatches: allBatches,
+        discountBp: 0, gstRateBp: medicine.gstRateBp, rxRequired: medicine.rxRequired,
+        schedule: medicine.schedule, schemeText, autoFefo: true, availableBatches: allBatches,
       };
-
       return { ...state, cart: [newLine, ...state.cart] };
     }
 
-    case "UPDATE_LINE_PACK_QTY": {
-      const safePack = Math.max(0, action.payload.packQty);
-      const nextCart = state.cart.map((line) => {
-        if (line.batchId !== action.payload.batchId) return line;
-        const upp = Math.max(1, line.unitsPerPack ?? 1);
-        let packQty = safePack;
-        let looseQty = line.looseQty;
-        if (upp > 1 && looseQty >= upp) {
-          packQty += Math.floor(looseQty / upp);
-          looseQty = looseQty % upp;
-        }
-        return { ...line, packQty, looseQty, qty: packQty * upp + looseQty };
-      });
-      return { ...state, cart: nextCart };
-    }
+    case "UPDATE_LINE_PACK_QTY":
+      return {
+        ...state,
+        cart: state.cart.map((line) => line.batchId === action.payload.batchId ? normalizeQty(line, action.payload.packQty, line.looseQty) : line),
+      };
 
-    case "UPDATE_LINE_LOOSE_QTY": {
-      const rawLoose = Math.max(0, action.payload.looseQty);
-      const nextCart = state.cart.map((line) => {
-        if (line.batchId !== action.payload.batchId) return line;
-        const upp = Math.max(1, line.unitsPerPack ?? 1);
-        let packQty = line.packQty;
-        let looseQty = rawLoose;
-        if (upp > 1 && looseQty >= upp) {
-          packQty += Math.floor(looseQty / upp);
-          looseQty = looseQty % upp;
-        }
-        return { ...line, packQty, looseQty, qty: packQty * upp + looseQty };
-      });
-      return { ...state, cart: nextCart };
-    }
+    case "UPDATE_LINE_LOOSE_QTY":
+      return {
+        ...state,
+        cart: state.cart.map((line) => line.batchId === action.payload.batchId ? normalizeQty(line, line.packQty, action.payload.looseQty) : line),
+      };
 
     case "UPDATE_LINE_DISCOUNT": {
       const safeDiscount = Math.min(10000, Math.max(0, action.payload.discountBp));
-      const nextCart = state.cart.map((line) =>
-        line.batchId === action.payload.batchId ? { ...line, discountBp: safeDiscount } : line
-      );
-      return { ...state, cart: nextCart };
+      return {
+        ...state,
+        cart: state.cart.map((l) => l.batchId === action.payload.batchId ? { ...l, discountBp: safeDiscount } : l),
+      };
     }
 
     case "UPDATE_LINE_BATCH": {
       const { oldBatchId, newBatch, reason } = action.payload;
       const isOverride = Boolean(reason);
-      const nextCart = state.cart.map((line) => {
-        if (line.batchId !== oldBatchId) return line;
-        return {
-          ...line,
-          batchId: newBatch.id,
-          batchNo: newBatch.batchNo,
-          expiryDate: newBatch.expiryDate,
-          mrp: newBatch.mrp,
-          saleRate: newBatch.saleRate ?? newBatch.mrp,
-          qtyOnHand: newBatch.qtyOnHand,
-          autoFefo: !isOverride,
-          overrideBatch: isOverride,
-          overrideReason: reason,
-        };
-      });
-      return { ...state, cart: nextCart };
+      return {
+        ...state,
+        cart: state.cart.map((line) => line.batchId !== oldBatchId ? line : {
+          ...line, batchId: newBatch.id, batchNo: newBatch.batchNo, expiryDate: newBatch.expiryDate,
+          mrp: newBatch.mrp, saleRate: newBatch.saleRate ?? newBatch.mrp, qtyOnHand: newBatch.qtyOnHand,
+          autoFefo: !isOverride, overrideBatch: isOverride, overrideReason: reason,
+        }),
+      };
     }
 
     case "REMOVE_LINE":
@@ -154,11 +106,7 @@ export function posCartReducer(state: PosState, action: PosAction): PosState {
       if (!state.customer) return state;
       return {
         ...state,
-        customer: {
-          ...state.customer,
-          redeemablePoints: action.payload.redeemablePoints,
-          redeemableValuePaise: action.payload.redeemableValuePaise,
-        },
+        customer: { ...state.customer, redeemablePoints: action.payload.redeemablePoints, redeemableValuePaise: action.payload.redeemableValuePaise },
       };
 
     case "SET_COMPLIANCE":
@@ -175,23 +123,26 @@ export function posCartReducer(state: PosState, action: PosAction): PosState {
 
     case "SET_SOUND_ENABLED":
       if (typeof window !== "undefined") {
-        try {
-          localStorage.setItem("pos_sound_enabled", String(action.payload));
-        } catch {
-          // ignore localStorage access errors
-        }
+        try { localStorage.setItem("pos_sound_enabled", String(action.payload)); } catch { /* ignore */ }
       }
       return { ...state, soundEnabled: action.payload };
 
     case "HYDRATE_HELD_SALE":
       return {
+        ...state, resumedHeldId: action.payload.heldSaleId, cart: action.payload.lines,
+        customer: action.payload.customer ?? state.customer,
+        compliance: action.payload.doctorName ? { ...state.compliance, doctorName: action.payload.doctorName } : state.compliance,
+      };
+
+    case "HYDRATE_DRAFT_CART":
+      return {
         ...state,
-        resumedHeldId: action.payload.heldSaleId,
         cart: action.payload.lines,
         customer: action.payload.customer ?? state.customer,
-        compliance: action.payload.doctorName
-          ? { ...state.compliance, doctorName: action.payload.doctorName }
-          : state.compliance,
+        compliance: action.payload.compliance ? { ...state.compliance, ...action.payload.compliance } : state.compliance,
+        paymentMethod: action.payload.paymentMethod ?? state.paymentMethod,
+        splitPayments: action.payload.splitPayments ? { ...state.splitPayments, ...action.payload.splitPayments } : state.splitPayments,
+        redeemPoints: action.payload.redeemPoints ?? state.redeemPoints,
       };
 
     case "RESET_SALE":
@@ -202,17 +153,55 @@ export function posCartReducer(state: PosState, action: PosAction): PosState {
   }
 }
 
-export function usePosCart() {
+export function usePosCart(identity?: CartIdentity) {
   const [state, dispatch] = useReducer(posCartReducer, initialPosState);
+  const tenantId = identity?.tenantId;
+  const storeId = identity?.storeId;
+  const userId = identity?.userId;
+  const terminalId = identity?.terminalId;
+  const storageKey = useMemo(
+    () => buildCartStorageKey({ tenantId, storeId, userId, terminalId }),
+    [tenantId, storeId, userId, terminalId]
+  );
+  const hydratedKeyRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
       const stored = localStorage.getItem("pos_sound_enabled");
-      if (stored !== null) {
-        dispatch({ type: "SET_SOUND_ENABLED", payload: stored === "true" });
-      }
+      if (stored !== null) dispatch({ type: "SET_SOUND_ENABLED", payload: stored === "true" });
     }
   }, []);
+
+  useEffect(() => {
+    let active = true;
+    hydratedKeyRef.current = null;
+
+    void loadDraftCart(identity ?? {}).then((draft) => {
+      if (!active) return;
+      if (draft && draft.lines.length > 0) {
+        dispatch({ type: "HYDRATE_DRAFT_CART", payload: draft });
+      } else {
+        dispatch({ type: "RESET_SALE" });
+      }
+      hydratedKeyRef.current = storageKey;
+    });
+
+    return () => { active = false; };
+  }, [storageKey, identity]);
+
+  useEffect(() => {
+    if (hydratedKeyRef.current !== storageKey) return;
+
+    if (state.cart.length > 0) {
+      void saveDraftCart(identity ?? {}, {
+        lines: state.cart, customer: state.customer, compliance: state.compliance,
+        paymentMethod: state.paymentMethod, splitPayments: state.splitPayments,
+        redeemPoints: state.redeemPoints,
+      });
+    } else {
+      void clearDraftCart(identity ?? {});
+    }
+  }, [state.cart, state.customer, state.compliance, state.paymentMethod, state.splitPayments, state.redeemPoints, storageKey, identity]);
 
   const loyaltyDiscountPaise = useMemo(() => {
     if (!state.customer || state.redeemPoints <= 0) return 0;
@@ -224,44 +213,21 @@ export function usePosCart() {
 
   const totals = useMemo(() => {
     const lineInputs = state.cart.map((line) => ({
-      batchId: line.batchId,
-      medicineId: line.medicineId,
-      qty: line.qty,
-      packQty: line.packQty,
-      looseQty: line.looseQty,
-      unitsPerPack: line.unitsPerPack,
-      rate: line.saleRate ?? line.mrp,
-      discountBp: line.discountBp,
-      gstRateBp: line.gstRateBp,
+      batchId: line.batchId, medicineId: line.medicineId, qty: line.qty, packQty: line.packQty,
+      looseQty: line.looseQty, unitsPerPack: line.unitsPerPack, rate: line.saleRate ?? line.mrp,
+      discountBp: line.discountBp, gstRateBp: line.gstRateBp,
     }));
     return computeSaleTotals(lineInputs, false, loyaltyDiscountPaise);
   }, [state.cart, loyaltyDiscountPaise]);
 
-  const rxWarning = useMemo(
-    () => state.cart.some((i) => Boolean(i.rxRequired)),
-    [state.cart]
-  );
+  const rxWarning = useMemo(() => state.cart.some((i) => Boolean(i.rxRequired)), [state.cart]);
 
   const controlledItems = useMemo(
-    () =>
-      state.cart.filter(
-        (i) => i.schedule && ["H", "H1", "X", "NARCOTIC"].includes(i.schedule.toUpperCase())
-      ),
+    () => state.cart.filter((i) => i.schedule && ["H", "H1", "X", "NARCOTIC"].includes(i.schedule.toUpperCase())),
     [state.cart]
   );
 
-  const playSound = useCallback(
-    (type: "beep" | "chime") => playCounterSound(type, state.soundEnabled),
-    [state.soundEnabled]
-  );
+  const playSound = useCallback((type: "beep" | "chime") => playCounterSound(type, state.soundEnabled), [state.soundEnabled]);
 
-  return {
-    state,
-    dispatch,
-    totals,
-    loyaltyDiscountPaise,
-    rxWarning,
-    controlledItems,
-    playSound,
-  };
+  return { state, dispatch, totals, loyaltyDiscountPaise, rxWarning, controlledItems, playSound };
 }

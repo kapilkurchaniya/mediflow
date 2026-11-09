@@ -120,8 +120,8 @@ describe("tenant and store isolation", () => {
     const med = await makeMedicine(t.db, attacker.tenant.id);
     signIn(attacker);
     expect(actionError(await assignMedicineToRack({ medicineId: med.id, rackId: rack.id }))).toBe("Rack not found.");
-    const [after] = await t.db.select().from(schema.medicines).where(eq(schema.medicines.id, med.id));
-    expect(after.rackId).toBeNull();
+    const [after] = await t.db.select().from(schema.storeMedicineSettings).where(and(eq(schema.storeMedicineSettings.medicineId, med.id), eq(schema.storeMedicineSettings.storeId, attacker.store.id)));
+    expect(after?.rackId).toBeFalsy();
   });
 
   it("cannot delete a rack that belongs to a different store of the same pharmacy", async () => {
@@ -140,8 +140,8 @@ describe("tenant and store isolation", () => {
     const med = await makeMedicine(t.db, p.tenant.id);
     expect(actionError(await assignMedicineToRack({ medicineId: med.id, rackId: rack.id }))).toBeNull();
     expect(actionError(await deleteRack({ id: rack.id }))).toBeNull();
-    const [after] = await t.db.select().from(schema.medicines).where(eq(schema.medicines.id, med.id));
-    expect(after.rackId).toBeNull();
+    const [after] = await t.db.select().from(schema.storeMedicineSettings).where(and(eq(schema.storeMedicineSettings.medicineId, med.id), eq(schema.storeMedicineSettings.storeId, p.store.id)));
+    expect(after?.rackId).toBeFalsy();
     expect(await rackRows(p.tenant.id)).toHaveLength(0);
   });
 });

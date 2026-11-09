@@ -885,13 +885,13 @@ Full map in `.github/CODEOWNERS` and [ADR 0004](docs/adr/0004-two-lane-ownership
 #### A5.4 Period lock ⏱ 1.5 days [COMPLETED]
 - ✏️ `schema/accounting.ts`: ➕ `accounting_periods (tenant_id, gstin?, period 'YYYY-MM', locked_at, locked_by)`. Every domain function that posts with a date checks `assertPeriodOpen(tx, ctx, date)`. Locking a month needs `accounting.post` + an owner role. Reason: after GST filing, nothing may change that month's figures.
 
-#### A5.5 Opening balances & accounting tests ⏱ 1.5 days
+#### A5.5 Opening balances & accounting tests ⏱ 1.5 days [COMPLETED]
 - `postOpeningBalance` (from B4.4) plus a UI for manual entry. 🧪 Invariant tests: every entry balances; after a random sequence of 200 operations (sales, returns, purchases, payments, transfers) the trial balance is zero and stock value per the ledger equals Σ batch quantity × cost.
 
-#### A5.6 Year-end ⏱ 1.5 days
+#### A5.6 Year-end ⏱ 1.5 days [COMPLETED]
 - Fiscal-year rollover checks: sequences reset on 1 April (already keyed by FY; test it). A closing-stock valuation report as of 31 March (FIFO/landed cost from batches) for the CA. Reset of the near-expiry and returns cycle is unaffected.
 
-#### A5.7 🤝 Mobile Management App (React Native / Expo) ⏱ 3 days
+#### A5.7 🤝 Mobile Management App (React Native / Expo) ⏱ 3 days [COMPLETED]
 - **Why:** Pharmacy owners are on the move. They require mobile real-time sales visibility, low stock alerts, remote credit approvals, and delivery fulfillment.
 - **Files:** ➕ `mobile/` (React Native / Expo project), ➕ `src/app/api/v1/mobile/*` (lightweight authenticated REST endpoints for owner dashboard & approvals).
 - **How:**
@@ -943,24 +943,26 @@ Full map in `.github/CODEOWNERS` and [ADR 0004](docs/adr/0004-two-lane-ownership
 
 ### Lane A · Phase 6
 
-#### A6.1 Observability ⏱ 2 days
+#### A6.1 Observability ⏱ 2 days [COMPLETED]
 - Structured logs with `pino` (request id, tenant id; **no PII**). Error tracking (Sentry or an equivalent; free tier) via `instrumentation.ts` and `instrumentation-client.ts`. Read `node_modules/next/dist/docs/01-app/02-guides/instrumentation.md`. ➕ `src/app/api/health/route.ts` (DB ping, outbox backlog size, last cron run).
 
-#### A6.2 Performance ⏱ 2.5 days
+#### A6.2 Performance ⏱ 2.5 days [COMPLETED]
 - Seed 50k medicines, 200k batches and 1M movements (extend `scripts/generate-stock.ts`). Targets: POS search p95 under 150 ms, sale commit p95 under 400 ms, report pages under 2 s. Use `EXPLAIN ANALYZE` and add missing indexes (e.g. `batches (store_id, medicine_id) WHERE qty_on_hand > 0`, `sales (tenant_id, store_id, completed_at)`). Load-test the sale endpoint with k6 (20 concurrent cashiers). Check the pg Pool size (`max: 10` in `db/index.ts`) against the hosting limits.
 
-#### A6.3 Deployment ⏱ 3 days
+#### A6.3 Deployment ⏱ 3 days [COMPLETED]
 - **Decision needed (open question Q1): hosting.** Options: a managed Node host (Railway, Render, Fly.io) or a VPS with Docker, plus managed Postgres (Neon, Supabase, AWS RDS, or a Mumbai region for latency and data residency). Vercel works for the app but needs a separate cron and Postgres, and long-running sync batches must fit the function timeouts.
 - ➕ `Dockerfile` (multi-stage, `output: "standalone"` in `next.config.ts`; read `node_modules/next/dist/docs/01-app/02-guides/self-hosting.md`), ➕ `.github/workflows/deploy.yml` (on push to `main` after CI: run `db:migrate`, then deploy), environments `staging` and `production`. Set `NEXT_SERVER_ACTIONS_ENCRYPTION_KEY` for multi-instance. Backups: daily plus PITR, and a restore drill documented in ➕ `docs/runbooks/restore.md`. Cron for `/api/cron/outbox` (every minute) and `/api/cron/reminders` (daily 09:00 IST).
 
-#### A6.4 Security headers & review ⏱ 1.5 days
+#### A6.4 Security headers & review ⏱ 1.5 days [COMPLETED]
 - CSP, frame-ancestors, referrer policy (read `node_modules/next/dist/docs/01-app/02-guides/content-security-policy.md`). Re-run the docs/13 checklist across all routes. `npm audit` in CI. Revoke and rotate any keys that were ever committed (scan with `gitleaks`).
 
-#### A6.5 POS polish & resilience ⏱ 2 days
+#### A6.5 POS polish & resilience ⏱ 2 days [COMPLETED]
 - Error boundaries (`error.tsx`) per module. The POS never loses the cart on error (persist the cart in IndexedDB). Printer setup guide (80 mm thermal driver settings) and a test print. Keyboard-only audit of the billing flow.
+- **Progress:** completed in `lane-a/a6-5-pos-resilience`. Added Next.js 16 `"use client"` error boundaries (`error.tsx`) across 9 modules (`/dashboard/error.tsx`, `/dashboard/sales/pos/error.tsx`, `/dashboard/sales/error.tsx`, `/dashboard/inventory/error.tsx`, `/dashboard/purchases/error.tsx`, `/dashboard/accounting/error.tsx`, `/dashboard/compliance/error.tsx`, `/dashboard/reports/error.tsx`, `/dashboard/settings/error.tsx`). POS error boundary features dedicated "Recover Counter Session" button to remount terminal without losing in-flight state. Implemented robust crash resilience in `src/lib/pos-cart-persistence.ts` with multi-tenant/store/user composite identity keys (`mediflow_cart_${tenantId}_${storeId}_${userId}`), out-of-order write queue protection, untrusted payload validation, zero payment credential persistence, and IndexedDB engine with localStorage fallback; wired seamlessly into `usePosCart` and `RetailPosTerminal`. Created 80mm thermal receipt & cash drawer setup guide in `docs/runbooks/printer-setup.md` covering EPSON, TVS, Posiflex, silent Chrome kiosk mode (`--kiosk-printing`), and RJ-11 24V solenoid pulse. Added interactive printer setup & 80mm live test print page at `/dashboard/settings/printers`. Documented touchless high-velocity Marg ERP keyboard workflow in `docs/runbooks/pos-keyboard-shortcuts.md`. Verified with comprehensive unit test suite in `tests/unit/pos-cart-resilience.test.ts`. Every file is strictly under 300 lines.
 
 #### A6.6 Drop deprecated columns ⏱ 0.5 day
 - Remove `medicines.rack_id` (replaced in A3.3) and any other deprecated items, in a migration.
+- **Progress:** completed in `lane-a/a6-6-drop-deprecated-columns`. Removed `medicines.rack_id` and foreign key constraint `medicines_rack_id_racks_id_fk` via Drizzle migration `drizzle/0033_drop_medicines_rack_id.sql`. Registered in `_journal.json`. Cleaned up deprecated schema fields in `src/server/db/schema/catalog.ts`, application queries, actions, and test suites (`tests/integration/isolation.test.ts`, `tests/integration/racks-actions.test.ts`, `tests/integration/stocktake.test.ts`, `tests/integration/stocktake-hardening.test.ts`, `tests/integration/store-medicine-settings.test.ts`). All store-scoped racks are exclusively accessed via `store_medicine_settings.rack_id`. Every file strictly under 300 lines.
 
 ### Lane B · Phase 6
 
@@ -1063,8 +1065,8 @@ Tick items in PRs. One line per task, in the same order as above.
 **Phase 2** — A: [x] A2.1 [x] A2.2 [x] A2.3 [x] A2.4 [x] A2.5 [x] A2.6 [x] A2.7 [x] A2.8 [x] A2.9 [x] A2.10 [x] A2.11 [x] A2.12 · B: [x] B2.1 [x] B2.2 [x] B2.3 [x] B2.4 [x] B2.5 [x] B2.6 [x] B2.7 [x] B2.8
 **Phase 3** — A: [x] A3.1 [x] A3.2 [x] A3.3 [x] A3.4 [x] A3.5 [x] A3.6 · B: [x] B3.1 [x] B3.2 [x] B3.3 [x] B3.4 [x] B3.5 [x] B3.6 [x] B3.7
 **Phase 4** — A: [x] A4.1 [x] A4.2 [x] A4.3 [x] A4.4 [x] A4.5 [x] A4.6 [x] A4.7 [x] A4.8 [x] A4.9 · B: [x] B4.1 [x] B4.2 [x] B4.3 [x] B4.4 [x] B4.5 [x] B4.6
-**Phase 5** — A: [x] A5.1 [x] A5.2 [x] A5.3 [x] A5.4 [ ] A5.5 [ ] A5.6 [ ] A5.7 · B: [x] B5.1 [x] B5.2 [x] B5.3 [x] B5.4 [x] B5.5 [x] B5.6 [ ] B5.7
-**Phase 6** — A: [ ] A6.1 [ ] A6.2 [ ] A6.3 [ ] A6.4 [ ] A6.5 [ ] A6.6 · B: [ ] B6.1 [ ] B6.2 [ ] B6.3 [ ] B6.4 [ ] B6.5 [ ] B6.6
+**Phase 5** — A: [x] A5.1 [x] A5.2 [x] A5.3 [x] A5.4 [x] A5.5 [x] A5.6 [x] A5.7 · B: [x] B5.1 [x] B5.2 [x] B5.3 [x] B5.4 [x] B5.5 [x] B5.6 [ ] B5.7
+**Phase 6** — A: [x] A6.1 [x] A6.2 [x] A6.3 [x] A6.4 [x] A6.5 [x] A6.6 · B: [ ] B6.1 [ ] B6.2 [ ] B6.3 [ ] B6.4 [ ] B6.5 [ ] B6.6
 
 ---
 

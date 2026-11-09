@@ -10,6 +10,8 @@
 import { db, schema, type DbOrTx } from "@/server/db";
 import { eq, and, sql, lte, or, isNull } from "drizzle-orm";
 import { handlers } from "./handlers";
+import { recordWorkerStart, recordWorkerSuccess, recordWorkerFailure } from "@/server/observability/heartbeat";
+import { runWithJobContext } from "@/server/logging/context";
 
 export type OutboxType =
   | "whatsapp.receipt"
@@ -72,13 +74,15 @@ export function calculateBackoffMs(attempts: number): number {
  * Processes a batch of pending outbox events using SKIP LOCKED for safe concurrent worker execution.
  */
 export async function processOutbox(limit = 25): Promise<ProcessResult> {
-  const now = new Date();
-  const result: ProcessResult = {
-    processed: 0,
-    succeeded: 0,
-    failed: 0,
-    errors: [],
-  };
+  return runWithJobContext("outbox_worker", async () => {
+    await recordWorkerStart(db, "outbox_worker", { batchSize: limit }).catch(() => {});
+    const now = new Date();
+    const result: ProcessResult = {
+      processed: 0,
+      succeeded: 0,
+      failed: 0,
+      errors: [],
+    };
 
   // 1. Fetch and lock pending events whose run time has arrived
   const candidateEvents = await db.transaction(async (tx) => {
@@ -163,5 +167,16 @@ export async function processOutbox(limit = 25): Promise<ProcessResult> {
     }
   }
 
+  if (result.failed > 0 && result.succeeded === 0 && result.processed > 0) {
+    await recordWorkerFailure(db, "outbox_worker", { processed: result.processed, failed: result.failed }).catch(() => {});
+  } else {
+    await recordWorkerSuccess(db, "outbox_worker", {
+      processed: result.processed,
+      succeeded: result.succeeded,
+      failed: result.failed,
+    }).catch(() => {});
+  }
+
   return result;
+});
 }

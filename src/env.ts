@@ -48,6 +48,11 @@ const envSchema = z
      */
     CRON_SECRET: z.string().optional(),
 
+    /**
+     * Consistent 32-byte key (base64) for multi-instance Server Functions encryption (Next.js self-hosting).
+     */
+    NEXT_SERVER_ACTIONS_ENCRYPTION_KEY: z.string().optional(),
+
     // ─── WhatsApp ─────────────────────────────────────────────────────────────
     /**
      * Token used during Meta webhook verification handshake.
@@ -80,6 +85,18 @@ const envSchema = z
     GSP_CLIENT_SECRET: z.string().optional(),
     GSP_PORTAL_USERNAME: z.string().optional(),
     GSP_PORTAL_PASSWORD: z.string().optional(),
+
+    // ─── Observability (Phase 6.1) ──────────────────────────────────────────
+    LOG_LEVEL: z.enum(["debug", "info", "warn", "error"]).default("info"),
+    HEALTH_SECRET: z.string().optional(),
+    SENTRY_DSN: z.string().optional(),
+
+    // ─── Database Pool & Performance (Phase 6.2) ───────────────────────────
+    DB_POOL_MAX: z.coerce.number().int().min(1).max(100).default(10),
+    DB_POOL_MIN: z.coerce.number().int().min(0).max(20).default(2),
+    DB_POOL_IDLE_TIMEOUT_MS: z.coerce.number().int().min(1000).default(30000),
+    DB_POOL_CONNECTION_TIMEOUT_MS: z.coerce.number().int().min(500).default(5000),
+    DB_STATEMENT_TIMEOUT_MS: z.coerce.number().int().min(1000).default(15000),
 
     // ─── AI providers (all optional) ─────────────────────────────────────────
     GEMINI_API_KEY: z.string().optional(),

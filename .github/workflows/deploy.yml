@@ -1,0 +1,132 @@
+name: Deploy to Production (ECS Fargate & Managed PostgreSQL)
+
+# Phase 6.3 (A6.3): Automated CD pipeline with pre-traffic migration gating
+# Triggers on push to main after CI verification.
+# Enforces strictly serialized execution (cancel-in-progress: false) to prevent migration conflicts.
+
+on:
+  push:
+    branches: ["main"]
+  workflow_dispatch:
+    inputs:
+      target_env:
+        description: "Target deployment environment"
+        required: true
+        default: "production"
+        type: choice
+        options:
+          - production
+          - staging
+
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  # ─── Stage 1: Pre-Traffic Database Migration Gating ──────────────────────
+  migrate:
+    name: "Pre-Traffic Database Migration"
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: "npm"
+
+      - name: Install Dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Execute Serialized Database Migrations
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          echo "🚀 Executing pre-traffic database migrations..."
+          npm run db:migrate
+          echo "✅ Database schema migration succeeded."
+
+  # ─── Stage 2: Container Build & ECS Deployment ──────────────────────────
+  deploy:
+    name: "Deploy Application Container"
+    needs: migrate
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Configure AWS Credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-region: ap-south-1
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          role-session-name: GitHubActions-MediFlow-Deploy
+
+      - name: Log in to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build, Tag, and Push Docker Image
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          ECR_REPOSITORY: mediflow
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          docker build \
+            --cache-from type=gha \
+            --cache-to type=gha,mode=max \
+            -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG \
+            -t $ECR_REGISTRY/$ECR_REPOSITORY:latest .
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
+
+      - name: Deploy to AWS ECS Fargate Service
+        env:
+          CLUSTER_NAME: mediflow-production
+          SERVICE_NAME: mediflow-web-service
+        run: |
+          echo "🚀 Triggering ECS Fargate rolling deployment..."
+          aws ecs update-service \
+            --cluster $CLUSTER_NAME \
+            --service $SERVICE_NAME \
+            --force-new-deployment \
+            --region ap-south-1
+          echo "⏳ Waiting for ECS service stabilization and ALB target health..."
+          aws ecs wait services-stable \
+            --cluster $CLUSTER_NAME \
+            --services $SERVICE_NAME \
+            --region ap-south-1
+          echo "✅ ECS service successfully updated and stable."
+
+  # ─── Stage 3: Post-Deployment Smoke & Readiness Verification ────────────
+  verify:
+    name: "Verify Deployment Health"
+    needs: deploy
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Run Smoke & Readiness Probes
+        env:
+          PROD_URL: ${{ secrets.PRODUCTION_URL || 'https://app.mediflow.in' }}
+          HEALTH_SECRET: ${{ secrets.HEALTH_SECRET }}
+        run: |
+          echo "🔍 Probing production application health and readiness..."
+          npx tsx scripts/verify-deployment-health.ts --url "$PROD_URL" --secret "$HEALTH_SECRET"

@@ -5,6 +5,7 @@ import { assertAccountingPeriodOpen } from "../accounting-periods";
 import { getOrSeedAccounts } from "../accounting";
 import { nextDocNumber } from "../sequence";
 import { writeAudit } from "@/server/audit";
+import { validateAndLockYearEndSource } from "../accounting-year-end";
 import { computeCanonicalPayloadHash } from "./types";
 import type { InventorySnapshotResult } from "./types";
 
@@ -13,6 +14,7 @@ interface CaptureSnapshotParams {
   storeId: string;
   asOfDate: string;
   userId?: string;
+  sourceYearEndSnapshotId?: string;
 }
 
 interface PostSnapshotJournalParams {
@@ -89,6 +91,12 @@ export async function captureOpeningInventorySnapshot(
     }
   }
 
+  if (params.sourceYearEndSnapshotId) {
+    await validateAndLockYearEndSource(tx, {
+      tenantId, storeId, asOfDate, totalPaise, sourceYearEndSnapshotId: params.sourceYearEndSnapshotId,
+    });
+  }
+
   // 4. Create snapshot header
   const [snapshot] = await tx
     .insert(schema.openingInventorySnapshots)
@@ -97,6 +105,7 @@ export async function captureOpeningInventorySnapshot(
       storeId,
       asOfDate,
       totalValuePaise: totalPaise,
+      sourceYearEndSnapshotId: params.sourceYearEndSnapshotId || null,
       status: "captured",
       createdBy: userId || null,
     })
