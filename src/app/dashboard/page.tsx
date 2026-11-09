@@ -10,6 +10,7 @@ import {
   ArrowUpRight,
   ChevronRight,
   ArrowLeftRight,
+  ShieldAlert,
 } from "lucide-react";
 import Link from "next/link";
 import { format } from "date-fns";
@@ -22,6 +23,7 @@ import { formatINR, formatNumber } from "@/lib/format";
 import { DateRangeFilter } from "@/app/components/DateRangeFilter";
 import { resolveDateRange } from "@/lib/date-range";
 import { requirePagePermission } from "@/server/rbac";
+import { getAllStoreLicenseAlerts } from "@/server/domain/compliance/license-tracker";
 
 export const metadata = { title: "Overview" };
 
