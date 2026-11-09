@@ -19,3 +19,4 @@ EXCEPTION
 END $$;
 
 ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "pharmacist_council_state" text;
+

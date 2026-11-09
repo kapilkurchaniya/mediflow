@@ -75,6 +75,18 @@ export default async function DashboardPage({
       ]
     : QUICK_ACTIONS;
 
+  let licenseAlerts: Awaited<ReturnType<typeof getAllStoreLicenseAlerts>> = [];
+  if (session?.tenantId) {
+    try {
+      licenseAlerts = await getAllStoreLicenseAlerts(session.tenantId);
+    } catch {
+      // Graceful fallback if query fails
+    }
+  }
+  const criticalOrUrgentAlerts = licenseAlerts.filter(
+    (a) => a.urgency === "critical" || a.urgency === "urgent"
+  );
+
   return (
     <div className="page space-y-6">
       <PageHeader
@@ -103,6 +115,34 @@ export default async function DashboardPage({
           )
         }
       />
+
+      {/* Statutory Regulatory License Alert Banner */}
+      {criticalOrUrgentAlerts.length > 0 && (
+        <div
+          role="alert"
+          className="rounded-xl border border-rose-200 bg-rose-50/90 p-4 text-rose-900 shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3"
+        >
+          <div className="flex items-center gap-3">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-rose-100 text-rose-700">
+              <ShieldAlert className="h-5 w-5" />
+            </span>
+            <div>
+              <p className="text-sm font-semibold text-rose-900">
+                Statutory Regulatory Alert (Drugs & Cosmetics Rules 1945)
+              </p>
+              <p className="text-xs text-rose-700">
+                {criticalOrUrgentAlerts.length} license{criticalOrUrgentAlerts.length > 1 ? "s" : ""} or registered pharmacist credential{criticalOrUrgentAlerts.length > 1 ? "s" : ""} have expired or are expiring within 30 days.
+              </p>
+            </div>
+          </div>
+          <Link
+            href="/dashboard/compliance/licenses"
+            className="btn btn-sm bg-rose-600 text-white hover:bg-rose-700 border-transparent shrink-0"
+          >
+            Review Renewals <ChevronRight className="h-3.5 w-3.5 ml-1" />
+          </Link>
+        </div>
+      )}
 
       {/* Date Filter Bar */}
       <div className="card px-4 py-3 bg-white/70 backdrop-blur-xs">
