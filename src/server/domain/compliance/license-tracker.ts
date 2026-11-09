@@ -492,3 +492,4 @@ export async function getPharmacistRegistrationAlerts(
   results.sort((a, b) => (a.daysRemaining ?? 9999) - (b.daysRemaining ?? 9999));
   return results;
 }
+
