@@ -6,6 +6,7 @@ import { requirePermission } from "@/server/rbac";
 import { revalidatePath } from "next/cache";
 import { extractStateCodeFromGstin } from "@/server/domain/gst";
 import { LoyaltyService } from "@/server/domain/loyalty";
+import { ConsentService } from "@/server/domain/privacy";
 
 export async function getCustomersCount(searchQuery?: string): Promise<number> {
   const ctx = await requirePermission("customer.view");
@@ -55,7 +56,7 @@ export async function getCustomers(searchQuery?: string, limit = 50, offset = 0)
     .offset(offset);
 }
 
-export async function createQuickCustomer(name: string, phone?: string) {
+export async function createQuickCustomer(name: string, phone?: string, consentReminders: boolean = true) {
   const ctx = await requirePermission("customer.manage");
   if (!name?.trim()) return { error: "Name is required" };
 
@@ -69,6 +70,27 @@ export async function createQuickCustomer(name: string, phone?: string) {
         isActive: true,
       })
       .returning({ id: schema.customers.id, name: schema.customers.name, phone: schema.customers.phone });
+
+    if (phone?.trim()) {
+      await Promise.all([
+        ConsentService.captureConsent({
+          tenantId: ctx.tenantId,
+          customerId: customer.id,
+          purpose: "transactional",
+          granted: true,
+          source: "pos",
+          capturedBy: ctx.userId,
+        }),
+        ConsentService.captureConsent({
+          tenantId: ctx.tenantId,
+          customerId: customer.id,
+          purpose: "reminders",
+          granted: consentReminders,
+          source: "pos",
+          capturedBy: ctx.userId,
+        }),
+      ]);
+    }
 
     revalidatePath("/dashboard/customers");
     return { success: true, customer };
@@ -89,6 +111,8 @@ export async function createCustomer(formData: FormData) {
   const stateCode = (gstin ? extractStateCodeFromGstin(gstin) : null) || rawStateCode || null;
   const creditLimitStr = formData.get("creditLimit") as string;
   const notes = formData.get("notes") as string;
+  const consentReminders = formData.get("consentReminders") === "on";
+  const consentMarketing = formData.get("consentMarketing") === "on";
 
   if (!name?.trim()) return { error: "Name is required" };
 
@@ -111,6 +135,35 @@ export async function createCustomer(formData: FormData) {
         isActive: true,
       })
       .returning();
+
+    if (phone?.trim()) {
+      await Promise.all([
+        ConsentService.captureConsent({
+          tenantId: ctx.tenantId,
+          customerId: customer.id,
+          purpose: "transactional",
+          granted: true,
+          source: "manual",
+          capturedBy: ctx.userId,
+        }),
+        ConsentService.captureConsent({
+          tenantId: ctx.tenantId,
+          customerId: customer.id,
+          purpose: "reminders",
+          granted: consentReminders,
+          source: "manual",
+          capturedBy: ctx.userId,
+        }),
+        ConsentService.captureConsent({
+          tenantId: ctx.tenantId,
+          customerId: customer.id,
+          purpose: "marketing",
+          granted: consentMarketing,
+          source: "manual",
+          capturedBy: ctx.userId,
+        }),
+      ]);
+    }
 
     revalidatePath("/dashboard/customers");
     return { success: true, customerId: customer.id };

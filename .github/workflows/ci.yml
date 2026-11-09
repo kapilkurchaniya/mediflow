@@ -36,8 +36,11 @@ jobs:
       # The build never connects to the database; env.ts only needs a syntactically valid URL.
       DATABASE_URL: postgres://ci:ci@127.0.0.1:5432/ci
       NEXT_TELEMETRY_DISABLED: "1"
+      CRON_SECRET: "ci-test-cron-secret"
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - uses: actions/setup-node@v4
         with:
@@ -100,6 +103,8 @@ jobs:
       SKIP_ENV_VALIDATION: "1"
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - uses: actions/setup-node@v4
         with:
@@ -140,6 +145,8 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - uses: actions/setup-node@v4
         with:

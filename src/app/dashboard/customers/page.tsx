@@ -1,5 +1,5 @@
 import { getCustomers, getCustomersCount } from "@/app/actions/customers";
-import { Plus, Users, Phone } from "lucide-react";
+import { Plus, Users, Phone, ShieldCheck } from "lucide-react";
 import Link from "next/link";
 import { PageHeader, SearchForm, EmptyState, Avatar, TableWrapper } from "@/app/components/ui";
 import { formatINR, formatNumber } from "@/lib/format";
@@ -95,9 +95,19 @@ export default async function CustomersPage({
                         {c.creditLimit > 0 ? formatINR(c.creditLimit) : <span className="text-ink-400">No credit</span>}
                       </td>
                       <td className="text-right">
-                        <span className={`badge badge-dot ${c.isActive ? "badge-success" : "badge-neutral"}`}>
-                          {c.isActive ? "Active" : "Inactive"}
-                        </span>
+                        <div className="flex items-center justify-end gap-2">
+                          <Link
+                            href={`/dashboard/customers/${c.id}/privacy`}
+                            className="inline-flex items-center gap-1 text-[11px] font-medium text-ink-600 hover:text-ink-900 border border-ink-200 dark:border-ink-800 px-2 py-0.5 rounded hover:bg-ink-50 dark:hover:bg-ink-900"
+                            title="Manage DPDP consent & privacy"
+                          >
+                            <ShieldCheck className="h-3 w-3 text-sky-600" />
+                            Privacy
+                          </Link>
+                          <span className={`badge badge-dot ${c.isActive ? "badge-success" : "badge-neutral"}`}>
+                            {c.isActive ? "Active" : "Inactive"}
+                          </span>
+                        </div>
                       </td>
                     </tr>
                   ))}

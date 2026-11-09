@@ -155,6 +155,22 @@ export default async function SettingsPage() {
               Configure GSP credentials (Sandbox / Production) for automated NIC IRN and signed QR code generation.
             </p>
           </Link>
+
+          {/* DPDP Patient Privacy Notice Link Card */}
+          <Link
+            href="/dashboard/settings/privacy"
+            className="card p-5 space-y-2 hover:border-brand-300 transition-colors block group"
+          >
+            <div className="flex items-center justify-between">
+              <span className="font-semibold text-ink-900 group-hover:text-brand-700 flex items-center gap-2 text-sm">
+                <ShieldCheck className="w-4 h-4 text-sky-600" /> DPDP Privacy Notice
+              </span>
+              <span className="text-xs text-brand-600 font-semibold group-hover:underline">Configure →</span>
+            </div>
+            <p className="text-[12px] text-ink-500 leading-relaxed">
+              Configure patient data protection notice, Data Protection Officer contact, and statutory retention policy.
+            </p>
+          </Link>
         </div>
       </div>
     </div>

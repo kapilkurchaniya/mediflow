@@ -18,7 +18,7 @@ export const rootLogger: Logger = pino({
     censor: CENSOR_VALUE,
   },
   formatters: {
-    level(label) {
+    level(label: string) {
       return { level: label };
     },
   },
