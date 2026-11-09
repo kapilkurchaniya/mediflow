@@ -1,7 +1,7 @@
 -- Regulatory Compliance & Drug License Renewal Alerts (B5.7)
 -- Drugs and Cosmetics Rules 1945 Form 20, 21, 20B, 21B, FSSAI, and Chief Pharmacist Registrations
 
-ALTER TABLE "stores" ADD COLUMN IF NOT EXISTS "form20_no" text;
+ ALTER TABLE "stores" ADD COLUMN IF NOT EXISTS "form20_no" text;
 ALTER TABLE "stores" ADD COLUMN IF NOT EXISTS "form20_expiry" date;
 ALTER TABLE "stores" ADD COLUMN IF NOT EXISTS "form21_no" text;
 ALTER TABLE "stores" ADD COLUMN IF NOT EXISTS "form21_expiry" date;
