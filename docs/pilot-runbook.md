@@ -1,4 +1,4 @@
-# Pilot Chain 2-Week Operational Runbook
+ # Pilot Chain 2-Week Operational Runbook
 **Target:** 3-Branch Retail Pharmacy Pilot | **Standard:** Zero-Disruption Production Go-Live
 
 ---
