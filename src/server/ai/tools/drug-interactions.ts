@@ -21,3 +21,4 @@ export const drugInteractionsTool: MediFlowAiTool<{ medications: string[] }> = {
     };
   },
 };
+
