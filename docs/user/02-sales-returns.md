@@ -24,3 +24,4 @@
 ## 3. Statutory Accounting Impact
 - MediFlow automatically updates the GST Outward Register and reverses proportional CGST + SGST.
 - Credit note serial numbers strictly adhere to GST Rule 46(b) formatting.
+
