@@ -113,7 +113,8 @@ export async function registerAction(prevState: { error?: string; success?: bool
   await createSession(token, result.user.id, result.tenant.id, result.store.id);
   await setSessionCookie(token);
 
-  redirect("/dashboard");
+  // Redirect newly registered pharmacy to Onboarding Wizard
+  redirect("/onboarding");
 }
 
 export async function logoutAction() {

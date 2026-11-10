@@ -1,7 +1,8 @@
 "use client";
 
 import React from "react";
-import { X, Keyboard, ScanLine, Search, Layout, Sparkles, Calculator, Navigation, ShoppingBag } from "lucide-react";
+import Link from "next/link";
+import { X, Keyboard, ScanLine, Search, Layout, Sparkles, Calculator, Navigation, ShoppingBag, BookOpen } from "lucide-react";
 import { useShell } from "./ShellContext";
 
 interface ShortcutGroup {
@@ -125,7 +126,15 @@ export function ShortcutsModal() {
           ))}
         </div>
 
-        <div className="border-t border-ink-150 bg-ink-50/70 px-5 py-3 text-right">
+        <div className="border-t border-ink-150 bg-ink-50/70 px-5 py-3 flex items-center justify-between">
+          <Link
+            href="/dashboard/help"
+            onClick={() => setShortcutsOpen(false)}
+            className="inline-flex items-center gap-1.5 text-xs font-medium text-primary-600 hover:text-primary-700"
+          >
+            <BookOpen className="h-3.5 w-3.5" />
+            <span>Looking for full task guides? Open Help Center</span>
+          </Link>
           <button
             type="button"
             onClick={() => setShortcutsOpen(false)}

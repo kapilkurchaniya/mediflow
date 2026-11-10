@@ -52,7 +52,7 @@ describe("registerAction", () => {
   it("creates a pharmacy whose first user is an Owner with ALL permissions (not locked out)", async () => {
     await expect(
       registerAction(null, form({ name: "Asha", email: "Asha@Example.test", password: "pw-123456", pharmacyName: "Asha Medicos" })),
-    ).rejects.toThrow("NEXT_REDIRECT:/dashboard");
+    ).rejects.toThrow("NEXT_REDIRECT:/onboarding");
 
     const [tenant] = await t.db.select().from(schema.tenants).where(eq(schema.tenants.name, "Asha Medicos"));
     const roles = await t.db.select().from(schema.roles).where(eq(schema.roles.tenantId, tenant.id));

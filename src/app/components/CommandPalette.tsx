@@ -10,6 +10,7 @@ import {
   Sidebar as SidebarIcon,
   X,
   ArrowRight,
+  BookOpen,
   type LucideIcon,
 } from "lucide-react";
 import { useShell } from "./ShellContext";
@@ -100,6 +101,17 @@ export function CommandPalette() {
         action: () => {
           setCommandOpen(false);
           setShortcutsOpen(true);
+        },
+      },
+      {
+        id: "act-help",
+        category: "Quick Actions",
+        label: "Help Center & SOP Task Guides",
+        description: "Task guides for first bill, returns, GST filing, and offline mode",
+        icon: BookOpen,
+        action: () => {
+          setCommandOpen(false);
+          router.push("/dashboard/help");
         },
       },
       {
