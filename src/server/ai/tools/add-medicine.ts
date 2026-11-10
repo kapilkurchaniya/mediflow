@@ -50,3 +50,4 @@ export const addMedicineTool: MediFlowAiTool<
     return proposal;
   },
 };
+

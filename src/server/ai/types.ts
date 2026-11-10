@@ -68,3 +68,4 @@ export interface ExpiryRedistributionProposalPayload {
   transferPacks: number;
   potentialLossPreventedPaise: number;
 }
+
