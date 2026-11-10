@@ -28,3 +28,4 @@
 1. Verify green power light on the desktop thermal printer.
 2. If paper jams, press the manual cut lever, clear paper, and reprint from **Sales History (`Alt + H`)**.
 3. Duplicate bills clearly carry the heading `"DUPLICATE TAX INVOICE"`.
+

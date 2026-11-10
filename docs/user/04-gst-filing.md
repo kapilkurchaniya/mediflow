@@ -26,3 +26,4 @@
   - `trial_balance.csv`: General ledger debit and credit reconciliation.
   - `profit_and_loss.csv`: Gross margin and net pharmacy income.
   - `stock_valuation.csv`: FIFO inventory valuation at cost vs MRP.
+
