@@ -293,3 +293,4 @@ export function searchHelpArticles(query: string, category?: HelpCategory | "all
     );
   });
 }
+
