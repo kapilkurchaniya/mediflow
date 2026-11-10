@@ -41,3 +41,4 @@ export const ALL_AI_TOOLS: MediFlowAiTool[] = [
   expiryRedistributionTool as MediFlowAiTool,
   explainGstMismatchTool as MediFlowAiTool,
 ];
+
