@@ -1,6 +1,7 @@
 import React from "react";
 import Link from "next/link";
 import { BookOpen, LifeBuoy, ArrowLeft } from "lucide-react";
+import { PilotFeedbackModal } from "./_components/PilotFeedbackModal";
 
 export default function HelpLayout({
   children,
@@ -40,6 +41,7 @@ export default function HelpLayout({
               <LifeBuoy className="h-3.5 w-3.5 text-primary-600" />
               All Guides
             </Link>
+            <PilotFeedbackModal />
           </div>
         </header>
 
@@ -48,3 +50,4 @@ export default function HelpLayout({
     </div>
   );
 }
+
