@@ -966,11 +966,15 @@ Full map in `.github/CODEOWNERS` and [ADR 0004](docs/adr/0004-two-lane-ownership
 
 ### Lane B · Phase 6
 
-#### B6.1 AI assistant hardening ⏱ 3 days
-- ✏️ `src/app/api/chat/route.ts`: remove `// @ts-nocheck`; move tools into ➕ `src/server/ai/tools/*.ts`, each typed and each calling **domain functions** (not raw SQL) with `ctx`, so tenant scoping and permissions are reused. Each tool declares its `permission`, and tools the user lacks aren't offered to the model. **Write tools** (`add_medicine`, future `create_po_draft`) return a *proposal*; the UI shows "Confirm" before executing (log to `ai_actions` with `status: pending_confirmation → confirmed`). Log every tool call to `ai_actions` (model, latency). Rate-limit per user.
+#### B6.1 AI assistant hardening ⏱ 3 days [COMPLETED]
+- ✏️ `src/app/api/chat/route.ts`: removed `// @ts-nocheck`; modularized tools into ➕ `src/server/ai/tools/*.ts`, strictly typed and calling **domain functions** (zero raw SQL) with `ctx` enforcing tenant and store isolation. Each tool declares its `permission`, and tools the caller lacks are dynamically stripped from the model registry. **Write tools** (`add_medicine`, `add_to_bill`) return a *proposal*; the UI displays an interactive confirmation card before executing (persisted to `ai_actions` with `status: pending_confirmation → confirmed / cancelled`). Implemented sliding-window rate limiter per user (60 queries/hr, burst 15/min) in `src/server/ai/rate-limiter.ts` returning 429 when exceeded. Every tool invocation logs model, latency, and tokens to `ai_actions`. Modularized UI into `src/app/components/ai/*` (<300 lines per file).
 
-#### B6.2 AI chores (stretch) ⏱ 2 days
-- Tools: `draft_purchase_order` (uses B3.2), `expiry_redistribution` (B3.5), `explain_gst_mismatch` (B5.3). Each one produces drafts only, which a human confirms.
+#### B6.2 AI chores (stretch) ⏱ 2 days [COMPLETED]
+- Autonomous pharmacy copilot chores:
+  - `draft_purchase_order` (uses B3.2 reorder engine): evaluates low-stock medicines against store reorder points and lead times, groups by preferred supplier, and generates an editable PO draft proposal.
+  - `expiry_redistribution` (uses B3.5 inter-branch redistribution): detects 30–90 day near-expiry stock in slow-moving stores and proposes an inter-branch transfer (`TR/...`) to high-velocity branches.
+  - `explain_gst_mismatch` (uses B5.3 GSTR-2B reconciliation): analyzes discrepancy categories (Section 16(2)(aa) ITC blocks, missing supplier filings, tolerance variance, rate mismatches) and provides plain-English tax explanations and recommended IMS actions.
+  - Each mutating chore generates human-in-the-loop proposals requiring explicit confirmation before committing to database ledgers. Verified with unit test suite in `tests/unit/ai-chores.test.ts`. Every file strictly under 300 lines.
 
 #### B6.3 Onboarding wizard ⏱ 2.5 days
 - ➕ `src/app/onboarding/*`. After register: business details (legal name, GSTIN → state) → first store (licence number, invoice prefix with live 16-char check) → import data (B4) or the seed catalogue → invite staff (A1.4) → print a test bill. Fixes register's `stateCode: "00"`.
@@ -1066,7 +1070,7 @@ Tick items in PRs. One line per task, in the same order as above.
 **Phase 3** — A: [x] A3.1 [x] A3.2 [x] A3.3 [x] A3.4 [x] A3.5 [x] A3.6 · B: [x] B3.1 [x] B3.2 [x] B3.3 [x] B3.4 [x] B3.5 [x] B3.6 [x] B3.7
 **Phase 4** — A: [x] A4.1 [x] A4.2 [x] A4.3 [x] A4.4 [x] A4.5 [x] A4.6 [x] A4.7 [x] A4.8 [x] A4.9 · B: [x] B4.1 [x] B4.2 [x] B4.3 [x] B4.4 [x] B4.5 [x] B4.6
 **Phase 5** — A: [x] A5.1 [x] A5.2 [x] A5.3 [x] A5.4 [x] A5.5 [x] A5.6 [x] A5.7 · B: [x] B5.1 [x] B5.2 [x] B5.3 [x] B5.4 [x] B5.5 [x] B5.6 [x] B5.7
-**Phase 6** — A: [x] A6.1 [x] A6.2 [x] A6.3 [x] A6.4 [x] A6.5 [x] A6.6 · B: [ ] B6.1 [ ] B6.2 [ ] B6.3 [ ] B6.4 [ ] B6.5 [ ] B6.6
+**Phase 6** — A: [x] A6.1 [x] A6.2 [x] A6.3 [x] A6.4 [x] A6.5 [x] A6.6 · B: [x] B6.1 [x] B6.2 [ ] B6.3 [ ] B6.4 [ ] B6.5 [ ] B6.6
 
 ---
 
