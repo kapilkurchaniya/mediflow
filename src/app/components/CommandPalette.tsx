@@ -10,6 +10,7 @@ import {
   Sidebar as SidebarIcon,
   X,
   ArrowRight,
+  BookOpen,
   type LucideIcon,
 } from "lucide-react";
 import { useShell } from "./ShellContext";
