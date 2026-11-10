@@ -104,6 +104,17 @@ export function CommandPalette() {
         },
       },
       {
+        id: "act-help",
+        category: "Quick Actions",
+        label: "Help Center & SOP Task Guides",
+        description: "Task guides for first bill, returns, GST filing, and offline mode",
+        icon: BookOpen,
+        action: () => {
+          setCommandOpen(false);
+          router.push("/dashboard/help");
+        },
+      },
+      {
         id: "act-ai",
         category: "Quick Actions",
         label: "Ask MediFlow AI Assistant",
