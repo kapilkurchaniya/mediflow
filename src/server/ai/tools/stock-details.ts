@@ -108,3 +108,4 @@ export const stockDetailsTool: MediFlowAiTool<{ searchTerm: string }> = {
     };
   },
 };
+

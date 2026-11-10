@@ -127,3 +127,4 @@ export const inventoryCheckTool: MediFlowAiTool<{ productName?: string }> = {
     };
   },
 };
+
