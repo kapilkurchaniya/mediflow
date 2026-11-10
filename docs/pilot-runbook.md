@@ -38,3 +38,4 @@
 | **Delta $>$ ₹2.00** | Missing bill, omitted return, or cancelled invoice | Check invoice sequence count. Inspect Cancelled Sales tab. |
 | **Tax Variance** | Marg using outdated 12% GST rate for formulation | Verify HSN 3004 tax rate in MediFlow (`GST_RATES_BP`). |
 | **Scanner Lag** | Raw barcode buffer speed mismatch | Adjust USB HID inter-character delay in Settings $\rightarrow$ Devices. |
+
