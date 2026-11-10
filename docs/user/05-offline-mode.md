@@ -23,3 +23,4 @@
 3. Official 16-character canonical GST invoice numbers are assigned in exact sequence.
 4. Cloud inventory balances and accounting ledgers update automatically with zero data collision.
 5. If a sync collision occurs, the system logs it to the Manager Review Drawer.
+
