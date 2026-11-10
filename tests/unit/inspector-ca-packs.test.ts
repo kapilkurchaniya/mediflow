@@ -126,9 +126,10 @@ describe("Drug Inspector & CA Audit Packs Domain Tests (Task B6.4)", () => {
   describe("GSTR-1 Official JSON Payload Generator", () => {
     it("builds GSTN Offline Tool compliant JSON payload", () => {
       const mockGstr1: Gstr1Summary = {
-        period: { month: 11, year: 2026 },
+        period: { month: 11, year: 2026, fromDate: "2026-11-01", toDate: "2026-11-30" },
         b2b: [
           {
+            id: "sale-b2b-01",
             partyGstin: "27AABCA1234A1Z5",
             partyName: "City Hospital",
             docNo: "INV-001",
@@ -139,23 +140,22 @@ describe("Drug Inspector & CA Audit Packs Domain Tests (Task B6.4)", () => {
             sgst: 2500,
             igst: 0,
             placeOfSupply: "27-Maharashtra",
+            status: "ACTIVE",
           },
         ],
         b2cl: [],
         b2cs: [
           {
             placeOfSupply: "27-Maharashtra",
-            rateBp: 500,
+            taxRateBp: 500,
             taxableAmount: 200000,
             cgst: 5000,
             sgst: 5000,
             igst: 0,
+            total: 210000,
           },
         ],
         cdnr: [],
-        cdnur: [],
-        export: [],
-        nilRated: { nilRated: 0, exempted: 0, nonGst: 0 },
         hsnSummary: [
           {
             hsn: "3004",
