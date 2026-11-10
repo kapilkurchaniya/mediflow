@@ -213,3 +213,4 @@ export async function generateStaticParams() {
   const articles = getAllHelpArticles();
   return articles.map((a) => ({ slug: a.slug }));
 }
+
