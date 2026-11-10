@@ -21,3 +21,4 @@
 - Destination store opens the incoming transfer in MediFlow and scans received physical boxes.
 - **Match:** Local batch stock increments automatically.
 - **Shortage / Breakage:** Staff marks damaged/missing units. MediFlow logs a transit variance claim against the carrier or issuing store.
+
