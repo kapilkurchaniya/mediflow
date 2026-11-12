@@ -77,16 +77,18 @@ export default async function ExpensesPage({
         title="Operating Expenses"
         description="Cash drawer payouts, rent, utilities, and daily store operational overheads."
         actions={
-          <div className="flex items-center gap-2">
-            <DateRangeFilter />
-            {canPost && (
-              <Link href="/dashboard/accounting/expenses/new" className="btn btn-primary text-[13px]">
-                <Plus className="mr-1.5 h-4 w-4" /> Record Expense
-              </Link>
-            )}
-          </div>
+          canPost ? (
+            <Link href="/dashboard/accounting/expenses/new" className="btn btn-primary text-[13px]">
+              <Plus className="mr-1.5 h-4 w-4" /> Record Expense
+            </Link>
+          ) : undefined
         }
       />
+
+      {/* Date Range Toolbar */}
+      <div className="card p-2.5 sm:p-3 bg-white border border-ink-150 shadow-2xs flex flex-wrap items-center justify-between gap-3">
+        <DateRangeFilter />
+      </div>
 
       <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard

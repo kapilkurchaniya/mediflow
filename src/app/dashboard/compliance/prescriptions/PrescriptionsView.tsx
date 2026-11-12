@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { PageHeader, EmptyState } from "@/app/components/ui";
 import { createPrescription, getPrescriptions } from "@/app/actions/compliance";
+import { MedicineAutocompleteInput } from "./MedicineAutocompleteInput";
 
 export interface PrescriptionItem {
   id?: string;
@@ -440,17 +441,16 @@ export function PrescriptionsView({
                 <div className="space-y-2">
                   {rxItems.map((item, idx) => (
                     <div key={idx} className="flex items-center gap-2 bg-ink-50 p-2 rounded-lg text-xs">
-                      <div className="flex-1">
-                        <input
-                          type="text"
-                          required
-                          placeholder="Medicine name (e.g. Amoxicillin 500mg)"
-                          value={item.medicineName}
-                          onChange={(e) => updateRxItem(idx, "medicineName", e.target.value)}
-                          className="input text-xs bg-white py-1 px-2 h-7"
-                        />
-                      </div>
-                      <div className="w-24">
+                      <MedicineAutocompleteInput
+                        value={item.medicineName}
+                        onChangeName={(name) => updateRxItem(idx, "medicineName", name)}
+                        onSelectOption={(opt) => {
+                          if (opt.strength && !item.dosage) {
+                            updateRxItem(idx, "dosage", opt.strength);
+                          }
+                        }}
+                      />
+                      <div className="w-24 shrink-0">
                         <input
                           type="text"
                           placeholder="Dosage (500mg)"
@@ -459,7 +459,7 @@ export function PrescriptionsView({
                           className="input text-xs bg-white py-1 px-2 h-7"
                         />
                       </div>
-                      <div className="w-20">
+                      <div className="w-20 shrink-0">
                         <input
                           type="text"
                           placeholder="1-0-1"
@@ -468,7 +468,7 @@ export function PrescriptionsView({
                           className="input text-xs bg-white py-1 px-2 h-7"
                         />
                       </div>
-                      <div className="w-16">
+                      <div className="w-16 shrink-0">
                         <input
                           type="number"
                           placeholder="Qty"
@@ -481,7 +481,7 @@ export function PrescriptionsView({
                         type="button"
                         onClick={() => removeRxItem(idx)}
                         disabled={rxItems.length <= 1}
-                        className="text-ink-400 hover:text-rose-600 disabled:opacity-30 p-1"
+                        className="text-ink-400 hover:text-rose-600 disabled:opacity-30 p-1 shrink-0"
                       >
                         <Trash2 className="h-3.5 w-3.5" />
                       </button>
