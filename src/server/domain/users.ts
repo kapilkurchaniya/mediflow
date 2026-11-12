@@ -221,6 +221,9 @@ export async function acceptInvite(
   const [existing] = await tx.select().from(schema.users).where(eq(schema.users.email, inv.email));
   let userId: string;
   if (existing) {
+    if (!existing.passwordHash) {
+      throw new DomainError("WRONG_PASSWORD", "This account uses Google Sign-In. Please accept the invite with Google.");
+    }
     if (!(await verify(input.password, existing.passwordHash))) {
       throw new DomainError("WRONG_PASSWORD", "That password is not correct for this email.");
     }
