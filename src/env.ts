@@ -98,6 +98,11 @@ const envSchema = z
     DB_POOL_CONNECTION_TIMEOUT_MS: z.coerce.number().int().min(500).default(5000),
     DB_STATEMENT_TIMEOUT_MS: z.coerce.number().int().min(1000).default(15000),
 
+    // ─── Google OAuth (optional) ─────────────────────────────────────────────
+    GOOGLE_CLIENT_ID: z.string().optional(),
+    GOOGLE_CLIENT_SECRET: z.string().optional(),
+    APP_URL: z.string().url().optional(),
+
     // ─── AI providers (all optional) ─────────────────────────────────────────
     GEMINI_API_KEY: z.string().optional(),
     GROQ_API_KEY: z.string().optional(),
