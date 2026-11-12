@@ -2,8 +2,8 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { applySecurityHeaders } from "@/server/security/headers";
 
-/** Routes that redirect authenticated users away (login/register pages). */
-const authRoutes = ["/login", "/register"];
+/** Routes that handle pre-auth flows (login/register pages). */
+const authRoutes = ["/login", "/register", "/register/google"];
 
 /**
  * API routes that authenticate themselves (API key, HMAC, device token, etc.) and must NOT

@@ -53,7 +53,7 @@ export default async function ProfilePage({
         statusBanner={statusBanner}
       />
 
-      <ProfileClient />
+      <ProfileClient hasPassword={Boolean(user.passwordHash)} />
     </div>
   );
 }

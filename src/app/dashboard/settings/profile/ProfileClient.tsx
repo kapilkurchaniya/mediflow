@@ -3,28 +3,34 @@
 import { useActionState } from "react";
 import { changePasswordAction } from "@/app/actions/auth";
 
-export function ProfileClient() {
+export function ProfileClient({ hasPassword = true }: { hasPassword?: boolean }) {
   const [state, formAction, pending] = useActionState(changePasswordAction, null);
 
   return (
     <form action={formAction} className="card p-5 space-y-4 max-w-md">
       <div>
-        <h2 className="text-[15px] font-semibold text-ink-900">Change password</h2>
+        <h2 className="text-[15px] font-semibold text-ink-900">
+          {hasPassword ? "Change password" : "Set a password"}
+        </h2>
         <p className="mt-1 text-[13px] text-ink-500">
-          Use at least 8 characters. Changing your password signs you out of every other device.
+          {hasPassword
+            ? "Use at least 8 characters. Changing your password signs you out of every other device."
+            : "You signed up with Google. Set a password so you can also sign in with your email and password."}
         </p>
       </div>
 
+      {hasPassword && (
+        <label className="block text-xs font-medium text-ink-700">
+          Current password
+          <input type="password" name="current" autoComplete="current-password" required className="input mt-1" />
+        </label>
+      )}
       <label className="block text-xs font-medium text-ink-700">
-        Current password
-        <input type="password" name="current" autoComplete="current-password" required className="input mt-1" />
-      </label>
-      <label className="block text-xs font-medium text-ink-700">
-        New password
+        {hasPassword ? "New password" : "Password"}
         <input type="password" name="next" autoComplete="new-password" required minLength={8} className="input mt-1" />
       </label>
       <label className="block text-xs font-medium text-ink-700">
-        Confirm new password
+        {hasPassword ? "Confirm new password" : "Confirm password"}
         <input type="password" name="confirm" autoComplete="new-password" required minLength={8} className="input mt-1" />
       </label>
 
@@ -32,7 +38,7 @@ export function ProfileClient() {
       {state?.success && <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-2.5 text-[12.5px] text-emerald-800">{state.success}</div>}
 
       <button type="submit" disabled={pending} className="btn btn-primary">
-        {pending ? "Saving…" : "Change password"}
+        {pending ? "Saving…" : hasPassword ? "Change password" : "Set password"}
       </button>
     </form>
   );
