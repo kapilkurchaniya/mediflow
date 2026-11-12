@@ -23,7 +23,7 @@ describe("Google OAuth PKCE & security helpers", () => {
   });
 
   it("signs and verifies HMAC payloads and rejects tampering or expiry", () => {
-    const secret = "test-secret-0123456789abcdef";
+    const secret = "0123456789abcdef0123456789abcdef";
     const now = 1_700_000_000_000;
     const token = signSignedPayload({ state: "abc", exp: now + 60_000 }, secret);
 
