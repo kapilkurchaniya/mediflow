@@ -63,31 +63,31 @@ export default function StockConflictsPage() {
     switch (status) {
       case "open":
         return (
-          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-900/50">
+          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200">
             Open
           </span>
         );
       case "investigating":
         return (
-          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-400 border border-blue-200 dark:border-blue-900/50">
+          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200">
             Investigating
           </span>
         );
       case "partially_resolved":
         return (
-          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-900/50">
+          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200">
             Partially Resolved
           </span>
         );
       case "resolved":
         return (
-          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-900/50">
+          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
             Resolved
           </span>
         );
       case "dismissed":
         return (
-          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-slate-100 dark:bg-ink-800 text-slate-600 dark:text-ink-400 border border-slate-200 dark:border-ink-700">
+          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-ink-100 text-ink-600 border border-ink-200">
             Dismissed
           </span>
         );
@@ -110,18 +110,18 @@ export default function StockConflictsPage() {
               Inventory Hub
             </Link>
           </div>
-          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-ink-900 dark:text-ink-50 flex items-center gap-2">
+          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-ink-900 flex items-center gap-2">
             <AlertTriangle className="w-6 h-6 text-amber-500" />
             Offline Sync Stock Conflicts
           </h1>
-          <p className="text-xs text-slate-500 dark:text-ink-400 mt-1">
+          <p className="text-xs text-ink-500 mt-1">
             Investigate, recount, and resolve negative ledger balances resulting from offline POS reconciliation.
           </p>
         </div>
         <button
           onClick={() => fetchConflicts(statusFilter)}
           disabled={loading}
-          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 dark:border-ink-800 bg-white dark:bg-ink-900 text-xs font-medium text-slate-700 dark:text-ink-200 hover:bg-slate-50 shadow-sm"
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-ink-200 bg-white text-xs font-medium text-ink-700 hover:bg-ink-50 shadow-2xs transition-colors"
         >
           <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
           Refresh
@@ -132,21 +132,21 @@ export default function StockConflictsPage() {
       <ConflictSummaryCards conflicts={conflicts} />
 
       {/* Controls & Search */}
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-white dark:bg-ink-900 p-3 rounded-xl border border-slate-200 dark:border-ink-800">
+      <div className="card flex flex-col sm:flex-row items-center justify-between gap-3 bg-white p-3 rounded-xl border border-ink-150 shadow-2xs">
         <div className="relative w-full sm:w-72">
-          <Search className="w-4 h-4 absolute left-3 top-2.5 text-slate-400" />
+          <Search className="w-4 h-4 absolute left-3 top-2.5 text-ink-400" />
           <input
             type="text"
             placeholder="Search medicine or batch..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full text-xs pl-9 pr-3 py-2 rounded-lg border border-slate-200 dark:border-ink-700 bg-slate-50 dark:bg-ink-800 text-slate-900 dark:text-ink-100"
+            className="w-full text-xs pl-9 pr-3 py-2 rounded-lg border border-ink-200 bg-white text-ink-900 focus:outline-none focus:ring-1 focus:ring-brand-500"
           />
         </div>
 
         {/* Filter Pills */}
         <div className="flex items-center gap-1.5 overflow-x-auto w-full sm:w-auto pb-1 sm:pb-0">
-          <Filter className="w-3.5 h-3.5 text-slate-400 shrink-0 ml-1" />
+          <Filter className="w-3.5 h-3.5 text-ink-400 shrink-0 ml-1" />
           {["all", "open", "investigating", "partially_resolved", "resolved", "dismissed"].map(
             (status) => (
               <button
@@ -154,8 +154,8 @@ export default function StockConflictsPage() {
                 onClick={() => setStatusFilter(status)}
                 className={`px-2.5 py-1 rounded-lg text-xs font-medium whitespace-nowrap transition-colors ${
                   statusFilter === status
-                    ? "bg-slate-900 text-white dark:bg-ink-100 dark:text-ink-900"
-                    : "bg-slate-100 dark:bg-ink-800 text-slate-600 dark:text-ink-400 hover:bg-slate-200"
+                    ? "bg-ink-900 text-white shadow-2xs"
+                    : "bg-ink-100 text-ink-600 hover:bg-ink-200"
                 }`}
               >
                 {status === "all" ? "All Cases" : status.replace("_", " ")}
@@ -166,10 +166,10 @@ export default function StockConflictsPage() {
       </div>
 
       {/* Conflicts Table */}
-      <div className="bg-white dark:bg-ink-900 border border-slate-200 dark:border-ink-800 rounded-xl overflow-hidden shadow-sm">
+      <div className="card bg-white border border-ink-150 rounded-xl overflow-hidden shadow-2xs">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
-            <thead className="bg-slate-50 dark:bg-ink-800/60 border-b border-slate-200 dark:border-ink-800 text-slate-500 font-medium">
+            <thead className="bg-ink-50 border-b border-ink-150 text-ink-500 font-medium">
               <tr>
                 <th className="py-3 px-4">Medicine Name</th>
                 <th className="py-3 px-4">Batch No</th>
@@ -181,16 +181,16 @@ export default function StockConflictsPage() {
                 <th className="py-3 px-4 text-right">Action</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100 dark:divide-ink-800">
+            <tbody className="divide-y divide-ink-100">
               {loading ? (
                 <tr>
-                  <td colSpan={8} className="py-12 text-center text-slate-400">
+                  <td colSpan={8} className="py-12 text-center text-ink-400">
                     Loading stock conflict cases...
                   </td>
                 </tr>
               ) : filteredConflicts.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="py-12 text-center text-slate-400">
+                  <td colSpan={8} className="py-12 text-center text-ink-400">
                     No conflict cases found.
                   </td>
                 </tr>
@@ -198,15 +198,15 @@ export default function StockConflictsPage() {
                 filteredConflicts.map((c) => (
                   <tr
                     key={c.id}
-                    className="hover:bg-slate-50/70 dark:hover:bg-ink-800/40 transition-colors"
+                    className="hover:bg-ink-50/60 transition-colors"
                   >
-                    <td className="py-3 px-4 font-semibold text-slate-900 dark:text-ink-100">
+                    <td className="py-3 px-4 font-semibold text-ink-900">
                       {c.medicineName}
                     </td>
-                    <td className="py-3 px-4 font-mono text-slate-600 dark:text-ink-300">
+                    <td className="py-3 px-4 font-mono text-ink-600">
                       {c.batchNo}
                     </td>
-                    <td className="py-3 px-4 text-slate-500">{c.expiryDate}</td>
+                    <td className="py-3 px-4 text-ink-500">{c.expiryDate}</td>
                     <td className="py-3 px-4 font-bold">
                       <span className={c.qtyOnHand < 0 ? "text-rose-600" : "text-emerald-600"}>
                         {c.qtyOnHand}
@@ -214,13 +214,13 @@ export default function StockConflictsPage() {
                     </td>
                     <td className="py-3 px-4 font-bold text-rose-600">{c.outstandingQty} units</td>
                     <td className="py-3 px-4">{getStatusBadge(c.status)}</td>
-                    <td className="py-3 px-4 text-slate-400">
+                    <td className="py-3 px-4 text-ink-400">
                       {new Date(c.openedAt).toLocaleDateString()}
                     </td>
                     <td className="py-3 px-4 text-right">
                       <button
                         onClick={() => setSelectedConflictId(c.id)}
-                        className="px-2.5 py-1 text-xs font-semibold rounded-md bg-emerald-600 hover:bg-emerald-700 text-white transition-colors"
+                        className="btn btn-primary btn-sm text-xs font-semibold"
                       >
                         Investigate / Resolve
                       </button>
