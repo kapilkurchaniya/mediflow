@@ -119,6 +119,7 @@ export async function loginMobile(
 
   if (!userRows[0]) throw new Error("INVALID_CREDENTIALS");
   const { user, membership, role } = userRows[0];
+  if (!user.passwordHash) throw new Error("INVALID_CREDENTIALS");
   const validPw = await bcrypt.compare(input.password, user.passwordHash);
   if (!validPw) throw new Error("INVALID_CREDENTIALS");
   if (membership.status !== "active") throw new Error("MEMBERSHIP_INACTIVE");

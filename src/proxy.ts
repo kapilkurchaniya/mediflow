@@ -2,14 +2,15 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { applySecurityHeaders } from "@/server/security/headers";
 
-/** Routes that redirect authenticated users away (login/register pages). */
-const authRoutes = ["/login", "/register"];
+/** Routes that handle pre-auth flows (login/register pages). */
+const authRoutes = ["/login", "/register", "/register/google"];
 
 /**
  * API routes that authenticate themselves (API key, HMAC, device token, etc.) and must NOT
  * be redirected to /login when the session cookie is absent.
  */
 const selfAuthPrefixes = [
+  "/api/auth",
   "/api/v1",
   "/api/webhooks",
   "/api/cron",
@@ -48,11 +49,9 @@ export async function proxy(request: NextRequest) {
 
   const hasSession = request.cookies.has("mediflow_session");
 
-  // Auth pages: redirect logged-in users to the dashboard.
+  // Auth pages: allow through; the Server Components validate the session against DB
+  // before redirecting so a stale/invalid cookie never causes a redirect loop.
   if (authRoutes.includes(pathname)) {
-    if (hasSession) {
-      return wrapResponse(NextResponse.redirect(new URL("/dashboard", request.url)));
-    }
     return wrapResponse(NextResponse.next());
   }
 

@@ -13,6 +13,8 @@ import { describe, expect, it } from "vitest";
 const PUBLIC_BY_DESIGN: Record<string, string> = {
   loginAction: "sign-in",
   registerAction: "creates a new pharmacy",
+  completeGoogleSignupAction: "public: completes Google OAuth pharmacy registration authenticated by signed HttpOnly signup cookie",
+  unlinkGoogleAccountAction: "any signed-in user unlinks their OWN Google account (requires requireAuth and an existing password)",
   logoutAction: "ends the session",
   acceptInviteAction: "public: a new person accepts an invitation; the one-time token in the link is the credential",
   changePasswordAction: "any signed-in user changes their OWN password (requires sign-in and the current password, no permission)",

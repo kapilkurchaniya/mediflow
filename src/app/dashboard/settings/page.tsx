@@ -10,13 +10,15 @@ import {
   Sliders,
 } from "lucide-react";
 import Link from "next/link";
+import { requireAuth } from "@/server/auth";
 import { requirePagePermission } from "@/server/rbac";
+import { ProfileClient } from "./profile/ProfileClient";
 
 export const metadata = { title: "Settings" };
 
 export default async function SettingsPage() {
   await requirePagePermission("settings.manage");
-  const data = await getStoreSettings();
+  const [{ user: authUser }, data] = await Promise.all([requireAuth(), getStoreSettings()]);
   const { store, user, tenant } = data;
 
   return (
@@ -82,26 +84,34 @@ export default async function SettingsPage() {
           </div>
         </div>
 
-        {/* Right Column: Account & Organization Details */}
+        {/* Right Column: Account Info, Password & Organization Details */}
         <div className="space-y-6">
-          {/* User Account Card */}
+          {/* Account Info Card */}
           <div className="card p-5 space-y-4">
-            <div className="flex items-center gap-2.5 pb-3 border-b border-ink-150">
-              <User className="h-5 w-5 text-purple-600" />
-              <div>
-                <h3 className="text-[14px] font-semibold text-ink-900">Logged-in User</h3>
-                <p className="text-[12px] text-ink-500">Active counter session</p>
+            <div className="flex items-center justify-between gap-2 pb-3 border-b border-ink-150">
+              <div className="flex items-center gap-2.5">
+                <User className="h-5 w-5 text-purple-600" />
+                <div>
+                  <h3 className="text-[14px] font-semibold text-ink-900">Account Info</h3>
+                  <p className="text-[12px] text-ink-500">Your sign-in identity &amp; security</p>
+                </div>
               </div>
+              <Link
+                href="/dashboard/settings/profile"
+                className="text-xs font-semibold text-brand-600 hover:text-brand-700 hover:underline shrink-0"
+              >
+                Google &amp; Profile →
+              </Link>
             </div>
 
             <div className="space-y-3 text-[13px]">
               <div>
-                <span className="text-ink-400 text-[11.5px] uppercase font-mono block">Operator Name</span>
+                <span className="text-ink-400 text-[11.5px] uppercase font-mono block">Full Name</span>
                 <span className="font-medium text-ink-900">{user.name}</span>
               </div>
               <div>
                 <span className="text-ink-400 text-[11.5px] uppercase font-mono block">Email Address</span>
-                <span className="font-mono text-ink-700">{user.email}</span>
+                <span className="font-mono text-ink-700 break-all">{user.email}</span>
               </div>
               {user.phone && (
                 <div>
@@ -111,6 +121,9 @@ export default async function SettingsPage() {
               )}
             </div>
           </div>
+
+          {/* Set / Update Password */}
+          <ProfileClient hasPassword={Boolean(authUser.passwordHash)} />
 
           {/* Organization & Subscription */}
           <div className="card p-5 space-y-4">
