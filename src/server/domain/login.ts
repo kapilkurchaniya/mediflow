@@ -1,4 +1,4 @@
-import { and, count, desc, eq, gt, inArray, max, ne } from "drizzle-orm";
+import { and, count, desc, eq, gt, inArray, max, ne, sql } from "drizzle-orm";
 import { schema, type DbOrTx } from "@/server/db";
 import { writeAudit } from "@/server/audit";
 
@@ -100,8 +100,15 @@ export async function attemptLogin(database: DbOrTx, input: LoginInput, verify: 
     return { ok: false, error: LOCKED_ERROR };
   }
 
-  const [user] = await database.select().from(schema.users).where(eq(schema.users.email, emailLower));
+  const [user] = await database
+    .select()
+    .from(schema.users)
+    .where(sql`lower(${schema.users.email}) = ${emailLower}`);
   const passwordOk = await verify(input.password, user?.passwordHash ?? DUMMY_HASH);
+  if (user && !user.passwordHash) {
+    await record(database, emailLower, input.ip, false, now);
+    return { ok: false, error: "This account uses Google Sign-In. Please continue with Google." };
+  }
   if (!user || !passwordOk) {
     await record(database, emailLower, input.ip, false, now);
     return { ok: false, error: GENERIC_LOGIN_ERROR };
@@ -161,7 +168,7 @@ export async function changePassword(
   if (input.next === input.current) return { ok: false, error: "Choose a password you have not used just now." };
 
   const [user] = await database.select().from(schema.users).where(eq(schema.users.id, input.userId));
-  if (!user || !(await verify(input.current, user.passwordHash))) {
+  if (!user || !user.passwordHash || !(await verify(input.current, user.passwordHash))) {
     return { ok: false, error: "Your current password is not correct." };
   }
 
