@@ -1,6 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 import { db, schema } from "@/server/db";
 import { sql } from "drizzle-orm";
@@ -43,11 +44,13 @@ export async function changePasswordAction(prevState: { error?: string; success?
     { tenantId: session.tenantId, storeId: session.storeId },
   );
   if (!result.ok) return { error: result.error };
+  revalidatePath("/dashboard/settings");
+  revalidatePath("/dashboard/settings/profile");
   return {
     success:
       result.signedOutElsewhere > 0
-        ? `Password changed. ${result.signedOutElsewhere} other signed-in device${result.signedOutElsewhere === 1 ? " was" : "s were"} signed out.`
-        : "Password changed.",
+        ? `Password saved. ${result.signedOutElsewhere} other signed-in device${result.signedOutElsewhere === 1 ? " was" : "s were"} signed out.`
+        : "Password saved.",
   };
 }
 
