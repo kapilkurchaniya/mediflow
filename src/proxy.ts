@@ -10,6 +10,7 @@ const authRoutes = ["/login", "/register"];
  * be redirected to /login when the session cookie is absent.
  */
 const selfAuthPrefixes = [
+  "/api/auth",
   "/api/v1",
   "/api/webhooks",
   "/api/cron",
@@ -48,11 +49,9 @@ export async function proxy(request: NextRequest) {
 
   const hasSession = request.cookies.has("mediflow_session");
 
-  // Auth pages: redirect logged-in users to the dashboard.
+  // Auth pages: allow through; the Server Components validate the session against DB
+  // before redirecting so a stale/invalid cookie never causes a redirect loop.
   if (authRoutes.includes(pathname)) {
-    if (hasSession) {
-      return wrapResponse(NextResponse.redirect(new URL("/dashboard", request.url)));
-    }
     return wrapResponse(NextResponse.next());
   }
 
