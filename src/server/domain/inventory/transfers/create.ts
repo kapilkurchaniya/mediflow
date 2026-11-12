@@ -3,6 +3,7 @@ import { db, schema, type Tx } from "@/server/db";
 import { DomainError } from "@/server/errors";
 import { writeAudit } from "@/server/audit";
 import { nextDocNumber } from "@/server/domain/sequence";
+import { determineStatutoryRouting } from "./statutory";
 import {
   CreateTransferSchema,
   CancelTransferSchema,
@@ -31,12 +32,24 @@ export async function createDraftTransfer(
   const run = async (tx: Tx) => {
     // 1. Verify source and destination stores
     const [fromStore] = await tx
-      .select({ id: schema.stores.id, name: schema.stores.name })
+      .select({
+        id: schema.stores.id,
+        name: schema.stores.name,
+        address: schema.stores.address,
+        gstin: schema.stores.gstin,
+        stateCode: schema.stores.stateCode,
+      })
       .from(schema.stores)
       .where(and(eq(schema.stores.id, input.fromStoreId), eq(schema.stores.tenantId, ctx.tenantId)));
 
     const [toStore] = await tx
-      .select({ id: schema.stores.id, name: schema.stores.name })
+      .select({
+        id: schema.stores.id,
+        name: schema.stores.name,
+        address: schema.stores.address,
+        gstin: schema.stores.gstin,
+        stateCode: schema.stores.stateCode,
+      })
       .from(schema.stores)
       .where(and(eq(schema.stores.id, input.toStoreId), eq(schema.stores.tenantId, ctx.tenantId)));
 
@@ -85,10 +98,22 @@ export async function createDraftTransfer(
       }
     }
 
+    // Compute statutory lines and financial routing for the draft
+    const statutoryLines = input.items.map((item) => {
+      const b = batchMap.get(item.fromBatchId)!;
+      return {
+        qty: item.qty,
+        unitCost: b.purchaseRate ?? 0,
+        gstRateBp: b.gstRateBp ?? 0,
+      };
+    });
+
+    const routing = determineStatutoryRouting(fromStore, toStore, statutoryLines);
+
     // 3. Sequential transfer number
     const transferNo = await nextDocNumber(tx, ctx.tenantId, input.fromStoreId, "transfer", "TRF");
 
-    // 4. Insert transfer header
+    // 4. Insert transfer header with calculated valuation
     const [transfer] = await tx
       .insert(schema.stockTransfers)
       .values({
@@ -97,8 +122,14 @@ export async function createDraftTransfer(
         fromStoreId: input.fromStoreId,
         toStoreId: input.toStoreId,
         status: "draft",
-        docKind: "delivery_challan",
+        docKind: routing.docKind,
         notes: input.notes ?? null,
+        taxableValuePaise: routing.taxableValuePaise,
+        cgstPaise: routing.cgstPaise,
+        sgstPaise: routing.sgstPaise,
+        igstPaise: routing.igstPaise,
+        totalValuePaise: routing.totalValuePaise,
+        placeOfSupply: routing.placeOfSupply,
         createdBy: ctx.userId,
       })
       .returning();
