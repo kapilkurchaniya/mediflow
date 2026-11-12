@@ -20,6 +20,14 @@ interface TransferItemsTableProps {
 }
 
 export function TransferItemsTable({ items, totalValuePaise }: TransferItemsTableProps) {
+  const calculatedTotal =
+    items?.reduce((sum, item) => {
+      const qty = item.qtyDispatched > 0 ? item.qtyDispatched : 0;
+      return sum + qty * (item.unitCost ?? 0);
+    }, 0) ?? 0;
+
+  const displayTotal = totalValuePaise > 0 ? totalValuePaise : calculatedTotal;
+
   return (
     <div className="overflow-hidden rounded-xl border border-ink-200 bg-white shadow-xs">
       <div className="p-4 border-b border-ink-100 flex items-center justify-between">
@@ -61,8 +69,8 @@ export function TransferItemsTable({ items, totalValuePaise }: TransferItemsTabl
         <tfoot className="bg-ink-50/50 font-semibold text-ink-900 text-xs">
           <tr>
             <td colSpan={8} className="py-3 px-4 text-right">Total Valuation:</td>
-            <td className="py-3 px-4 text-right text-brand-700">
-              {formatINR(totalValuePaise)}
+            <td className="py-3 px-4 text-right text-brand-700 font-bold">
+              {formatINR(displayTotal)}
             </td>
           </tr>
         </tfoot>

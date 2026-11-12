@@ -35,7 +35,7 @@ export async function searchTavily(query: string): Promise<string> {
 async function callGemini(prompt: string): Promise<string> {
   const apiKey = process.env.GEMINI_API_KEY?.trim();
   if (!apiKey) throw new Error("No Gemini key");
-  const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=${apiKey}`, {
+  const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -113,6 +113,11 @@ export async function generateAICompletion(prompt: string): Promise<AIResponse> 
       } catch (e: unknown) {
         lastError = e instanceof Error ? e : new Error(String(e));
         console.warn(`[AI] ${provider.name} attempt ${attempt} failed: ${lastError.message}`);
+        // If the upstream service is temporarily overloaded (503 / 429), fail over to the next provider immediately
+        if (lastError.message.includes("503") || lastError.message.includes("high demand") || lastError.message.includes("429")) {
+          console.warn(`[AI] ${provider.name} unavailable (overloaded), falling over immediately`);
+          break;
+        }
         if (attempt < MAX_RETRIES) {
           await new Promise((r) => setTimeout(r, 500 * attempt));
         }
