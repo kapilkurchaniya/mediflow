@@ -386,6 +386,73 @@ export async function exportRegisterCsvData(params: {
   return { success: true, csvContent };
 }
 
+export interface SearchMedicineOption {
+  id: string;
+  name: string;
+  genericName: string | null;
+  dosageForm: string | null;
+  strength: string | null;
+  schedule: string;
+  rxRequired: boolean;
+}
+
+/**
+ * Fast search for medicines for prescription drafting.
+ */
+export async function searchMedicinesForPrescription(
+  query: string,
+  limit = 20
+): Promise<SearchMedicineOption[]> {
+  const ctx = await requirePermission("prescription.approve");
+  const trimmed = query?.trim() ?? "";
+  if (!trimmed) {
+    const list = await db
+      .select({
+        id: schema.medicines.id,
+        name: schema.medicines.name,
+        genericName: schema.medicines.genericName,
+        dosageForm: schema.medicines.dosageForm,
+        strength: schema.medicines.strength,
+        schedule: schema.medicines.schedule,
+        rxRequired: schema.medicines.rxRequired,
+      })
+      .from(schema.medicines)
+      .where(and(eq(schema.medicines.tenantId, ctx.tenantId), eq(schema.medicines.isActive, true)))
+      .orderBy(schema.medicines.name)
+      .limit(limit);
+    return list;
+  }
+
+  const q = `%${trimmed.toLowerCase()}%`;
+  const list = await db
+    .select({
+      id: schema.medicines.id,
+      name: schema.medicines.name,
+      genericName: schema.medicines.genericName,
+      dosageForm: schema.medicines.dosageForm,
+      strength: schema.medicines.strength,
+      schedule: schema.medicines.schedule,
+      rxRequired: schema.medicines.rxRequired,
+    })
+    .from(schema.medicines)
+    .where(
+      and(
+        eq(schema.medicines.tenantId, ctx.tenantId),
+        eq(schema.medicines.isActive, true),
+        or(
+          ilike(schema.medicines.name, q),
+          ilike(schema.medicines.genericName, q),
+          ilike(schema.medicines.composition, q),
+          ilike(schema.medicines.barcode, q)
+        )!
+      )
+    )
+    .orderBy(schema.medicines.name)
+    .limit(limit);
+
+  return list;
+}
+
 /**
  * Cancels a prescription without deletion (B1.4 statutory audit trail preservation).
  */

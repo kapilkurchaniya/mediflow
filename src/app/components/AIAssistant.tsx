@@ -295,6 +295,8 @@ export function AIAssistant() {
           <input
             className="input input-sm flex-1 !shadow-none bg-white border-ink-200 focus:border-brand-400 focus:ring-1 focus:ring-brand-400 outline-none rounded-lg px-3 py-1.5 text-[13px]"
             placeholder="Type a command or ask a question…"
+            autoComplete="off"
+            suppressHydrationWarning
             value={input}
             onChange={(e) => setInput(e.target.value)}
           />

@@ -1,4 +1,4 @@
-import { and, desc, eq, or } from "drizzle-orm";
+import { and, desc, eq, or, sql } from "drizzle-orm";
 import { db, schema, type DbOrTx } from "@/server/db";
 import { DomainError } from "@/server/errors";
 
@@ -42,7 +42,11 @@ export async function listTransfers(
       docKind: schema.stockTransfers.docKind,
       documentNo: schema.stockTransfers.documentNo,
       documentDate: schema.stockTransfers.documentDate,
-      totalValuePaise: schema.stockTransfers.totalValuePaise,
+      totalValuePaise: sql<number>`COALESCE(NULLIF(${schema.stockTransfers.totalValuePaise}, 0), (
+        SELECT COALESCE(SUM(${schema.stockTransferItems.qty} * COALESCE(${schema.stockTransferItems.unitCost}, 0)), 0)
+        FROM ${schema.stockTransferItems}
+        WHERE ${schema.stockTransferItems.transferId} = ${schema.stockTransfers.id}
+      ), 0)`.mapWith(Number),
       transportMode: schema.stockTransfers.transportMode,
       vehicleNo: schema.stockTransfers.vehicleNo,
       createdAt: schema.stockTransfers.createdAt,
@@ -152,8 +156,25 @@ export async function getTransferById(
     .where(eq(schema.stockTransferReceiptEvents.transferId, transfer.id))
     .orderBy(desc(schema.stockTransferReceiptEvents.receivedAt));
 
+  const calculatedTaxablePaise = items.reduce((acc, it) => {
+    const qty = it.qtyDispatched > 0 ? it.qtyDispatched : it.qty;
+    return acc + qty * (it.unitCost ?? 0);
+  }, 0);
+
+  const effectiveTaxablePaise =
+    transfer.taxableValuePaise > 0 ? transfer.taxableValuePaise : calculatedTaxablePaise;
+  const effectiveTotalPaise =
+    transfer.totalValuePaise > 0
+      ? transfer.totalValuePaise
+      : effectiveTaxablePaise +
+        (transfer.cgstPaise || 0) +
+        (transfer.sgstPaise || 0) +
+        (transfer.igstPaise || 0);
+
   return {
     ...transfer,
+    taxableValuePaise: effectiveTaxablePaise,
+    totalValuePaise: effectiveTotalPaise,
     fromStore,
     toStore,
     items,
