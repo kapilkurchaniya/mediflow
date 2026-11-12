@@ -129,7 +129,13 @@ export async function resolveGoogleAuth(
 /** Creates a new pharmacy tenant, main store, Owner role, user, and Google OAuth link. */
 export async function createGooglePharmacySignup(
   tx: Tx,
-  input: { profile: GoogleProfile; pharmacyName: string; ip?: string | null },
+  input: {
+    profile: GoogleProfile;
+    pharmacyName: string;
+    fullName?: string;
+    passwordHash?: string | null;
+    ip?: string | null;
+  },
   now = new Date(),
 ): Promise<{ userId: string; tenantId: string; storeId: string }> {
   const emailLower = input.profile.email.trim().toLowerCase();
@@ -138,13 +144,14 @@ export async function createGooglePharmacySignup(
     throw new DomainError("EMAIL_EXISTS", "An account with this email already exists. Please sign in with Google.");
   }
 
+  const displayName = input.fullName?.trim() || input.profile.name;
   const [tenant] = await tx.insert(schema.tenants).values({ name: input.pharmacyName.trim() }).returning();
   const [user] = await tx
     .insert(schema.users)
     .values({
-      name: input.profile.name,
+      name: displayName,
       email: emailLower,
-      passwordHash: null,
+      passwordHash: input.passwordHash ?? null,
       avatarUrl: input.profile.picture,
       emailVerifiedAt: now,
       lastLoginAt: now,

@@ -162,14 +162,20 @@ export async function changePassword(
   hash: (password: string) => Promise<string>,
   audit?: { tenantId: string; storeId: string },
 ): Promise<ChangePasswordResult> {
-  if (!input.current || !input.next) return { ok: false, error: "Fill in all the fields." };
+  if (!input.next) return { ok: false, error: "Fill in all the fields." };
   if (input.next !== input.confirm) return { ok: false, error: "The new passwords do not match." };
   if (input.next.length < MIN_PASSWORD_LENGTH) return { ok: false, error: `The new password must be at least ${MIN_PASSWORD_LENGTH} characters.` };
-  if (input.next === input.current) return { ok: false, error: "Choose a password you have not used just now." };
 
   const [user] = await database.select().from(schema.users).where(eq(schema.users.id, input.userId));
-  if (!user || !user.passwordHash || !(await verify(input.current, user.passwordHash))) {
-    return { ok: false, error: "Your current password is not correct." };
+  if (!user) return { ok: false, error: "User not found." };
+
+  const hadPassword = Boolean(user.passwordHash);
+  if (hadPassword) {
+    if (!input.current) return { ok: false, error: "Fill in all the fields." };
+    if (input.next === input.current) return { ok: false, error: "Choose a password you have not used just now." };
+    if (!user.passwordHash || !(await verify(input.current, user.passwordHash))) {
+      return { ok: false, error: "Your current password is not correct." };
+    }
   }
 
   await database.update(schema.users).set({ passwordHash: await hash(input.next) }).where(eq(schema.users.id, input.userId));
@@ -179,7 +185,11 @@ export async function changePassword(
     .returning({ id: schema.sessions.id });
 
   if (audit) {
-    await writeAudit(database, { ...audit, userId: input.userId }, { action: "update", entityType: "user", entityId: input.userId, reason: "Password changed" });
+    await writeAudit(
+      database,
+      { ...audit, userId: input.userId },
+      { action: "update", entityType: "user", entityId: input.userId, reason: hadPassword ? "Password changed" : "Password set" },
+    );
   }
   return { ok: true, signedOutElsewhere: ended.length };
 }
