@@ -264,7 +264,7 @@ export function LicenseTrackerClient({
             <ShieldAlert className="h-5 w-5 text-rose-600 mt-0.5 shrink-0" />
             <div className="space-y-1">
               <h3 className="text-sm font-semibold text-rose-900">
-                Critical Compliance Alert: {criticalCount} License(s) Expired or Expiring in $\le 7$ Days
+                Critical Compliance Alert: {criticalCount} License(s) Expired or Expiring in ≤ 7 Days
               </h3>
               <p className="text-xs text-rose-700 leading-relaxed">
                 Under Rule 61 of Drugs & Cosmetics Rules 1945, dispensing without an active Form 20/21 or qualified Chief Pharmacist registration is a severe statutory violation punishable by immediate store sealing. Renew immediately via state FDA online portal.
@@ -318,7 +318,7 @@ export function LicenseTrackerClient({
             Critical / Expired
           </div>
           <div className="text-2xl font-bold text-rose-900 mt-2">{criticalCount}</div>
-          <div className="text-xs text-rose-600 mt-0.5">$\le 7$ days or overdue</div>
+          <div className="text-xs text-rose-600 mt-0.5">≤ 7 days or overdue</div>
         </div>
       </div>
 
