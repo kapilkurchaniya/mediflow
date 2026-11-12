@@ -2,13 +2,21 @@ import Link from "next/link";
 import { Activity } from "lucide-react";
 import { db } from "@/server/db";
 import { describeInvite } from "@/server/domain/users";
+import { isGoogleOAuthConfigured } from "@/server/oauth/google";
 import { AcceptInviteForm } from "./AcceptInviteForm";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Join your team | MediFlow" };
 
-export default async function InvitePage({ params }: { params: Promise<{ token: string }> }) {
+export default async function InvitePage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ token: string }>;
+  searchParams: Promise<{ error_description?: string }>;
+}) {
   const { token } = await params;
+  const sp = await searchParams;
   const info = await describeInvite(db, token);
 
   return (
@@ -33,7 +41,13 @@ export default async function InvitePage({ params }: { params: Promise<{ token: 
                 You have been invited to <strong>{info.pharmacyName}</strong> as <strong>{info.roleName}</strong>.
                 Your sign-in email is <strong>{info.email}</strong>.
               </p>
-              <AcceptInviteForm token={token} existingUser={info.existingUser} />
+              <AcceptInviteForm
+                token={token}
+                existingUser={info.existingUser}
+                email={info.email}
+                googleEnabled={isGoogleOAuthConfigured()}
+                oauthError={sp.error_description ?? null}
+              />
             </>
           )}
         </div>
