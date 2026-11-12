@@ -3,7 +3,7 @@
 import { redirect } from "next/navigation";
 import { headers } from "next/headers";
 import { db, schema } from "@/server/db";
-import { eq } from "drizzle-orm";
+import { sql } from "drizzle-orm";
 import { seedSystemRoles } from "@/server/roles";
 import { hashPassword, verifyPassword, createSession, setSessionCookie, deleteSessionCookie, invalidateSession, getCurrentSession, requireAuth } from "@/server/auth";
 import { attemptLogin, changePassword } from "@/server/domain/login";
@@ -61,57 +61,64 @@ export async function registerAction(prevState: { error?: string; success?: bool
     return { error: "All fields are required" };
   }
 
-  // Check if user already exists
-  const existingUsers = await db
-    .select()
-    .from(schema.users)
-    .where(eq(schema.users.email, email.toLowerCase()));
+  const emailLower = email.trim().toLowerCase();
 
-  if (existingUsers.length > 0) {
-    return { error: "Email already in use" };
-  }
+  try {
+    // Check if user already exists (case-insensitive)
+    const existingUsers = await db
+      .select({ id: schema.users.id })
+      .from(schema.users)
+      .where(sql`lower(${schema.users.email}) = ${emailLower}`);
 
-  const passwordHash = await hashPassword(password);
+    if (existingUsers.length > 0) {
+      return { error: "Email already in use" };
+    }
 
-  // Use a transaction to create User, Tenant, and Store
-  const result = await db.transaction(async (tx) => {
-    // Create Tenant
-    const [tenant] = await tx.insert(schema.tenants).values({
-      name: pharmacyName,
-    }).returning();
+    const passwordHash = await hashPassword(password);
 
-    // Create User
-    const [user] = await tx.insert(schema.users).values({
-      name,
-      email: email.toLowerCase(),
-      passwordHash,
-      isPlatformAdmin: false,
-    }).returning();
+    // Use a transaction to create User, Tenant, and Store
+    const result = await db.transaction(async (tx) => {
+      // Create Tenant
+      const [tenant] = await tx.insert(schema.tenants).values({
+        name: pharmacyName.trim(),
+      }).returning();
 
-    // Create Store
-    const [store] = await tx.insert(schema.stores).values({
-      tenantId: tenant.id,
-      name: "Main Store",
-      code: "MAIN",
-      stateCode: "00", // Default or ask user later
-    }).returning();
+      // Create User
+      const [user] = await tx.insert(schema.users).values({
+        name: name.trim(),
+        email: emailLower,
+        passwordHash,
+        isPlatformAdmin: false,
+      }).returning();
 
-    // Create the system roles (owner, manager, pharmacist, ...) with their permissions, and make this user the Owner
-    const roleIds = await seedSystemRoles(tx, tenant.id);
-    await tx.insert(schema.memberships).values({
-      tenantId: tenant.id,
-      userId: user.id,
-      roleId: roleIds.owner,
-      allStores: true,
+      // Create Store
+      const [store] = await tx.insert(schema.stores).values({
+        tenantId: tenant.id,
+        name: "Main Store",
+        code: "MAIN",
+        stateCode: "00", // Default or ask user later
+      }).returning();
+
+      // Create the system roles (owner, manager, pharmacist, ...) with their permissions, and make this user the Owner
+      const roleIds = await seedSystemRoles(tx, tenant.id);
+      await tx.insert(schema.memberships).values({
+        tenantId: tenant.id,
+        userId: user.id,
+        roleId: roleIds.owner,
+        allStores: true,
+      });
+
+      return { user, tenant, store };
     });
 
-    return { user, tenant, store };
-  });
-
-  // Create session
-  const token = (await import("@/server/auth")).generateSessionToken();
-  await createSession(token, result.user.id, result.tenant.id, result.store.id);
-  await setSessionCookie(token);
+    // Create session
+    const token = (await import("@/server/auth")).generateSessionToken();
+    await createSession(token, result.user.id, result.tenant.id, result.store.id);
+    await setSessionCookie(token);
+  } catch (err) {
+    console.error("[registerAction] Registration failed:", err);
+    return { error: "Unable to create account right now. Please try again." };
+  }
 
   // Redirect newly registered pharmacy to Onboarding Wizard
   redirect("/onboarding");
