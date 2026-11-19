@@ -527,26 +527,22 @@ function inferElementTooltip(target: HTMLElement): {
   return null;
 }
 
+const subscribeNoop = () => () => {};
+
 export function GlobalTooltipLayer() {
   const { tooltipsEnabled } = useShell();
   const pathname = usePathname();
-  const [active, setActive] = useState<TooltipData | null>(null);
-  const [mounted, setMounted] = useState(false);
+  const [active, setActive] = useState<{ data: TooltipData; path: string } | null>(null);
+  const mounted = React.useSyncExternalStore(subscribeNoop, () => true, () => false);
   const currentElRef = useRef<HTMLElement | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  // Synchronize root attribute and clear active tooltip when toggled off or route changes
+  // Synchronize root attribute
   useEffect(() => {
     if (typeof document !== "undefined") {
       document.documentElement.dataset.tooltips = tooltipsEnabled ? "on" : "off";
     }
-    setActive(null);
-    currentElRef.current = null;
-  }, [tooltipsEnabled, pathname]);
+  }, [tooltipsEnabled]);
 
   const hideTooltip = useCallback(() => {
     if (timerRef.current) {
@@ -608,11 +604,14 @@ export function GlobalTooltipLayer() {
         }
 
         setActive({
-          title: resolved.title,
-          description: resolved.description,
-          shortcut: resolved.shortcut,
-          placement,
-          rect,
+          data: {
+            title: resolved.title,
+            description: resolved.description,
+            shortcut: resolved.shortcut,
+            placement,
+            rect,
+          },
+          path: pathname,
         });
       }, 140);
     };
@@ -641,12 +640,13 @@ export function GlobalTooltipLayer() {
       window.removeEventListener("scroll", handleScrollOrKey, { capture: true });
       window.removeEventListener("keydown", handleScrollOrKey);
     };
-  }, [tooltipsEnabled, hideTooltip]);
+  }, [tooltipsEnabled, hideTooltip, pathname]);
 
-  if (!mounted || !tooltipsEnabled || !active) return null;
+  const currentTooltip = tooltipsEnabled && active?.path === pathname ? active.data : null;
+  if (!mounted || !currentTooltip) return null;
 
   // Calculate clamped viewport coordinates
-  const { rect, placement, title, description, shortcut } = active;
+  const { rect, placement, title, description, shortcut } = currentTooltip;
   const vw = typeof window !== "undefined" ? window.innerWidth : 1280;
   const vh = typeof window !== "undefined" ? window.innerHeight : 800;
   const maxWidth = 280;
