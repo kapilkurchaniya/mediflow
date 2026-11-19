@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import Link from "next/link";
+import Link, { useLinkStatus } from "next/link";
 import { usePathname } from "next/navigation";
 import clsx from "clsx";
 import {
@@ -30,6 +30,17 @@ export function isNavItemActive(
   if (!matches(pathname, item)) return false;
   return !allItems.some(
     (other) => other !== item && other.href.length > item.href.length && matches(pathname, other)
+  );
+}
+
+function NavPendingIndicator() {
+  const { pending } = useLinkStatus();
+  if (!pending) return null;
+  return (
+    <span
+      aria-hidden="true"
+      className="ml-auto h-1.5 w-1.5 shrink-0 rounded-full bg-brand-600 animate-ping"
+    />
   );
 }
 
@@ -101,7 +112,10 @@ export function Sidebar({
             type="button"
             onClick={toggleCollapsed}
             className="btn btn-ghost btn-icon text-ink-400 hover:text-ink-700"
-            title={isCollapsed ? "Expand sidebar (Ctrl+B)" : "Collapse sidebar (Ctrl+B)"}
+            data-tooltip-title={isCollapsed ? "Expand Sidebar" : "Collapse Sidebar"}
+            data-tooltip={isCollapsed ? "Expand the left navigation menu to show full module labels." : "Collapse the left navigation menu to compact icon-only mode for more screen space."}
+            data-tooltip-shortcut="Ctrl+B"
+            data-tooltip-placement="right"
             aria-label="Toggle sidebar"
           >
             {isCollapsed ? (
@@ -118,7 +132,10 @@ export function Sidebar({
         <button
           type="button"
           onClick={() => setStoreSwitcherOpen(true)}
-          title={isCollapsed ? (currentStore?.name ?? storeName) : "Switch branch or warehouse (Ctrl+Shift+S)"}
+          data-tooltip-title={`Active Store: ${currentStore?.name ?? storeName}`}
+          data-tooltip="Switch your active pharmacy branch or central warehouse context."
+          data-tooltip-shortcut="Ctrl+Shift+S"
+          data-tooltip-placement="right"
           className={clsx(
             "flex w-full items-center gap-2 rounded-lg border border-ink-150 bg-white px-2 py-1.5 text-left shadow-xs transition-colors hover:border-ink-300 hover:bg-ink-50/50",
             isCollapsed && "justify-center px-1"
@@ -162,7 +179,10 @@ export function Sidebar({
                     <Link
                       href={item.href}
                       onClick={() => isMobile && setMobileOpen(false)}
-                      title={isCollapsed ? `${item.label} ${item.shortcut ? `(${item.shortcut})` : ""}` : undefined}
+                      data-tooltip-title={item.label}
+                      data-tooltip={item.description || `Open ${item.label}`}
+                      data-tooltip-shortcut={item.shortcut}
+                      data-tooltip-placement="right"
                       aria-current={active ? "page" : undefined}
                       className={clsx(
                         "group relative flex h-8.5 items-center rounded-md text-[13px] transition-colors duration-100",
@@ -182,6 +202,7 @@ export function Sidebar({
                       {!isCollapsed && (
                         <>
                           <span className="truncate">{item.label}</span>
+                          <NavPendingIndicator />
                           {item.shortcut && (
                             <span className="kbd ml-auto text-[10px]">{item.shortcut}</span>
                           )}
@@ -202,7 +223,9 @@ export function Sidebar({
           <Link
             href={settingsItem.href}
             onClick={() => isMobile && setMobileOpen(false)}
-            title={isCollapsed ? "Settings" : undefined}
+            data-tooltip-title="Settings"
+            data-tooltip={settingsItem.description || "Store profile, GSTIN, thermal printer, tooltips & billing preferences"}
+            data-tooltip-placement="right"
             className={clsx(
               "flex h-8 items-center rounded-md text-[13px] text-ink-600 transition-colors hover:bg-ink-100/70 hover:text-ink-900",
               isCollapsed ? "justify-center px-0" : "gap-2.5 px-2.5"
@@ -221,13 +244,21 @@ export function Sidebar({
         >
           <span
             className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-brand-100 text-[11px] font-semibold text-brand-800"
-            title={isCollapsed ? `${userName} (${userEmail})` : undefined}
+            data-tooltip-title={userName}
+            data-tooltip={`Signed in as ${userEmail}`}
+            data-tooltip-placement="right"
           >
             {letters || "U"}
           </span>
           {!isCollapsed && (
             <>
-              <Link href="/dashboard/settings/profile" className="min-w-0 flex-1 rounded hover:bg-ink-50" title="My profile and password">
+              <Link
+                href="/dashboard/settings/profile"
+                className="min-w-0 flex-1 rounded hover:bg-ink-50"
+                data-tooltip-title="My Profile & Security"
+                data-tooltip="Update your name, change your password, or link your Google account."
+                data-tooltip-placement="right"
+              >
                 <p className="truncate text-[12.5px] font-medium text-ink-900 leading-tight">
                   {userName}
                 </p>
@@ -238,7 +269,9 @@ export function Sidebar({
                   type="submit"
                   className="btn btn-ghost btn-icon h-7 w-7 text-ink-400 hover:text-red-600"
                   aria-label="Sign out"
-                  title="Sign out"
+                  data-tooltip-title="Sign Out"
+                  data-tooltip="End your current session and return to the login screen."
+                  data-tooltip-placement="right"
                 >
                   <LogOut className="h-3.5 w-3.5" />
                 </button>

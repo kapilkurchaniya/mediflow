@@ -1,0 +1,47 @@
+{
+  "id": "VID-4.2",
+  "series": "Inventory, Batches & Warehouse Operations",
+  "part": 2,
+  "totalParts": 8,
+  "title": "Packaging Unit Setup & Strip-to-Tablet Conversion Ratios",
+  "shortcut": "FRACTIONAL UNITS · STRIP TO TABLET CONVERSION",
+  "role": "Inventory Controllers & Cashiers",
+  "targetDurationSeconds": 50,
+  "voice": "en-IN-PrabhatNeural",
+  "intro": {
+    "duration": 4,
+    "title": "Packaging Units & Conversion",
+    "subtitle": "Strip to tablet conversion ratios, pack size configuration, and fractional loose unit counter billing",
+    "badge": "PACKAGING CONVERSION · STRIP/TAB"
+  },
+  "narration": [
+    {
+      "id": "scene-1",
+      "text": "Welcome to Phase 4, Part 2: Packaging Unit Setup and Conversion Ratios. In retail pharmacy, patients often buy partial strips, requiring precise unit conversion ratios."
+    },
+    {
+      "id": "scene-2",
+      "text": "In the Item Master, configure the primary purchase unit as Strip and the loose dispensing unit as Tablet, specifying the exact units per pack such as 10 or 15 tablets."
+    },
+    {
+      "id": "scene-3",
+      "text": "At the POS billing counter, when a customer requests just four tablets, simply enter four slash ten or toggle the loose unit mode directly on the item row."
+    },
+    {
+      "id": "scene-4",
+      "text": "MediFlow computes the exact fractional price automatically based on the master conversion ratio, eliminating cashier math and price discrepancies."
+    },
+    {
+      "id": "scene-5",
+      "text": "Inventory is accurately decremented by zero point four strips, guaranteeing zero audit discrepancy between warehouse purchases and retail counter sales."
+    }
+  ],
+  "outro": {
+    "duration": 4,
+    "takeaway": "Packaging Conversion: Define strip-to-tablet conversion factors so partial blister sales calculate exact prices and deduct inventory with decimal precision.",
+    "nextPart": {
+      "id": "VID-4.3",
+      "title": "Part 3: Organizing Racks & Shelves (R1-S3) for Rapid Counter Picking"
+    }
+  }
+}

@@ -1,0 +1,47 @@
+{
+  "id": "VID-7.5",
+  "series": "Patient Care, Omnichannel Orders & Communications",
+  "part": 5,
+  "totalParts": 5,
+  "title": "Using WhatsApp Live Inbox & Sending Transactional Templates",
+  "shortcut": "WHATSAPP INBOX · TEMPLATES",
+  "role": "Cashiers, Pharmacists & Support Staff",
+  "targetDurationSeconds": 55,
+  "voice": "en-IN-PrabhatNeural",
+  "intro": {
+    "duration": 4,
+    "title": "WhatsApp Live Inbox & Templates",
+    "subtitle": "Patient two-way chats, prescription image consultation, and verified Meta HSM templates",
+    "badge": "WHATSAPP INBOX · TEMPLATES"
+  },
+  "narration": [
+    {
+      "id": "scene-1",
+      "text": "Welcome to Phase 7, Part 5: Using WhatsApp Live Inbox and Sending Transactional Templates. Managing patient chats directly inside MediFlow streamlines prescription consultations and home delivery support."
+    },
+    {
+      "id": "scene-2",
+      "text": "Go to WhatsApp Inbox. The conversation thread list displays all active patient chats, unread message badges, and recent timestamps."
+    },
+    {
+      "id": "scene-3",
+      "text": "Open a chat to communicate in real time, review prescription photos sent by patients, and clarify dosage instructions."
+    },
+    {
+      "id": "scene-4",
+      "text": "To send pre-approved Meta business notifications, click Templates. Select from verified templates like Refill Reminder, Order Ready, or Digital Bill."
+    },
+    {
+      "id": "scene-5",
+      "text": "Send the template with automatically filled customer variables. The message delivers instantly with real-time delivery status. This concludes Phase 7!"
+    }
+  ],
+  "outro": {
+    "duration": 4,
+    "takeaway": "WhatsApp Live Inbox: Engage patients in real-time two-way messaging, review prescriptions, and dispatch pre-approved Meta HSM templates effortlessly.",
+    "nextPart": {
+      "id": "VID-8.1",
+      "title": "Phase 8, Part 1: Real-Time Cashier Shift Handover & Float Reconciliation"
+    }
+  }
+}

@@ -11,6 +11,6 @@ export const purchasingNav: NavItem[] = [
   { group: "operations", order: 32, href: "/dashboard/purchases/returns", label: "Purchase returns", icon: RotateCcw, description: "Vendor debit notes & stock returns", permission: "purchase.return" },
   { group: "operations", order: 33, href: "/dashboard/purchases/returns/new", label: "New debit note", icon: RotateCcw, description: "Issue a purchase debit note", paletteOnly: true, permission: "purchase.return" },
   { group: "operations", order: 34, href: "/dashboard/purchases/expiry-returns", label: "Expiry returns", icon: Clock, description: "Near-expiry & expired stock return", permission: "purchase.return" },
-  { group: "inventory", order: 40, href: "/dashboard/settings/schemes", label: "Trade schemes", icon: Tag, permission: "purchase.view" },
+  { group: "inventory", order: 40, href: "/dashboard/settings/schemes", label: "Trade schemes", icon: Tag, description: "Configure supplier bonus quantities (e.g. 10+1) & trade discounts", permission: "purchase.view" },
   { group: "directory", order: 10, href: "/dashboard/suppliers", label: "Suppliers", icon: Truck, description: "Wholesalers & distributors list", permission: "supplier.view" },
 ];

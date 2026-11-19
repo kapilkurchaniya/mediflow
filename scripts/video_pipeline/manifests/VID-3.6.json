@@ -1,0 +1,47 @@
+{
+  "id": "VID-3.6",
+  "series": "Drug Compliance & Regulations",
+  "part": 6,
+  "totalParts": 6,
+  "title": "One-Click Inspector-Ready Statutory Register Printing",
+  "shortcut": "INSPECTOR PRINT · FORM 35 A4 LANDSCAPE",
+  "role": "Pharmacy Owners & Chief Compliance Pharmacists",
+  "targetDurationSeconds": 50,
+  "voice": "en-IN-PrabhatNeural",
+  "intro": {
+    "duration": 4,
+    "title": "Inspector-Ready Register Printing",
+    "subtitle": "One-click A4 landscape printing of Form 35 Schedule H1 and Schedule H registers with statutory attestations",
+    "badge": "FORM 35 PRINT · INSPECTION READY"
+  },
+  "narration": [
+    {
+      "id": "scene-1",
+      "text": "Welcome to Phase 3, Part 6: One-Click Inspector-Ready Statutory Register Printing. When drug inspectors visit your pharmacy, you need formatted, legally attested registers within seconds."
+    },
+    {
+      "id": "scene-2",
+      "text": "From the Compliance dashboard, select the target register such as Schedule H1, choose your date range, and click the Print Register button."
+    },
+    {
+      "id": "scene-3",
+      "text": "MediFlow formats the report into standard A4 landscape, featuring your store's Drug Licence Number, pharmacist credentials, and Rule 65 legal citations."
+    },
+    {
+      "id": "scene-4",
+      "text": "Every line item meticulously details patient addresses, prescribing physician registration numbers, batch identifiers, and exact unit balances."
+    },
+    {
+      "id": "scene-5",
+      "text": "The bottom attestation provides statutory sign-off blocks for your registered pharmacist and the inspecting drug officer. Congratulations on completing Phase 3!"
+    }
+  ],
+  "outro": {
+    "duration": 4,
+    "takeaway": "Inspector-Ready Printing: Instantly generate legally binding Form 35 registers formatted for A4 landscape with pharmacist attestations and inspector verification blocks.",
+    "nextPart": {
+      "id": "VID-4.1",
+      "title": "Phase 4, Part 1: Creating Master Medicines & GST Setup"
+    }
+  }
+}

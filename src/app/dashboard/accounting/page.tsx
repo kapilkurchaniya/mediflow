@@ -106,8 +106,10 @@ export default async function AccountingPage({
     to: params.to,
   });
 
-  const trialBalance = await getTrialBalance(dateRange.from, dateRange.to);
-  const journalLines = await getJournalLines(dateRange.from, dateRange.to);
+  const [trialBalance, journalLines] = await Promise.all([
+    getTrialBalance(dateRange.from, dateRange.to),
+    getJournalLines(dateRange.from, dateRange.to),
+  ]);
 
   const totalDebit = trialBalance.reduce((sum, row) => sum + row.totalDebit, 0);
   const totalCredit = trialBalance.reduce((sum, row) => sum + row.totalCredit, 0);

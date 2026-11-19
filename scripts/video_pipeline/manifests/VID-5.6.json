@@ -1,0 +1,47 @@
+{
+  "id": "VID-5.6",
+  "series": "Purchasing, GRN & Distributor Operations",
+  "part": 6,
+  "totalParts": 7,
+  "title": "Supplier Returns & Issuing Statutory Debit Notes",
+  "shortcut": "SUPPLIER RETURNS · DEBIT NOTES",
+  "role": "Purchase Managers, Store Owners & Accountants",
+  "targetDurationSeconds": 55,
+  "voice": "en-IN-PrabhatNeural",
+  "intro": {
+    "duration": 4,
+    "title": "Supplier Returns & Debit Notes",
+    "subtitle": "Reverse purchase invoices, input tax credit adjustments, reason coding, and statutory GST Debit Note generation",
+    "badge": "DEBIT NOTES · GST CREDIT"
+  },
+  "narration": [
+    {
+      "id": "scene-1",
+      "text": "Welcome to Phase 5, Part 6: Supplier Returns and Issuing Statutory Debit Notes. Returning near-expiry or damaged goods generates GST-compliant debit notes for accurate accounts payable credits."
+    },
+    {
+      "id": "scene-2",
+      "text": "Go to Purchases, click Returns, then select New Return. Pick the original distributor purchase invoice to view all delivered items."
+    },
+    {
+      "id": "scene-3",
+      "text": "Select the specific medicines to return. Enter the return quantity and choose the statutory return reason, such as Expired Goods or Damaged in Transit."
+    },
+    {
+      "id": "scene-4",
+      "text": "MediFlow automatically reverses the input GST and calculates total debit note credit amounts based on original billed rates."
+    },
+    {
+      "id": "scene-5",
+      "text": "Save the return to generate the official Debit Note voucher. Click Print to export a signed GST Form GSTR-1 compliant document for your distributor. In Part 7, we review Supplier Ledgers & Payment Vouchers!"
+    }
+  ],
+  "outro": {
+    "duration": 4,
+    "takeaway": "Supplier Returns: Issue statutory GST debit notes against inward purchase invoices, reverse input tax credits, and deduct payable dues reliably.",
+    "nextPart": {
+      "id": "VID-5.7",
+      "title": "Part 7: Reviewing Supplier Ledgers & Recording Payment Vouchers"
+    }
+  }
+}

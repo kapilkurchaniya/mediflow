@@ -1,0 +1,47 @@
+{
+  "id": "VID-2.11",
+  "series": "POS Counter Mastery",
+  "part": 11,
+  "totalParts": 14,
+  "title": "Salt & Generic Molecule Substitute Finder",
+  "shortcut": "F9 / ALT · SUBSTITUTE FINDER",
+  "role": "Pharmacists & Counter Staff",
+  "targetDurationSeconds": 55,
+  "voice": "en-IN-PrabhatNeural",
+  "intro": {
+    "duration": 4,
+    "title": "Salt & Generic Molecule Substitute Finder",
+    "subtitle": "Instant bio-equivalent discovery, stock availability check, and customer savings",
+    "badge": "F9 · MOLECULE FINDER · SALT LOOKUP"
+  },
+  "narration": [
+    {
+      "id": "scene-1",
+      "text": "Welcome to Phase 2, Part 11: Salt and Generic Molecule Substitute Finder. When a prescribed medicine is out of stock or when patients request affordable alternatives, pharmacists can instantly locate bio-equivalent formulations."
+    },
+    {
+      "id": "scene-2",
+      "text": "In the cart, locate the generic salt name under the medicine title, or press F9. Click the Alt substitute button next to the salt name to open the Therapeutic Alternatives modal."
+    },
+    {
+      "id": "scene-3",
+      "text": "MediFlow automatically filters available inventory sharing the exact active pharmaceutical ingredient. The finder displays on-hand strip stock, batch numbers, and live retail prices."
+    },
+    {
+      "id": "scene-4",
+      "text": "Click Select Substitute. MediFlow seamlessly replaces the item in the cart, instantly recalculating tax rates and margins without manual re-entry."
+    },
+    {
+      "id": "scene-5",
+      "text": "Press F10 to finalize the invoice. In Part 12, learn Promise Orders: capturing patient demand when a medicine is completely out of stock."
+    }
+  ],
+  "outro": {
+    "duration": 4,
+    "takeaway": "Substitute Finder (F9): Instantly find and dispense in-stock generic alternatives sharing the exact therapeutic molecule.",
+    "nextPart": {
+      "id": "VID-2.12",
+      "title": "Part 12: Promise Orders: Capturing Out-of-Stock Patient Demand"
+    }
+  }
+}

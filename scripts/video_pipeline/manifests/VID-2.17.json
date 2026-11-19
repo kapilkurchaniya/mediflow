@@ -1,0 +1,47 @@
+{
+  "id": "VID-2.17",
+  "series": "POS Counter Mastery",
+  "part": 17,
+  "totalParts": 18,
+  "title": "Cash Register Shifts: Opening Float, Drawer Reconciliation, X & Z-Reports",
+  "shortcut": "F4 · REGISTER SHIFTS · X & Z REPORTS",
+  "role": "Cashiers, Store Managers & Owners",
+  "targetDurationSeconds": 60,
+  "voice": "en-IN-PrabhatNeural",
+  "intro": {
+    "duration": 4,
+    "title": "Cash Register Shifts & Drawer Audit",
+    "subtitle": "Opening cash float, real-time drawer calculations, interim X-Reports, and closing Z-Report audits",
+    "badge": "F4 · CASH REGISTER · Z-REPORT"
+  },
+  "narration": [
+    {
+      "id": "scene-1",
+      "text": "Welcome to Phase 2, Part 17: Cash Register Shifts and Drawer Reconciliation. Eliminate cash discrepancies and audit cashier handovers with automated register controls."
+    },
+    {
+      "id": "scene-2",
+      "text": "Press F4 or navigate to Sales Register to open the drawer management portal. Enter your opening float tally to unlock the billing counter for your shift."
+    },
+    {
+      "id": "scene-3",
+      "text": "MediFlow computes expected drawer cash continuously: starting float plus counter cash collections and receipts, minus cash returns and drawer payouts."
+    },
+    {
+      "id": "scene-4",
+      "text": "For lunchtime spot-checks or manager audits, click X-Report or press Alt plus P to generate an interim non-closing summary on your thermal receipt printer."
+    },
+    {
+      "id": "scene-5",
+      "text": "At shift handover, click Close Register, enter counted currency denominations, and lock the shift to print the closing Z-Report. In Part 18, we redeem Customer Loyalty Points!"
+    }
+  ],
+  "outro": {
+    "duration": 4,
+    "takeaway": "Register Reconciliation: Enforce opening float verification, live expected cash formulas, mid-shift X-Reports, and closing Z-Report denomination audits.",
+    "nextPart": {
+      "id": "VID-2.18",
+      "title": "Part 18: Redeeming Customer Loyalty Points on the POS Counter (F8)"
+    }
+  }
+}

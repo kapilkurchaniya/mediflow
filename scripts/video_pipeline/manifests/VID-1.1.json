@@ -1,0 +1,52 @@
+{
+  "id": "VID-1.1",
+  "series": "Getting Started & Navigation",
+  "part": 1,
+  "totalParts": 5,
+  "title": "First-Time Sign-In & Branch Selection",
+  "shortcut": "LOGIN",
+  "role": "All Pharmacy Staff / Owners",
+  "targetDurationSeconds": 48,
+  "voice": "en-IN-PrabhatNeural",
+  "intro": {
+    "duration": 4,
+    "title": "First-Time Sign-In & Branch Selection",
+    "subtitle": "Secure authentication and multi-branch pharmacy workspace",
+    "badge": "SECURE ACCESS"
+  },
+  "narration": [
+    {
+      "id": "scene-1",
+      "text": "Welcome to MediFlow. In this first tutorial, you will learn how to sign in securely and navigate your pharmacy branch.",
+      "caption": "Welcome to MediFlow. Learn how to sign in securely and select your pharmacy branch."
+    },
+    {
+      "id": "scene-2",
+      "text": "Enter your registered email address and password. Each staff member has individual credentials for statutory audit trails.",
+      "caption": "Enter your email and password. Individual logins maintain strict audit compliance."
+    },
+    {
+      "id": "scene-3",
+      "text": "Click Sign In to access your workspace. MediFlow takes you directly to the live pharmacy dashboard overview.",
+      "caption": "Click Sign In to launch your live pharmacy dashboard overview."
+    },
+    {
+      "id": "scene-4",
+      "text": "At the top of the sidebar, view your active branch. Multi-outlet pharmacies can seamlessly switch between branch locations.",
+      "caption": "View your active branch at the top sidebar, or switch between store locations."
+    },
+    {
+      "id": "scene-5",
+      "text": "You are now logged in and ready to work. In Part 2, we will explore the screen layout and sidebar navigation shortcut Ctrl+B.",
+      "caption": "You're ready! Watch Part 2 to master the screen layout and shortcut Ctrl+B."
+    }
+  ],
+  "outro": {
+    "duration": 4,
+    "takeaway": "Rule 65 Compliance: Every bill and prescription is tied to the logged-in user ID.",
+    "nextPart": {
+      "id": "VID-1.2",
+      "title": "Screen Layout, Sidebar Navigation (Ctrl+B) & Alerts"
+    }
+  }
+}

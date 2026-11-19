@@ -1,0 +1,47 @@
+{
+  "id": "VID-3.3",
+  "series": "Drug Compliance & Regulations",
+  "part": 3,
+  "totalParts": 6,
+  "title": "Managing the Doctor Master Directory",
+  "shortcut": "DOCTOR DIRECTORY · MCI REG NUMBERS",
+  "role": "Pharmacy Compliance Officers & Administrators",
+  "targetDurationSeconds": 50,
+  "voice": "en-IN-PrabhatNeural",
+  "intro": {
+    "duration": 4,
+    "title": "Doctor Master Directory",
+    "subtitle": "Prescriber master data, MCI registration numbers, clinic affiliations, and instant POS integration",
+    "badge": "DOCTOR DIRECTORY · MCI VERIFIED"
+  },
+  "narration": [
+    {
+      "id": "scene-1",
+      "text": "Welcome to Phase 3, Part 3: Managing the Doctor Master Directory. A verified prescriber database is the backbone of statutory compliance and seamless prescription dispensing."
+    },
+    {
+      "id": "scene-2",
+      "text": "Navigate to Compliance and click Doctors. MediFlow displays your complete registry of registered medical practitioners, qualifications, and state council numbers."
+    },
+    {
+      "id": "scene-3",
+      "text": "Click Add Doctor to enroll a new prescriber. Enter the physician's full name, State Medical Council registration number, specialization, and affiliated hospital or clinic."
+    },
+    {
+      "id": "scene-4",
+      "text": "Click Save Prescriber. The doctor profile is immediately validated and available across all counter billing terminals for one-click compliance selection."
+    },
+    {
+      "id": "scene-5",
+      "text": "Maintain up-to-date prescriber records to guarantee audit compliance. In Part 4, discover how to record Digital Inward Patient Prescriptions."
+    }
+  ],
+  "outro": {
+    "duration": 4,
+    "takeaway": "Doctor Master Directory: Maintain verified prescriber credentials and MCI registration numbers for instant counter billing and airtight audit compliance.",
+    "nextPart": {
+      "id": "VID-3.4",
+      "title": "Part 4: Recording Digital Inward Patient Prescriptions (Rx)"
+    }
+  }
+}

@@ -1,0 +1,52 @@
+{
+  "id": "VID-1.5",
+  "series": "Getting Started & Navigation",
+  "part": 5,
+  "totalParts": 5,
+  "title": "Pharmacy Profile Setup & GST Rule 46 Bill Prefix",
+  "shortcut": "SETTINGS",
+  "role": "Pharmacy Owners & Store Admins",
+  "targetDurationSeconds": 56,
+  "voice": "en-IN-PrabhatNeural",
+  "intro": {
+    "duration": 4,
+    "title": "Pharmacy Profile & GST Rule 46 Prefix",
+    "subtitle": "Configure statutory licenses, store branding, and compliant invoice numbering",
+    "badge": "GST RULE 46 · DL 20B/21B"
+  },
+  "narration": [
+    {
+      "id": "scene-1",
+      "text": "Welcome to Part 5. Every invoice issued to a patient is a statutory tax document. Let's configure your pharmacy identity, legal licenses, and bill numbering in Store Settings.",
+      "caption": "Configure your pharmacy identity, statutory licenses, and invoice numbering."
+    },
+    {
+      "id": "scene-2",
+      "text": "Under the Drugs and Cosmetics Act, your Drug License 20B and 21B numbers must appear on every cash memo. Enter your 15-character GSTIN to ensure hassle-free tax credits.",
+      "caption": "Enter Form 20B/21B Drug Licenses and 15-digit GSTIN for statutory compliance."
+    },
+    {
+      "id": "scene-3",
+      "text": "Next is the Bill Serial Prefix. Under GST Rule 46, invoice serials must be consecutive and within 16 characters. Set a prefix like INV or MED, and MediFlow auto-generates the financial year serial.",
+      "caption": "GST Rule 46: Set prefixes like INV or MED for auto-formatted consecutive serials."
+    },
+    {
+      "id": "scene-4",
+      "text": "Configure your receipt format: choose fast Thermal 80mm rolls for high-traffic retail counters, or detailed A4 Tax Invoices with comprehensive CGST and SGST breakdowns.",
+      "caption": "Select Thermal 80mm rolls for fast checkout or A4 for full GST ledger breakdown."
+    },
+    {
+      "id": "scene-5",
+      "text": "Click Save Changes. Your settings update across all POS counters immediately. This concludes Phase 1! Watch Part 6 to begin Phase 2: Basic Counter Billing with fast search and Auto-FEFO.",
+      "caption": "Settings saved! Phase 1 complete. Watch Part 6 for POS Counter Billing & Auto-FEFO."
+    }
+  ],
+  "outro": {
+    "duration": 4,
+    "takeaway": "Statutory Rule 46: Tax invoices must follow consecutive serial numbering unique for each financial year.",
+    "nextPart": {
+      "id": "VID-2.1",
+      "title": "Part 6: Basic Counter Billing: Fast Search & Auto-FEFO (F2, F3, F10)"
+    }
+  }
+}

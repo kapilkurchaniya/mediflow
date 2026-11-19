@@ -1,0 +1,47 @@
+{
+  "id": "VID-2.4",
+  "series": "POS Counter Mastery",
+  "part": 4,
+  "totalParts": 14,
+  "title": "Fast Customer Selection & 3-Second Quick Add",
+  "shortcut": "F4 · ALT+N",
+  "role": "Pharmacy Cashiers & Pharmacists",
+  "targetDurationSeconds": 56,
+  "voice": "en-IN-PrabhatNeural",
+  "intro": {
+    "duration": 4,
+    "title": "Customer Selection & Quick Add",
+    "subtitle": "Instant patient search, loyalty point tracking, and 3-second walk-in registration",
+    "badge": "F4 · ALT+N · LOYALTY"
+  },
+  "narration": [
+    {
+      "id": "scene-1",
+      "text": "Welcome to Phase 2, Part 4: Fast Customer Selection and Three-Second Quick Add. Tagging regular patients enables reward points, store credit, and purchase history without slowing down your checkout queue."
+    },
+    {
+      "id": "scene-2",
+      "text": "In the customer search box, type the patient's name or mobile number. Notice Ramesh Kumar appears instantly in the dropdown. Click to select him."
+    },
+    {
+      "id": "scene-3",
+      "text": "MediFlow immediately displays his profile card: his mobile number, a store credit limit of five thousand rupees, and one hundred and fifty active loyalty reward points ready to redeem."
+    },
+    {
+      "id": "scene-4",
+      "text": "For a first-time walk-in patient, click New or press Alt plus N. Type the patient's name like Sunita Sharma, enter their ten-digit mobile number, and click Save. Within three seconds, the customer is registered and attached to the bill."
+    },
+    {
+      "id": "scene-5",
+      "text": "Customer tagging builds patient retention and keeps your pharmacy records organized. In Part 5, we will explore Split-Tender Payments and Cash Change Due using F8."
+    }
+  ],
+  "outro": {
+    "duration": 4,
+    "takeaway": "Customer Profiles: Track loyalty points, store credit balances, and digitize walk-in registrations in 3 seconds.",
+    "nextPart": {
+      "id": "VID-2.5",
+      "title": "Part 5: Split-Tender Payments & Cash Change Due (F8)"
+    }
+  }
+}

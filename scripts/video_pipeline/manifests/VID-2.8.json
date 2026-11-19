@@ -1,0 +1,47 @@
+{
+  "id": "VID-2.8",
+  "series": "POS Counter Mastery",
+  "part": 8,
+  "totalParts": 14,
+  "title": "Resuming Parked Bills & Live Revalidation",
+  "shortcut": "F7 · RESUME PARKED BILL",
+  "role": "Pharmacy Cashiers & Store Managers",
+  "targetDurationSeconds": 60,
+  "voice": "en-IN-PrabhatNeural",
+  "intro": {
+    "duration": 4,
+    "title": "Resuming Parked Bills & Live Revalidation",
+    "subtitle": "Instant recall via F7, automatic inventory revalidation, and zero checkout friction",
+    "badge": "F7 · PARKED BILLS · REVALIDATION"
+  },
+  "narration": [
+    {
+      "id": "scene-1",
+      "text": "Welcome to Phase 2, Part 8: Resuming Parked Bills and Live Revalidation. When a customer returns to the counter after fetching cash or their prescription, cashiers can restore their held cart in under two seconds."
+    },
+    {
+      "id": "scene-2",
+      "text": "Press F7 or click the Parked Bills counter badge at the top of the screen. MediFlow opens the Parked Bills Register, showing customer names, held timestamps, item totals, and cashier notes."
+    },
+    {
+      "id": "scene-3",
+      "text": "Locate the customer's parked transaction—such as Ramesh Kumar's bill with notes 'Stepped out for cash'. Click Resume to reload the cart instantly onto the active billing register."
+    },
+    {
+      "id": "scene-4",
+      "text": "While reloading, MediFlow's background engine immediately re-validates batch stock and expiry dates against live inventory. If a batch expired or changed while parked, an instant audit warning alerts the cashier."
+    },
+    {
+      "id": "scene-5",
+      "text": "With the cart restored and verified, accept payment and press F10 to finalize the invoice. In Part 9, learn how MediFlow's Auto-FEFO engine automatically allocates near-expiry batches across multiple packs."
+    }
+  ],
+  "outro": {
+    "duration": 4,
+    "takeaway": "Parked Bills Register (F7): Instantly recall held transactions with automatic live inventory and expiry revalidation.",
+    "nextPart": {
+      "id": "VID-2.9",
+      "title": "Part 9: Auto-FEFO Batch Engine & Multi-Batch Slicing"
+    }
+  }
+}

@@ -8,7 +8,7 @@ export const accountingNav: NavItem[] = [
   { group: "finance", order: 16, href: "/dashboard/accounting/receivables", label: "Receivables", icon: Users, description: "Credit control & receivables ageing", permission: "accounting.view" },
   { group: "finance", order: 18, href: "/dashboard/accounting/receipts", label: "Receipts", icon: HandCoins, description: "Record money received from customers", permission: "accounting.post" },
   { group: "finance", order: 20, href: "/dashboard/accounting/expenses", label: "Expenses", icon: ReceiptText, description: "Operating expenses & payout vouchers", permission: "accounting.view" },
-  { group: "finance", order: 22, href: "/dashboard/accounting/bank-reconciliation", label: "Bank reconciliation", icon: Building2, permission: "accounting.view" },
+  { group: "finance", order: 22, href: "/dashboard/accounting/bank-reconciliation", label: "Bank reconciliation", icon: Building2, description: "Match bank & UPI statements against ledger entries", permission: "accounting.view" },
   { group: "finance", order: 24, href: "/dashboard/accounting/periods", label: "Period Lock", icon: Lock, description: "Monthly period lock & closing audit trail", permission: "accounting.view" },
   { group: "finance", order: 26, href: "/dashboard/accounting/opening-balances", label: "Opening Balances", icon: Scale, description: "Subledger balances & equity reconciliation", permission: "accounting.view" },
   { group: "finance", order: 28, href: "/dashboard/accounting/year-end", label: "Year-End Rollover", icon: CalendarCheck, description: "Closing-stock valuation & sequence rollover", permission: "accounting.view" },

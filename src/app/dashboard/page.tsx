@@ -17,7 +17,6 @@ import { format } from "date-fns";
 import { eq } from "drizzle-orm";
 import { db, schema } from "@/server/db";
 import { getDashboardStats } from "@/app/actions/dashboard";
-import { getCurrentSession } from "@/server/auth";
 import { PageHeader, StatCard, EmptyState, Avatar } from "@/app/components/ui";
 import { formatINR, formatNumber } from "@/lib/format";
 import { DateRangeFilter } from "@/app/components/DateRangeFilter";
@@ -46,25 +45,24 @@ export default async function DashboardPage({
 }: {
   searchParams: Promise<{ range?: string; from?: string; to?: string }>;
 }) {
-  await requirePagePermission("dashboard.view");
+  const ctx = await requirePagePermission("dashboard.view");
   const { range, from, to } = await searchParams;
   const dateRange = resolveDateRange({ range, from, to });
-  const [stats, { user, session }] = await Promise.all([getDashboardStats(dateRange), getCurrentSession()]);
-  const firstName = user?.name?.split(" ")[0] ?? "there";
+  const [stats, storeRows, licenseAlerts] = await Promise.all([
+    getDashboardStats(dateRange),
+    db
+      .select({ kind: schema.stores.kind })
+      .from(schema.stores)
+      .where(eq(schema.stores.id, ctx.storeId))
+      .limit(1),
+    getAllStoreLicenseAlerts(ctx.tenantId).catch(() => []),
+  ]);
+  const firstName = ctx.user.name?.split(" ")[0] ?? "there";
   const avgBill = stats.todayCount > 0 ? Math.round(stats.todaySales / stats.todayCount) : 0;
   const attention = stats.lowStockCount + stats.expiringSoonCount;
   const isFiltered = Boolean((range && range !== "today") || from || to);
   const revenueLabel = range === "today" || !isFiltered ? "Today’s revenue" : "Period revenue";
-
-  let isWarehouse = false;
-  if (session?.storeId) {
-    const [store] = await db
-      .select({ kind: schema.stores.kind })
-      .from(schema.stores)
-      .where(eq(schema.stores.id, session.storeId))
-      .limit(1);
-    isWarehouse = store?.kind === "warehouse";
-  }
+  const isWarehouse = storeRows[0]?.kind === "warehouse";
 
   const quickActions = isWarehouse
     ? [
@@ -75,14 +73,6 @@ export default async function DashboardPage({
       ]
     : QUICK_ACTIONS;
 
-  let licenseAlerts: Awaited<ReturnType<typeof getAllStoreLicenseAlerts>> = [];
-  if (session?.tenantId) {
-    try {
-      licenseAlerts = await getAllStoreLicenseAlerts(session.tenantId);
-    } catch {
-      // Graceful fallback if query fails
-    }
-  }
   const criticalOrUrgentAlerts = licenseAlerts.filter(
     (a) => a.urgency === "critical" || a.urgency === "urgent"
   );

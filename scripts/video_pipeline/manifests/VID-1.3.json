@@ -1,0 +1,52 @@
+{
+  "id": "VID-1.3",
+  "series": "Getting Started & Navigation",
+  "part": 3,
+  "totalParts": 5,
+  "title": "Command Palette (Ctrl+K) Power Search & Quick Actions",
+  "shortcut": "Ctrl + K",
+  "role": "All Pharmacy Staff / Fast Cashiers",
+  "targetDurationSeconds": 52,
+  "voice": "en-IN-PrabhatNeural",
+  "intro": {
+    "duration": 4,
+    "title": "Command Palette & Quick Actions",
+    "subtitle": "Navigate any module in milliseconds with shortcut Ctrl+K",
+    "badge": "Ctrl + K · SEARCH"
+  },
+  "narration": [
+    {
+      "id": "scene-1",
+      "text": "Welcome to Part 3. In high-speed pharmacies, cashiers shouldn't waste time clicking nested menus. Press Control plus K to launch the MediFlow Command Palette from anywhere.",
+      "caption": "Press Ctrl+K from anywhere in MediFlow to open the global Command Palette."
+    },
+    {
+      "id": "scene-2",
+      "text": "The palette opens instantly over your workspace. Type any keyword like 'batches' or 'stock' to filter through all pharmacy modules in milliseconds.",
+      "caption": "Search any module or action in milliseconds—type 'batches' to see stock tools."
+    },
+    {
+      "id": "scene-3",
+      "text": "Use the up and down arrow keys to navigate, then press Enter to jump straight to that screen without lifting your hands from the keyboard.",
+      "caption": "Use Arrow keys to select and press Enter to jump straight to the module."
+    },
+    {
+      "id": "scene-4",
+      "text": "Beyond navigation, the command palette can trigger quick actions like opening the shortcuts cheat sheet or launching the AI Assistant.",
+      "caption": "Execute quick actions: launch the shortcuts cheat sheet or trigger AI Assistant."
+    },
+    {
+      "id": "scene-5",
+      "text": "Mastering Ctrl plus K saves pharmacists hundreds of clicks every single day. In Part 4, we will cover MediFlow's 7 user roles and permission safeguards.",
+      "caption": "Save hundreds of clicks daily! Watch Part 4 to explore the 7 pharmacy roles."
+    }
+  ],
+  "outro": {
+    "duration": 4,
+    "takeaway": "Speed Rule: Experienced pharmacy cashiers use Ctrl+K to navigate 3x faster than mouse clicks.",
+    "nextPart": {
+      "id": "VID-1.4",
+      "title": "Understanding the 7 Pharmacy Roles & Permission Safeguards"
+    }
+  }
+}

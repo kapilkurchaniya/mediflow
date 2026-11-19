@@ -1,0 +1,47 @@
+{
+  "id": "VID-3.4",
+  "series": "Drug Compliance & Regulations",
+  "part": 4,
+  "totalParts": 6,
+  "title": "Recording Digital Inward Patient Prescriptions (Rx)",
+  "shortcut": "INWARD RX VAULT · DIGITAL DIGITIZATION",
+  "role": "Pharmacy Compliance Officers & Pharmacists",
+  "targetDurationSeconds": 50,
+  "voice": "en-IN-PrabhatNeural",
+  "intro": {
+    "duration": 4,
+    "title": "Recording Digital Inward Prescriptions (Rx)",
+    "subtitle": "Inbound Rx digitization, patient demographics, verified prescriber linking, and dosage regimen audit",
+    "badge": "INWARD RX VAULT · TAMPER-EVIDENT"
+  },
+  "narration": [
+    {
+      "id": "scene-1",
+      "text": "Welcome to Phase 3, Part 4: Recording Digital Inward Patient Prescriptions. Digitizing incoming doctor prescriptions guarantees foolproof compliance and instant counter dispensing."
+    },
+    {
+      "id": "scene-2",
+      "text": "Navigate to Compliance and select Prescriptions. MediFlow's central prescription vault displays all logged patient prescriptions along with doctor credentials and validation status."
+    },
+    {
+      "id": "scene-3",
+      "text": "Click New Prescription. Enter the patient's full name, contact number, age, and select the certified prescribing practitioner directly from your doctor registry."
+    },
+    {
+      "id": "scene-4",
+      "text": "Add the prescribed pharmaceutical molecules, specifying precise dosage, administration frequency, and treatment course duration."
+    },
+    {
+      "id": "scene-5",
+      "text": "Click Save Prescription to commit the record. The prescription is assigned an immutable registry number, ready for fast dispensing. Next, explore Statutory Drug Registers."
+    }
+  ],
+  "outro": {
+    "duration": 4,
+    "takeaway": "Digital Rx Repository: Capture patient demographics, certified doctor credentials, and dosage schedules into an immutable compliance vault ready for POS dispensing.",
+    "nextPart": {
+      "id": "VID-3.5",
+      "title": "Part 5: Viewing Immutable Statutory Drug Registers (H, H1, X, Narcotics)"
+    }
+  }
+}

@@ -109,6 +109,9 @@ export function Topbar() {
       {!isOnline && (
         <div
           role="alert"
+          data-tooltip-title="Offline Billing Mode Active"
+          data-tooltip="Network connection lost. You can continue billing in POS using cached stock and reserved invoice numbers; bills sync automatically when back online."
+          data-tooltip-placement="bottom"
           className="flex items-center gap-1.5 rounded-full bg-red-100 px-2.5 py-1 text-[11.5px] font-medium text-red-700 border border-red-200"
         >
           <WifiOff className="h-3.5 w-3.5 animate-pulse text-red-600" />
@@ -122,7 +125,10 @@ export function Topbar() {
           type="button"
           onClick={() => setCommandOpen(true)}
           className="flex h-8 w-9 sm:w-56 md:w-64 items-center justify-center sm:justify-start gap-2 rounded-md border border-ink-200 bg-ink-50/70 px-2 sm:px-2.5 text-[13px] text-ink-400 transition-colors hover:border-ink-300 hover:bg-white"
-          title="Command Palette (Cmd+K)"
+          data-tooltip-title="Command Palette"
+          data-tooltip="Instantly search or jump to any screen, report, or action across MediFlow."
+          data-tooltip-shortcut="⌘K"
+          data-tooltip-placement="bottom"
           aria-label="Search or type a command"
         >
           <Search className="h-3.5 w-3.5 shrink-0 text-ink-500" />
@@ -141,7 +147,10 @@ export function Topbar() {
           onClick={() => setShortcutsOpen(true)}
           className="btn btn-ghost btn-icon text-ink-500 hover:text-ink-900"
           aria-label="Keyboard Shortcuts"
-          title="Keyboard Shortcuts (?)"
+          data-tooltip-title="Keyboard Shortcuts Cheat Sheet"
+          data-tooltip="View all POS counter and global ERP hotkeys for fast keyboard-only operation."
+          data-tooltip-shortcut="?"
+          data-tooltip-placement="bottom"
         >
           <HelpCircle className="h-4 w-4" />
         </button>
@@ -154,7 +163,9 @@ export function Topbar() {
           <Link
             href="/dashboard/inventory/transfers/new"
             className="btn btn-primary btn-sm ml-1 shrink-0"
-            title="Create Stock Transfer"
+            data-tooltip-title="Create Stock Transfer"
+            data-tooltip="Dispatch medicine batches from this warehouse to a retail branch with a challan."
+            data-tooltip-placement="bottom"
           >
             <ArrowLeftRight className="h-4 w-4" />
             <span className="hidden sm:inline">Transfer stock</span>
@@ -163,7 +174,10 @@ export function Topbar() {
           <Link
             href="/dashboard/sales/pos"
             className="btn btn-primary btn-sm ml-1 shrink-0"
-            title="New POS Bill (F2)"
+            data-tooltip-title="New POS Counter Bill"
+            data-tooltip="Open the high-speed retail billing terminal to scan items and print receipts."
+            data-tooltip-shortcut="F2"
+            data-tooltip-placement="bottom"
           >
             <Plus className="h-4 w-4" />
             <span className="hidden sm:inline">New bill</span>

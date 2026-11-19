@@ -1,0 +1,47 @@
+{
+  "id": "VID-2.13",
+  "series": "POS Counter Mastery",
+  "part": 13,
+  "totalParts": 14,
+  "title": "Line Discounts & Cart Price Adjustments",
+  "shortcut": "LINE DISCOUNT % · NET RECALCULATION",
+  "role": "Pharmacy Cashiers & Store Managers",
+  "targetDurationSeconds": 55,
+  "voice": "en-IN-PrabhatNeural",
+  "intro": {
+    "duration": 4,
+    "title": "Line Discounts & Price Adjustments",
+    "subtitle": "Item-level percentage discounts, live GST re-computation, and store margin protection",
+    "badge": "LINE DISCOUNTS · GST COMPLIANT"
+  },
+  "narration": [
+    {
+      "id": "scene-1",
+      "text": "Welcome to Phase 2, Part 13: Line Discounts & Cart Price Adjustments. MediFlow allows pharmacy cashiers to apply transparent item-level discounts while strictly maintaining GST integrity."
+    },
+    {
+      "id": "scene-2",
+      "text": "When medicines are added to the billing cart, notice the dedicated Discount percentage column positioned alongside the unit rate and batch details."
+    },
+    {
+      "id": "scene-3",
+      "text": "Click into the discount input for an item and enter the approved concession, such as ten percent. MediFlow instantly recalculates the line total and highlights the customer saving."
+    },
+    {
+      "id": "scene-4",
+      "text": "Observe the bottom Totals Bar. Total discount savings are summarized in green, and the statutory CGST and SGST splits rebalance automatically without manual math."
+    },
+    {
+      "id": "scene-5",
+      "text": "Press F8 to review the net discounted payable on the split-tender checkout. In our final Phase 2 tutorial, Part 14, discover Thermal 80mm Slip and A4 Tax Invoice Printing."
+    }
+  ],
+  "outro": {
+    "duration": 4,
+    "takeaway": "Line Discounts: Apply item-level percentage discounts directly in the counter cart with real-time totals, GST recalculation, and margin visibility.",
+    "nextPart": {
+      "id": "VID-2.14",
+      "title": "Part 14: Thermal 80mm Slip & A4 Tax Invoice Printing"
+    }
+  }
+}

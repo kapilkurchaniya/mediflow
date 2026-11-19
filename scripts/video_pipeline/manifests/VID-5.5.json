@@ -1,0 +1,47 @@
+{
+  "id": "VID-5.5",
+  "series": "Purchasing, GRN & Distributor Operations",
+  "part": 5,
+  "totalParts": 7,
+  "title": "One-Click Inward GRN Receipt against PO",
+  "shortcut": "RECEIVE GRN · PO-TO-GRN CONVERSION",
+  "role": "Purchase Managers, Store Keepers & Accountants",
+  "targetDurationSeconds": 55,
+  "voice": "en-IN-PrabhatNeural",
+  "intro": {
+    "duration": 4,
+    "title": "PO-to-GRN Inward Receipt",
+    "subtitle": "Convert approved Purchase Orders to inward bills with 1-click prefill, delivery matching, and batch registration",
+    "badge": "RECEIVE GRN AGAINST PO"
+  },
+  "narration": [
+    {
+      "id": "scene-1",
+      "text": "Welcome to Phase 5, Part 5: One-Click Inward GRN Receipt against a Purchase Order. Converting approved POs directly into GRNs eliminates duplicate data entry and enforces delivery matching."
+    },
+    {
+      "id": "scene-2",
+      "text": "On the Purchase Order Details screen, review your approved order. When the distributor delivers the goods, click Receive GRN."
+    },
+    {
+      "id": "scene-3",
+      "text": "Notice the banner: Receiving goods against PO. The supplier, ordered medicines, quantities, and negotiated rates are loaded automatically."
+    },
+    {
+      "id": "scene-4",
+      "text": "Enter the distributor's physical invoice number, and type the received Batch Numbers and Expiry Dates directly into each pre-filled row."
+    },
+    {
+      "id": "scene-5",
+      "text": "Save the inward bill. The purchase order automatically marks as Received, updating supplier ledger payables and replenishing warehouse stock batches."
+    }
+  ],
+  "outro": {
+    "duration": 4,
+    "takeaway": "PO-to-GRN Conversion: Convert approved purchase orders to inward bills with 1 click, capture physical batch lots, and update inventory effortlessly.",
+    "nextPart": {
+      "id": "VID-5.6",
+      "title": "Part 6: Supplier Returns & Issuing Statutory Debit Notes"
+    }
+  }
+}

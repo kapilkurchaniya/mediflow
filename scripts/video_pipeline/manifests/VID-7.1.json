@@ -1,0 +1,47 @@
+{
+  "id": "VID-7.1",
+  "series": "Patient Care, Omnichannel Orders & Communications",
+  "part": 1,
+  "totalParts": 5,
+  "title": "Managing Omnichannel Orders Pipeline (Received → Delivered)",
+  "shortcut": "OMNICHANNEL ORDERS · PIPELINE",
+  "role": "Cashiers, Pharmacists & Dispatchers",
+  "targetDurationSeconds": 55,
+  "voice": "en-IN-PrabhatNeural",
+  "intro": {
+    "duration": 4,
+    "title": "Omnichannel Orders Pipeline",
+    "subtitle": "Track incoming WhatsApp, phone and app orders across Received, Preparing, Ready and Delivered stages",
+    "badge": "ORDERS · FULFILLMENT PIPELINE"
+  },
+  "narration": [
+    {
+      "id": "scene-1",
+      "text": "Welcome to Phase 7, Part 1: Managing Omnichannel Orders Pipeline. Fulfilling remote customer orders from WhatsApp, mobile apps, and telephone orders keeps your pharmacy responsive and organized."
+    },
+    {
+      "id": "scene-2",
+      "text": "Go to Orders. The pipeline dashboard organizes orders across key fulfillment stages: Received, Preparing, Ready, and Delivered."
+    },
+    {
+      "id": "scene-3",
+      "text": "Channel origin badges identify order sources instantly, distinguishing WhatsApp chats, eRetail web carts, and direct phone calls."
+    },
+    {
+      "id": "scene-4",
+      "text": "Open an order to inspect requested medicines and customer notes. Advance the status to Preparing for dispensary packing, then Ready for pickup."
+    },
+    {
+      "id": "scene-5",
+      "text": "Complete the order by generating an instant POS tax bill or marking it Delivered upon home delivery. In Part 2, we fulfill Promise Orders!"
+    }
+  ],
+  "outro": {
+    "duration": 4,
+    "takeaway": "Omnichannel Orders Pipeline: Fulfill remote pharmacy orders systematically across Received, Preparing, Ready and Delivered stages.",
+    "nextPart": {
+      "id": "VID-7.2",
+      "title": "Part 2: Fulfilling Promise Orders upon Supplier GRN Delivery"
+    }
+  }
+}

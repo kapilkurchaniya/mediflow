@@ -1,0 +1,47 @@
+{
+  "id": "VID-5.1",
+  "series": "Purchasing, GRN & Distributor Operations",
+  "part": 1,
+  "totalParts": 7,
+  "title": "Adding Suppliers & Distributor Profiles (GSTIN & State Code)",
+  "shortcut": "SUPPLIER MASTER · GSTIN & DRUG LICENCE",
+  "role": "Purchase Managers, Store Owners & Accountants",
+  "targetDurationSeconds": 55,
+  "voice": "en-IN-PrabhatNeural",
+  "intro": {
+    "duration": 4,
+    "title": "Adding Supplier Profiles",
+    "subtitle": "Distributor master onboarding, 15-digit GSTIN state codes, wholesale drug licenses, and credit terms",
+    "badge": "SUPPLIER MASTER · GSTIN"
+  },
+  "narration": [
+    {
+      "id": "scene-1",
+      "text": "Welcome to Phase 5, Part 1: Adding Suppliers and Distributor Profiles. Proper supplier master setup ensures seamless GST input tax credit and drug controller licensing compliance."
+    },
+    {
+      "id": "scene-2",
+      "text": "From the dashboard navigation, click Suppliers, then select New Supplier to open the distributor profile form."
+    },
+    {
+      "id": "scene-3",
+      "text": "Enter the distributor agency name, primary contact person, and phone number for purchase coordination."
+    },
+    {
+      "id": "scene-4",
+      "text": "In the Statutory section, enter the supplier's 15-digit GSTIN and wholesale Drug Licence Number. MediFlow validates the state code prefix for automated IGST or CGST/SGST tax routing."
+    },
+    {
+      "id": "scene-5",
+      "text": "Set default trade terms such as thirty credit days and opening balance. Click Save Supplier to register the distributor for purchase orders and inward GRNs."
+    }
+  ],
+  "outro": {
+    "duration": 4,
+    "takeaway": "Supplier Profiles: Register pharmaceutical distributors with verified GSTIN, state codes, and drug licenses for compliant inward purchase billing.",
+    "nextPart": {
+      "id": "VID-5.2",
+      "title": "Part 2: Recording a Supplier Bill (GRN) Inward Entry"
+    }
+  }
+}

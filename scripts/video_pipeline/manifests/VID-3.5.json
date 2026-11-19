@@ -1,0 +1,47 @@
+{
+  "id": "VID-3.5",
+  "series": "Drug Compliance & Regulations",
+  "part": 5,
+  "totalParts": 6,
+  "title": "Viewing Immutable Statutory Drug Registers (H, H1, X, Narcotics)",
+  "shortcut": "STATUTORY REGISTERS · FORM 35 & NDPS",
+  "role": "Pharmacy Owners & Chief Compliance Pharmacists",
+  "targetDurationSeconds": 50,
+  "voice": "en-IN-PrabhatNeural",
+  "intro": {
+    "duration": 4,
+    "title": "Statutory Drug Registers",
+    "subtitle": "Form 35 Schedule H1, Schedule H, Schedule X psychotropics, and NDPS narcotics registers with tamper-evident audit trails",
+    "badge": "STATUTORY REGISTERS · RULE 65"
+  },
+  "narration": [
+    {
+      "id": "scene-1",
+      "text": "Welcome to Phase 3, Part 5: Viewing Immutable Statutory Drug Registers. Under Indian Drugs and Cosmetics Rules, pharmacies must maintain strict, tamper-evident registers for controlled substances."
+    },
+    {
+      "id": "scene-2",
+      "text": "Open Compliance to access your registers. The Schedule H1 tab automatically catalogs Form 35 entries including 3rd generation cephalosporins and anti-TB drugs, locked for 3-year statutory retention."
+    },
+    {
+      "id": "scene-3",
+      "text": "Switch to Schedule H to monitor everyday prescription medicine dispenses, displaying patient identity, registered prescriber details, and doctor registration numbers."
+    },
+    {
+      "id": "scene-4",
+      "text": "Click NDPS Narcotics or Schedule X to review heavily monitored psychotropic substances, with exact quantities dispensed and strict invoice linkages."
+    },
+    {
+      "id": "scene-5",
+      "text": "Filter transactions by date range or search by patient name to verify any supply instant. In Part 6, learn how to print inspector-ready statutory registers."
+    }
+  ],
+  "outro": {
+    "duration": 4,
+    "takeaway": "Statutory Drug Registers: Maintain tamper-evident, separate registers for Schedule H1, H, X, and NDPS narcotics with automated 3-year retention compliance.",
+    "nextPart": {
+      "id": "VID-3.6",
+      "title": "Part 6: One-Click Inspector-Ready Statutory Register Printing"
+    }
+  }
+}

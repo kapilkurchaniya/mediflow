@@ -1,0 +1,52 @@
+{
+  "id": "VID-1.4",
+  "series": "Getting Started & Navigation",
+  "part": 4,
+  "totalParts": 5,
+  "title": "Understanding the 7 Pharmacy Roles & Permission Safeguards",
+  "shortcut": "RBAC",
+  "role": "Pharmacy Owners & Store Managers",
+  "targetDurationSeconds": 54,
+  "voice": "en-IN-PrabhatNeural",
+  "intro": {
+    "duration": 4,
+    "title": "7 Pharmacy Roles & Permission Safeguards",
+    "subtitle": "Enforce strict role-based access control and audit integrity",
+    "badge": "RBAC · PERMISSIONS"
+  },
+  "narration": [
+    {
+      "id": "scene-1",
+      "text": "Welcome to Part 4. In a licensed pharmacy, statutory compliance requires strict role-based access control. MediFlow enforces seven distinct pharmacy roles to protect audit integrity.",
+      "caption": "Strict statutory compliance: MediFlow enforces 7 dedicated pharmacy roles."
+    },
+    {
+      "id": "scene-2",
+      "text": "In the Staff and Access directory, managers can view all team members, their assigned roles, active branch permissions, and last login timestamps.",
+      "caption": "View your team directory with assigned roles, branch permissions, and login history."
+    },
+    {
+      "id": "scene-3",
+      "text": "Each role has strict safeguards. Cashiers are restricted to POS billing without seeing wholesale purchase costs, while registered pharmacists approve prescription drugs.",
+      "caption": "Cashiers focus on POS billing without seeing purchase costs; Pharmacists verify Rx drugs."
+    },
+    {
+      "id": "scene-4",
+      "text": "You can restrict staff to specific branches or grant chain-wide access. In emergencies, instantly suspend a user to revoke their login and active sessions.",
+      "caption": "Restrict staff to single branches or chain-wide. Instantly suspend users in one click."
+    },
+    {
+      "id": "scene-5",
+      "text": "Clear separation of duties keeps your pharmacy inspection-ready every day. In our final Phase 1 video, we will configure Pharmacy Profiles and GST Rule 46 invoice prefixes.",
+      "caption": "Audit-ready operations! Watch Part 5 to setup Pharmacy Profiles & GST Rule 46."
+    }
+  ],
+  "outro": {
+    "duration": 4,
+    "takeaway": "Statutory Rule: Rule 65 requires Schedule H and X dispensing by a registered pharmacist only.",
+    "nextPart": {
+      "id": "VID-1.5",
+      "title": "Pharmacy Profile Setup & GST Rule 46 Bill Prefix (INV, MED)"
+    }
+  }
+}

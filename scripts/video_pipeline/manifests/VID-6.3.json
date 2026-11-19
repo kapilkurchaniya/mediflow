@@ -1,0 +1,47 @@
+{
+  "id": "VID-6.3",
+  "series": "Customer Relationship Management (CRM) & Loyalty",
+  "part": 3,
+  "totalParts": 5,
+  "title": "Configuring Pharmacy Loyalty Rewards Program (Earning & Value)",
+  "shortcut": "LOYALTY PROGRAM · POINTS ACCRUAL",
+  "role": "Store Owners & Retail Pharmacists",
+  "targetDurationSeconds": 55,
+  "voice": "en-IN-PrabhatNeural",
+  "intro": {
+    "duration": 4,
+    "title": "Pharmacy Loyalty Program Setup",
+    "subtitle": "Define earning ratios, point rupee valuation, minimum redemption limits, and POS activation",
+    "badge": "LOYALTY REWARDS · EARNING RULES"
+  },
+  "narration": [
+    {
+      "id": "scene-1",
+      "text": "Welcome to Phase 6, Part 3: Configuring Pharmacy Loyalty Rewards Program. A structured rewards program boosts repeat visits, builds customer loyalty, and drives higher basket values."
+    },
+    {
+      "id": "scene-2",
+      "text": "Go to Settings and select Loyalty Program. Here you control the earning ratio, point valuation, and redemption thresholds across your retail network."
+    },
+    {
+      "id": "scene-3",
+      "text": "In Points Accrual Rules, configure the earning ratio, such as awarding one point for every hundred rupees spent on non-scheduled medicines."
+    },
+    {
+      "id": "scene-4",
+      "text": "Set the point redemption value and minimum redemption threshold. For instance, each point is worth one rupee, with a minimum requirement of ten points before cashiers can redeem them at billing."
+    },
+    {
+      "id": "scene-5",
+      "text": "Toggle the program to Active and click Save Settings. All billing terminals now calculate reward points automatically on qualified sales invoices. In Part 4, we examine the Customer Loyalty Ledger!"
+    }
+  ],
+  "outro": {
+    "duration": 4,
+    "takeaway": "Loyalty Program Configuration: Establish clear points-to-rupee ratios and redemption thresholds to increase customer retention and sales basket sizes.",
+    "nextPart": {
+      "id": "VID-6.4",
+      "title": "Part 4: Customer Loyalty Points Ledger & Audited Manual Adjustments"
+    }
+  }
+}

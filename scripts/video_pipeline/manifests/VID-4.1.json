@@ -1,0 +1,47 @@
+{
+  "id": "VID-4.1",
+  "series": "Inventory, Batches & Warehouse Operations",
+  "part": 1,
+  "totalParts": 8,
+  "title": "Creating Master Medicines: Brand, Salt, GST 2.0 & Schedule",
+  "shortcut": "NEW MEDICINE MASTER · BRAND & SALT COMPOSITION",
+  "role": "Inventory Managers & Pharmacists",
+  "targetDurationSeconds": 60,
+  "voice": "en-IN-PrabhatNeural",
+  "intro": {
+    "duration": 4,
+    "title": "Creating Master Medicines",
+    "subtitle": "Brand name, salt composition, GST 2.0 (5%) tax slab, drug schedule, and physical rack assignment",
+    "badge": "MEDICINE MASTER · GST 2.0"
+  },
+  "narration": [
+    {
+      "id": "scene-1",
+      "text": "Welcome to Phase 4: Inventory and Warehouse Operations! In Part 1, we cover creating master medicines in your item registry with brand names, salts, and GST 2.0 tax slabs."
+    },
+    {
+      "id": "scene-2",
+      "text": "From Inventory, click New Item. Enter the brand trade name like Augmentin 625 Duo, and specify the generic composition such as Amoxicillin and Potassium Clavulanate."
+    },
+    {
+      "id": "scene-3",
+      "text": "Set default MRP and selling price. Under GST Rate, select 5 percent reflecting GST 2.0 pharma reforms, and add the statutory eight-digit HSN code."
+    },
+    {
+      "id": "scene-4",
+      "text": "Configure packaging units and designate the regulatory schedule like Schedule H1, checking Prescription Required to enforce clinical verification at the counter."
+    },
+    {
+      "id": "scene-5",
+      "text": "Assign a physical rack and shelf location for lightning-fast picker retrieval, then save the item. In Part 2, discover packaging unit setups and strip-to-tablet conversions."
+    }
+  ],
+  "outro": {
+    "duration": 4,
+    "takeaway": "Medicine Master: Standardize trade names, salt molecules, GST 2.0 tax rates, and physical rack slots to streamline procurement and counter billing.",
+    "nextPart": {
+      "id": "VID-4.2",
+      "title": "Part 2: Packaging Unit Setup & Strip-to-Tablet Conversion Ratios"
+    }
+  }
+}
