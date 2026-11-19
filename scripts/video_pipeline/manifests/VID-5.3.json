@@ -1,0 +1,47 @@
+{
+  "id": "VID-5.3",
+  "series": "Purchasing, GRN & Distributor Operations",
+  "part": 3,
+  "totalParts": 7,
+  "title": "Pharma Schemes: 10+1 Free, TD%, CD% & Landed Cost Dilution",
+  "shortcut": "TRADE SCHEMES · LANDED COST DILUTION",
+  "role": "Purchase Managers, Inventory Controllers & Accountants",
+  "targetDurationSeconds": 60,
+  "voice": "en-IN-PrabhatNeural",
+  "intro": {
+    "duration": 4,
+    "title": "Trade Schemes & Landed Cost",
+    "subtitle": "Bonus free quantities (10+1), trade discount (TD%), cash discount (CD%), and automated landed cost dilution",
+    "badge": "10+1 FREE · COST DILUTION"
+  },
+  "narration": [
+    {
+      "id": "scene-1",
+      "text": "Welcome to Phase 5, Part 3: Pharma Trade Schemes, TD%, CD%, and Landed Cost Dilution. In pharmaceutical wholesale, bonus goods directly impact your net inventory valuation."
+    },
+    {
+      "id": "scene-2",
+      "text": "On the purchase inward screen, add a line item. If the distributor gives a 10 plus 1 free scheme, enter 10 in Billed Packs and 1 in the Free Scheme column."
+    },
+    {
+      "id": "scene-3",
+      "text": "Observe the Landed Cost column: MediFlow automatically dilutes your cost per unit by spreading the billed purchase price across all 11 physical units."
+    },
+    {
+      "id": "scene-4",
+      "text": "Next, configure discounts: enter Trade Discount percentage to reduce the taxable value before GST, and Cash Discount for prompt supplier payment."
+    },
+    {
+      "id": "scene-5",
+      "text": "Review the dynamic margin calculation. Net landed costs update in real time, guaranteeing exact gross profit tracking when items are dispensed at the counter. Next, Generating Formal Purchase Orders!"
+    }
+  ],
+  "outro": {
+    "duration": 4,
+    "takeaway": "Landed Cost Dilution: Automatically spread purchase costs over billed plus free scheme packs, compute net margins with TD and CD, and preserve accurate profit accounting.",
+    "nextPart": {
+      "id": "VID-5.4",
+      "title": "Part 4: Generating Formal Purchase Orders (PO) & PDF Export"
+    }
+  }
+}

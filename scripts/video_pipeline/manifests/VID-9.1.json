@@ -1,0 +1,47 @@
+{
+  "id": "VID-9.1",
+  "series": "GST Compliance, E-Invoicing & Statutory Reports",
+  "part": 1,
+  "totalParts": 7,
+  "title": "GST Overview Dashboard: Output Tax vs Input Tax Credit",
+  "shortcut": "GST DASHBOARD · TAX LIABILITY",
+  "role": "Accountants & Pharmacy Owners",
+  "targetDurationSeconds": 50,
+  "voice": "en-IN-PrabhatNeural",
+  "intro": {
+    "duration": 4,
+    "title": "GST Overview Dashboard",
+    "subtitle": "Output tax liability, Input Tax Credit (ITC) reconciliation, and net payable calculations",
+    "badge": "GST · TAX DASHBOARD"
+  },
+  "narration": [
+    {
+      "id": "scene-1",
+      "text": "Welcome to Phase 9, Part 1: GST Overview Dashboard: Output Tax versus Input Tax Credit. MediFlow provides automated Goods and Services Tax tracking directly synced with your counter sales and distributor purchases."
+    },
+    {
+      "id": "scene-2",
+      "text": "Navigate to GST Overview. The dashboard aggregates total outward tax collected from retail sales alongside inward ITC accrued from verified supplier GRNs."
+    },
+    {
+      "id": "scene-3",
+      "text": "Monitor your statutory tax position split clearly into Central GST, State GST, and Integrated GST components across any filing month."
+    },
+    {
+      "id": "scene-4",
+      "text": "Review net payable tax estimates after automatic ITC set-off, preventing cash surprises before filing deadlines."
+    },
+    {
+      "id": "scene-5",
+      "text": "Use the filing period selector to audit quarterly or monthly return cycles. In Part 2, we generate GSTR-1 outward supply files and HSN summaries!"
+    }
+  ],
+  "outro": {
+    "duration": 4,
+    "takeaway": "GST Overview: Instantly compare Output Tax against Input Tax Credit to forecast statutory net tax payable with zero calculation errors.",
+    "nextPart": {
+      "id": "VID-9.2",
+      "title": "Part 2: GSTR-1 Outward Supplies, HSN Summary & Portal JSON Export"
+    }
+  }
+}

@@ -1,0 +1,47 @@
+{
+  "id": "VID-6.2",
+  "series": "Customer Relationship Management (CRM) & Loyalty",
+  "part": 2,
+  "totalParts": 5,
+  "title": "Family Health Groups & Shared Household Credit Limits",
+  "shortcut": "FAMILY GROUPS · SHARED CREDIT",
+  "role": "Store Owners, Pharmacists & Cashiers",
+  "targetDurationSeconds": 55,
+  "voice": "en-IN-PrabhatNeural",
+  "intro": {
+    "duration": 4,
+    "title": "Family Health Groups & Shared Credit",
+    "subtitle": "Unite household members, shared Khata ceilings, primary payers, and unified billing",
+    "badge": "FAMILY GROUPS · HOUSEHOLD CREDIT"
+  },
+  "narration": [
+    {
+      "id": "scene-1",
+      "text": "Welcome to Phase 6, Part 2: Family Health Groups and Shared Household Credit Limits. Grouping related patients under a single family account simplifies credit tracking and household prescription management."
+    },
+    {
+      "id": "scene-2",
+      "text": "Go to Customers and select Family Groups. The left sidebar lists existing family accounts alongside active member counts and total household credit limits."
+    },
+    {
+      "id": "scene-3",
+      "text": "Click Create Group. Enter the household name, such as Sharma Family, and define a unified maximum shared credit ceiling across all members."
+    },
+    {
+      "id": "scene-4",
+      "text": "Open the group details and click Add Member. Link individual family members, select their relationship like Spouse or Child, and designate the Primary Payer responsible for billing settlements."
+    },
+    {
+      "id": "scene-5",
+      "text": "At the POS counter, purchases by any family member automatically draw from the shared credit balance, preventing duplicate credit risk. In Part 3, we configure Pharmacy Loyalty Rewards!"
+    }
+  ],
+  "outro": {
+    "duration": 4,
+    "takeaway": "Family Health Groups: Combine household accounts under a single credit ceiling with designated primary payers for seamless community pharmacy billing.",
+    "nextPart": {
+      "id": "VID-6.3",
+      "title": "Part 3: Configuring Pharmacy Loyalty Rewards Program (Earning & Value)"
+    }
+  }
+}

@@ -1,0 +1,47 @@
+{
+  "id": "VID-2.12",
+  "series": "POS Counter Mastery",
+  "part": 12,
+  "totalParts": 14,
+  "title": "Promise Orders: Capturing Out-of-Stock Patient Demand",
+  "shortcut": "PROMISE ORDER · PATIENT DEMAND",
+  "role": "Pharmacy Cashiers & Procurement Managers",
+  "targetDurationSeconds": 50,
+  "voice": "en-IN-PrabhatNeural",
+  "intro": {
+    "duration": 4,
+    "title": "Promise Orders: Out-of-Stock Demand",
+    "subtitle": "Customer reservation, unfulfilled prescription tracking, and instant procurement replenishment",
+    "badge": "PROMISE ORDERS · ZERO LOST SALES"
+  },
+  "narration": [
+    {
+      "id": "scene-1",
+      "text": "Welcome to Phase 2, Part 12: Promise Orders: Capturing Out-of-Stock Patient Demand. When a customer requests a medicine that is temporarily exhausted, never turn them away empty-handed."
+    },
+    {
+      "id": "scene-2",
+      "text": "Search for the requested medicine in the search bar. When MediFlow detects zero inventory, it displays an Out of Stock badge along with a dedicated Promise Order button."
+    },
+    {
+      "id": "scene-3",
+      "text": "Click Promise Order to open the Patient Demand modal. Enter the patient's name, ten-digit mobile number, required quantity, and any urgent delivery notes."
+    },
+    {
+      "id": "scene-4",
+      "text": "Click Save Promise Order. MediFlow records the reservation and immediately routes the unfulfilled demand to the Procurement and Purchase dashboard."
+    },
+    {
+      "id": "scene-5",
+      "text": "When the distributor bill is inwards in Phase 5, MediFlow automatically notifies the cashier to contact the patient and fulfill the promised bill. In Part 13, learn Line Discounts and Manager Overrides."
+    }
+  ],
+  "outro": {
+    "duration": 4,
+    "takeaway": "Promise Orders: Capture patient contact details and quantity for out-of-stock medicines, converting lost sales into loyal repeat visits.",
+    "nextPart": {
+      "id": "VID-2.13",
+      "title": "Part 13: Line Discounts & Manager Discount Overrides"
+    }
+  }
+}

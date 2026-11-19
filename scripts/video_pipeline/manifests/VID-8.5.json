@@ -1,0 +1,47 @@
+{
+  "id": "VID-8.5",
+  "series": "Accounting, Cash Flow & Financial Ledgers",
+  "part": 5,
+  "totalParts": 5,
+  "title": "Uploading Bank Statements & Auto-Reconciliation",
+  "shortcut": "BANK RECONCILIATION · SMART MATCHING",
+  "role": "Accountants, Auditors & Store Owners",
+  "targetDurationSeconds": 55,
+  "voice": "en-IN-PrabhatNeural",
+  "intro": {
+    "duration": 4,
+    "title": "Bank Reconciliation & Auto-Matching",
+    "subtitle": "CSV statement uploads, digital UPI/card receipt reconciliation, and period clearance",
+    "badge": "ACCOUNTING · BANK RECON"
+  },
+  "narration": [
+    {
+      "id": "scene-1",
+      "text": "Welcome to Phase 8, Part 5: Uploading Bank Statements and Auto-Reconciliation. Seamlessly bridge your bank accounts with counter collections, card swipes, and UPI settlements."
+    },
+    {
+      "id": "scene-2",
+      "text": "Under Accounting, click Bank Reconciliation and select your primary current account to inspect differences between book balances and cleared bank entries."
+    },
+    {
+      "id": "scene-3",
+      "text": "Upload your bank's CSV statement. MediFlow parses dates, reference IDs, withdrawal debits, and credit deposits automatically."
+    },
+    {
+      "id": "scene-4",
+      "text": "Click Auto-Reconcile. MediFlow matches UPI references, card batch settlements, and exact rupee values to pair verified records instantly."
+    },
+    {
+      "id": "scene-5",
+      "text": "Accept confirmed matches and lock the reconciliation period with complete immutable audit verification. This concludes Phase 8 Accounting tutorials!"
+    }
+  ],
+  "outro": {
+    "duration": 4,
+    "takeaway": "Bank Reconciliation: Eliminate manual ledger tick-marking with intelligent CSV statement upload and automated UPI matching.",
+    "nextPart": {
+      "id": "VID-9.1",
+      "title": "Phase 9, Part 1: GST Overview Dashboard: Output Tax vs Input Tax Credit"
+    }
+  }
+}

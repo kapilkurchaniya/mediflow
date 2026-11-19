@@ -484,7 +484,7 @@ export default function SmartImportPage() {
               
               <button
                 onClick={handleImport}
-                disabled={validCount === 0 || isImporting}
+                disabled={validCount === 0 || isImporting || isEnriching}
                 className="px-6 py-2 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium rounded-lg shadow-sm flex items-center transition-colors disabled:opacity-50"
               >
                 {isImporting ? (

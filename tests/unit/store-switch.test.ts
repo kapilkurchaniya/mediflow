@@ -93,8 +93,8 @@ describe("Store Switcher Unit Tests (Task A3.2)", () => {
     const membershipUpdates: { id: string; lastStoreId: string }[] = [];
 
     const mockDb = {
-      select: (fields?: unknown) => ({
-        from: (table: unknown) => ({
+      select: (fields?: unknown) => {
+        const createQuery = () => ({
           where: (whereClause: unknown) => {
             const execute = async () => {
               // Target store query
@@ -112,6 +112,21 @@ describe("Store Switcher Unit Tests (Task A3.2)", () => {
               if (fields && typeof fields === "object" && "n" in fields) {
                 return [{ n: options.hasSwitchAny ? 1 : 0 }];
               }
+              // Joined membership and switchAnyPerm query
+              if (
+                fields &&
+                typeof fields === "object" &&
+                "membership" in fields
+              ) {
+                return membership
+                  ? [
+                      {
+                        membership,
+                        switchAnyPerm: options.hasSwitchAny ? "store.switch_any" : null,
+                      },
+                    ]
+                  : [];
+              }
               // Membership query
               return membership ? [membership] : [];
             };
@@ -127,8 +142,15 @@ describe("Store Switcher Unit Tests (Task A3.2)", () => {
                 execute().then(resolve, reject),
             };
           },
-        }),
-      }),
+        });
+
+        return {
+          from: (table: unknown) => ({
+            ...createQuery(),
+            leftJoin: () => createQuery(),
+          }),
+        };
+      },
       update: (table: unknown) => ({
         set: (values: Record<string, unknown>) => ({
           where: async (whereClause: unknown) => {

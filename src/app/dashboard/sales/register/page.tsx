@@ -35,15 +35,16 @@ export default async function CashRegisterPage() {
     );
   }
 
-  // Load current active shift & past history
-  const currentShift = await getCurrentShift(db, ctx);
-  const shiftHistory = await getShiftHistory(db, ctx, 25);
-
-  const [tenant] = await db
-    .select({ settings: schema.tenants.settings })
-    .from(schema.tenants)
-    .where(eq(schema.tenants.id, ctx.tenantId))
-    .limit(1);
+  // Load current active shift, history, and tenant configuration in parallel
+  const [currentShift, shiftHistory, [tenant]] = await Promise.all([
+    getCurrentShift(db, ctx),
+    getShiftHistory(db, ctx, 25),
+    db
+      .select({ settings: schema.tenants.settings })
+      .from(schema.tenants)
+      .where(eq(schema.tenants.id, ctx.tenantId))
+      .limit(1),
+  ]);
 
   const requireShiftSetting = Boolean((tenant?.settings as Record<string, unknown>)?.requireShift);
 

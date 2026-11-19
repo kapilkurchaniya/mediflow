@@ -1,0 +1,47 @@
+{
+  "id": "VID-2.10",
+  "series": "POS Counter Mastery",
+  "part": 10,
+  "totalParts": 14,
+  "title": "Audited Manual Batch Overrides",
+  "shortcut": "BATCH OVERRIDE · AUDIT LOGGED",
+  "role": "Pharmacists, Cashiers & Compliance Officers",
+  "targetDurationSeconds": 55,
+  "voice": "en-IN-PrabhatNeural",
+  "intro": {
+    "duration": 4,
+    "title": "Audited Manual Batch Overrides",
+    "subtitle": "Cashier flexibility, seamless batch replacement, and immutable audit logging",
+    "badge": "MANUAL OVERRIDE · AUDIT LOGGED"
+  },
+  "narration": [
+    {
+      "id": "scene-1",
+      "text": "Welcome to Phase 2, Part 10: Audited Manual Batch Overrides. While MediFlow defaults to earliest-expiry batches, customer requests for long travels or damaged shelf packaging require manual batch selection."
+    },
+    {
+      "id": "scene-2",
+      "text": "Add Paracetamol 650 to the cart. By default, Auto-FEFO assigns batch PCM-26E expiring September 2026."
+    },
+    {
+      "id": "scene-3",
+      "text": "Click the batch dropdown and choose alternative batch PARA-B1, expiring December 2027. MediFlow instantly switches the batch and recalculates line margins."
+    },
+    {
+      "id": "scene-4",
+      "text": "Notice that manual overrides do not require cumbersome supervisor PINs at checkout. Instead, MediFlow flags the line with an audited override tag and records the reason in the backend governance log."
+    },
+    {
+      "id": "scene-5",
+      "text": "Press F10 to finalize the invoice with the overridden batch printed on the receipt. In Part 11, learn how to find molecule and generic substitutes with F9."
+    }
+  ],
+  "outro": {
+    "duration": 4,
+    "takeaway": "Manual Batch Overrides: Flexibly switch medicine batches at the counter with automatic audit trail recording.",
+    "nextPart": {
+      "id": "VID-2.11",
+      "title": "Part 11: Salt & Generic Molecule Substitute Finder (F9)"
+    }
+  }
+}

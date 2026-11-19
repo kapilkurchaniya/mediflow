@@ -1,0 +1,47 @@
+{
+  "id": "VID-8.4",
+  "series": "Accounting, Cash Flow & Financial Ledgers",
+  "part": 4,
+  "totalParts": 5,
+  "title": "Customer & Supplier Balance Ageing (Debtors / Creditors Buckets)",
+  "shortcut": "BALANCE AGEING · DEBTORS & CREDITORS",
+  "role": "Accountants, Auditors & Store Owners",
+  "targetDurationSeconds": 55,
+  "voice": "en-IN-PrabhatNeural",
+  "intro": {
+    "duration": 4,
+    "title": "Customer & Supplier Balance Ageing",
+    "subtitle": "Standardized 0-30, 31-60, 61-90, and 90+ days ageing buckets for working capital management",
+    "badge": "ACCOUNTING · AGEING"
+  },
+  "narration": [
+    {
+      "id": "scene-1",
+      "text": "Welcome to Phase 8, Part 4: Customer and Supplier Balance Ageing: Debtors and Creditors Buckets. Maintain healthy cash flow by identifying overdue receivables and upcoming distributor payables."
+    },
+    {
+      "id": "scene-2",
+      "text": "Navigate to Outstanding Balances under Accounting. Overdue invoices are grouped into standard thirty, sixty, ninety, and ninety-plus day aging buckets."
+    },
+    {
+      "id": "scene-3",
+      "text": "Analyze Customer Debtors to locate high-risk credit accounts requiring immediate payment reminders and follow-up."
+    },
+    {
+      "id": "scene-4",
+      "text": "Review Supplier Payables to monitor distributor invoices approaching cash discount dates or standard credit terms."
+    },
+    {
+      "id": "scene-5",
+      "text": "Send instant WhatsApp collection reminders directly to customers and export the aging schedule for cash flow forecasting. In Part 5, we explore Bank Statement Auto-Reconciliation!"
+    }
+  ],
+  "outro": {
+    "duration": 4,
+    "takeaway": "Balance Ageing: Proactively manage working capital and mitigate bad debts with automated thirty-day aging buckets.",
+    "nextPart": {
+      "id": "VID-8.5",
+      "title": "Part 5: Uploading Bank Statements & Auto-Reconciliation"
+    }
+  }
+}

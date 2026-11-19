@@ -1,0 +1,47 @@
+{
+  "id": "VID-5.4",
+  "series": "Purchasing, GRN & Distributor Operations",
+  "part": 4,
+  "totalParts": 7,
+  "title": "Generating Formal Purchase Orders (PO) & PDF Export",
+  "shortcut": "PURCHASE ORDERS · PO GENERATION & PDF",
+  "role": "Purchase Managers, Store Owners & Pharmacists",
+  "targetDurationSeconds": 55,
+  "voice": "en-IN-PrabhatNeural",
+  "intro": {
+    "duration": 4,
+    "title": "Purchase Orders & PDF Export",
+    "subtitle": "Formal procurement workflows, distributor item orders, multi-state PO approval, and branded PDF generation",
+    "badge": "PURCHASE ORDERS · PDF"
+  },
+  "narration": [
+    {
+      "id": "scene-1",
+      "text": "Welcome to Phase 5, Part 4: Generating Formal Purchase Orders and PDF Export. Structured purchase orders eliminate procurement discrepancies and streamline distributor communication."
+    },
+    {
+      "id": "scene-2",
+      "text": "Go to Purchases, then Orders, and click New Purchase Order. Select your distributor and set the expected delivery date."
+    },
+    {
+      "id": "scene-3",
+      "text": "Add required medicines to the order table. Specify order quantities and anticipated purchase rates per pack."
+    },
+    {
+      "id": "scene-4",
+      "text": "Add order notes for supplier dispatch instructions, then click Save Purchase Order. Review the generated PO with unique order numbering."
+    },
+    {
+      "id": "scene-5",
+      "text": "Approve the order and click Print or Export PDF to generate an inspector-ready purchase order document ready for WhatsApp or email dispatch. In Part 5, we receive the inward GRN against this PO!"
+    }
+  ],
+  "outro": {
+    "duration": 4,
+    "takeaway": "Purchase Orders & PDF: Create formal distributor procurement orders, approve lines, and export professional PDF vouchers for rapid vendor fulfillment.",
+    "nextPart": {
+      "id": "VID-5.5",
+      "title": "Part 5: One-Click Inward GRN Receipt against PO"
+    }
+  }
+}

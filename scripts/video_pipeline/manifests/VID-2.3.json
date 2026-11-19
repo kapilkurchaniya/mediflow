@@ -1,0 +1,47 @@
+{
+  "id": "VID-2.3",
+  "series": "POS Counter Mastery",
+  "part": 3,
+  "totalParts": 14,
+  "title": "Loose Tablet & Strip Cutting: Fractional Billing",
+  "shortcut": "PACK · LOOSE",
+  "role": "Pharmacy Cashiers & Pharmacists",
+  "targetDurationSeconds": 58,
+  "voice": "en-IN-PrabhatNeural",
+  "intro": {
+    "duration": 4,
+    "title": "Loose Tablet & Strip Cutting",
+    "subtitle": "Fractional strip sales, pro-rata pricing, and unit-level inventory tracking",
+    "badge": "PACK · LOOSE UNITS"
+  },
+  "narration": [
+    {
+      "id": "scene-1",
+      "text": "Welcome to Phase 2, Part 3: Loose Tablet & Strip Cutting. In Indian retail pharmacies, patients frequently ask for fractional strips—such as five loose tablets instead of purchasing a full strip."
+    },
+    {
+      "id": "scene-2",
+      "text": "When you search and add a strip-based medicine like Paracetamol 650 to the cart, MediFlow automatically detects its units per pack—here, fifteen tablets per strip."
+    },
+    {
+      "id": "scene-3",
+      "text": "Notice the dual quantity columns: Packs and Loose. If the patient only needs five tablets, set Packs to zero and enter five in the Loose field. MediFlow instantly calculates the exact pro-rata rate of ten rupees without any manual math."
+    },
+    {
+      "id": "scene-4",
+      "text": "You can also combine full packs and loose tablets—for instance, one strip plus five loose tablets. The inventory tracker deducts twenty loose units accurately, preventing shelf stock discrepancies."
+    },
+    {
+      "id": "scene-5",
+      "text": "Fractional strip cutting makes healthcare affordable for patients while keeping your batch stock perfectly balanced. In Part 4, learn Fast Customer Selection and Three-Second Quick Add."
+    }
+  ],
+  "outro": {
+    "duration": 4,
+    "takeaway": "Fractional Billing: Sell exact loose tablets with automated pro-rata pricing and unit-level stock deduction.",
+    "nextPart": {
+      "id": "VID-2.4",
+      "title": "Part 4: Fast Customer Selection & 3-Second Quick Add (F4)"
+    }
+  }
+}

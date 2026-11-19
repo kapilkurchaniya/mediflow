@@ -13,6 +13,7 @@ import Link from "next/link";
 import { requireAuth } from "@/server/auth";
 import { requirePagePermission } from "@/server/rbac";
 import { ProfileClient } from "./profile/ProfileClient";
+import { TooltipSettingsCard } from "./TooltipSettingsCard";
 
 export const metadata = { title: "Settings" };
 
@@ -82,6 +83,9 @@ export default async function SettingsPage() {
               </Link>
             </div>
           </div>
+
+          {/* Interface & Guided Feature Tooltips Preference */}
+          <TooltipSettingsCard />
         </div>
 
         {/* Right Column: Account Info, Password & Organization Details */}

@@ -1,0 +1,47 @@
+{
+  "id": "VID-2.6",
+  "series": "POS Counter Mastery",
+  "part": 6,
+  "totalParts": 14,
+  "title": "Customer Credit Sales ('Khata') & Limit Control",
+  "shortcut": "F8 · CREDIT / KHATA",
+  "role": "Pharmacy Cashiers, Accountants & Store Managers",
+  "targetDurationSeconds": 60,
+  "voice": "en-IN-PrabhatNeural",
+  "intro": {
+    "duration": 4,
+    "title": "Customer Credit Sales ('Khata') & Limit Control",
+    "subtitle": "Sanctioned credit limits, automatic unpaid balance assignment, and strict debt safeguards",
+    "badge": "F8 · CREDIT SALES · KHATA CONTROL"
+  },
+  "narration": [
+    {
+      "id": "scene-1",
+      "text": "Welcome to Phase 2, Part 6: Customer Credit Sales and Khata Limit Control. In Indian retail pharmacies, trusted local families frequently buy monthly medicines on credit. MediFlow provides built-in ledger management with strict credit limit safeguards."
+    },
+    {
+      "id": "scene-2",
+      "text": "Before billing on credit, always attach a registered customer. Search for Ramesh Kumar in the customer box. His profile shows an approved credit limit of five thousand rupees with zero prior overdue balance."
+    },
+    {
+      "id": "scene-3",
+      "text": "Add the prescribed medicines to the cart. Next, press F8 or click Split Tender and Credit to open the payment settlement modal."
+    },
+    {
+      "id": "scene-4",
+      "text": "When a customer takes the medicines on store credit, leave the payment fields empty or zero. MediFlow instantly assigns the entire net payable amount into Customer Credit in amber."
+    },
+    {
+      "id": "scene-5",
+      "text": "If a customer has no approved credit limit or exceeds their limit, MediFlow strictly blocks completion to prevent uncollectible debt. Press F10 or click Complete Sale to finalize the bill and log it into their Khata account."
+    }
+  ],
+  "outro": {
+    "duration": 4,
+    "takeaway": "Credit Sales (F8): Safely bill medicines on credit with automated ledger allocation and strict customer credit limits.",
+    "nextPart": {
+      "id": "VID-2.8",
+      "title": "Part 8: Resuming Parked Bills & Live Revalidation (F7)"
+    }
+  }
+}

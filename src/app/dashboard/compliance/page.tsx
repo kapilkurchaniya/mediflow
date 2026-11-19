@@ -10,8 +10,10 @@ export const metadata = {
 
 export default async function CompliancePage() {
   await requirePagePermission("report.view");
-  const stats = await getComplianceOverview();
-  const logs = await getDispensingLogs({ limit: 100 });
+  const [stats, logs] = await Promise.all([
+    getComplianceOverview(),
+    getDispensingLogs({ limit: 100 }),
+  ]);
 
   return (
     <ComplianceRegisterView

@@ -1,0 +1,47 @@
+{
+  "id": "VID-7.4",
+  "series": "Patient Care, Omnichannel Orders & Communications",
+  "part": 4,
+  "totalParts": 5,
+  "title": "Connecting Meta WhatsApp Cloud API & SMS Gateways",
+  "shortcut": "WHATSAPP API · CLOUD GATEWAYS",
+  "role": "Pharmacy Administrators & Technical Managers",
+  "targetDurationSeconds": 55,
+  "voice": "en-IN-PrabhatNeural",
+  "intro": {
+    "duration": 4,
+    "title": "Meta WhatsApp Cloud API Setup",
+    "subtitle": "Configure Phone Number ID, WABA account, permanent tokens, and webhook sync",
+    "badge": "WHATSAPP API · CLOUD GATEWAYS"
+  },
+  "narration": [
+    {
+      "id": "scene-1",
+      "text": "Welcome to Phase 7, Part 4: Connecting Meta WhatsApp Cloud API and SMS Gateways. Direct Meta integration enables sending verified digital tax invoices, PDF receipts, and refill alerts with maximum deliverability."
+    },
+    {
+      "id": "scene-2",
+      "text": "Go to Settings and select WhatsApp Business. The setup dashboard allows entering official Meta Developer credentials."
+    },
+    {
+      "id": "scene-3",
+      "text": "Enter your Meta Phone Number ID, WhatsApp Business Account ID, and permanent System User Access Token generated in Meta Business Manager."
+    },
+    {
+      "id": "scene-4",
+      "text": "Configure your Webhook Verify Token to enable real-time bidirectional message sync with the pharmacy inbox."
+    },
+    {
+      "id": "scene-5",
+      "text": "Toggle the connection to Active and click Save Configuration. Your pharmacy is now directly connected to the official Meta Cloud API. In Part 5, we explore the WhatsApp Live Inbox!"
+    }
+  ],
+  "outro": {
+    "duration": 4,
+    "takeaway": "WhatsApp Cloud API: Connect your official Meta business number to dispatch verified PDF invoices, appointment reminders, and automated refill notifications.",
+    "nextPart": {
+      "id": "VID-7.5",
+      "title": "Part 5: Using WhatsApp Live Inbox & Sending Transactional Templates"
+    }
+  }
+}

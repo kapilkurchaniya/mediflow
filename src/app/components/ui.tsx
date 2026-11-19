@@ -2,8 +2,9 @@ import Link from "next/link";
 import { ArrowLeft, Search, type LucideIcon } from "lucide-react";
 import clsx from "clsx";
 import { SearchInput } from "./SearchInput";
+import { Tooltip } from "./Tooltip";
 
-export { SearchInput };
+export { SearchInput, Tooltip };
 
 /* -------------------------------------------------------------------------- */
 /* Brand mark                                                                 */
@@ -65,6 +66,8 @@ export function PageHeader({
           <Link
             href={backHref}
             aria-label="Go back"
+            data-tooltip-title="Go Back"
+            data-tooltip="Return to the parent screen."
             className="btn btn-secondary btn-icon mt-0.5 shrink-0"
           >
             <ArrowLeft />
@@ -104,6 +107,7 @@ export function StatCard({
   icon: Icon,
   tone = "neutral",
   href,
+  tooltip,
 }: {
   label: string;
   value: React.ReactNode;
@@ -111,7 +115,14 @@ export function StatCard({
   icon?: LucideIcon;
   tone?: Tone;
   href?: string;
+  tooltip?: string;
 }) {
+  const derivedTooltip =
+    tooltip ||
+    (typeof footnote === "string"
+      ? `${label}: ${footnote}`
+      : `Live metric summary for ${label}.`);
+
   const body = (
     <>
       <div className="flex items-center justify-between">
@@ -133,13 +144,23 @@ export function StatCard({
     return (
       <Link
         href={href}
+        data-tooltip-title={label}
+        data-tooltip={`${derivedTooltip} Click to view full details.`}
         className="card card-interactive group block p-5"
       >
         {body}
       </Link>
     );
   }
-  return <div className="card p-5">{body}</div>;
+  return (
+    <div
+      data-tooltip-title={label}
+      data-tooltip={derivedTooltip}
+      className="card p-5"
+    >
+      {body}
+    </div>
+  );
 }
 
 /* -------------------------------------------------------------------------- */

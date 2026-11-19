@@ -1,0 +1,47 @@
+{
+  "id": "VID-6.5",
+  "series": "Customer Relationship Management (CRM) & Loyalty",
+  "part": 5,
+  "totalParts": 5,
+  "title": "Medical Representatives (MR) Master & Commission Tracking",
+  "shortcut": "MEDICAL REPRESENTATIVES · COMMISSIONS",
+  "role": "Store Owners & Accounting Managers",
+  "targetDurationSeconds": 55,
+  "voice": "en-IN-PrabhatNeural",
+  "intro": {
+    "duration": 4,
+    "title": "Medical Representatives & Commissions",
+    "subtitle": "Track pharma field reps, manufacturer affiliations, visiting schedules, and commission rates",
+    "badge": "MR MASTER · COMMISSIONS"
+  },
+  "narration": [
+    {
+      "id": "scene-1",
+      "text": "Welcome to Phase 6, Part 5: Medical Representatives Master and Commission Tracking. Maintaining organized field rep records streamlines pharmaceutical supply coordination, product launches, and incentive settlements."
+    },
+    {
+      "id": "scene-2",
+      "text": "Go to Settings and select Medical Reps. The dashboard organizes registered representatives by pharma manufacturer, contact details, and commission structures."
+    },
+    {
+      "id": "scene-3",
+      "text": "Click Add Medical Rep. Enter the representative's full name, mobile number, email, and the parent pharma manufacturing company they represent."
+    },
+    {
+      "id": "scene-4",
+      "text": "Configure commission terms. Enter their contracted commission rate percentage for promoted doctor prescriptions or institutional sample orders."
+    },
+    {
+      "id": "scene-5",
+      "text": "Save the profile. You can toggle active status at any time, keeping your pharmaceutical liaison contacts up to date. This concludes Phase 6!"
+    }
+  ],
+  "outro": {
+    "duration": 4,
+    "takeaway": "Medical Reps Master: Manage pharmaceutical representatives, track company affiliations, and record commission incentive rates accurately.",
+    "nextPart": {
+      "id": "VID-7.1",
+      "title": "Phase 7, Part 1: Real-Time Cashier Shift Handover & Float Reconciliation"
+    }
+  }
+}

@@ -37,18 +37,21 @@ export async function loadAuthCtx(
   session: { tenantId: string; storeId: string },
   user: { id: string; name: string; email: string; pharmacistRegNo: string | null },
 ): Promise<AuthCtx> {
-  const [m] = await database
-    .select()
+  const rows = await database
+    .select({
+      membership: schema.memberships,
+      permission: schema.rolePermissions.permission,
+    })
     .from(schema.memberships)
-    .where(and(eq(schema.memberships.tenantId, session.tenantId), eq(schema.memberships.userId, user.id)))
-    .limit(1);
+    .leftJoin(schema.rolePermissions, eq(schema.rolePermissions.roleId, schema.memberships.roleId))
+    .where(and(eq(schema.memberships.tenantId, session.tenantId), eq(schema.memberships.userId, user.id)));
+
+  const m = rows[0]?.membership;
   if (!m || m.status !== "active") throw new ForbiddenError("membership.active");
 
-  const rows = await database
-    .select({ permission: schema.rolePermissions.permission })
-    .from(schema.rolePermissions)
-    .where(eq(schema.rolePermissions.roleId, m.roleId));
-  const permissions = new Set(rows.map((r) => r.permission as Permission));
+  const permissions = new Set(
+    rows.filter((r) => r.permission !== null).map((r) => r.permission as Permission),
+  );
 
   const allowedStoreIds: AuthCtx["allowedStoreIds"] =
     m.allStores || permissions.has("store.switch_any") ? "all" : m.storeIds;

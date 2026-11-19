@@ -1,0 +1,47 @@
+{
+  "id": "VID-8.3",
+  "series": "Accounting, Cash Flow & Financial Ledgers",
+  "part": 3,
+  "totalParts": 5,
+  "title": "Real-Time Financial Statements: Trial Balance, P&L & Balance Sheet",
+  "shortcut": "TRIAL BALANCE · P&L · BALANCE SHEET",
+  "role": "Accountants, Auditors & Store Owners",
+  "targetDurationSeconds": 55,
+  "voice": "en-IN-PrabhatNeural",
+  "intro": {
+    "duration": 4,
+    "title": "Real-Time Financial Statements",
+    "subtitle": "Trial Balance, Trading Profit & Loss, Balance Sheet statutory positions, and CA export",
+    "badge": "ACCOUNTING · STATEMENTS"
+  },
+  "narration": [
+    {
+      "id": "scene-1",
+      "text": "Welcome to Phase 8, Part 3: Real-Time Financial Statements: Trial Balance, Profit and Loss, and Balance Sheet. MediFlow automatically compiles balanced statutory financial reports as transactions occur."
+    },
+    {
+      "id": "scene-2",
+      "text": "Open the Trial Balance under Accounting. Every general ledger account displays closing balances with debits perfectly matching credits."
+    },
+    {
+      "id": "scene-3",
+      "text": "Switch to the Profit and Loss statement. Track retail sales revenue, cost of goods sold, gross margin percentage, and net operational earnings across any date range."
+    },
+    {
+      "id": "scene-4",
+      "text": "Examine the Balance Sheet to evaluate your pharmacy's capital structure, current assets, inventory value, trade receivables, and distributor liabilities."
+    },
+    {
+      "id": "scene-5",
+      "text": "Export audit-ready Excel and PDF reports directly for your Chartered Accountant and tax filings. In Part 4, we examine Customer and Supplier Balance Ageing!"
+    }
+  ],
+  "outro": {
+    "duration": 4,
+    "takeaway": "Financial Statements: Instantly generate Trial Balance, P&L, and Balance Sheet reports with zero manual adjustments.",
+    "nextPart": {
+      "id": "VID-8.4",
+      "title": "Part 4: Customer & Supplier Balance Ageing (Debtors / Creditors Buckets)"
+    }
+  }
+}

@@ -51,6 +51,11 @@ interface ShellContextType {
   storeSwitcherOpen: boolean;
   setStoreSwitcherOpen: (open: boolean) => void;
 
+  // Global feature tooltips state
+  tooltipsEnabled: boolean;
+  setTooltipsEnabled: (enabled: boolean) => void;
+  toggleTooltips: () => void;
+
   // Network connection state
   isOnline: boolean;
 
@@ -69,6 +74,7 @@ interface ShellContextType {
 const ShellContext = createContext<ShellContextType | null>(null);
 
 const STORAGE_KEY_COLLAPSED = "mediflow:sidebar-collapsed";
+export const STORAGE_KEY_TOOLTIPS = "mediflow:tooltips-enabled";
 
 export function ShellProvider({
   children,
@@ -109,9 +115,39 @@ export function ShellProvider({
   const [calculatorOpen, setCalculatorOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [storeSwitcherOpen, setStoreSwitcherOpen] = useState(false);
+  const [tooltipsEnabled, setTooltipsEnabledState] = useState(() => {
+    if (typeof window === "undefined") return true;
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY_TOOLTIPS);
+      return saved !== null ? saved !== "false" : true;
+    } catch {
+      return true;
+    }
+  });
   const isOnline = useSyncExternalStore(subscribeOnline, getOnlineSnapshot, getServerSnapshot);
 
   const toggleCalculator = useCallback(() => setCalculatorOpen((o) => !o), []);
+
+  const setTooltipsEnabled = useCallback((val: boolean) => {
+    setTooltipsEnabledState(val);
+    try {
+      localStorage.setItem(STORAGE_KEY_TOOLTIPS, String(val));
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  const toggleTooltips = useCallback(() => {
+    setTooltipsEnabledState((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem(STORAGE_KEY_TOOLTIPS, String(next));
+      } catch {
+        // ignore
+      }
+      return next;
+    });
+  }, []);
 
   const setCollapsed = useCallback((val: boolean) => {
     setCollapsedState(val);
@@ -258,6 +294,9 @@ export function ShellProvider({
         setNotificationsOpen,
         storeSwitcherOpen,
         setStoreSwitcherOpen,
+        tooltipsEnabled,
+        setTooltipsEnabled,
+        toggleTooltips,
         isOnline,
         storeName,
         currentStore,

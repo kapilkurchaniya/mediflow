@@ -46,7 +46,7 @@ export default async function ExpensesPage({
   const canViewAllStores = can(ctx, "report.all_stores");
 
   const dateRange = resolveDateRange({
-    range: params.range || "this_month",
+    range: params.range || "month",
     from: params.from,
     to: params.to,
   });
@@ -87,7 +87,7 @@ export default async function ExpensesPage({
 
       {/* Date Range Toolbar */}
       <div className="card p-2.5 sm:p-3 bg-white border border-ink-150 shadow-2xs flex flex-wrap items-center justify-between gap-3">
-        <DateRangeFilter />
+        <DateRangeFilter defaultRange="month" />
       </div>
 
       <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">

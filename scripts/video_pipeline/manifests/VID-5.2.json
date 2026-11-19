@@ -1,0 +1,47 @@
+{
+  "id": "VID-5.2",
+  "series": "Purchasing, GRN & Distributor Operations",
+  "part": 2,
+  "totalParts": 7,
+  "title": "Recording a Supplier Bill (GRN) Inward Entry",
+  "shortcut": "PURCHASE INWARD · GRN BILLING",
+  "role": "Purchase Managers, Stock Controllers & Accountants",
+  "targetDurationSeconds": 60,
+  "voice": "en-IN-PrabhatNeural",
+  "intro": {
+    "duration": 4,
+    "title": "Supplier Bill & GRN Inward",
+    "subtitle": "Distributor invoice logging, batch numbering, expiry verification, and automated GST input tax calculations",
+    "badge": "GRN INWARD ENTRY"
+  },
+  "narration": [
+    {
+      "id": "scene-1",
+      "text": "Welcome to Phase 5, Part 2: Recording a Supplier Bill or Goods Receipt Note. Logging distributor invoices accurately updates physical inventory and locks in statutory purchase tax."
+    },
+    {
+      "id": "scene-2",
+      "text": "Go to Purchases and click Inward Stock. Select your registered distributor and enter the physical invoice number and bill date."
+    },
+    {
+      "id": "scene-3",
+      "text": "Add medicines to the invoice table. For each line, enter the supplier's Batch Number, Expiry Date, and Received Quantity."
+    },
+    {
+      "id": "scene-4",
+      "text": "Specify the Purchase Rate and Maximum Retail Price. MediFlow instantly validates the margin percentage and applies the item's GST tax tier."
+    },
+    {
+      "id": "scene-5",
+      "text": "Review invoice subtotals, GST breakdown, and rounded net payable. Click Save Inward Bill to update stock batches across all pharmacy counters. In Part 3, we dive into Trade Schemes and Landed Cost Dilution."
+    }
+  ],
+  "outro": {
+    "duration": 4,
+    "takeaway": "GRN Inward Entry: Inward distributor stock with batch details, expiry dates, purchase rates, and GST taxes to immediately replenish counter inventory.",
+    "nextPart": {
+      "id": "VID-5.3",
+      "title": "Part 3: Pharma Schemes: 10+1 Free, TD%, CD% & Landed Cost Dilution"
+    }
+  }
+}

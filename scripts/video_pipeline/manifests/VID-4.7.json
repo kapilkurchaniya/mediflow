@@ -1,0 +1,47 @@
+{
+  "id": "VID-4.7",
+  "series": "Inventory, Batches & Warehouse Operations",
+  "part": 7,
+  "totalParts": 8,
+  "title": "Monitoring Batches, Near-Expiry (≤90 Days) & Expired Badges",
+  "shortcut": "EXPIRY TRACKING · ≤90 DAYS ALERT & BADGES",
+  "role": "Pharmacists, Inventory Controllers & Cashiers",
+  "targetDurationSeconds": 55,
+  "voice": "en-IN-PrabhatNeural",
+  "intro": {
+    "duration": 4,
+    "title": "Monitoring Batches & Expiry",
+    "subtitle": "Track batch-level shelf life, ≤90-day near-expiry warning dots, and expired danger locks",
+    "badge": "EXPIRY TRACKING · ≤90 DAYS"
+  },
+  "narration": [
+    {
+      "id": "scene-1",
+      "text": "Welcome to Phase 4, Part 7: Monitoring Batches, Near-Expiry, and Expired Badges. Timely expiry tracking protects your pharmacy against dead stock losses and statutory non-compliance."
+    },
+    {
+      "id": "scene-2",
+      "text": "Navigate to Batches and Stock. The top summary cards immediately display active batches, inventory valuation at PTR, and the count of batches expiring within 90 days."
+    },
+    {
+      "id": "scene-3",
+      "text": "Click the Expiring in ≤ 90 Days filter tab. The view narrows exclusively to vulnerable batches, color-coding urgency with yellow warning dots and red danger badges."
+    },
+    {
+      "id": "scene-4",
+      "text": "Batches with under 30 days remaining are flagged in bold red. This visual clarity enables your counter staff to prioritize sales or initiate distributor returns before expiry locks out the stock."
+    },
+    {
+      "id": "scene-5",
+      "text": "Export the audit list or review individual racks for prompt action. In Part 8, we will explore configuring Supplier Trade Schemes like Buy 10 Get 1 Free."
+    }
+  ],
+  "outro": {
+    "duration": 4,
+    "takeaway": "Near-Expiry Tracking: Filter batches expiring within 90 days, monitor color-coded urgency badges, and prevent dead inventory before drug shelf life elapses.",
+    "nextPart": {
+      "id": "VID-4.8",
+      "title": "Part 8: Configuring Supplier Trade Schemes (Buy 10 Get 1 Free)"
+    }
+  }
+}

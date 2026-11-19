@@ -11,6 +11,7 @@ import bcrypt from "bcryptjs";
 import * as schema from "../src/server/db/schema";
 import { seedSystemRoles } from "../src/server/roles";
 import { recordStockMovement } from "../src/server/domain/stock";
+import { getISTDateParts } from "../src/server/domain/accounting-periods/period-resolver";
 import { validateE2EDatabaseUrl } from "./seed-e2e-guard";
 
 async function main() {
@@ -58,29 +59,42 @@ async function main() {
     .returning();
 
   // Ensure open year-end period controls exist for store to satisfy fail-closed stock movement trigger
-  await db.insert(schema.yearEndPeriodControls).values([
-    {
-      tenantId: tenant.id,
-      storeId: store.id,
-      fiscalYear: "2026-2027",
-      cutoffDate: new Date("2027-03-31T18:29:59.000Z"),
-      status: "open",
-    },
-    {
-      tenantId: tenant.id,
-      storeId: store.id,
-      fiscalYear: "2025-2026",
-      cutoffDate: new Date("2026-03-31T18:29:59.000Z"),
-      status: "open",
-    },
-    {
-      tenantId: tenant.id,
-      storeId: store.id,
-      fiscalYear: "2024-2025",
-      cutoffDate: new Date("2025-03-31T18:29:59.000Z"),
-      status: "open",
-    },
-  ]);
+  const { year: istYear, month: istMonth } = getISTDateParts(new Date());
+  const fyStart = istMonth >= 4 ? istYear : istYear - 1;
+  const currentFy = `${fyStart}-${fyStart + 1}`;
+  await db
+    .insert(schema.yearEndPeriodControls)
+    .values([
+      {
+        tenantId: tenant.id,
+        storeId: store.id,
+        fiscalYear: "2026-2027",
+        cutoffDate: new Date("2027-03-31T18:29:59.000Z"),
+        status: "open",
+      },
+      {
+        tenantId: tenant.id,
+        storeId: store.id,
+        fiscalYear: "2025-2026",
+        cutoffDate: new Date("2026-03-31T18:29:59.000Z"),
+        status: "open",
+      },
+      {
+        tenantId: tenant.id,
+        storeId: store.id,
+        fiscalYear: "2024-2025",
+        cutoffDate: new Date("2025-03-31T18:29:59.000Z"),
+        status: "open",
+      },
+      {
+        tenantId: tenant.id,
+        storeId: store.id,
+        fiscalYear: currentFy,
+        cutoffDate: new Date(`${fyStart + 1}-03-31T18:29:59.000Z`),
+        status: "open",
+      },
+    ])
+    .onConflictDoNothing();
 
   // 6. Seed System Roles & Permissions
   const roleIds = await seedSystemRoles(db, tenant.id);

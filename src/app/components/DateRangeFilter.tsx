@@ -1,20 +1,21 @@
 "use client";
 
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
-import { useCallback, useMemo } from "react";
+import { useCallback } from "react";
 import { Calendar } from "lucide-react";
 import clsx from "clsx";
+import { resolveDateRange } from "@/lib/date-range";
 
 const PRESETS = [
-  { label: "Today", key: "today" },
-  { label: "Yesterday", key: "yesterday" },
-  { label: "Last 7 days", key: "7d" },
-  { label: "Last 30 days", key: "30d" },
-  { label: "This month", key: "month" },
-  { label: "Last month", key: "last-month" },
-  { label: "This quarter", key: "quarter" },
-  { label: "This year", key: "year" },
-  { label: "All time", key: "all" },
+  { label: "Today", key: "today", tip: "Filter records posted today (current calendar day)." },
+  { label: "Yesterday", key: "yesterday", tip: "Filter records posted on the previous calendar day." },
+  { label: "Last 7 days", key: "7d", tip: "Filter records from the past 7 rolling days." },
+  { label: "Last 30 days", key: "30d", tip: "Filter records from the past 30 rolling days." },
+  { label: "This month", key: "month", tip: "Filter records from the 1st of the current month through today." },
+  { label: "Last month", key: "last-month", tip: "Filter records from the entire previous calendar month." },
+  { label: "This quarter", key: "quarter", tip: "Filter records from the start of the current 3-month quarter." },
+  { label: "This year", key: "year", tip: "Filter records from January 1st of the current year through today." },
+  { label: "All time", key: "all", tip: "Show all historical records without any date restriction." },
 ] as const;
 
 export type PresetKey = (typeof PRESETS)[number]["key"];
@@ -24,52 +25,19 @@ export type PresetKey = (typeof PRESETS)[number]["key"];
  * "All time" returns null dates.
  */
 export function resolvePreset(key: string): { from: string | null; to: string | null } {
-  const now = new Date();
-  const y = now.getFullYear();
-  const m = now.getMonth();
-  const d = now.getDate();
-
-  function fmt(dt: Date) {
-    return dt.toISOString().split("T")[0];
-  }
-
-  switch (key) {
-    case "today":
-      return { from: fmt(new Date(y, m, d)), to: fmt(new Date(y, m, d)) };
-    case "yesterday": {
-      const yd = new Date(y, m, d - 1);
-      return { from: fmt(yd), to: fmt(yd) };
-    }
-    case "7d":
-      return { from: fmt(new Date(y, m, d - 6)), to: fmt(now) };
-    case "30d":
-      return { from: fmt(new Date(y, m, d - 29)), to: fmt(now) };
-    case "month":
-      return { from: fmt(new Date(y, m, 1)), to: fmt(now) };
-    case "last-month":
-      return { from: fmt(new Date(y, m - 1, 1)), to: fmt(new Date(y, m, 0)) };
-    case "quarter": {
-      const qStart = new Date(y, Math.floor(m / 3) * 3, 1);
-      return { from: fmt(qStart), to: fmt(now) };
-    }
-    case "year":
-      return { from: fmt(new Date(y, 0, 1)), to: fmt(now) };
-    case "all":
-    default:
-      return { from: null, to: null };
-  }
+  return resolveDateRange({ range: key });
 }
 
 /**
  * Client-side date range filter with preset chips + custom date inputs.
  * Works via URL search params — no client state needed on the page component.
  */
-export function DateRangeFilter() {
+export function DateRangeFilter({ defaultRange = "all" }: { defaultRange?: PresetKey } = {}) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
-  const activePreset = searchParams.get("range") || "all";
+  const activePreset = searchParams.get("range") || defaultRange;
   const customFrom = searchParams.get("from") || "";
   const customTo = searchParams.get("to") || "";
   const isCustom = activePreset === "custom";
@@ -88,13 +56,13 @@ export function DateRangeFilter() {
 
   const handlePreset = useCallback(
     (key: string) => {
-      if (key === "all") {
+      if (key === "all" && defaultRange === "all") {
         updateParams({ range: null, from: null, to: null });
       } else {
         updateParams({ range: key, from: null, to: null });
       }
     },
-    [updateParams],
+    [updateParams, defaultRange],
   );
 
   const handleCustomDate = useCallback(
@@ -115,6 +83,8 @@ export function DateRangeFilter() {
             key={preset.key}
             type="button"
             onClick={() => handlePreset(preset.key)}
+            data-tooltip-title={`Date Filter: ${preset.label}`}
+            data-tooltip={preset.tip}
             className={clsx(
               "rounded-md px-2.5 py-1 text-[12px] font-medium transition-all duration-150",
               activePreset === preset.key && !isCustom

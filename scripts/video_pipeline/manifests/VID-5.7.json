@@ -1,0 +1,47 @@
+{
+  "id": "VID-5.7",
+  "series": "Purchasing, GRN & Distributor Operations",
+  "part": 7,
+  "totalParts": 7,
+  "title": "Reviewing Supplier Ledgers & Recording Payment Vouchers",
+  "shortcut": "SUPPLIER LEDGER · PAYMENT VOUCHERS",
+  "role": "Accountants, Store Owners & Cashiers",
+  "targetDurationSeconds": 55,
+  "voice": "en-IN-PrabhatNeural",
+  "intro": {
+    "duration": 4,
+    "title": "Supplier Ledgers & Payments",
+    "subtitle": "Track distributor closing balances, bill-by-bill settlements, NEFT/UPI bank references, and cash vouchers",
+    "badge": "SUPPLIER LEDGER · PAYMENTS"
+  },
+  "narration": [
+    {
+      "id": "scene-1",
+      "text": "Welcome to Phase 5, Part 7: Reviewing Supplier Ledgers and Recording Payment Vouchers. Maintaining transparent vendor accounts prevents disputed dues and guarantees uninterrupted distributor credit."
+    },
+    {
+      "id": "scene-2",
+      "text": "Open a supplier profile. The ledger dashboard summarizes total purchases, returns, previous payments, and the real-time closing payable balance."
+    },
+    {
+      "id": "scene-3",
+      "text": "Click Record Payment. The payment portal displays outstanding invoices with options to clear specific bills or settle a partial lump sum."
+    },
+    {
+      "id": "scene-4",
+      "text": "Select your payment method: Bank Transfer NEFT, UPI, or Cheque. Enter the bank UTR transaction reference and payment date."
+    },
+    {
+      "id": "scene-5",
+      "text": "Save the payment voucher. The supplier's outstanding ledger balance reduces immediately, generating an audited cash book entry. This concludes Phase 5!"
+    }
+  ],
+  "outro": {
+    "duration": 4,
+    "takeaway": "Supplier Ledgers & Payments: Track real-time distributor payables, record bank and UPI payments with UTR references, and keep supplier accounts reconciled.",
+    "nextPart": {
+      "id": "VID-6.1",
+      "title": "Phase 6, Part 1: Customer Directory, Medical Profiles & Credit Configuration"
+    }
+  }
+}

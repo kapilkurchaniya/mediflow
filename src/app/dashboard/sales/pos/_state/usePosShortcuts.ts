@@ -16,6 +16,7 @@ export interface ShortcutHandlers {
   onOpenShortcutsCheatSheet?: () => void;
   onEscape?: () => void;
   isModalOpen?: boolean;
+  allowCompleteSaleInModal?: boolean;
 }
 
 export function usePosShortcuts(handlers: ShortcutHandlers) {
@@ -35,10 +36,13 @@ export function usePosShortcuts(handlers: ShortcutHandlers) {
         return;
       }
 
-      // If a modal is open, only allow Escape or F12 (calculator toggle) to prevent hijacking dialog inputs
+      // If a modal is open, only allow Escape, F12 (calculator), or F10 (when payment settlement modal is open)
       if (isModalActive) {
         if (e.key === "Escape") {
           handlers.onEscape?.();
+        } else if (e.key === "F10" && handlers.allowCompleteSaleInModal) {
+          e.preventDefault();
+          handlers.onCompleteSale?.();
         } else if (e.key === "F12") {
           e.preventDefault();
           handlers.onOpenCalculator?.();

@@ -1,0 +1,47 @@
+{
+  "id": "VID-6.1",
+  "series": "Customer Relationship Management (CRM) & Loyalty",
+  "part": 1,
+  "totalParts": 5,
+  "title": "Customer Directory, Medical Profiles & Credit Configuration",
+  "shortcut": "CUSTOMER DIRECTORY · CREDIT LIMITS",
+  "role": "Pharmacists, Cashiers & Store Managers",
+  "targetDurationSeconds": 55,
+  "voice": "en-IN-PrabhatNeural",
+  "intro": {
+    "duration": 4,
+    "title": "Customer Directory & Credit Setup",
+    "subtitle": "Patient records, WhatsApp contact, B2B GSTIN place of supply, and credit limits",
+    "badge": "CRM · PATIENT PROFILES"
+  },
+  "narration": [
+    {
+      "id": "scene-1",
+      "text": "Welcome to Phase 6, Part 1: Customer Directory, Medical Profiles and Credit Configuration. Building detailed patient profiles enables personalized care, digital WhatsApp invoices, and controlled store credit."
+    },
+    {
+      "id": "scene-2",
+      "text": "Open Customers and click New Customer. Enter the patient's full name, mobile number for WhatsApp delivery, and email."
+    },
+    {
+      "id": "scene-3",
+      "text": "For institutional or business clients, enter their fifteen-character GSTIN. MediFlow automatically extracts the state code and determines intra or inter-state GST rules."
+    },
+    {
+      "id": "scene-4",
+      "text": "Set financial credit parameters. Establishing a credit limit allows the customer to purchase via Khata credit while safeguarding your cash flow."
+    },
+    {
+      "id": "scene-5",
+      "text": "Save the customer. The profile is active instantly across all POS counters, with credit balances monitored on every bill. In Part 2, we explore Family Health Groups!"
+    }
+  ],
+  "outro": {
+    "duration": 4,
+    "takeaway": "Customer Directory: Maintain verified patient records, B2B GSTIN tax states, and Khata credit limits to build lasting customer trust.",
+    "nextPart": {
+      "id": "VID-6.2",
+      "title": "Part 2: Family Health Groups & Shared Household Credit Limits"
+    }
+  }
+}
