@@ -61,31 +61,12 @@ export function GoogleSignupForm({ name, email }: { name: string; email: string 
               />
             </div>
 
-            <div>
-              <div className="flex items-center justify-between mb-1.5">
-                <label htmlFor="google-password" className="block text-sm font-medium text-slate-700">
-                  Set Password <span className="text-slate-400 font-normal">(Optional)</span>
-                </label>
-              </div>
-              <input
-                id="google-password"
-                name="password"
-                type="password"
-                autoComplete="new-password"
-                className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-brand-500 transition-all"
-                placeholder="Min 8 chars — leave blank to skip"
-              />
-              <p className="mt-1.5 text-xs text-slate-500">
-                You can skip this now and set a password later in Account Settings.
-              </p>
-            </div>
-
             <button
               type="submit"
               disabled={isPending}
               className="w-full flex justify-center py-3.5 px-4 border border-transparent rounded-xl shadow-sm text-sm font-bold text-white bg-brand-600 hover:bg-brand-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-500 transition-all disabled:opacity-70"
             >
-              {isPending ? "Creating workspace..." : "Create Workspace & Go to Dashboard"}
+              {isPending ? "Creating workspace..." : "Continue to Password Setup"}
             </button>
           </form>
 
