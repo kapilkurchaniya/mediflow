@@ -101,9 +101,6 @@ export async function registerAction(prevState: { error?: string; success?: bool
   if (!name || !email || !password || !pharmacyName) {
     return { error: "All fields are required" };
   }
-  if (password.length < 8) {
-    return { error: "Password must be at least 8 characters long" };
-  }
 
   const emailLower = email.trim().toLowerCase();
 
@@ -116,6 +113,9 @@ export async function registerAction(prevState: { error?: string; success?: bool
 
     if (existingUsers.length > 0) {
       return { error: "Email already in use" };
+    }
+    if (password.length < 8) {
+      return { error: "Password must be at least 8 characters long" };
     }
 
     const passwordHash = await hashPassword(password);
