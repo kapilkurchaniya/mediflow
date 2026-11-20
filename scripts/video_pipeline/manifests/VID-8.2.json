@@ -1,0 +1,47 @@
+{
+  "id": "VID-8.2",
+  "series": "Accounting, Cash Flow & Financial Ledgers",
+  "part": 2,
+  "totalParts": 5,
+  "title": "Settle Customer Khata: Recording Receipts against Bills",
+  "shortcut": "CUSTOMER KHATA · RECEIPTS",
+  "role": "Cashiers & Accountants",
+  "targetDurationSeconds": 55,
+  "voice": "en-IN-PrabhatNeural",
+  "intro": {
+    "duration": 4,
+    "title": "Customer Khata Receipts",
+    "subtitle": "Record customer payments, bill-by-bill FIFO allocation, UPI references, and WhatsApp vouchers",
+    "badge": "ACCOUNTING · KHATA RECEIPTS"
+  },
+  "narration": [
+    {
+      "id": "scene-1",
+      "text": "Welcome to Phase 8, Part 2: Settle Customer Khata: Recording Receipts against Bills. In Phase 2, we issued credit sales to patients. Today, we record payments to settle outstanding Khata balances."
+    },
+    {
+      "id": "scene-2",
+      "text": "Go to Accounting and select Receipts, then click New Receipt. Search for the customer or family group to load all outstanding credit bills."
+    },
+    {
+      "id": "scene-3",
+      "text": "Choose your payment mode: Cash, UPI, or Bank Transfer. Enter the bank transaction reference number and receipt date."
+    },
+    {
+      "id": "scene-4",
+      "text": "Enter the amount received. MediFlow automatically allocates the payment against oldest unpaid bills in real time, safely holding any surplus overpayment as an unallocated Customer Advance."
+    },
+    {
+      "id": "scene-5",
+      "text": "Save the receipt to issue an audited RCT voucher and send an instant WhatsApp confirmation to the patient. In Part 3, we examine Financial Statements!"
+    }
+  ],
+  "outro": {
+    "duration": 4,
+    "takeaway": "Customer Khata Receipts: Collect patient credit dues, allocate receipts against specific invoices, and issue verified WhatsApp payment vouchers.",
+    "nextPart": {
+      "id": "VID-8.3",
+      "title": "Part 3: Real-Time Financial Statements: Trial Balance, P&L & Balance Sheet"
+    }
+  }
+}

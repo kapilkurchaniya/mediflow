@@ -1,0 +1,47 @@
+{
+  "id": "VID-2.16",
+  "series": "POS Counter Mastery",
+  "part": 16,
+  "totalParts": 18,
+  "title": "Customer Sale Returns & Statutory GST Credit Notes (Alt + R)",
+  "shortcut": "ALT + R · CREDIT NOTE",
+  "role": "Cashiers, Pharmacists & Store Managers",
+  "targetDurationSeconds": 58,
+  "voice": "en-IN-PrabhatNeural",
+  "intro": {
+    "duration": 4,
+    "title": "Customer Sale Returns & Credit Notes",
+    "subtitle": "Partial strip and tablet returns, automatic expiry quarantine, sequential CN numbers, and GSTR-1 reporting",
+    "badge": "ALT + R · CREDIT NOTE"
+  },
+  "narration": [
+    {
+      "id": "scene-1",
+      "text": "Welcome to Phase 2, Part 16: Customer Sale Returns and Statutory GST Credit Notes. When patients return unconsumed medicines or alter prescriptions, MediFlow issues verified credit notes with strict compliance."
+    },
+    {
+      "id": "scene-2",
+      "text": "Open the completed invoice and click Return Items, or press Alt plus R from the invoice screen to open the Return workflow."
+    },
+    {
+      "id": "scene-3",
+      "text": "MediFlow supports partial returns across both full strips and fractional loose tablets, with strict quantity caps ensuring you never return more than originally billed."
+    },
+    {
+      "id": "scene-4",
+      "text": "Returned medicines are restored to their exact original batch. If the batch expired after the bill date, MediFlow automatically places the stock into statutory quarantine hold."
+    },
+    {
+      "id": "scene-5",
+      "text": "Submit the return to generate a permanent sequential Credit Note voucher, adjust customer khata, and report to GSTR-1. In Part 17, we master Cash Register Shifts and Drawer Audits!"
+    }
+  ],
+  "outro": {
+    "duration": 4,
+    "takeaway": "Customer Sale Returns: Issue sequential GST credit notes, restore batches with automatic expiry quarantine, and enforce exact quantity return caps.",
+    "nextPart": {
+      "id": "VID-2.17",
+      "title": "Part 17: Cash Register Shifts: Opening Float, Drawer Reconciliation, X & Z-Reports"
+    }
+  }
+}

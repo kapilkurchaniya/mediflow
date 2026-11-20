@@ -1,0 +1,47 @@
+{
+  "id": "VID-4.3",
+  "series": "Inventory, Batches & Warehouse Operations",
+  "part": 3,
+  "totalParts": 8,
+  "title": "Organizing Racks & Shelves (R1-S3) for Rapid Counter Picking",
+  "shortcut": "RACK MANAGEMENT · R1-S3 PHYSICAL SLOTS",
+  "role": "Store Managers & Pharmacy Pickers",
+  "targetDurationSeconds": 45,
+  "voice": "en-IN-PrabhatNeural",
+  "intro": {
+    "duration": 4,
+    "title": "Rack & Shelf Organization",
+    "subtitle": "Physical warehouse layout, shelf coding (R1-S3), and instant 3-second counter retrieval",
+    "badge": "RACK CODES · RAPID PICKING"
+  },
+  "narration": [
+    {
+      "id": "scene-1",
+      "text": "Welcome to Phase 4, Part 3: Organizing Racks and Shelves for Rapid Counter Picking. Systematic shelf coding eliminates customer wait times during peak counter rush."
+    },
+    {
+      "id": "scene-2",
+      "text": "In Settings, navigate to Racks and Shelves. Here you can map your entire pharmacy floor plan with structured aisles, tiers, and bin codes."
+    },
+    {
+      "id": "scene-3",
+      "text": "Click Add Rack to define a new location code like R1-S3, naming it Fast-Moving Antibiotics with clear physical descriptions."
+    },
+    {
+      "id": "scene-4",
+      "text": "Assign each medicine to its designated shelf slot in the item master to maintain synchronized inventory organization."
+    },
+    {
+      "id": "scene-5",
+      "text": "At the POS counter, the exact rack code appears instantly in search results, enabling cashiers to retrieve items in seconds. Next: Opening Stock Batches."
+    }
+  ],
+  "outro": {
+    "duration": 4,
+    "takeaway": "Rack Management: Organize your pharmacy using systematic codes like R1-S3 to display physical shelf locations during counter search for under-3-second picking.",
+    "nextPart": {
+      "id": "VID-4.4",
+      "title": "Part 4: Adding Initial Inventory via Opening Stock Batches"
+    }
+  }
+}

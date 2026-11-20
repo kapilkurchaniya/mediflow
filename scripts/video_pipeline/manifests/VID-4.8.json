@@ -1,0 +1,47 @@
+{
+  "id": "VID-4.8",
+  "series": "Inventory, Batches & Warehouse Operations",
+  "part": 8,
+  "totalParts": 8,
+  "title": "Configuring Supplier Trade Schemes (Buy 10 Get 1 Free)",
+  "shortcut": "TRADE SCHEMES · BUY 10 GET 1 FREE",
+  "role": "Inventory Controllers, Purchase Managers & Store Owners",
+  "targetDurationSeconds": 55,
+  "voice": "en-IN-PrabhatNeural",
+  "intro": {
+    "duration": 4,
+    "title": "Supplier Trade Schemes",
+    "subtitle": "Set up automated Buy X Get Y bonus units, volume trade discounts, and diluted landed cost calculations",
+    "badge": "TRADE SCHEMES · 10+1 FREE"
+  },
+  "narration": [
+    {
+      "id": "scene-1",
+      "text": "Welcome to Phase 4, Part 8: Configuring Supplier Trade Schemes, like Buy 10 Get 1 Free. Trade schemes automate bonus unit calculations during inward purchasing and counter sales."
+    },
+    {
+      "id": "scene-2",
+      "text": "Navigate to Settings, then Trade Schemes. Click Create New Scheme to open the promotion configuration builder."
+    },
+    {
+      "id": "scene-3",
+      "text": "Select the Buy X Get Y promotion card. Enter a scheme title, set the Buy Quantity to 10, and Free Quantity to 1."
+    },
+    {
+      "id": "scene-4",
+      "text": "Choose the target scope: Apply it store-wide, by therapeutic drug category, or target a specific medicine like Paracetamol 650."
+    },
+    {
+      "id": "scene-5",
+      "text": "Save the scheme. The deal is immediately active across MediFlow, automatically computing bonus units and diluted landed costs in GRNs. This concludes Phase 4!"
+    }
+  ],
+  "outro": {
+    "duration": 4,
+    "takeaway": "Trade Schemes: Automate Buy X Get Y bonus inventory, prevent manual calculator errors, and accurately track net landed costs during purchasing.",
+    "nextPart": {
+      "id": "VID-5.1",
+      "title": "Phase 5, Part 1: Adding Suppliers & Distributor Profiles (GSTIN & State Code)"
+    }
+  }
+}

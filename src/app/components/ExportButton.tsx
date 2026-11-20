@@ -56,7 +56,8 @@ export function ExportButton({
       onClick={handleExport}
       disabled={isExporting}
       className="btn btn-secondary"
-      title="Download CSV register"
+      data-tooltip-title="Download CSV Export"
+      data-tooltip="Export the currently filtered register to a CSV spreadsheet for Excel or Tally/CA review."
     >
       {isExporting ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Download className="h-4 w-4 mr-1" />}
       {isExporting ? "Exporting..." : label}

@@ -1,0 +1,52 @@
+{
+  "id": "VID-2.1",
+  "series": "POS Counter Mastery",
+  "part": 1,
+  "totalParts": 14,
+  "title": "Basic Counter Billing: Fast Search & Auto-FEFO",
+  "shortcut": "F2 · F3 · F10",
+  "role": "Pharmacy Cashiers & Billing Operators",
+  "targetDurationSeconds": 58,
+  "voice": "en-IN-PrabhatNeural",
+  "intro": {
+    "duration": 4,
+    "title": "Basic Counter Billing & Auto-FEFO",
+    "subtitle": "High-speed medicine lookup, automated batch picking, and instant checkout",
+    "badge": "F2 · F3 · F10"
+  },
+  "narration": [
+    {
+      "id": "scene-1",
+      "text": "Welcome to Phase 2, Part 1: POS Counter Mastery. At a busy pharmacy counter, speed is essential. Press F2 anytime to clear the counter and initialize a fresh customer bill.",
+      "caption": "Press F2 to clear counter and initialize a fresh customer bill."
+    },
+    {
+      "id": "scene-2",
+      "text": "Press F3 or forward slash to jump straight to the search bar. MediFlow searches Brand Names, Generic Molecules, and Barcodes simultaneously without needing a mouse.",
+      "caption": "Press F3 or / to search brand names, molecules, and barcodes instantly."
+    },
+    {
+      "id": "scene-3",
+      "text": "Notice the Auto-FEFO recommendation. MediFlow automatically prioritizes the earliest expiring batch in your racks, protecting your store from dead stock and shelf expiry loss.",
+      "caption": "Auto-FEFO automatically picks the earliest expiring batch in your racks."
+    },
+    {
+      "id": "scene-4",
+      "text": "Press Enter to add the medicine to your active cart. The bill updates instantly with pack quantity, loose tablets, MRP, GST rates, and live net payable.",
+      "caption": "Instant cart insertion with pack quantity, MRP, GST breakdown, and net total."
+    },
+    {
+      "id": "scene-5",
+      "text": "To finalize the sale, simply press F10. MediFlow generates the GST tax invoice, deducts inventory, and opens the thermal print receipt. Watch Part 2 for Barcode Scanning.",
+      "caption": "Press F10 to complete sale, deduct stock, and print thermal receipt."
+    }
+  ],
+  "outro": {
+    "duration": 4,
+    "takeaway": "Auto-FEFO Rule: Always dispense the earliest expiring batch first to prevent shelf expiration loss.",
+    "nextPart": {
+      "id": "VID-2.2",
+      "title": "Part 2: Barcode Scanning & Instant Pack Insertion"
+    }
+  }
+}

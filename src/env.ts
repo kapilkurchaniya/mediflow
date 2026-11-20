@@ -94,7 +94,7 @@ const envSchema = z
     // ─── Database Pool & Performance (Phase 6.2) ───────────────────────────
     DB_POOL_MAX: z.coerce.number().int().min(1).max(100).default(10),
     DB_POOL_MIN: z.coerce.number().int().min(0).max(20).default(2),
-    DB_POOL_IDLE_TIMEOUT_MS: z.coerce.number().int().min(1000).default(30000),
+    DB_POOL_IDLE_TIMEOUT_MS: z.coerce.number().int().min(1000).default(300000),
     DB_POOL_CONNECTION_TIMEOUT_MS: z.coerce.number().int().min(500).default(5000),
     DB_STATEMENT_TIMEOUT_MS: z.coerce.number().int().min(1000).default(15000),
 

@@ -48,6 +48,13 @@ next-env.d.ts
 # Local medicine dataset (downloaded by scripts/fetch-dataset.ts)
 scripts/Indian-Medicine-Dataset/
 
+# Local media, scratch and test artifacts
+/recordings/
+/reports/
+/scratch/
+__pycache__/
+*.pyc
+
 # ...but keep the documented templates
 !.env.example
 !.env.test.example

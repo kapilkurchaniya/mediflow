@@ -1,0 +1,47 @@
+{
+  "id": "VID-4.6",
+  "series": "Inventory, Batches & Warehouse Operations",
+  "part": 6,
+  "totalParts": 8,
+  "title": "Bulk Import Preview, Validation & AI Enrichment",
+  "shortcut": "BULK PREVIEW · AI ENRICHMENT & VALIDATION",
+  "role": "Inventory Controllers & IT Migration Leads",
+  "targetDurationSeconds": 55,
+  "voice": "en-IN-PrabhatNeural",
+  "intro": {
+    "duration": 4,
+    "title": "Bulk Preview & AI Enrichment",
+    "subtitle": "Interactive row validation, AI auto-enrichment of manufacturers and categories, and 1-click catalog import",
+    "badge": "VALIDATION & AI ENRICH"
+  },
+  "narration": [
+    {
+      "id": "scene-1",
+      "text": "Welcome to Phase 4, Part 6: Bulk Import Preview, Validation, and AI Enrichment. Once your CSV is parsed, MediFlow validates every row to keep your catalog error-free."
+    },
+    {
+      "id": "scene-2",
+      "text": "Examine the status dashboard: Green rows indicate valid entries, while yellow warnings flag missing MRPs or quantities that require your attention."
+    },
+    {
+      "id": "scene-3",
+      "text": "Click Auto-Enrich Missing Data. MediFlow's AI scans Indian pharma drug databases to automatically fill missing manufacturers, salts, and therapeutic categories."
+    },
+    {
+      "id": "scene-4",
+      "text": "Inspect the refreshed table. Warnings resolve automatically as accurate market MRPs and manufacturer brands are appended."
+    },
+    {
+      "id": "scene-5",
+      "text": "Click Import All Data to commit the items. Hundreds of medicines and traceable batches are generated simultaneously, ready for immediate counter billing."
+    }
+  ],
+  "outro": {
+    "duration": 4,
+    "takeaway": "Validation & AI Enrichment: Preview parsed spreadsheet rows, auto-fill missing pharmaceutical metadata using AI, and commit clean inventory batches with one click.",
+    "nextPart": {
+      "id": "VID-4.7",
+      "title": "Part 7: Monitoring Batches, Near-Expiry (≤90 Days) & Expired Badges"
+    }
+  }
+}

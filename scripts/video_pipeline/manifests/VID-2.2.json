@@ -1,0 +1,47 @@
+{
+  "id": "VID-2.2",
+  "series": "POS Counter Mastery",
+  "part": 2,
+  "totalParts": 14,
+  "title": "Barcode Scanning & Instant Pack Insertion",
+  "shortcut": "BARCODE · SCAN",
+  "role": "Pharmacy Cashiers & Pharmacists",
+  "targetDurationSeconds": 50,
+  "voice": "en-IN-PrabhatNeural",
+  "intro": {
+    "duration": 4,
+    "title": "Barcode Scanning & Instant Cart Insertion",
+    "subtitle": "High-speed handheld scanning, zero-click item addition, and instant totals",
+    "badge": "BARCODE · SCANNER"
+  },
+  "narration": [
+    {
+      "id": "scene-1",
+      "text": "Welcome to Phase 2, Part 2: Barcode Scanning. In a busy Indian pharmacy, reaching for the mouse or typing every medicine name creates queues. MediFlow supports all standard USB and wireless barcode scanners out of the box."
+    },
+    {
+      "id": "scene-2",
+      "text": "Simply point your barcode gun at the medicine box or strip. MediFlow's smart input listener automatically detects high-speed hardware scans without needing you to click the search bar first."
+    },
+    {
+      "id": "scene-3",
+      "text": "Watch as the barcode is scanned. You hear the confirmation beep, and Azithromycin 500 milligram is instantly inserted into your active cart with its earliest expiring batch and MRP."
+    },
+    {
+      "id": "scene-4",
+      "text": "The live cart table immediately displays the pack quantity, GST rate, and net payable without a single extra keystroke, keeping your checkout line moving smoothly."
+    },
+    {
+      "id": "scene-5",
+      "text": "Barcode scanning eliminates dispensing errors and accelerates counter throughput. In Part 3, we will explore Loose Tablet and Strip Cutting for fractional billing."
+    }
+  ],
+  "outro": {
+    "duration": 4,
+    "takeaway": "Barcode Scanning: Instantly adds in-stock batches with zero manual clicks, preventing queue bottlenecks.",
+    "nextPart": {
+      "id": "VID-2.3",
+      "title": "Part 3: Loose Tablet & Strip Cutting: Fractional Billing"
+    }
+  }
+}

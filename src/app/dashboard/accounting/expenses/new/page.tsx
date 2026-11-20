@@ -51,6 +51,7 @@ export default async function NewExpensePage() {
         categories={categories}
         hasOpenShift={Boolean(openSession)}
         storeName={store?.name || "Active Store"}
+        initialOperationId={crypto.randomUUID()}
       />
     </div>
   );

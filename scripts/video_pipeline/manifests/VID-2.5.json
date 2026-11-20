@@ -1,0 +1,47 @@
+{
+  "id": "VID-2.5",
+  "series": "POS Counter Mastery",
+  "part": 5,
+  "totalParts": 14,
+  "title": "Split-Tender Payments & Cash Change Due",
+  "shortcut": "F8 · SPLIT TENDER",
+  "role": "Pharmacy Cashiers & Pharmacists",
+  "targetDurationSeconds": 58,
+  "voice": "en-IN-PrabhatNeural",
+  "intro": {
+    "duration": 4,
+    "title": "Split Payments & Cash Change Due",
+    "subtitle": "Multi-tender checkout (Cash + UPI + Card), automated change calculation, and instant reconciliation",
+    "badge": "F8 · SPLIT TENDER · CASH DUE"
+  },
+  "narration": [
+    {
+      "id": "scene-1",
+      "text": "Welcome to Phase 2, Part 5: Split-Tender Payments and Cash Change Due. At a modern pharmacy counter, customers frequently pay partially in cash and partially via UPI QR, or hand over a large currency note."
+    },
+    {
+      "id": "scene-2",
+      "text": "Press F8 or click Split Tender to open the multi-payment panel. MediFlow provides dedicated inputs for Cash, UPI, and Debit Card, along with One-Click Exact Tender shortcuts."
+    },
+    {
+      "id": "scene-3",
+      "text": "When a patient hands over a five-hundred rupee note for a smaller bill, type five hundred into the Cash box. MediFlow instantly calculates the exact change to return in green, preventing mental math mistakes."
+    },
+    {
+      "id": "scene-4",
+      "text": "For split payments, enter fifty rupees in Cash and one hundred rupees in UPI. The tendered total automatically balances the bill with zero remaining dues."
+    },
+    {
+      "id": "scene-5",
+      "text": "Press F10 or click Complete Sale to finalize the invoice with all payment methods printed on the thermal receipt. In Part 6, learn Customer Credit Sales and Khata Limit Control."
+    }
+  ],
+  "outro": {
+    "duration": 4,
+    "takeaway": "Split Tender (F8): Mix Cash, UPI, and Card on a single bill with automated change due calculation.",
+    "nextPart": {
+      "id": "VID-2.6",
+      "title": "Part 6: Customer Credit Sales ('Khata') & Limit Control (F8)"
+    }
+  }
+}

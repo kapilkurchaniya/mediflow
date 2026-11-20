@@ -1,0 +1,47 @@
+{
+  "id": "VID-2.18",
+  "series": "POS Counter Mastery",
+  "part": 18,
+  "totalParts": 18,
+  "title": "Redeeming Customer Loyalty Points on POS Counter (F8)",
+  "shortcut": "F8 · LOYALTY POINTS REDEMPTION",
+  "role": "Cashiers, Pharmacists & Store Managers",
+  "targetDurationSeconds": 50,
+  "voice": "en-IN-PrabhatNeural",
+  "intro": {
+    "duration": 4,
+    "title": "POS Loyalty Points Redemption",
+    "subtitle": "Customer points balance check, one-click Redeem Max, bill discounts, and automatic audit reconciliation",
+    "badge": "F8 · REDEEM POINTS · LOYALTY"
+  },
+  "narration": [
+    {
+      "id": "scene-1",
+      "text": "Welcome to Phase 2, Part 18: Redeeming Customer Loyalty Points on the POS Counter. Rewarding returning patients builds trust, drives customer retention, and increases lifetime basket value."
+    },
+    {
+      "id": "scene-2",
+      "text": "When billing, select a registered patient in the Customer picker. MediFlow instantly verifies and displays their active loyalty points and rupee redemption value on screen."
+    },
+    {
+      "id": "scene-3",
+      "text": "Press F8 or click Split Tender to open the settlement panel. Under Loyalty Points, enter the points to redeem or simply click Redeem Max to apply the full eligible discount."
+    },
+    {
+      "id": "scene-4",
+      "text": "The bill total updates instantly. MediFlow protects the transaction with row-level balance verification, logs an audited redeem event, and prints redeemed points directly on the receipt."
+    },
+    {
+      "id": "scene-5",
+      "text": "And if a bill is ever cancelled or returned, customer reward points are automatically restored! Congratulations on completing Phase 2: POS Counter Mastery!"
+    }
+  ],
+  "outro": {
+    "duration": 4,
+    "takeaway": "POS Loyalty Redemption: Check live customer balances, apply instant bill discounts with Redeem Max, and ensure automatic point restoration on bill reversals.",
+    "nextPart": {
+      "id": "VID-3.1",
+      "title": "Phase 3, Part 1: Dispensing Schedule H Prescription Medicines"
+    }
+  }
+}

@@ -96,6 +96,9 @@ export function NotificationsPopover() {
         )}
         aria-label="Notifications"
         aria-expanded={notificationsOpen}
+        data-tooltip-title="Store Alerts & Notifications"
+        data-tooltip="View near-expiry batch warnings, low-stock reorder alerts, and compliance reminders."
+        data-tooltip-placement="bottom"
       >
         <Bell className="h-4 w-4" />
         {unreadCount > 0 && (

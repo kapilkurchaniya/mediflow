@@ -1,0 +1,47 @@
+{
+  "id": "VID-2.9",
+  "series": "POS Counter Mastery",
+  "part": 9,
+  "totalParts": 14,
+  "title": "Auto-FEFO Batch Engine & Multi-Batch Slicing",
+  "shortcut": "AUTO-FEFO · FIRST-EXPIRY FIRST-OUT",
+  "role": "Pharmacists, Cashiers & Store Managers",
+  "targetDurationSeconds": 60,
+  "voice": "en-IN-PrabhatNeural",
+  "intro": {
+    "duration": 4,
+    "title": "Auto-FEFO Batch Engine & Multi-Batch Slicing",
+    "subtitle": "First-Expiry First-Out dispensing, multi-batch visibility, and zero expired stock loss",
+    "badge": "AUTO-FEFO · BATCH INTELLIGENCE"
+  },
+  "narration": [
+    {
+      "id": "scene-1",
+      "text": "Welcome to Phase 2, Part 9: Auto-FEFO Batch Engine and Multi-Batch Slicing. In retail pharmacy operations, dispensing older stock before newer batches is vital to prevent expiration losses and comply with drug safety standards."
+    },
+    {
+      "id": "scene-2",
+      "text": "When you add Paracetamol 650 to the cart, MediFlow's background engine automatically queries all available batches and allocates the earliest expiring batch, PCM-26E expiring September 2026."
+    },
+    {
+      "id": "scene-3",
+      "text": "Click the batch selector to review all on-hand inventory. MediFlow ranks batches in strict chronological expiry order, displaying the batch code, verified expiry date, and real-time available stock."
+    },
+    {
+      "id": "scene-4",
+      "text": "Whether selling single strips or wholesale quantities, MediFlow transparently computes line totals and GST rates without pricing discrepancies or cashier confusion."
+    },
+    {
+      "id": "scene-5",
+      "text": "Press F10 to complete the invoice. The exact batch number and expiry date are printed on the thermal receipt for complete patient safety and statutory compliance. In Part 10, learn Audited Manual Batch Overrides."
+    }
+  ],
+  "outro": {
+    "duration": 4,
+    "takeaway": "Auto-FEFO Engine: Automatically prioritizes nearest-expiry batches to eliminate expired stock losses.",
+    "nextPart": {
+      "id": "VID-2.10",
+      "title": "Part 10: Audited Manual Batch Overrides"
+    }
+  }
+}

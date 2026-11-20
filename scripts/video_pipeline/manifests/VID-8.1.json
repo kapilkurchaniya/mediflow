@@ -1,0 +1,47 @@
+{
+  "id": "VID-8.1",
+  "series": "Accounting, Cash Flow & Financial Ledgers",
+  "part": 1,
+  "totalParts": 5,
+  "title": "The Double-Entry Engine: Day Book & Daily Balanced Journals",
+  "shortcut": "DAY BOOK · BALANCED JOURNALS",
+  "role": "Accountants, Auditors & Store Owners",
+  "targetDurationSeconds": 55,
+  "voice": "en-IN-PrabhatNeural",
+  "intro": {
+    "duration": 4,
+    "title": "Day Book & Balanced Journals",
+    "subtitle": "Double-entry ledger engine, automatic debit-credit balancing, and voucher audit trails",
+    "badge": "ACCOUNTING · DAY BOOK"
+  },
+  "narration": [
+    {
+      "id": "scene-1",
+      "text": "Welcome to Phase 8, Part 1: The Double-Entry Engine: Day Book and Daily Balanced Journals. Behind every sale, purchase, and payment, MediFlow automatically creates double-entry debit and credit vouchers."
+    },
+    {
+      "id": "scene-2",
+      "text": "Go to Accounting. The Day Book presents an audited chronological record of all posted financial vouchers across Cash, Bank, Sales, and Purchase accounts."
+    },
+    {
+      "id": "scene-3",
+      "text": "Every transaction enforces strict double-entry balance, ensuring total debits equal total credits with zero suspense accounts."
+    },
+    {
+      "id": "scene-4",
+      "text": "Filter vouchers by date range or transaction type to audit cash receipts, distributor payments, and tax liability postings."
+    },
+    {
+      "id": "scene-5",
+      "text": "Open any journal entry to inspect ledger account codes, reference numbers, and user audit trails. In Part 2, we settle Customer Khata accounts!"
+    }
+  ],
+  "outro": {
+    "duration": 4,
+    "takeaway": "Double-Entry Engine: Maintain balanced general ledgers with automatic journal postings for every pharmacy sale, purchase, and expense.",
+    "nextPart": {
+      "id": "VID-8.2",
+      "title": "Part 2: Settle Customer Khata: Recording Receipts against Bills"
+    }
+  }
+}

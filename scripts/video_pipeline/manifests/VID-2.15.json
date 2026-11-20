@@ -1,0 +1,47 @@
+{
+  "id": "VID-2.15",
+  "series": "POS Counter Mastery",
+  "part": 15,
+  "totalParts": 18,
+  "title": "Same-Day Bill Cancellation (Alt + C) & Audit Reversals",
+  "shortcut": "ALT + C · SAME-DAY CANCEL",
+  "role": "Store Managers & Pharmacy Owners",
+  "targetDurationSeconds": 55,
+  "voice": "en-IN-PrabhatNeural",
+  "intro": {
+    "duration": 4,
+    "title": "Same-Day Bill Cancellation",
+    "subtitle": "Manager authorization, exact batch inventory restoration, reversing journals, and audit preservation",
+    "badge": "ALT + C · CANCEL BILL"
+  },
+  "narration": [
+    {
+      "id": "scene-1",
+      "text": "Welcome to Phase 2, Part 15: Same-Day Bill Cancellation. When a patient changes their mind or an accidental entry error occurs, authorized managers can cancel the transaction with full audit integrity."
+    },
+    {
+      "id": "scene-2",
+      "text": "Open the invoice from Sales and Invoices or press Alt plus M. Press Alt plus C or click Cancel Bill to open the secure cancellation dialog."
+    },
+    {
+      "id": "scene-3",
+      "text": "Under statutory GST rules, cancellations are strictly permitted on the same business day before midnight IST. Enter a mandatory audit reason to proceed."
+    },
+    {
+      "id": "scene-4",
+      "text": "MediFlow automatically restores medicine quantities back into their exact batches, posts a balanced reversing double-entry journal, and voids the outward invoice in GSTR-1."
+    },
+    {
+      "id": "scene-5",
+      "text": "Schedule H, H1, and X dispensing logs remain permanently preserved with indelible audit timestamps. In Part 16, we process Customer Sale Returns and GST Credit Notes!"
+    }
+  ],
+  "outro": {
+    "duration": 4,
+    "takeaway": "Same-Day Cancellation: Restore batch inventory, reverse financial journals, and preserve statutory drug dispensing logs with full manager audit trails.",
+    "nextPart": {
+      "id": "VID-2.16",
+      "title": "Part 16: Customer Sale Returns & Statutory GST Credit Notes (Alt + R)"
+    }
+  }
+}

@@ -61,6 +61,7 @@ export function TransferDetailClient({
       setIsDispatchModalOpen(false);
       router.refresh();
     } else {
+      setIsDispatchModalOpen(false);
       setActionError(res.error ?? "Failed to dispatch transfer");
     }
   };
@@ -90,6 +91,7 @@ export function TransferDetailClient({
       setIsReceiveModalOpen(false);
       router.refresh();
     } else {
+      setIsReceiveModalOpen(false);
       setActionError(res.error ?? "Failed to receive transfer");
     }
   };

@@ -12,21 +12,21 @@ export async function getStoreSettings() {
   const session = await requirePermission("settings.manage");
   const { user } = await requireAuth(); // for the profile card (phone is not part of AuthCtx)
 
-  let store = null;
-  if (session.storeId) {
-    const [foundStore] = await db
+  const [storeRows, [tenant]] = await Promise.all([
+    session.storeId
+      ? db
+          .select()
+          .from(schema.stores)
+          .where(eq(schema.stores.id, session.storeId))
+          .limit(1)
+      : Promise.resolve([]),
+    db
       .select()
-      .from(schema.stores)
-      .where(eq(schema.stores.id, session.storeId))
-      .limit(1);
-    store = foundStore;
-  }
-
-  const [tenant] = await db
-    .select()
-    .from(schema.tenants)
-    .where(eq(schema.tenants.id, session.tenantId))
-    .limit(1);
+      .from(schema.tenants)
+      .where(eq(schema.tenants.id, session.tenantId))
+      .limit(1),
+  ]);
+  const store = storeRows[0] ?? null;
 
   return {
     user: {

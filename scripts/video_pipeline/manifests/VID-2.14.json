@@ -1,0 +1,47 @@
+{
+  "id": "VID-2.14",
+  "series": "POS Counter Mastery",
+  "part": 14,
+  "totalParts": 14,
+  "title": "Thermal 80mm Slip & A4 Tax Invoice Printing",
+  "shortcut": "PRINT INVOICE · THERMAL 80MM & A4 GST",
+  "role": "Pharmacy Cashiers & Retail Pharmacists",
+  "targetDurationSeconds": 55,
+  "voice": "en-IN-PrabhatNeural",
+  "intro": {
+    "duration": 4,
+    "title": "Thermal 80mm Slip & A4 Tax Invoice",
+    "subtitle": "High-speed counter thermal receipts, regulatory A4 GST tax invoices, and dual print formatting",
+    "badge": "INVOICE PRINTING · DUAL FORMAT"
+  },
+  "narration": [
+    {
+      "id": "scene-1",
+      "text": "Welcome to Phase 2, Part 14: Thermal 80mm Slip and A4 Tax Invoice Printing. In this final counter mastery tutorial, learn how to instantly issue clean customer receipts and regulatory tax invoices."
+    },
+    {
+      "id": "scene-2",
+      "text": "Open any completed invoice from the sales ledger or immediately after checkout. MediFlow loads the dedicated print preview page."
+    },
+    {
+      "id": "scene-3",
+      "text": "The 80mm Thermal Slip format is optimized for high-speed counter thermal printers like TVS and Epson. It includes store drug licenses, GSTIN, itemized batches, expiry dates, and clean payment breakdown."
+    },
+    {
+      "id": "scene-4",
+      "text": "Click Full A4 GST Invoice to switch to statutory format. This layout displays detailed tax tables with CGST, SGST, HSN codes, and digital signature boxes for corporate or insurance billing."
+    },
+    {
+      "id": "scene-5",
+      "text": "Click Print or press Ctrl + P to output directly. Congratulations on mastering Phase 2! In Phase 3, we dive into Drug Compliance and Prescription Regulations."
+    }
+  ],
+  "outro": {
+    "duration": 4,
+    "takeaway": "Invoice Printing: Seamlessly toggle between fast 80mm thermal counter slips and formal A4 GST tax invoices with full statutory compliance.",
+    "nextPart": {
+      "id": "VID-3.1",
+      "title": "Phase 3, Part 1: Dispensing Schedule H Prescription Medicines"
+    }
+  }
+}

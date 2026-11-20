@@ -1,0 +1,47 @@
+{
+  "id": "VID-3.2",
+  "series": "Drug Compliance & Regulations",
+  "part": 2,
+  "totalParts": 6,
+  "title": "Dispensing Schedule H1 & Schedule X Narcotics",
+  "shortcut": "SCHEDULE H1 & X · STATUTORY REGISTERS",
+  "role": "Retail Pharmacists & Compliance Officers",
+  "targetDurationSeconds": 55,
+  "voice": "en-IN-PrabhatNeural",
+  "intro": {
+    "duration": 4,
+    "title": "Dispensing Schedule H1 & Schedule X",
+    "subtitle": "Strict antibiotic tracking, narcotic controls, and automatic 2-year statutory register retention",
+    "badge": "SCHEDULE H1 & X · AUDIT READY"
+  },
+  "narration": [
+    {
+      "id": "scene-1",
+      "text": "Welcome to Phase 3, Part 2: Dispensing Schedule H1 & Schedule X Narcotics. Schedule H1 antibiotics and psychotropic drugs carry stringent regulatory obligations under Indian pharmacy law."
+    },
+    {
+      "id": "scene-2",
+      "text": "When you add an item like Azithromycin 500mg into the cart, MediFlow flags the item with a prominent Schedule H1 badge and enforces statutory prescription capture."
+    },
+    {
+      "id": "scene-3",
+      "text": "The Doctor and Prescription panel is locked open. Select the registered doctor, verify their Medical Council registration, and input the patient's age and clinical slip reference."
+    },
+    {
+      "id": "scene-4",
+      "text": "MediFlow automatically attributes the dispensed batch to the statutory Schedule H1 ledger, maintaining an immutable audit log for the mandatory retention period."
+    },
+    {
+      "id": "scene-5",
+      "text": "The counter settlement completes safely with zero regulatory risk. In Part 3, discover how to manage your Doctor Master Directory and MCI Registration numbers."
+    }
+  ],
+  "outro": {
+    "duration": 4,
+    "takeaway": "Schedule H1 & X Dispensing: Eliminate audit vulnerability by enforcing mandatory prescriber tracking and automated dual statutory register logging.",
+    "nextPart": {
+      "id": "VID-3.3",
+      "title": "Part 3: Managing the Doctor Master Directory"
+    }
+  }
+}

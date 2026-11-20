@@ -1,0 +1,2246 @@
+{
+  "VID-1.1": [
+    {
+      "type": "INTRO_PILL_COLLISION",
+      "card": "intro",
+      "severity": "WARNING",
+      "pill_width": 600,
+      "text_span": [
+        663,
+        1257
+      ],
+      "text_width": 594,
+      "left_margin": 3,
+      "right_margin": 3,
+      "text": "Getting Started & Navigation \u00b7 PART 1 OF 5",
+      "desc": "Top pill text crashes into rounded endcap borders: margins are 3px left / 3px right (min 20px required for rx=24). Pill [660..1260] (600px)."
+    }
+  ],
+  "VID-1.1-hi": [
+    {
+      "type": "INTRO_PILL_COLLISION",
+      "card": "intro",
+      "severity": "WARNING",
+      "pill_width": 600,
+      "text_span": [
+        663,
+        1257
+      ],
+      "text_width": 594,
+      "left_margin": 3,
+      "right_margin": 3,
+      "text": "Getting Started & Navigation \u00b7 \u092d\u093e\u0917 1 / 5",
+      "desc": "Top pill text crashes into rounded endcap borders: margins are 3px left / 3px right (min 20px required for rx=24). Pill [660..1260] (600px)."
+    }
+  ],
+  "VID-1.2": [
+    {
+      "type": "INTRO_PILL_COLLISION",
+      "card": "intro",
+      "severity": "WARNING",
+      "pill_width": 600,
+      "text_span": [
+        663,
+        1257
+      ],
+      "text_width": 594,
+      "left_margin": 3,
+      "right_margin": 3,
+      "text": "Getting Started & Navigation \u00b7 PART 2 OF 5",
+      "desc": "Top pill text crashes into rounded endcap borders: margins are 3px left / 3px right (min 20px required for rx=24). Pill [660..1260] (600px)."
+    }
+  ],
+  "VID-1.2-hi": [
+    {
+      "type": "INTRO_PILL_COLLISION",
+      "card": "intro",
+      "severity": "WARNING",
+      "pill_width": 600,
+      "text_span": [
+        663,
+        1257
+      ],
+      "text_width": 594,
+      "left_margin": 3,
+      "right_margin": 3,
+      "text": "Getting Started & Navigation \u00b7 \u092d\u093e\u0917 2 / 5",
+      "desc": "Top pill text crashes into rounded endcap borders: margins are 3px left / 3px right (min 20px required for rx=24). Pill [660..1260] (600px)."
+    }
+  ],
+  "VID-1.3": [
+    {
+      "type": "INTRO_PILL_COLLISION",
+      "card": "intro",
+      "severity": "WARNING",
+      "pill_width": 600,
+      "text_span": [
+        663,
+        1257
+      ],
+      "text_width": 594,
+      "left_margin": 3,
+      "right_margin": 3,
+      "text": "Getting Started & Navigation \u00b7 PART 3 OF 5",
+      "desc": "Top pill text crashes into rounded endcap borders: margins are 3px left / 3px right (min 20px required for rx=24). Pill [660..1260] (600px)."
+    }
+  ],
+  "VID-1.3-hi": [
+    {
+      "type": "INTRO_PILL_COLLISION",
+      "card": "intro",
+      "severity": "WARNING",
+      "pill_width": 600,
+      "text_span": [
+        663,
+        1257
+      ],
+      "text_width": 594,
+      "left_margin": 3,
+      "right_margin": 3,
+      "text": "Getting Started & Navigation \u00b7 \u092d\u093e\u0917 3 / 5",
+      "desc": "Top pill text crashes into rounded endcap borders: margins are 3px left / 3px right (min 20px required for rx=24). Pill [660..1260] (600px)."
+    }
+  ],
+  "VID-1.4": [
+    {
+      "type": "INTRO_PILL_COLLISION",
+      "card": "intro",
+      "severity": "WARNING",
+      "pill_width": 600,
+      "text_span": [
+        663,
+        1257
+      ],
+      "text_width": 594,
+      "left_margin": 3,
+      "right_margin": 3,
+      "text": "Getting Started & Navigation \u00b7 PART 4 OF 5",
+      "desc": "Top pill text crashes into rounded endcap borders: margins are 3px left / 3px right (min 20px required for rx=24). Pill [660..1260] (600px)."
+    }
+  ],
+  "VID-1.4-hi": [
+    {
+      "type": "INTRO_PILL_COLLISION",
+      "card": "intro",
+      "severity": "WARNING",
+      "pill_width": 600,
+      "text_span": [
+        663,
+        1257
+      ],
+      "text_width": 594,
+      "left_margin": 3,
+      "right_margin": 3,
+      "text": "Getting Started & Navigation \u00b7 \u092d\u093e\u0917 4 / 5",
+      "desc": "Top pill text crashes into rounded endcap borders: margins are 3px left / 3px right (min 20px required for rx=24). Pill [660..1260] (600px)."
+    }
+  ],
+  "VID-1.5": [
+    {
+      "type": "INTRO_PILL_COLLISION",
+      "card": "intro",
+      "severity": "WARNING",
+      "pill_width": 600,
+      "text_span": [
+        663,
+        1257
+      ],
+      "text_width": 594,
+      "left_margin": 3,
+      "right_margin": 3,
+      "text": "Getting Started & Navigation \u00b7 PART 5 OF 5",
+      "desc": "Top pill text crashes into rounded endcap borders: margins are 3px left / 3px right (min 20px required for rx=24). Pill [660..1260] (600px)."
+    }
+  ],
+  "VID-1.5-hi": [
+    {
+      "type": "INTRO_PILL_COLLISION",
+      "card": "intro",
+      "severity": "WARNING",
+      "pill_width": 600,
+      "text_span": [
+        663,
+        1257
+      ],
+      "text_width": 594,
+      "left_margin": 3,
+      "right_margin": 3,
+      "text": "Getting Started & Navigation \u00b7 \u092d\u093e\u0917 5 / 5",
+      "desc": "Top pill text crashes into rounded endcap borders: margins are 3px left / 3px right (min 20px required for rx=24). Pill [660..1260] (600px)."
+    }
+  ],
+  "VID-2.1": [
+    {
+      "type": "INTRO_PILL_COLLISION",
+      "card": "intro",
+      "severity": "WARNING",
+      "pill_width": 600,
+      "text_span": [
+        663,
+        1257
+      ],
+      "text_width": 594,
+      "left_margin": 3,
+      "right_margin": 3,
+      "text": "POS Counter Mastery \u00b7 PART 1 OF 14",
+      "desc": "Top pill text crashes into rounded endcap borders: margins are 3px left / 3px right (min 20px required for rx=24). Pill [660..1260] (600px)."
+    }
+  ],
+  "VID-2.1-hi": [
+    {
+      "type": "INTRO_PILL_COLLISION",
+      "card": "intro",
+      "severity": "WARNING",
+      "pill_width": 600,
+      "text_span": [
+        663,
+        1257
+      ],
+      "text_width": 594,
+      "left_margin": 3,
+      "right_margin": 3,
+      "text": "POS Counter Mastery \u00b7 \u092d\u093e\u0917 1 / 14",
+      "desc": "Top pill text crashes into rounded endcap borders: margins are 3px left / 3px right (min 20px required for rx=24). Pill [660..1260] (600px)."
+    }
+  ],
+  "VID-2.10": [
+    {
+      "type": "INTRO_PILL_COLLISION",
+      "card": "intro",
+      "severity": "WARNING",
+      "pill_width": 600,
+      "text_span": [
+        663,
+        1257
+      ],
+      "text_width": 594,
+      "left_margin": 3,
+      "right_margin": 3,
+      "text": "POS Counter Mastery \u00b7 PART 10 OF 14",
+      "desc": "Top pill text crashes into rounded endcap borders: margins are 3px left / 3px right (min 20px required for rx=24). Pill [660..1260] (600px)."
+    }
+  ],
+  "VID-2.10-hi": [
+    {
+      "type": "INTRO_PILL_COLLISION",
+      "card": "intro",
+      "severity": "WARNING",
+      "pill_width": 600,
+      "text_span": [
+        663,
+        1257
+      ],
+      "text_width": 594,
+      "left_margin": 3,
+      "right_margin": 3,
+      "text": "POS \u0915\u093e\u0909\u0902\u091f\u0930 \u092e\u093e\u0938\u094d\u091f\u0930\u0940 \u00b7 \u092d\u093e\u0917 10 / 14",
+      "desc": "Top pill text crashes into rounded endcap borders: margins are 3px left / 3px right (min 20px required for rx=24). Pill [660..1260] (600px)."
+    }
+  ],
+  "VID-2.11": [
+    {
+      "type": "INTRO_PILL_COLLISION",
+      "card": "intro",
+      "severity": "WARNING",
+      "pill_width": 600,
+      "text_span": [
+        663,
+        1257
+      ],
+      "text_width": 594,
+      "left_margin": 3,
+      "right_margin": 3,
+      "text": "POS Counter Mastery \u00b7 PART 11 OF 14",
+      "desc": "Top pill text crashes into rounded endcap borders: margins are 3px left / 3px right (min 20px required for rx=24). Pill [660..1260] (600px)."
+    }
+  ],
+  "VID-2.11-hi": [
+    {
+      "type": "INTRO_PILL_COLLISION",
+      "card": "intro",
+      "severity": "WARNING",
+      "pill_width": 600,
+      "text_span": [
+        663,
+        1257
+      ],
+      "text_width": 594,
+      "left_margin": 3,
+      "right_margin": 3,
+      "text": "POS \u0915\u093e\u0909\u0902\u091f\u0930 \u092e\u093e\u0938\u094d\u091f\u0930\u0940 \u00b7 \u092d\u093e\u0917 11 / 14",
+      "desc": "Top pill text crashes into rounded endcap borders: margins are 3px left / 3px right (min 20px required for rx=24). Pill [660..1260] (600px)."
+    }
+  ],
+  "VID-2.12": [
+    {
+      "type": "INTRO_PILL_COLLISION",
+      "card": "intro",
+      "severity": "WARNING",
+      "pill_width": 600,
+      "text_span": [
+        663,
+        1257
+      ],
+      "text_width": 594,
+      "left_margin": 3,
+      "right_margin": 3,
+      "text": "POS Counter Mastery \u00b7 PART 12 OF 14",
+      "desc": "Top pill text crashes into rounded endcap borders: margins are 3px left / 3px right (min 20px required for rx=24). Pill [660..1260] (600px)."
+    }
+  ],
+  "VID-2.12-hi": [
+    {
+      "type": "INTRO_PILL_COLLISION",
+      "card": "intro",
+      "severity": "WARNING",
+      "pill_width": 600,
+      "text_span": [
+        663,
+        1257
+      ],
+      "text_width": 594,
+      "left_margin": 3,
+      "right_margin": 3,
+      "text": "POS \u0915\u093e\u0909\u0902\u091f\u0930 \u092e\u093e\u0938\u094d\u091f\u0930\u0940 \u00b7 \u092d\u093e\u0917 12 / 14",
+      "desc": "Top pill text crashes into rounded endcap borders: margins are 3px left / 3px right (min 20px required for rx=24). Pill [660..1260] (600px)."
+    }
+  ],
+  "VID-2.13": [
+    {
+      "type": "INTRO_PILL_COLLISION",
+      "card": "intro",
+      "severity": "WARNING",
+      "pill_width": 600,
+      "text_span": [
+        663,
+        1257
+      ],
+      "text_width": 594,
+      "left_margin": 3,
+      "right_margin": 3,
+      "text": "POS Counter Mastery \u00b7 PART 13 OF 14",
+      "desc": "Top pill text crashes into rounded endcap borders: margins are 3px left / 3px right (min 20px required for rx=24). Pill [660..1260] (600px)."
+    },
+    {
+      "type": "OUTRO_TAKEAWAY_MARGIN_BREACH",
+      "card": "outro",
+      "severity": "WARNING",
+      "text_span": [
+        78,
+        1841
+      ],
+      "text_width": 1763,
+      "left_margin": 78,
+      "right_margin": 79,
+      "text": "Line Discounts: Apply item-level percentage discounts directly in the counter cart with real-time totals, GST recalculation, and margin visibility.",
+      "desc": "Outro takeaway text extends dangerously close to canvas edge: span [78..1841] (width 1763px). Left margin=78px, right margin=79px (recommended min 120px)."
+    }
+  ],
+  "VID-2.13-hi": [
+    {
+      "type": "INTRO_PILL_COLLISION",
+      "card": "intro",
+      "severity": "WARNING",
+      "pill_width": 600,
+      "text_span": [
+        663,
+        1257
+      ],
+      "text_width": 594,
+      "left_margin": 3,
+      "right_margin": 3,
+      "text": "POS \u0915\u093e\u0909\u0902\u091f\u0930 \u092e\u093e\u0938\u094d\u091f\u0930\u0940 \u00b7 \u092d\u093e\u0917 13 / 14",
+      "desc": "Top pill text crashes into rounded endcap borders: margins are 3px left / 3px right (min 20px required for rx=24). Pill [660..1260] (600px)."
+    }
+  ],
+  "VID-2.14": [
+    {
+      "type": "INTRO_PILL_COLLISION",
+      "card": "intro",
+      "severity": "WARNING",
+      "pill_width": 600,
+      "text_span": [
+        663,
+        1257
+      ],
+      "text_width": 594,
+      "left_margin": 3,
+      "right_margin": 3,
+      "text": "POS Counter Mastery \u00b7 PART 14 OF 14",
+      "desc": "Top pill text crashes into rounded endcap borders: margins are 3px left / 3px right (min 20px required for rx=24). Pill [660..1260] (600px)."
+    }
+  ],
+  "VID-2.14-hi": [
+    {
+      "type": "INTRO_PILL_COLLISION",
+      "card": "intro",
+      "severity": "WARNING",
+      "pill_width": 600,
+      "text_span": [
+        663,
+        1257
+      ],
+      "text_width": 594,
+      "left_margin": 3,
+      "right_margin": 3,
+      "text": "POS \u0915\u093e\u0909\u0902\u091f\u0930 \u092e\u093e\u0938\u094d\u091f\u0930\u0940 \u00b7 \u092d\u093e\u0917 14 / 14",
+      "desc": "Top pill text crashes into rounded endcap borders: margins are 3px left / 3px right (min 20px required for rx=24). Pill [660..1260] (600px)."
+    }
+  ],
+  "VID-2.15": [
+    {
+      "type": "INTRO_PILL_COLLISION",
+      "card": "intro",
+      "severity": "WARNING",
+      "pill_width": 579,
+      "text_span": [
+        674,
+        1246
+      ],
+      "text_width": 572,
+      "left_margin": 3,
+      "right_margin": 3,
+      "text": "POS Counter Mastery \u00b7 PART 15 OF 18",
+      "desc": "Top pill text crashes into rounded endcap borders: margins are 3px left / 3px right (min 20px required for rx=24). Pill [671..1249] (579px)."
+    }
+  ],
+  "VID-2.15-hi": [
+    {
+      "type": "INTRO_PILL_COLLISION",
+      "card": "intro",
+      "severity": "WARNING",
+      "pill_width": 536,
+      "text_span": [
+        695,
+        1225
+      ],
+      "text_width": 530,
+      "left_margin": 3,
+      "right_margin": 3,
+      "text": "POS \u0915\u093e\u0909\u0902\u091f\u0930 \u092e\u093e\u0938\u094d\u091f\u0930\u0940 \u00b7 \u092d\u093e\u0917 15 / 18",
+      "desc": "Top pill text crashes into rounded endcap borders: margins are 3px left / 3px right (min 20px required for rx=24). Pill [692..1228] (536px)."
+    }
+  ],
+  "VID-2.16": [
+    {
+      "type": "INTRO_PILL_COLLISION",
+      "card": "intro",
+      "severity": "WARNING",
+      "pill_width": 579,
+      "text_span": [
+        674,
+        1246
+      ],
+      "text_width": 572,
+      "left_margin": 3,
+      "right_margin": 3,
+      "text": "POS Counter Mastery \u00b7 PART 16 OF 18",
+      "desc": "Top pill text crashes into rounded endcap borders: margins are 3px left / 3px right (min 20px required for rx=24). Pill [671..1249] (579px)."
+    }
+  ],
+  "VID-2.16-hi": [
+    {
+      "type": "INTRO_PILL_COLLISION",
+      "card": "intro",
+      "severity": "WARNING",
+      "pill_width": 536,
+      "text_span": [
+        695,
+        1225
+      ],
+      "text_width": 530,
+      "left_margin": 3,
+      "right_margin": 3,
+      "text": "POS \u0915\u093e\u0909\u0902\u091f\u0930 \u092e\u093e\u0938\u094d\u091f\u0930\u0940 \u00b7 \u092d\u093e\u0917 16 / 18",
+      "desc": "Top pill text crashes into rounded endcap borders: margins are 3px left / 3px right (min 20px required for rx=24). Pill [692..1228] (536px)."
+    }
+  ],
+  "VID-2.17": [
+    {
+      "type": "INTRO_PILL_COLLISION",
+      "card": "intro",
+      "severity": "WARNING",
+      "pill_width": 579,
+      "text_span": [
+        674,
+        1246
+      ],
+      "text_width": 572,
+      "left_margin": 3,
+      "right_margin": 3,
+      "text": "POS Counter Mastery \u00b7 PART 17 OF 18",
+      "desc": "Top pill text crashes into rounded endcap borders: margins are 3px left / 3px right (min 20px required for rx=24). Pill [671..1249] (579px)."
+    }
+  ],
+  "VID-2.17-hi": [
+    {
+      "type": "INTRO_PILL_COLLISION",
+      "card": "intro",
+      "severity": "WARNING",
+      "pill_width": 536,
+      "text_span": [
+        695,
+        1225
+      ],
+      "text_width": 530,
+      "left_margin": 3,
+      "right_margin": 3,
+      "text": "POS \u0915\u093e\u0909\u0902\u091f\u0930 \u092e\u093e\u0938\u094d\u091f\u0930\u0940 \u00b7 \u092d\u093e\u0917 17 / 18",
+      "desc": "Top pill text crashes into rounded endcap borders: margins are 3px left / 3px right (min 20px required for rx=24). Pill [692..1228] (536px)."
+    }
+  ],
+  "VID-2.18": [
+    {
+      "type": "INTRO_PILL_COLLISION",
+      "card": "intro",
+      "severity": "WARNING",
+      "pill_width": 579,
+      "text_span": [
+        674,
+        1246
+      ],
+      "text_width": 572,
+      "left_margin": 3,
+      "right_margin": 3,
+      "text": "POS Counter Mastery \u00b7 PART 18 OF 18",
+      "desc": "Top pill text crashes into rounded endcap borders: margins are 3px left / 3px right (min 20px required for rx=24). Pill [671..1249] (579px)."
+    }
+  ],
+  "VID-2.18-hi": [
+    {
+      "type": "INTRO_PILL_COLLISION",
+      "card": "intro",
+      "severity": "WARNING",
+      "pill_width": 565,
+      "text_span": [
+        681,
+        1239
+      ],
+      "text_width": 558,
+      "left_margin": 3,
+      "right_margin": 3,
+      "text": "\u092a\u0940\u0913\u090f\u0938 \u0915\u093e\u0909\u0902\u091f\u0930 \u092e\u093e\u0938\u094d\u091f\u0930\u0940 \u00b7 \u092d\u093e\u0917 18 / 18",
+      "desc": "Top pill text crashes into rounded endcap borders: margins are 3px left / 3px right (min 20px required for rx=24). Pill [678..1242] (565px)."
+    }
+  ],
+  "VID-2.2": [
+    {
+      "type": "INTRO_PILL_COLLISION",
+      "card": "intro",
+      "severity": "WARNING",
+      "pill_width": 600,
+      "text_span": [
+        663,
+        1257
+      ],
+      "text_width": 594,
+      "left_margin": 3,
+      "right_margin": 3,
+      "text": "POS Counter Mastery \u00b7 PART 2 OF 14",
+      "desc": "Top pill text crashes into rounded endcap borders: margins are 3px left / 3px right (min 20px required for rx=24). Pill [660..1260] (600px)."
+    }
+  ],
+  "VID-2.2-hi": [
+    {
+      "type": "INTRO_PILL_COLLISION",
+      "card": "intro",
+      "severity": "WARNING",
+      "pill_width": 600,
+      "text_span": [
+        663,
+        1257
+      ],
+      "text_width": 594,
+      "left_margin": 3,
+      "right_margin": 3,
+      "text": "POS \u0915\u093e\u0909\u0902\u091f\u0930 \u092e\u093e\u0938\u094d\u091f\u0930\u0940 \u00b7 \u092d\u093e\u0917 2 / 14",
+      "desc": "Top pill text crashes into rounded endcap borders: margins are 3px left / 3px right (min 20px required for rx=24). Pill [660..1260] (600px)."
+    }
+  ],
+  "VID-2.3": [
+    {
+      "type": "INTRO_PILL_COLLISION",
+      "card": "intro",
+      "severity": "WARNING",
+      "pill_width": 600,
+      "text_span": [
+        663,
+        1257
+      ],
+      "text_width": 594,
+      "left_margin": 3,
+      "right_margin": 3,
+      "text": "POS Counter Mastery \u00b7 PART 3 OF 14",
+      "desc": "Top pill text crashes into rounded endcap borders: margins are 3px left / 3px right (min 20px required for rx=24). Pill [660..1260] (600px)."
+    }
+  ],
+  "VID-2.3-hi": [
+    {
+      "type": "INTRO_PILL_COLLISION",
+      "card": "intro",
+      "severity": "WARNING",
+      "pill_width": 600,
+      "text_span": [
+        663,
+        1257
+      ],
+      "text_width": 594,
+      "left_margin": 3,
+      "right_margin": 3,
+      "text": "POS \u0915\u093e\u0909\u0902\u091f\u0930 \u092e\u093e\u0938\u094d\u091f\u0930\u0940 \u00b7 \u092d\u093e\u0917 3 / 14",
+      "desc": "Top pill text crashes into rounded endcap borders: margins are 3px left / 3px right (min 20px required for rx=24). Pill [660..1260] (600px)."
+    }
+  ],
+  "VID-2.4": [
+    {
+      "type": "INTRO_PILL_COLLISION",
+      "card": "intro",
+      "severity": "WARNING",
+      "pill_width": 600,
+      "text_span": [
+        663,
+        1257
+      ],
+      "text_width": 594,
+      "left_margin": 3,
+      "right_margin": 3,
+      "text": "POS Counter Mastery \u00b7 PART 4 OF 14",
+      "desc": "Top pill text crashes into rounded endcap borders: margins are 3px left / 3px right (min 20px required for rx=24). Pill [660..1260] (600px)."
+    }
+  ],
+  "VID-2.4-hi": [
+    {
+      "type": "INTRO_PILL_COLLISION",
+      "card": "intro",
+      "severity": "WARNING",
+      "pill_width": 600,
+      "text_span": [
+        663,
+        1257
+      ],
+      "text_width": 594,
+      "left_margin": 3,
+      "right_margin": 3,
+      "text": "POS \u0915\u093e\u0909\u0902\u091f\u0930 \u092e\u093e\u0938\u094d\u091f\u0930\u0940 \u00b7 \u092d\u093e\u0917 4 / 14",
+      "desc": "Top pill text crashes into rounded endcap borders: margins are 3px left / 3px right (min 20px required for rx=24). Pill [660..1260] (600px)."
+    }
+  ],
+  "VID-2.5": [
+    {
+      "type": "INTRO_PILL_COLLISION",
+      "card": "intro",
+      "severity": "WARNING",
+      "pill_width": 600,
+      "text_span": [
+        663,
+        1257
+      ],
+      "text_width": 594,
+      "left_margin": 3,
+      "right_margin": 3,
+      "text": "POS Counter Mastery \u00b7 PART 5 OF 14",
+      "desc": "Top pill text crashes into rounded endcap borders: margins are 3px left / 3px right (min 20px required for rx=24). Pill [660..1260] (600px)."
+    }
+  ],
+  "VID-2.5-hi": [
+    {
+      "type": "INTRO_PILL_COLLISION",
+      "card": "intro",
+      "severity": "WARNING",
+      "pill_width": 600,
+      "text_span": [
+        663,
+        1257
+      ],
+      "text_width": 594,
+      "left_margin": 3,
+      "right_margin": 3,
+      "text": "POS \u0915\u093e\u0909\u0902\u091f\u0930 \u092e\u093e\u0938\u094d\u091f\u0930\u0940 \u00b7 \u092d\u093e\u0917 5 / 14",
+      "desc": "Top pill text crashes into rounded endcap borders: margins are 3px left / 3px right (min 20px required for rx=24). Pill [660..1260] (600px)."
+    }
+  ],
+  "VID-2.6": [
+    {
+      "type": "INTRO_PILL_COLLISION",
+      "card": "intro",
+      "severity": "WARNING",
+      "pill_width": 600,
+      "text_span": [
+        663,
+        1257
+      ],
+      "text_width": 594,
+      "left_margin": 3,
+      "right_margin": 3,
+      "text": "POS Counter Mastery \u00b7 PART 6 OF 14",
+      "desc": "Top pill text crashes into rounded endcap borders: margins are 3px left / 3px right (min 20px required for rx=24). Pill [660..1260] (600px)."
+    }
+  ],
+  "VID-2.6-hi": [
+    {
+      "type": "INTRO_PILL_COLLISION",
+      "card": "intro",
+      "severity": "WARNING",
+      "pill_width": 600,
+      "text_span": [
+        663,
+        1257
+      ],
+      "text_width": 594,
+      "left_margin": 3,
+      "right_margin": 3,
+      "text": "POS \u0915\u093e\u0909\u0902\u091f\u0930 \u092e\u093e\u0938\u094d\u091f\u0930\u0940 \u00b7 \u092d\u093e\u0917 6 / 14",
+      "desc": "Top pill text crashes into rounded endcap borders: margins are 3px left / 3px right (min 20px required for rx=24). Pill [660..1260] (600px)."
+    }
+  ],
+  "VID-2.7": [
+    {
+      "type": "INTRO_PILL_COLLISION",
+      "card": "intro",
+      "severity": "WARNING",
+      "pill_width": 600,
+      "text_span": [
+        663,
+        1257
+      ],
+      "text_width": 594,
+      "left_margin": 3,
+      "right_margin": 3,
+      "text": "POS Counter Mastery \u00b7 PART 7 OF 14",
+      "desc": "Top pill text crashes into rounded endcap borders: margins are 3px left / 3px right (min 20px required for rx=24). Pill [660..1260] (600px)."
+    }
+  ],
+  "VID-2.7-hi": [
+    {
+      "type": "INTRO_PILL_COLLISION",
+      "card": "intro",
+      "severity": "WARNING",
+      "pill_width": 600,
+      "text_span": [
+        663,
+        1257
+      ],
+      "text_width": 594,
+      "left_margin": 3,
+      "right_margin": 3,
+      "text": "POS \u0915\u093e\u0909\u0902\u091f\u0930 \u092e\u093e\u0938\u094d\u091f\u0930\u0940 \u00b7 \u092d\u093e\u0917 7 / 14",
+      "desc": "Top pill text crashes into rounded endcap borders: margins are 3px left / 3px right (min 20px required for rx=24). Pill [660..1260] (600px)."
+    }
+  ],
+  "VID-2.8": [
+    {
+      "type": "INTRO_PILL_COLLISION",
+      "card": "intro",
+      "severity": "WARNING",
+      "pill_width": 600,
+      "text_span": [
+        663,
+        1257
+      ],
+      "text_width": 594,
+      "left_margin": 3,
+      "right_margin": 3,
+      "text": "POS Counter Mastery \u00b7 PART 8 OF 14",
+      "desc": "Top pill text crashes into rounded endcap borders: margins are 3px left / 3px right (min 20px required for rx=24). Pill [660..1260] (600px)."
+    }
+  ],
+  "VID-2.8-hi": [
+    {
+      "type": "INTRO_PILL_COLLISION",
+      "card": "intro",
+      "severity": "WARNING",
+      "pill_width": 600,
+      "text_span": [
+        663,
+        1257
+      ],
+      "text_width": 594,
+      "left_margin": 3,
+      "right_margin": 3,
+      "text": "POS \u0915\u093e\u0909\u0902\u091f\u0930 \u092e\u093e\u0938\u094d\u091f\u0930\u0940 \u00b7 \u092d\u093e\u0917 8 / 14",
+      "desc": "Top pill text crashes into rounded endcap borders: margins are 3px left / 3px right (min 20px required for rx=24). Pill [660..1260] (600px)."
+    }
+  ],
+  "VID-2.9": [
+    {
+      "type": "INTRO_PILL_COLLISION",
+      "card": "intro",
+      "severity": "WARNING",
+      "pill_width": 600,
+      "text_span": [
+        663,
+        1257
+      ],
+      "text_width": 594,
+      "left_margin": 3,
+      "right_margin": 3,
+      "text": "POS Counter Mastery \u00b7 PART 9 OF 14",
+      "desc": "Top pill text crashes into rounded endcap borders: margins are 3px left / 3px right (min 20px required for rx=24). Pill [660..1260] (600px)."
+    }
+  ],
+  "VID-2.9-hi": [
+    {
+      "type": "INTRO_PILL_COLLISION",
+      "card": "intro",
+      "severity": "WARNING",
+      "pill_width": 600,
+      "text_span": [
+        663,
+        1257
+      ],
+      "text_width": 594,
+      "left_margin": 3,
+      "right_margin": 3,
+      "text": "POS \u0915\u093e\u0909\u0902\u091f\u0930 \u092e\u093e\u0938\u094d\u091f\u0930\u0940 \u00b7 \u092d\u093e\u0917 9 / 14",
+      "desc": "Top pill text crashes into rounded endcap borders: margins are 3px left / 3px right (min 20px required for rx=24). Pill [660..1260] (600px)."
+    }
+  ],
+  "VID-3.1": [
+    {
+      "type": "INTRO_PILL_COLLISION",
+      "card": "intro",
+      "severity": "WARNING",
+      "pill_width": 600,
+      "text_span": [
+        663,
+        1257
+      ],
+      "text_width": 594,
+      "left_margin": 3,
+      "right_margin": 3,
+      "text": "Drug Compliance & Regulations \u00b7 PART 1 OF 6",
+      "desc": "Top pill text crashes into rounded endcap borders: margins are 3px left / 3px right (min 20px required for rx=24). Pill [660..1260] (600px)."
+    },
+    {
+      "type": "OUTRO_TAKEAWAY_CLIPPED",
+      "card": "outro",
+      "severity": "CRITICAL",
+      "text_span": [
+        0,
+        1919
+      ],
+      "text_width": 1919,
+      "left_margin": 0,
+      "right_margin": 1,
+      "text": "Schedule H Dispensing: Enforce mandatory doctor registration and prescription tracking seamlessly at POS, preventing audit fines and regulatory penalties.",
+      "desc": "Outro takeaway text clips / bleeds offscreen: span [0..1919] (width 1919px). Left margin=0px, right margin=1px."
+    }
+  ],
+  "VID-3.1-hi": [
+    {
+      "type": "INTRO_PILL_COLLISION",
+      "card": "intro",
+      "severity": "WARNING",
+      "pill_width": 600,
+      "text_span": [
+        663,
+        1257
+      ],
+      "text_width": 594,
+      "left_margin": 3,
+      "right_margin": 3,
+      "text": "\u0921\u094d\u0930\u0917 \u0915\u0902\u092a\u094d\u0932\u093e\u092f\u0902\u0938 \u0914\u0930 \u0930\u0947\u0917\u0941\u0932\u0947\u0936\u0902\u0938 \u00b7 \u092d\u093e\u0917 1 / 6",
+      "desc": "Top pill text crashes into rounded endcap borders: margins are 3px left / 3px right (min 20px required for rx=24). Pill [660..1260] (600px)."
+    }
+  ],
+  "VID-3.2": [
+    {
+      "type": "INTRO_PILL_COLLISION",
+      "card": "intro",
+      "severity": "WARNING",
+      "pill_width": 600,
+      "text_span": [
+        663,
+        1257
+      ],
+      "text_width": 594,
+      "left_margin": 3,
+      "right_margin": 3,
+      "text": "Drug Compliance & Regulations \u00b7 PART 2 OF 6",
+      "desc": "Top pill text crashes into rounded endcap borders: margins are 3px left / 3px right (min 20px required for rx=24). Pill [660..1260] (600px)."
+    },
+    {
+      "type": "OUTRO_TAKEAWAY_MARGIN_BREACH",
+      "card": "outro",
+      "severity": "WARNING",
+      "text_span": [
+        40,
+        1879
+      ],
+      "text_width": 1839,
+      "left_margin": 40,
+      "right_margin": 41,
+      "text": "Schedule H1 &amp; X Dispensing: Eliminate audit vulnerability by enforcing mandatory prescriber tracking and automated dual statutory register logging.",
+      "desc": "Outro takeaway text extends dangerously close to canvas edge: span [40..1879] (width 1839px). Left margin=40px, right margin=41px (recommended min 120px)."
+    }
+  ],
+  "VID-3.2-hi": [
+    {
+      "type": "INTRO_PILL_COLLISION",
+      "card": "intro",
+      "severity": "WARNING",
+      "pill_width": 600,
+      "text_span": [
+        663,
+        1257
+      ],
+      "text_width": 594,
+      "left_margin": 3,
+      "right_margin": 3,
+      "text": "\u0921\u094d\u0930\u0917 \u0915\u0902\u092a\u094d\u0932\u093e\u092f\u0902\u0938 \u0914\u0930 \u0930\u0947\u0917\u0941\u0932\u0947\u0936\u0902\u0938 \u00b7 \u092d\u093e\u0917 2 / 6",
+      "desc": "Top pill text crashes into rounded endcap borders: margins are 3px left / 3px right (min 20px required for rx=24). Pill [660..1260] (600px)."
+    }
+  ],
+  "VID-3.3": [
+    {
+      "type": "INTRO_PILL_COLLISION",
+      "card": "intro",
+      "severity": "WARNING",
+      "pill_width": 600,
+      "text_span": [
+        663,
+        1257
+      ],
+      "text_width": 594,
+      "left_margin": 3,
+      "right_margin": 3,
+      "text": "Drug Compliance & Regulations \u00b7 PART 3 OF 6",
+      "desc": "Top pill text crashes into rounded endcap borders: margins are 3px left / 3px right (min 20px required for rx=24). Pill [660..1260] (600px)."
+    },
+    {
+      "type": "OUTRO_TAKEAWAY_MARGIN_BREACH",
+      "card": "outro",
+      "severity": "WARNING",
+      "text_span": [
+        28,
+        1891
+      ],
+      "text_width": 1863,
+      "left_margin": 28,
+      "right_margin": 29,
+      "text": "Doctor Master Directory: Maintain verified prescriber credentials and MCI registration numbers for instant counter billing and airtight audit compliance.",
+      "desc": "Outro takeaway text extends dangerously close to canvas edge: span [28..1891] (width 1863px). Left margin=28px, right margin=29px (recommended min 120px)."
+    }
+  ],
+  "VID-3.3-hi": [
+    {
+      "type": "INTRO_PILL_COLLISION",
+      "card": "intro",
+      "severity": "WARNING",
+      "pill_width": 600,
+      "text_span": [
+        663,
+        1257
+      ],
+      "text_width": 594,
+      "left_margin": 3,
+      "right_margin": 3,
+      "text": "\u0921\u094d\u0930\u0917 \u0915\u0902\u092a\u094d\u0932\u093e\u092f\u0902\u0938 \u0914\u0930 \u0930\u0947\u0917\u0941\u0932\u0947\u0936\u0902\u0938 \u00b7 \u092d\u093e\u0917 3 / 6",
+      "desc": "Top pill text crashes into rounded endcap borders: margins are 3px left / 3px right (min 20px required for rx=24). Pill [660..1260] (600px)."
+    }
+  ],
+  "VID-3.4": [
+    {
+      "type": "INTRO_PILL_COLLISION",
+      "card": "intro",
+      "severity": "WARNING",
+      "pill_width": 600,
+      "text_span": [
+        663,
+        1257
+      ],
+      "text_width": 594,
+      "left_margin": 3,
+      "right_margin": 3,
+      "text": "Drug Compliance & Regulations \u00b7 PART 4 OF 6",
+      "desc": "Top pill text crashes into rounded endcap borders: margins are 3px left / 3px right (min 20px required for rx=24). Pill [660..1260] (600px)."
+    },
+    {
+      "type": "OUTRO_TAKEAWAY_CLIPPED",
+      "card": "outro",
+      "severity": "CRITICAL",
+      "text_span": [
+        11,
+        1919
+      ],
+      "text_width": 1908,
+      "left_margin": 11,
+      "right_margin": 1,
+      "text": "Digital Rx Repository: Capture patient demographics, certified doctor credentials, and dosage schedules into an immutable compliance vault ready for POS dispensing.",
+      "desc": "Outro takeaway text clips / bleeds offscreen: span [11..1919] (width 1908px). Left margin=11px, right margin=1px."
+    }
+  ],
+  "VID-3.4-hi": [
+    {
+      "type": "INTRO_PILL_COLLISION",
+      "card": "intro",
+      "severity": "WARNING",
+      "pill_width": 600,
+      "text_span": [
+        663,
+        1257
+      ],
+      "text_width": 594,
+      "left_margin": 3,
+      "right_margin": 3,
+      "text": "\u0921\u094d\u0930\u0917 \u0915\u0902\u092a\u094d\u0932\u093e\u092f\u0902\u0938 \u0914\u0930 \u0930\u0947\u0917\u0941\u0932\u0947\u0936\u0902\u0938 \u00b7 \u092d\u093e\u0917 4 / 6",
+      "desc": "Top pill text crashes into rounded endcap borders: margins are 3px left / 3px right (min 20px required for rx=24). Pill [660..1260] (600px)."
+    }
+  ],
+  "VID-3.5": [
+    {
+      "type": "INTRO_PILL_COLLISION",
+      "card": "intro",
+      "severity": "WARNING",
+      "pill_width": 600,
+      "text_span": [
+        663,
+        1257
+      ],
+      "text_width": 594,
+      "left_margin": 3,
+      "right_margin": 3,
+      "text": "Drug Compliance & Regulations \u00b7 PART 5 OF 6",
+      "desc": "Top pill text crashes into rounded endcap borders: margins are 3px left / 3px right (min 20px required for rx=24). Pill [660..1260] (600px)."
+    },
+    {
+      "type": "OUTRO_TAKEAWAY_CLIPPED",
+      "card": "outro",
+      "severity": "CRITICAL",
+      "text_span": [
+        2,
+        1919
+      ],
+      "text_width": 1917,
+      "left_margin": 2,
+      "right_margin": 1,
+      "text": "Statutory Drug Registers: Maintain tamper-evident, separate registers for Schedule H1, H, X, and NDPS narcotics with automated 3-year retention compliance.",
+      "desc": "Outro takeaway text clips / bleeds offscreen: span [2..1919] (width 1917px). Left margin=2px, right margin=1px."
+    }
+  ],
+  "VID-3.5-hi": [
+    {
+      "type": "INTRO_PILL_COLLISION",
+      "card": "intro",
+      "severity": "WARNING",
+      "pill_width": 600,
+      "text_span": [
+        663,
+        1257
+      ],
+      "text_width": 594,
+      "left_margin": 3,
+      "right_margin": 3,
+      "text": "\u0921\u094d\u0930\u0917 \u0915\u0902\u092a\u094d\u0932\u093e\u092f\u0902\u0938 \u0914\u0930 \u0930\u0947\u0917\u0941\u0932\u0947\u0936\u0902\u0938 \u00b7 \u092d\u093e\u0917 5 / 6",
+      "desc": "Top pill text crashes into rounded endcap borders: margins are 3px left / 3px right (min 20px required for rx=24). Pill [660..1260] (600px)."
+    }
+  ],
+  "VID-3.6": [
+    {
+      "type": "INTRO_PILL_COLLISION",
+      "card": "intro",
+      "severity": "WARNING",
+      "pill_width": 600,
+      "text_span": [
+        663,
+        1257
+      ],
+      "text_width": 594,
+      "left_margin": 3,
+      "right_margin": 3,
+      "text": "Drug Compliance & Regulations \u00b7 PART 6 OF 6",
+      "desc": "Top pill text crashes into rounded endcap borders: margins are 3px left / 3px right (min 20px required for rx=24). Pill [660..1260] (600px)."
+    },
+    {
+      "type": "OUTRO_TAKEAWAY_CLIPPED",
+      "card": "outro",
+      "severity": "CRITICAL",
+      "text_span": [
+        1,
+        1919
+      ],
+      "text_width": 1918,
+      "left_margin": 1,
+      "right_margin": 1,
+      "text": "Inspector-Ready Printing: Instantly generate legally binding Form 35 registers formatted for A4 landscape with pharmacist attestations and inspector verification blocks.",
+      "desc": "Outro takeaway text clips / bleeds offscreen: span [1..1919] (width 1918px). Left margin=1px, right margin=1px."
+    }
+  ],
+  "VID-3.6-hi": [
+    {
+      "type": "INTRO_PILL_COLLISION",
+      "card": "intro",
+      "severity": "WARNING",
+      "pill_width": 600,
+      "text_span": [
+        663,
+        1257
+      ],
+      "text_width": 594,
+      "left_margin": 3,
+      "right_margin": 3,
+      "text": "\u0921\u094d\u0930\u0917 \u0915\u0902\u092a\u094d\u0932\u093e\u092f\u0902\u0938 \u0914\u0930 \u0930\u0947\u0917\u0941\u0932\u0947\u0936\u0902\u0938 \u00b7 \u092d\u093e\u0917 6 / 6",
+      "desc": "Top pill text crashes into rounded endcap borders: margins are 3px left / 3px right (min 20px required for rx=24). Pill [660..1260] (600px)."
+    }
+  ],
+  "VID-4.1": [
+    {
+      "type": "INTRO_PILL_COLLISION",
+      "card": "intro",
+      "severity": "WARNING",
+      "pill_width": 787,
+      "text_span": [
+        570,
+        1350
+      ],
+      "text_width": 780,
+      "left_margin": 3,
+      "right_margin": 3,
+      "text": "Inventory, Batches & Warehouse Operations \u00b7 PART 1 OF 8",
+      "desc": "Top pill text crashes into rounded endcap borders: margins are 3px left / 3px right (min 20px required for rx=24). Pill [567..1353] (787px)."
+    }
+  ],
+  "VID-4.1-hi": [
+    {
+      "type": "INTRO_PILL_COLLISION",
+      "card": "intro",
+      "severity": "WARNING",
+      "pill_width": 709,
+      "text_span": [
+        609,
+        1311
+      ],
+      "text_width": 702,
+      "left_margin": 3,
+      "right_margin": 3,
+      "text": "\u0907\u0928\u094d\u0935\u0947\u0902\u091f\u094d\u0930\u0940, \u092c\u0948\u091a\u0947\u0938 \u0914\u0930 \u0935\u0947\u092f\u0930\u0939\u093e\u0909\u0938 \u0911\u092a\u0930\u0947\u0936\u0902\u0938 \u00b7 \u092d\u093e\u0917 1 / 8",
+      "desc": "Top pill text crashes into rounded endcap borders: margins are 3px left / 3px right (min 20px required for rx=24). Pill [606..1314] (709px)."
+    }
+  ],
+  "VID-4.2": [
+    {
+      "type": "INTRO_PILL_COLLISION",
+      "card": "intro",
+      "severity": "WARNING",
+      "pill_width": 787,
+      "text_span": [
+        570,
+        1350
+      ],
+      "text_width": 780,
+      "left_margin": 3,
+      "right_margin": 3,
+      "text": "Inventory, Batches & Warehouse Operations \u00b7 PART 2 OF 8",
+      "desc": "Top pill text crashes into rounded endcap borders: margins are 3px left / 3px right (min 20px required for rx=24). Pill [567..1353] (787px)."
+    }
+  ],
+  "VID-4.2-hi": [
+    {
+      "type": "INTRO_PILL_COLLISION",
+      "card": "intro",
+      "severity": "WARNING",
+      "pill_width": 709,
+      "text_span": [
+        609,
+        1311
+      ],
+      "text_width": 702,
+      "left_margin": 3,
+      "right_margin": 3,
+      "text": "\u0907\u0928\u094d\u0935\u0947\u0902\u091f\u094d\u0930\u0940, \u092c\u0948\u091a\u0947\u0938 \u0914\u0930 \u0935\u0947\u092f\u0930\u0939\u093e\u0909\u0938 \u0911\u092a\u0930\u0947\u0936\u0902\u0938 \u00b7 \u092d\u093e\u0917 2 / 8",
+      "desc": "Top pill text crashes into rounded endcap borders: margins are 3px left / 3px right (min 20px required for rx=24). Pill [606..1314] (709px)."
+    }
+  ],
+  "VID-4.3": [
+    {
+      "type": "INTRO_PILL_COLLISION",
+      "card": "intro",
+      "severity": "WARNING",
+      "pill_width": 787,
+      "text_span": [
+        570,
+        1350
+      ],
+      "text_width": 780,
+      "left_margin": 3,
+      "right_margin": 3,
+      "text": "Inventory, Batches & Warehouse Operations \u00b7 PART 3 OF 8",
+      "desc": "Top pill text crashes into rounded endcap borders: margins are 3px left / 3px right (min 20px required for rx=24). Pill [567..1353] (787px)."
+    }
+  ],
+  "VID-4.3-hi": [
+    {
+      "type": "INTRO_PILL_COLLISION",
+      "card": "intro",
+      "severity": "WARNING",
+      "pill_width": 709,
+      "text_span": [
+        609,
+        1311
+      ],
+      "text_width": 702,
+      "left_margin": 3,
+      "right_margin": 3,
+      "text": "\u0907\u0928\u094d\u0935\u0947\u0902\u091f\u094d\u0930\u0940, \u092c\u0948\u091a\u0947\u0938 \u0914\u0930 \u0935\u0947\u092f\u0930\u0939\u093e\u0909\u0938 \u0911\u092a\u0930\u0947\u0936\u0902\u0938 \u00b7 \u092d\u093e\u0917 3 / 8",
+      "desc": "Top pill text crashes into rounded endcap borders: margins are 3px left / 3px right (min 20px required for rx=24). Pill [606..1314] (709px)."
+    }
+  ],
+  "VID-4.4": [
+    {
+      "type": "INTRO_PILL_COLLISION",
+      "card": "intro",
+      "severity": "WARNING",
+      "pill_width": 787,
+      "text_span": [
+        570,
+        1350
+      ],
+      "text_width": 780,
+      "left_margin": 3,
+      "right_margin": 3,
+      "text": "Inventory, Batches & Warehouse Operations \u00b7 PART 4 OF 8",
+      "desc": "Top pill text crashes into rounded endcap borders: margins are 3px left / 3px right (min 20px required for rx=24). Pill [567..1353] (787px)."
+    }
+  ],
+  "VID-4.4-hi": [
+    {
+      "type": "INTRO_PILL_COLLISION",
+      "card": "intro",
+      "severity": "WARNING",
+      "pill_width": 709,
+      "text_span": [
+        609,
+        1311
+      ],
+      "text_width": 702,
+      "left_margin": 3,
+      "right_margin": 3,
+      "text": "\u0907\u0928\u094d\u0935\u0947\u0902\u091f\u094d\u0930\u0940, \u092c\u0948\u091a\u0947\u0938 \u0914\u0930 \u0935\u0947\u092f\u0930\u0939\u093e\u0909\u0938 \u0911\u092a\u0930\u0947\u0936\u0902\u0938 \u00b7 \u092d\u093e\u0917 4 / 8",
+      "desc": "Top pill text crashes into rounded endcap borders: margins are 3px left / 3px right (min 20px required for rx=24). Pill [606..1314] (709px)."
+    }
+  ],
+  "VID-4.5": [
+    {
+      "type": "INTRO_PILL_COLLISION",
+      "card": "intro",
+      "severity": "WARNING",
+      "pill_width": 787,
+      "text_span": [
+        570,
+        1350
+      ],
+      "text_width": 780,
+      "left_margin": 3,
+      "right_margin": 3,
+      "text": "Inventory, Batches & Warehouse Operations \u00b7 PART 5 OF 8",
+      "desc": "Top pill text crashes into rounded endcap borders: margins are 3px left / 3px right (min 20px required for rx=24). Pill [567..1353] (787px)."
+    }
+  ],
+  "VID-4.5-hi": [
+    {
+      "type": "INTRO_PILL_COLLISION",
+      "card": "intro",
+      "severity": "WARNING",
+      "pill_width": 709,
+      "text_span": [
+        609,
+        1311
+      ],
+      "text_width": 702,
+      "left_margin": 3,
+      "right_margin": 3,
+      "text": "\u0907\u0928\u094d\u0935\u0947\u0902\u091f\u094d\u0930\u0940, \u092c\u0948\u091a\u0947\u0938 \u0914\u0930 \u0935\u0947\u092f\u0930\u0939\u093e\u0909\u0938 \u0911\u092a\u0930\u0947\u0936\u0902\u0938 \u00b7 \u092d\u093e\u0917 5 / 8",
+      "desc": "Top pill text crashes into rounded endcap borders: margins are 3px left / 3px right (min 20px required for rx=24). Pill [606..1314] (709px)."
+    }
+  ],
+  "VID-4.6": [
+    {
+      "type": "INTRO_PILL_COLLISION",
+      "card": "intro",
+      "severity": "WARNING",
+      "pill_width": 787,
+      "text_span": [
+        570,
+        1350
+      ],
+      "text_width": 780,
+      "left_margin": 3,
+      "right_margin": 3,
+      "text": "Inventory, Batches & Warehouse Operations \u00b7 PART 6 OF 8",
+      "desc": "Top pill text crashes into rounded endcap borders: margins are 3px left / 3px right (min 20px required for rx=24). Pill [567..1353] (787px)."
+    }
+  ],
+  "VID-4.6-hi": [
+    {
+      "type": "INTRO_PILL_COLLISION",
+      "card": "intro",
+      "severity": "WARNING",
+      "pill_width": 709,
+      "text_span": [
+        609,
+        1311
+      ],
+      "text_width": 702,
+      "left_margin": 3,
+      "right_margin": 3,
+      "text": "\u0907\u0928\u094d\u0935\u0947\u0902\u091f\u094d\u0930\u0940, \u092c\u0948\u091a\u0947\u0938 \u0914\u0930 \u0935\u0947\u092f\u0930\u0939\u093e\u0909\u0938 \u0911\u092a\u0930\u0947\u0936\u0902\u0938 \u00b7 \u092d\u093e\u0917 6 / 8",
+      "desc": "Top pill text crashes into rounded endcap borders: margins are 3px left / 3px right (min 20px required for rx=24). Pill [606..1314] (709px)."
+    }
+  ],
+  "VID-4.7": [
+    {
+      "type": "INTRO_PILL_COLLISION",
+      "card": "intro",
+      "severity": "WARNING",
+      "pill_width": 787,
+      "text_span": [
+        570,
+        1350
+      ],
+      "text_width": 780,
+      "left_margin": 3,
+      "right_margin": 3,
+      "text": "Inventory, Batches & Warehouse Operations \u00b7 PART 7 OF 8",
+      "desc": "Top pill text crashes into rounded endcap borders: margins are 3px left / 3px right (min 20px required for rx=24). Pill [567..1353] (787px)."
+    }
+  ],
+  "VID-4.7-hi": [
+    {
+      "type": "INTRO_PILL_COLLISION",
+      "card": "intro",
+      "severity": "WARNING",
+      "pill_width": 709,
+      "text_span": [
+        609,
+        1311
+      ],
+      "text_width": 702,
+      "left_margin": 3,
+      "right_margin": 3,
+      "text": "\u0907\u0928\u094d\u0935\u0947\u0902\u091f\u094d\u0930\u0940, \u092c\u0948\u091a\u0947\u0938 \u0914\u0930 \u0935\u0947\u092f\u0930\u0939\u093e\u0909\u0938 \u0911\u092a\u0930\u0947\u0936\u0902\u0938 \u00b7 \u092d\u093e\u0917 7 / 8",
+      "desc": "Top pill text crashes into rounded endcap borders: margins are 3px left / 3px right (min 20px required for rx=24). Pill [606..1314] (709px)."
+    }
+  ],
+  "VID-4.8": [
+    {
+      "type": "INTRO_PILL_COLLISION",
+      "card": "intro",
+      "severity": "WARNING",
+      "pill_width": 787,
+      "text_span": [
+        570,
+        1350
+      ],
+      "text_width": 780,
+      "left_margin": 3,
+      "right_margin": 3,
+      "text": "Inventory, Batches & Warehouse Operations \u00b7 PART 8 OF 8",
+      "desc": "Top pill text crashes into rounded endcap borders: margins are 3px left / 3px right (min 20px required for rx=24). Pill [567..1353] (787px)."
+    }
+  ],
+  "VID-4.8-hi": [
+    {
+      "type": "INTRO_PILL_COLLISION",
+      "card": "intro",
+      "severity": "WARNING",
+      "pill_width": 709,
+      "text_span": [
+        609,
+        1311
+      ],
+      "text_width": 702,
+      "left_margin": 3,
+      "right_margin": 3,
+      "text": "\u0907\u0928\u094d\u0935\u0947\u0902\u091f\u094d\u0930\u0940, \u092c\u0948\u091a\u0947\u0938 \u0914\u0930 \u0935\u0947\u092f\u0930\u0939\u093e\u0909\u0938 \u0911\u092a\u0930\u0947\u0936\u0902\u0938 \u00b7 \u092d\u093e\u0917 8 / 8",
+      "desc": "Top pill text crashes into rounded endcap borders: margins are 3px left / 3px right (min 20px required for rx=24). Pill [606..1314] (709px)."
+    }
+  ],
+  "VID-5.1": [
+    {
+      "type": "INTRO_PILL_COLLISION",
+      "card": "intro",
+      "severity": "WARNING",
+      "pill_width": 774,
+      "text_span": [
+        576,
+        1344
+      ],
+      "text_width": 768,
+      "left_margin": 3,
+      "right_margin": 3,
+      "text": "Purchasing, GRN & Distributor Operations \u00b7 PART 1 OF 7",
+      "desc": "Top pill text crashes into rounded endcap borders: margins are 3px left / 3px right (min 20px required for rx=24). Pill [573..1347] (774px)."
+    }
+  ],
+  "VID-5.1-hi": [
+    {
+      "type": "INTRO_PILL_COLLISION",
+      "card": "intro",
+      "severity": "WARNING",
+      "pill_width": 774,
+      "text_span": [
+        576,
+        1344
+      ],
+      "text_width": 768,
+      "left_margin": 3,
+      "right_margin": 3,
+      "text": "\u092a\u0930\u091a\u0947\u091c\u093f\u0902\u0917, \u091c\u0940\u0906\u0930\u090f\u0928 \u0914\u0930 \u0921\u093f\u0938\u094d\u091f\u094d\u0930\u0940\u092c\u094d\u092f\u0942\u091f\u0930 \u0911\u092a\u0930\u0947\u0936\u0902\u0938 \u00b7 \u092d\u093e\u0917 1 / 7",
+      "desc": "Top pill text crashes into rounded endcap borders: margins are 3px left / 3px right (min 20px required for rx=24). Pill [573..1347] (774px)."
+    }
+  ],
+  "VID-5.2": [
+    {
+      "type": "INTRO_PILL_COLLISION",
+      "card": "intro",
+      "severity": "WARNING",
+      "pill_width": 774,
+      "text_span": [
+        576,
+        1344
+      ],
+      "text_width": 768,
+      "left_margin": 3,
+      "right_margin": 3,
+      "text": "Purchasing, GRN & Distributor Operations \u00b7 PART 2 OF 7",
+      "desc": "Top pill text crashes into rounded endcap borders: margins are 3px left / 3px right (min 20px required for rx=24). Pill [573..1347] (774px)."
+    }
+  ],
+  "VID-5.2-hi": [
+    {
+      "type": "INTRO_PILL_COLLISION",
+      "card": "intro",
+      "severity": "WARNING",
+      "pill_width": 774,
+      "text_span": [
+        576,
+        1344
+      ],
+      "text_width": 768,
+      "left_margin": 3,
+      "right_margin": 3,
+      "text": "\u092a\u0930\u091a\u0947\u091c\u093f\u0902\u0917, \u091c\u0940\u0906\u0930\u090f\u0928 \u0914\u0930 \u0921\u093f\u0938\u094d\u091f\u094d\u0930\u0940\u092c\u094d\u092f\u0942\u091f\u0930 \u0911\u092a\u0930\u0947\u0936\u0902\u0938 \u00b7 \u092d\u093e\u0917 2 / 7",
+      "desc": "Top pill text crashes into rounded endcap borders: margins are 3px left / 3px right (min 20px required for rx=24). Pill [573..1347] (774px)."
+    }
+  ],
+  "VID-5.3": [
+    {
+      "type": "INTRO_PILL_COLLISION",
+      "card": "intro",
+      "severity": "WARNING",
+      "pill_width": 600,
+      "text_span": [
+        663,
+        1257
+      ],
+      "text_width": 594,
+      "left_margin": 3,
+      "right_margin": 3,
+      "text": "Purchasing, GRN & Distributor Operations \u00b7 PART 3 OF 7",
+      "desc": "Top pill text crashes into rounded endcap borders: margins are 3px left / 3px right (min 20px required for rx=24). Pill [660..1260] (600px)."
+    },
+    {
+      "type": "OUTRO_TAKEAWAY_CLIPPED",
+      "card": "outro",
+      "severity": "CRITICAL",
+      "text_span": [
+        0,
+        1919
+      ],
+      "text_width": 1919,
+      "left_margin": 0,
+      "right_margin": 1,
+      "text": "Landed Cost Dilution: Automatically spread purchase costs over billed plus free scheme packs, compute net margins with TD and CD, and preserve accurate profit accounting.",
+      "desc": "Outro takeaway text clips / bleeds offscreen: span [0..1919] (width 1919px). Left margin=0px, right margin=1px."
+    }
+  ],
+  "VID-5.3-hi": [
+    {
+      "type": "INTRO_PILL_COLLISION",
+      "card": "intro",
+      "severity": "WARNING",
+      "pill_width": 600,
+      "text_span": [
+        663,
+        1257
+      ],
+      "text_width": 594,
+      "left_margin": 3,
+      "right_margin": 3,
+      "text": "\u092a\u0930\u091a\u0947\u091c\u093f\u0902\u0917, \u091c\u0940\u0906\u0930\u090f\u0928 \u0914\u0930 \u0921\u093f\u0938\u094d\u091f\u094d\u0930\u0940\u092c\u094d\u092f\u0942\u091f\u0930 \u0911\u092a\u0930\u0947\u0936\u0902\u0938 \u00b7 \u092d\u093e\u0917 3 / 7",
+      "desc": "Top pill text crashes into rounded endcap borders: margins are 3px left / 3px right (min 20px required for rx=24). Pill [660..1260] (600px)."
+    }
+  ],
+  "VID-5.4": [
+    {
+      "type": "INTRO_PILL_COLLISION",
+      "card": "intro",
+      "severity": "WARNING",
+      "pill_width": 600,
+      "text_span": [
+        663,
+        1257
+      ],
+      "text_width": 594,
+      "left_margin": 3,
+      "right_margin": 3,
+      "text": "Purchasing, GRN & Distributor Operations \u00b7 PART 4 OF 7",
+      "desc": "Top pill text crashes into rounded endcap borders: margins are 3px left / 3px right (min 20px required for rx=24). Pill [660..1260] (600px)."
+    },
+    {
+      "type": "OUTRO_TAKEAWAY_MARGIN_BREACH",
+      "card": "outro",
+      "severity": "WARNING",
+      "text_span": [
+        18,
+        1901
+      ],
+      "text_width": 1883,
+      "left_margin": 18,
+      "right_margin": 19,
+      "text": "Purchase Orders &amp; PDF: Create formal distributor procurement orders, approve lines, and export professional PDF vouchers for rapid vendor fulfillment.",
+      "desc": "Outro takeaway text extends dangerously close to canvas edge: span [18..1901] (width 1883px). Left margin=18px, right margin=19px (recommended min 120px)."
+    }
+  ],
+  "VID-5.4-hi": [
+    {
+      "type": "INTRO_PILL_COLLISION",
+      "card": "intro",
+      "severity": "WARNING",
+      "pill_width": 600,
+      "text_span": [
+        663,
+        1257
+      ],
+      "text_width": 594,
+      "left_margin": 3,
+      "right_margin": 3,
+      "text": "\u092a\u0930\u091a\u0947\u091c\u093f\u0902\u0917, \u091c\u0940\u0906\u0930\u090f\u0928 \u0914\u0930 \u0921\u093f\u0938\u094d\u091f\u094d\u0930\u0940\u092c\u094d\u092f\u0942\u091f\u0930 \u0911\u092a\u0930\u0947\u0936\u0902\u0938 \u00b7 \u092d\u093e\u0917 4 / 7",
+      "desc": "Top pill text crashes into rounded endcap borders: margins are 3px left / 3px right (min 20px required for rx=24). Pill [660..1260] (600px)."
+    }
+  ],
+  "VID-5.5": [
+    {
+      "type": "INTRO_PILL_COLLISION",
+      "card": "intro",
+      "severity": "WARNING",
+      "pill_width": 600,
+      "text_span": [
+        663,
+        1257
+      ],
+      "text_width": 594,
+      "left_margin": 3,
+      "right_margin": 3,
+      "text": "Purchasing, GRN & Distributor Operations \u00b7 PART 5 OF 7",
+      "desc": "Top pill text crashes into rounded endcap borders: margins are 3px left / 3px right (min 20px required for rx=24). Pill [660..1260] (600px)."
+    },
+    {
+      "type": "OUTRO_TAKEAWAY_MARGIN_BREACH",
+      "card": "outro",
+      "severity": "WARNING",
+      "text_span": [
+        41,
+        1878
+      ],
+      "text_width": 1837,
+      "left_margin": 41,
+      "right_margin": 42,
+      "text": "PO-to-GRN Conversion: Convert approved purchase orders to inward bills with 1 click, capture physical batch lots, and update inventory effortlessly.",
+      "desc": "Outro takeaway text extends dangerously close to canvas edge: span [41..1878] (width 1837px). Left margin=41px, right margin=42px (recommended min 120px)."
+    }
+  ],
+  "VID-5.5-hi": [
+    {
+      "type": "INTRO_PILL_COLLISION",
+      "card": "intro",
+      "severity": "WARNING",
+      "pill_width": 600,
+      "text_span": [
+        663,
+        1257
+      ],
+      "text_width": 594,
+      "left_margin": 3,
+      "right_margin": 3,
+      "text": "\u092a\u0930\u091a\u0947\u091c\u093f\u0902\u0917, \u091c\u0940\u0906\u0930\u090f\u0928 \u0914\u0930 \u0921\u093f\u0938\u094d\u091f\u094d\u0930\u0940\u092c\u094d\u092f\u0942\u091f\u0930 \u0911\u092a\u0930\u0947\u0936\u0902\u0938 \u00b7 \u092d\u093e\u0917 5 / 7",
+      "desc": "Top pill text crashes into rounded endcap borders: margins are 3px left / 3px right (min 20px required for rx=24). Pill [660..1260] (600px)."
+    }
+  ],
+  "VID-5.6": [
+    {
+      "type": "INTRO_PILL_COLLISION",
+      "card": "intro",
+      "severity": "WARNING",
+      "pill_width": 600,
+      "text_span": [
+        663,
+        1257
+      ],
+      "text_width": 594,
+      "left_margin": 3,
+      "right_margin": 3,
+      "text": "Purchasing, GRN & Distributor Operations \u00b7 PART 6 OF 7",
+      "desc": "Top pill text crashes into rounded endcap borders: margins are 3px left / 3px right (min 20px required for rx=24). Pill [660..1260] (600px)."
+    },
+    {
+      "type": "OUTRO_TAKEAWAY_MARGIN_BREACH",
+      "card": "outro",
+      "severity": "WARNING",
+      "text_span": [
+        69,
+        1849
+      ],
+      "text_width": 1780,
+      "left_margin": 69,
+      "right_margin": 71,
+      "text": "Supplier Returns: Issue statutory GST debit notes against inward purchase invoices, reverse input tax credits, and deduct payable dues reliably.",
+      "desc": "Outro takeaway text extends dangerously close to canvas edge: span [69..1849] (width 1780px). Left margin=69px, right margin=71px (recommended min 120px)."
+    }
+  ],
+  "VID-5.6-hi": [
+    {
+      "type": "INTRO_PILL_COLLISION",
+      "card": "intro",
+      "severity": "WARNING",
+      "pill_width": 600,
+      "text_span": [
+        663,
+        1257
+      ],
+      "text_width": 594,
+      "left_margin": 3,
+      "right_margin": 3,
+      "text": "\u092a\u0930\u091a\u0947\u091c\u093f\u0902\u0917, \u091c\u0940\u0906\u0930\u090f\u0928 \u0914\u0930 \u0921\u093f\u0938\u094d\u091f\u094d\u0930\u0940\u092c\u094d\u092f\u0942\u091f\u0930 \u0911\u092a\u0930\u0947\u0936\u0902\u0938 \u00b7 \u092d\u093e\u0917 6 / 7",
+      "desc": "Top pill text crashes into rounded endcap borders: margins are 3px left / 3px right (min 20px required for rx=24). Pill [660..1260] (600px)."
+    }
+  ],
+  "VID-5.7": [
+    {
+      "type": "INTRO_PILL_COLLISION",
+      "card": "intro",
+      "severity": "WARNING",
+      "pill_width": 600,
+      "text_span": [
+        663,
+        1257
+      ],
+      "text_width": 594,
+      "left_margin": 3,
+      "right_margin": 3,
+      "text": "Purchasing, GRN & Distributor Operations \u00b7 PART 7 OF 7",
+      "desc": "Top pill text crashes into rounded endcap borders: margins are 3px left / 3px right (min 20px required for rx=24). Pill [660..1260] (600px)."
+    },
+    {
+      "type": "OUTRO_TAKEAWAY_CLIPPED",
+      "card": "outro",
+      "severity": "CRITICAL",
+      "text_span": [
+        0,
+        1919
+      ],
+      "text_width": 1919,
+      "left_margin": 0,
+      "right_margin": 1,
+      "text": "Supplier Ledgers &amp; Payments: Track real-time distributor payables, record bank and UPI payments with UTR references, and keep supplier accounts reconciled.",
+      "desc": "Outro takeaway text clips / bleeds offscreen: span [0..1919] (width 1919px). Left margin=0px, right margin=1px."
+    }
+  ],
+  "VID-5.7-hi": [
+    {
+      "type": "INTRO_PILL_COLLISION",
+      "card": "intro",
+      "severity": "WARNING",
+      "pill_width": 600,
+      "text_span": [
+        663,
+        1257
+      ],
+      "text_width": 594,
+      "left_margin": 3,
+      "right_margin": 3,
+      "text": "\u092a\u0930\u091a\u0947\u091c\u093f\u0902\u0917, \u091c\u0940\u0906\u0930\u090f\u0928 \u0914\u0930 \u0921\u093f\u0938\u094d\u091f\u094d\u0930\u0940\u092c\u094d\u092f\u0942\u091f\u0930 \u0911\u092a\u0930\u0947\u0936\u0902\u0938 \u00b7 \u092d\u093e\u0917 7 / 7",
+      "desc": "Top pill text crashes into rounded endcap borders: margins are 3px left / 3px right (min 20px required for rx=24). Pill [660..1260] (600px)."
+    }
+  ],
+  "VID-6.1": [
+    {
+      "type": "INTRO_PILL_COLLISION",
+      "card": "intro",
+      "severity": "WARNING",
+      "pill_width": 816,
+      "text_span": [
+        555,
+        1365
+      ],
+      "text_width": 810,
+      "left_margin": 3,
+      "right_margin": 3,
+      "text": "Customer Relationship Management (CRM) & Loyalty \u00b7 PART 1 OF 5",
+      "desc": "Top pill text crashes into rounded endcap borders: margins are 3px left / 3px right (min 20px required for rx=24). Pill [552..1368] (816px)."
+    }
+  ],
+  "VID-6.1-hi": [
+    {
+      "type": "INTRO_PILL_OVERFLOW",
+      "card": "intro",
+      "severity": "CRITICAL",
+      "pill_width": 600,
+      "text_span": [
+        634,
+        1285
+      ],
+      "text_width": 651,
+      "left_bleed": 26,
+      "right_bleed": 25,
+      "text": "Customer Relationship Management (CRM) & Loyalty \u00b7 \u092d\u093e\u0917 1 / 5",
+      "desc": "Top pill text overflows container: text spans [634..1285] (651px) vs pill [660..1260] (600px). Left bleed=26px, right bleed=25px."
+    }
+  ],
+  "VID-6.2": [
+    {
+      "type": "INTRO_PILL_COLLISION",
+      "card": "intro",
+      "severity": "WARNING",
+      "pill_width": 816,
+      "text_span": [
+        555,
+        1365
+      ],
+      "text_width": 810,
+      "left_margin": 3,
+      "right_margin": 3,
+      "text": "Customer Relationship Management (CRM) & Loyalty \u00b7 PART 2 OF 5",
+      "desc": "Top pill text crashes into rounded endcap borders: margins are 3px left / 3px right (min 20px required for rx=24). Pill [552..1368] (816px)."
+    }
+  ],
+  "VID-6.2-hi": [
+    {
+      "type": "INTRO_PILL_OVERFLOW",
+      "card": "intro",
+      "severity": "CRITICAL",
+      "pill_width": 600,
+      "text_span": [
+        634,
+        1285
+      ],
+      "text_width": 651,
+      "left_bleed": 26,
+      "right_bleed": 25,
+      "text": "Customer Relationship Management (CRM) & Loyalty \u00b7 \u092d\u093e\u0917 2 / 5",
+      "desc": "Top pill text overflows container: text spans [634..1285] (651px) vs pill [660..1260] (600px). Left bleed=26px, right bleed=25px."
+    }
+  ],
+  "VID-6.3": [
+    {
+      "type": "INTRO_PILL_OVERFLOW",
+      "card": "intro",
+      "severity": "CRITICAL",
+      "pill_width": 600,
+      "text_span": [
+        610,
+        1309
+      ],
+      "text_width": 699,
+      "left_bleed": 50,
+      "right_bleed": 49,
+      "text": "Customer Relationship Management (CRM) & Loyalty \u00b7 PART 3 OF 5",
+      "desc": "Top pill text overflows container: text spans [610..1309] (699px) vs pill [660..1260] (600px). Left bleed=50px, right bleed=49px."
+    },
+    {
+      "type": "OUTRO_TAKEAWAY_MARGIN_BREACH",
+      "card": "outro",
+      "severity": "WARNING",
+      "text_span": [
+        21,
+        1897
+      ],
+      "text_width": 1876,
+      "left_margin": 21,
+      "right_margin": 23,
+      "text": "Loyalty Program Configuration: Establish clear points-to-rupee ratios and redemption thresholds to increase customer retention and sales basket sizes.",
+      "desc": "Outro takeaway text extends dangerously close to canvas edge: span [21..1897] (width 1876px). Left margin=21px, right margin=23px (recommended min 120px)."
+    }
+  ],
+  "VID-6.3-hi": [
+    {
+      "type": "INTRO_PILL_OVERFLOW",
+      "card": "intro",
+      "severity": "CRITICAL",
+      "pill_width": 600,
+      "text_span": [
+        634,
+        1285
+      ],
+      "text_width": 651,
+      "left_bleed": 26,
+      "right_bleed": 25,
+      "text": "Customer Relationship Management (CRM) & Loyalty \u00b7 \u092d\u093e\u0917 3 / 5",
+      "desc": "Top pill text overflows container: text spans [634..1285] (651px) vs pill [660..1260] (600px). Left bleed=26px, right bleed=25px."
+    }
+  ],
+  "VID-6.4": [
+    {
+      "type": "INTRO_PILL_OVERFLOW",
+      "card": "intro",
+      "severity": "CRITICAL",
+      "pill_width": 600,
+      "text_span": [
+        610,
+        1309
+      ],
+      "text_width": 699,
+      "left_bleed": 50,
+      "right_bleed": 49,
+      "text": "Customer Relationship Management (CRM) & Loyalty \u00b7 PART 4 OF 5",
+      "desc": "Top pill text overflows container: text spans [610..1309] (699px) vs pill [660..1260] (600px). Left bleed=50px, right bleed=49px."
+    },
+    {
+      "type": "OUTRO_TAKEAWAY_MARGIN_BREACH",
+      "card": "outro",
+      "severity": "WARNING",
+      "text_span": [
+        74,
+        1844
+      ],
+      "text_width": 1770,
+      "left_margin": 74,
+      "right_margin": 76,
+      "text": "Customer Loyalty Ledger: Review lifetime point histories, verify bill-linked redemptions, and issue audited goodwill point adjustments securely.",
+      "desc": "Outro takeaway text extends dangerously close to canvas edge: span [74..1844] (width 1770px). Left margin=74px, right margin=76px (recommended min 120px)."
+    }
+  ],
+  "VID-6.4-hi": [
+    {
+      "type": "INTRO_PILL_OVERFLOW",
+      "card": "intro",
+      "severity": "CRITICAL",
+      "pill_width": 600,
+      "text_span": [
+        634,
+        1285
+      ],
+      "text_width": 651,
+      "left_bleed": 26,
+      "right_bleed": 25,
+      "text": "Customer Relationship Management (CRM) & Loyalty \u00b7 \u092d\u093e\u0917 4 / 5",
+      "desc": "Top pill text overflows container: text spans [634..1285] (651px) vs pill [660..1260] (600px). Left bleed=26px, right bleed=25px."
+    }
+  ],
+  "VID-6.5": [
+    {
+      "type": "INTRO_PILL_OVERFLOW",
+      "card": "intro",
+      "severity": "CRITICAL",
+      "pill_width": 600,
+      "text_span": [
+        610,
+        1309
+      ],
+      "text_width": 699,
+      "left_bleed": 50,
+      "right_bleed": 49,
+      "text": "Customer Relationship Management (CRM) & Loyalty \u00b7 PART 5 OF 5",
+      "desc": "Top pill text overflows container: text spans [610..1309] (699px) vs pill [660..1260] (600px). Left bleed=50px, right bleed=49px."
+    }
+  ],
+  "VID-6.5-hi": [
+    {
+      "type": "INTRO_PILL_OVERFLOW",
+      "card": "intro",
+      "severity": "CRITICAL",
+      "pill_width": 600,
+      "text_span": [
+        634,
+        1285
+      ],
+      "text_width": 651,
+      "left_bleed": 26,
+      "right_bleed": 25,
+      "text": "Customer Relationship Management (CRM) & Loyalty \u00b7 \u092d\u093e\u0917 5 / 5",
+      "desc": "Top pill text overflows container: text spans [634..1285] (651px) vs pill [660..1260] (600px). Left bleed=26px, right bleed=25px."
+    }
+  ],
+  "VID-7.1": [
+    {
+      "type": "INTRO_PILL_COLLISION",
+      "card": "intro",
+      "severity": "WARNING",
+      "pill_width": 828,
+      "text_span": [
+        549,
+        1371
+      ],
+      "text_width": 822,
+      "left_margin": 3,
+      "right_margin": 3,
+      "text": "Patient Care, Omnichannel Orders & Communications \u00b7 PART 1 OF 5",
+      "desc": "Top pill text crashes into rounded endcap borders: margins are 3px left / 3px right (min 20px required for rx=24). Pill [546..1374] (828px)."
+    }
+  ],
+  "VID-7.1-hi": [
+    {
+      "type": "INTRO_PILL_OVERFLOW",
+      "card": "intro",
+      "severity": "CRITICAL",
+      "pill_width": 600,
+      "text_span": [
+        630,
+        1289
+      ],
+      "text_width": 659,
+      "left_bleed": 30,
+      "right_bleed": 29,
+      "text": "Patient Care, Omnichannel Orders & Communications \u00b7 \u092d\u093e\u0917 1 / 5",
+      "desc": "Top pill text overflows container: text spans [630..1289] (659px) vs pill [660..1260] (600px). Left bleed=30px, right bleed=29px."
+    }
+  ],
+  "VID-7.2": [
+    {
+      "type": "INTRO_PILL_OVERFLOW",
+      "card": "intro",
+      "severity": "CRITICAL",
+      "pill_width": 600,
+      "text_span": [
+        606,
+        1313
+      ],
+      "text_width": 707,
+      "left_bleed": 54,
+      "right_bleed": 53,
+      "text": "Patient Care, Omnichannel Orders & Communications \u00b7 PART 2 OF 5",
+      "desc": "Top pill text overflows container: text spans [606..1313] (707px) vs pill [660..1260] (600px). Left bleed=54px, right bleed=53px."
+    }
+  ],
+  "VID-7.2-hi": [
+    {
+      "type": "INTRO_PILL_OVERFLOW",
+      "card": "intro",
+      "severity": "CRITICAL",
+      "pill_width": 600,
+      "text_span": [
+        630,
+        1289
+      ],
+      "text_width": 659,
+      "left_bleed": 30,
+      "right_bleed": 29,
+      "text": "Patient Care, Omnichannel Orders & Communications \u00b7 \u092d\u093e\u0917 2 / 5",
+      "desc": "Top pill text overflows container: text spans [630..1289] (659px) vs pill [660..1260] (600px). Left bleed=30px, right bleed=29px."
+    }
+  ],
+  "VID-7.3": [
+    {
+      "type": "INTRO_PILL_OVERFLOW",
+      "card": "intro",
+      "severity": "CRITICAL",
+      "pill_width": 600,
+      "text_span": [
+        606,
+        1313
+      ],
+      "text_width": 707,
+      "left_bleed": 54,
+      "right_bleed": 53,
+      "text": "Patient Care, Omnichannel Orders & Communications \u00b7 PART 3 OF 5",
+      "desc": "Top pill text overflows container: text spans [606..1313] (707px) vs pill [660..1260] (600px). Left bleed=54px, right bleed=53px."
+    },
+    {
+      "type": "OUTRO_TAKEAWAY_MARGIN_BREACH",
+      "card": "outro",
+      "severity": "WARNING",
+      "text_span": [
+        42,
+        1877
+      ],
+      "text_width": 1835,
+      "left_margin": 42,
+      "right_margin": 43,
+      "text": "Patient Refill Reminders: Proactively schedule medicine refills via WhatsApp and SMS to safeguard patient health and maximize pharmacy retention.",
+      "desc": "Outro takeaway text extends dangerously close to canvas edge: span [42..1877] (width 1835px). Left margin=42px, right margin=43px (recommended min 120px)."
+    }
+  ],
+  "VID-7.3-hi": [
+    {
+      "type": "INTRO_PILL_OVERFLOW",
+      "card": "intro",
+      "severity": "CRITICAL",
+      "pill_width": 600,
+      "text_span": [
+        630,
+        1289
+      ],
+      "text_width": 659,
+      "left_bleed": 30,
+      "right_bleed": 29,
+      "text": "Patient Care, Omnichannel Orders & Communications \u00b7 \u092d\u093e\u0917 3 / 5",
+      "desc": "Top pill text overflows container: text spans [630..1289] (659px) vs pill [660..1260] (600px). Left bleed=30px, right bleed=29px."
+    }
+  ],
+  "VID-7.4": [
+    {
+      "type": "INTRO_PILL_OVERFLOW",
+      "card": "intro",
+      "severity": "CRITICAL",
+      "pill_width": 600,
+      "text_span": [
+        606,
+        1313
+      ],
+      "text_width": 707,
+      "left_bleed": 54,
+      "right_bleed": 53,
+      "text": "Patient Care, Omnichannel Orders & Communications \u00b7 PART 4 OF 5",
+      "desc": "Top pill text overflows container: text spans [606..1313] (707px) vs pill [660..1260] (600px). Left bleed=54px, right bleed=53px."
+    },
+    {
+      "type": "OUTRO_TAKEAWAY_CLIPPED",
+      "card": "outro",
+      "severity": "CRITICAL",
+      "text_span": [
+        0,
+        1919
+      ],
+      "text_width": 1919,
+      "left_margin": 0,
+      "right_margin": 1,
+      "text": "WhatsApp Cloud API: Connect your official Meta business number to dispatch verified PDF invoices, appointment reminders, and automated refill notifications.",
+      "desc": "Outro takeaway text clips / bleeds offscreen: span [0..1919] (width 1919px). Left margin=0px, right margin=1px."
+    }
+  ],
+  "VID-7.4-hi": [
+    {
+      "type": "INTRO_PILL_OVERFLOW",
+      "card": "intro",
+      "severity": "CRITICAL",
+      "pill_width": 600,
+      "text_span": [
+        630,
+        1289
+      ],
+      "text_width": 659,
+      "left_bleed": 30,
+      "right_bleed": 29,
+      "text": "Patient Care, Omnichannel Orders & Communications \u00b7 \u092d\u093e\u0917 4 / 5",
+      "desc": "Top pill text overflows container: text spans [630..1289] (659px) vs pill [660..1260] (600px). Left bleed=30px, right bleed=29px."
+    }
+  ],
+  "VID-7.5": [
+    {
+      "type": "INTRO_PILL_OVERFLOW",
+      "card": "intro",
+      "severity": "CRITICAL",
+      "pill_width": 600,
+      "text_span": [
+        606,
+        1313
+      ],
+      "text_width": 707,
+      "left_bleed": 54,
+      "right_bleed": 53,
+      "text": "Patient Care, Omnichannel Orders & Communications \u00b7 PART 5 OF 5",
+      "desc": "Top pill text overflows container: text spans [606..1313] (707px) vs pill [660..1260] (600px). Left bleed=54px, right bleed=53px."
+    },
+    {
+      "type": "OUTRO_TAKEAWAY_CLIPPED",
+      "card": "outro",
+      "severity": "CRITICAL",
+      "text_span": [
+        7,
+        1910
+      ],
+      "text_width": 1903,
+      "left_margin": 7,
+      "right_margin": 10,
+      "text": "WhatsApp Live Inbox: Engage patients in real-time two-way messaging, review prescriptions, and dispatch pre-approved Meta HSM templates effortlessly.",
+      "desc": "Outro takeaway text clips / bleeds offscreen: span [7..1910] (width 1903px). Left margin=7px, right margin=10px."
+    }
+  ],
+  "VID-7.5-hi": [
+    {
+      "type": "INTRO_PILL_OVERFLOW",
+      "card": "intro",
+      "severity": "CRITICAL",
+      "pill_width": 600,
+      "text_span": [
+        630,
+        1289
+      ],
+      "text_width": 659,
+      "left_bleed": 30,
+      "right_bleed": 29,
+      "text": "Patient Care, Omnichannel Orders & Communications \u00b7 \u092d\u093e\u0917 5 / 5",
+      "desc": "Top pill text overflows container: text spans [630..1289] (659px) vs pill [660..1260] (600px). Left bleed=30px, right bleed=29px."
+    }
+  ],
+  "VID-8.1": [
+    {
+      "type": "INTRO_PILL_COLLISION",
+      "card": "intro",
+      "severity": "WARNING",
+      "pill_width": 787,
+      "text_span": [
+        570,
+        1350
+      ],
+      "text_width": 780,
+      "left_margin": 3,
+      "right_margin": 3,
+      "text": "Accounting, Cash Flow & Financial Ledgers \u00b7 PART 1 OF 5",
+      "desc": "Top pill text crashes into rounded endcap borders: margins are 3px left / 3px right (min 20px required for rx=24). Pill [567..1353] (787px)."
+    }
+  ],
+  "VID-8.1-hi": [
+    {
+      "type": "INTRO_PILL_COLLISION",
+      "card": "intro",
+      "severity": "WARNING",
+      "pill_width": 761,
+      "text_span": [
+        583,
+        1337
+      ],
+      "text_width": 754,
+      "left_margin": 3,
+      "right_margin": 3,
+      "text": "Accounting, Cash Flow & Financial Ledgers \u00b7 \u092d\u093e\u0917 1 / 5",
+      "desc": "Top pill text crashes into rounded endcap borders: margins are 3px left / 3px right (min 20px required for rx=24). Pill [580..1340] (761px)."
+    }
+  ],
+  "VID-8.2": [
+    {
+      "type": "INTRO_PILL_COLLISION",
+      "card": "intro",
+      "severity": "WARNING",
+      "pill_width": 787,
+      "text_span": [
+        570,
+        1350
+      ],
+      "text_width": 780,
+      "left_margin": 3,
+      "right_margin": 3,
+      "text": "Accounting, Cash Flow & Financial Ledgers \u00b7 PART 2 OF 5",
+      "desc": "Top pill text crashes into rounded endcap borders: margins are 3px left / 3px right (min 20px required for rx=24). Pill [567..1353] (787px)."
+    }
+  ],
+  "VID-8.2-hi": [
+    {
+      "type": "INTRO_PILL_COLLISION",
+      "card": "intro",
+      "severity": "WARNING",
+      "pill_width": 761,
+      "text_span": [
+        583,
+        1337
+      ],
+      "text_width": 754,
+      "left_margin": 3,
+      "right_margin": 3,
+      "text": "Accounting, Cash Flow & Financial Ledgers \u00b7 \u092d\u093e\u0917 2 / 5",
+      "desc": "Top pill text crashes into rounded endcap borders: margins are 3px left / 3px right (min 20px required for rx=24). Pill [580..1340] (761px)."
+    }
+  ],
+  "VID-8.3": [
+    {
+      "type": "INTRO_PILL_COLLISION",
+      "card": "intro",
+      "severity": "WARNING",
+      "pill_width": 787,
+      "text_span": [
+        570,
+        1350
+      ],
+      "text_width": 780,
+      "left_margin": 3,
+      "right_margin": 3,
+      "text": "Accounting, Cash Flow & Financial Ledgers \u00b7 PART 3 OF 5",
+      "desc": "Top pill text crashes into rounded endcap borders: margins are 3px left / 3px right (min 20px required for rx=24). Pill [567..1353] (787px)."
+    }
+  ],
+  "VID-8.3-hi": [
+    {
+      "type": "INTRO_PILL_COLLISION",
+      "card": "intro",
+      "severity": "WARNING",
+      "pill_width": 735,
+      "text_span": [
+        596,
+        1324
+      ],
+      "text_width": 728,
+      "left_margin": 3,
+      "right_margin": 3,
+      "text": "\u0932\u0947\u0916\u093e\u0902\u0915\u0928, \u0928\u0915\u0926\u0940 \u092a\u094d\u0930\u0935\u093e\u0939 \u0914\u0930 \u0935\u093f\u0924\u094d\u0924\u0940\u092f \u092c\u0939\u0940\u0916\u093e\u0924\u0947 \u00b7 \u092d\u093e\u0917 3 / 5",
+      "desc": "Top pill text crashes into rounded endcap borders: margins are 3px left / 3px right (min 20px required for rx=24). Pill [593..1327] (735px)."
+    }
+  ],
+  "VID-8.4": [
+    {
+      "type": "INTRO_PILL_COLLISION",
+      "card": "intro",
+      "severity": "WARNING",
+      "pill_width": 787,
+      "text_span": [
+        570,
+        1350
+      ],
+      "text_width": 780,
+      "left_margin": 3,
+      "right_margin": 3,
+      "text": "Accounting, Cash Flow & Financial Ledgers \u00b7 PART 4 OF 5",
+      "desc": "Top pill text crashes into rounded endcap borders: margins are 3px left / 3px right (min 20px required for rx=24). Pill [567..1353] (787px)."
+    }
+  ],
+  "VID-8.4-hi": [
+    {
+      "type": "INTRO_PILL_COLLISION",
+      "card": "intro",
+      "severity": "WARNING",
+      "pill_width": 735,
+      "text_span": [
+        596,
+        1324
+      ],
+      "text_width": 728,
+      "left_margin": 3,
+      "right_margin": 3,
+      "text": "\u0932\u0947\u0916\u093e\u0902\u0915\u0928, \u0928\u0915\u0926\u0940 \u092a\u094d\u0930\u0935\u093e\u0939 \u0914\u0930 \u0935\u093f\u0924\u094d\u0924\u0940\u092f \u092c\u0939\u0940\u0916\u093e\u0924\u0947 \u00b7 \u092d\u093e\u0917 4 / 5",
+      "desc": "Top pill text crashes into rounded endcap borders: margins are 3px left / 3px right (min 20px required for rx=24). Pill [593..1327] (735px)."
+    }
+  ],
+  "VID-8.5": [
+    {
+      "type": "INTRO_PILL_COLLISION",
+      "card": "intro",
+      "severity": "WARNING",
+      "pill_width": 787,
+      "text_span": [
+        570,
+        1350
+      ],
+      "text_width": 780,
+      "left_margin": 3,
+      "right_margin": 3,
+      "text": "Accounting, Cash Flow & Financial Ledgers \u00b7 PART 5 OF 5",
+      "desc": "Top pill text crashes into rounded endcap borders: margins are 3px left / 3px right (min 20px required for rx=24). Pill [567..1353] (787px)."
+    }
+  ],
+  "VID-8.5-hi": [
+    {
+      "type": "INTRO_PILL_COLLISION",
+      "card": "intro",
+      "severity": "WARNING",
+      "pill_width": 735,
+      "text_span": [
+        596,
+        1324
+      ],
+      "text_width": 728,
+      "left_margin": 3,
+      "right_margin": 3,
+      "text": "\u0932\u0947\u0916\u093e\u0902\u0915\u0928, \u0928\u0915\u0926\u0940 \u092a\u094d\u0930\u0935\u093e\u0939 \u0914\u0930 \u0935\u093f\u0924\u094d\u0924\u0940\u092f \u092c\u0939\u0940\u0916\u093e\u0924\u0947 \u00b7 \u092d\u093e\u0917 5 / 5",
+      "desc": "Top pill text crashes into rounded endcap borders: margins are 3px left / 3px right (min 20px required for rx=24). Pill [593..1327] (735px)."
+    }
+  ]
+}

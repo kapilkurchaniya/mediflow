@@ -9,16 +9,17 @@ interface ExpiryPreset {
   label: string;
   key: string;
   tone?: "danger" | "warning";
+  tip: string;
 }
 
 const EXPIRY_PRESETS: readonly ExpiryPreset[] = [
-  { label: "All batches", key: "all" },
-  { label: "Expired", key: "expired", tone: "danger" },
-  { label: "≤ 30 days", key: "30d", tone: "danger" },
-  { label: "≤ 60 days", key: "60d", tone: "warning" },
-  { label: "≤ 90 days", key: "90d", tone: "warning" },
-  { label: "≤ 6 months", key: "180d" },
-  { label: "This year", key: "year" },
+  { label: "All batches", key: "all", tip: "Show all stock batches regardless of expiration date." },
+  { label: "Expired", key: "expired", tone: "danger", tip: "Show batches already past their expiry date that must be quarantined." },
+  { label: "≤ 30 days", key: "30d", tone: "danger", tip: "Critical expiry alert: batches expiring within the next 30 days." },
+  { label: "≤ 60 days", key: "60d", tone: "warning", tip: "Near-expiry warning: batches expiring within the next 60 days." },
+  { label: "≤ 90 days", key: "90d", tone: "warning", tip: "Early expiry notice: batches expiring within the next 90 days." },
+  { label: "≤ 6 months", key: "180d", tip: "Show batches expiring within the next 180 days (6 months)." },
+  { label: "This year", key: "year", tip: "Show batches expiring before the end of the current calendar year." },
 ];
 
 export function ExpiryDateFilter() {
@@ -73,6 +74,8 @@ export function ExpiryDateFilter() {
               key={preset.key}
               type="button"
               onClick={() => handlePreset(preset.key)}
+              data-tooltip-title={`Expiry Filter: ${preset.label}`}
+              data-tooltip={preset.tip}
               className={clsx(
                 "rounded-md px-2.5 py-1 text-[12px] font-medium transition-all duration-150",
                 isActive

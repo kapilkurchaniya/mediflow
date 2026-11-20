@@ -1,0 +1,47 @@
+{
+  "id": "VID-6.4",
+  "series": "Customer Relationship Management (CRM) & Loyalty",
+  "part": 4,
+  "totalParts": 5,
+  "title": "Customer Loyalty Points Ledger & Audited Manual Adjustments",
+  "shortcut": "LOYALTY LEDGER · POINT ADJUSTMENTS",
+  "role": "Pharmacists, Cashiers & Store Owners",
+  "targetDurationSeconds": 55,
+  "voice": "en-IN-PrabhatNeural",
+  "intro": {
+    "duration": 4,
+    "title": "Loyalty Points Ledger & Adjustments",
+    "subtitle": "Track point history, bill accruals, cash redemption values, and audited manual adjustments",
+    "badge": "LOYALTY LEDGER · AUDITED CREDITS"
+  },
+  "narration": [
+    {
+      "id": "scene-1",
+      "text": "Welcome to Phase 6, Part 4: Customer Loyalty Points Ledger and Audited Manual Adjustments. Maintaining transparent point histories ensures customer trust and allows goodwill credits when resolving service concerns."
+    },
+    {
+      "id": "scene-2",
+      "text": "Open a customer profile and click Loyalty Ledger. The summary cards display their active reward balance, rupee purchasing value, and lifetime points earned."
+    },
+    {
+      "id": "scene-3",
+      "text": "The transaction history lists every point accrual from counter invoices and point redemptions, complete with timestamps and linked bill numbers."
+    },
+    {
+      "id": "scene-4",
+      "text": "To grant promotional goodwill points or resolve a discrepancy, click Adjust Points. Specify the points, and enter an audit reason such as Customer Delight."
+    },
+    {
+      "id": "scene-5",
+      "text": "Save the adjustment. The customer's balance updates immediately, with the audit reason permanently logged. In Part 5, we cover Medical Representatives and Commission Tracking!"
+    }
+  ],
+  "outro": {
+    "duration": 4,
+    "takeaway": "Customer Loyalty Ledger: Review lifetime point histories, verify bill-linked redemptions, and issue audited goodwill point adjustments securely.",
+    "nextPart": {
+      "id": "VID-6.5",
+      "title": "Part 5: Medical Representatives (MR) Master & Commission Tracking"
+    }
+  }
+}

@@ -122,7 +122,7 @@ export function StoreSwitcherDialog({
         role="dialog"
         aria-modal="true"
         aria-label="Switch branch or warehouse"
-        className="absolute left-0 sm:left-auto sm:right-0 top-full mt-1.5 z-50 w-[320px] sm:w-[360px] rounded-xl border border-ink-200 bg-white p-2.5 shadow-xl animate-enter focus:outline-none"
+        className="fixed left-1/2 -translate-x-1/2 top-20 z-50 w-[min(360px,calc(100vw-2rem))] rounded-xl border border-ink-200 bg-white p-2.5 shadow-xl animate-enter focus:outline-none"
       >
         {/* Header */}
         <div className="flex items-center justify-between pb-2 mb-2 border-b border-ink-100">

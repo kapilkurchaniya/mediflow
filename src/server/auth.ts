@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { cookies } from "next/headers";
 import { db, schema, type DbOrTx } from "./db";
 import { eq } from "drizzle-orm";
@@ -120,15 +121,17 @@ export async function updateSessionStore(
 
 /**
  * Retrieves the current session and user from the request cookies.
+ * Memoized per server request via React.cache to avoid redundant DB lookups
+ * across layouts, pages, and server actions during the same render pass.
  */
-export async function getCurrentSession() {
+export const getCurrentSession = cache(async () => {
   const cookieStore = await cookies();
   const token = cookieStore.get(SESSION_COOKIE_NAME)?.value ?? null;
   if (!token) return { session: null, user: null };
 
   const { session, user } = await validateSessionToken(token);
   return { session, user };
-}
+});
 
 /**
  * Retrieves the current session and ensures tenantId and storeId are present.

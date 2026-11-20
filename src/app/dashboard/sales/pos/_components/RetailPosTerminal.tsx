@@ -200,6 +200,7 @@ export function RetailPosTerminal() {
       setSubstituteGeneric(null); setPromiseMedicine(null);
     },
     isModalOpen: isPaymentOpen || isParkOpen || isHeldListOpen || shortcutsOpen || calculatorOpen || Boolean(substituteGeneric) || Boolean(promiseMedicine),
+    allowCompleteSaleInModal: isPaymentOpen && !isParkOpen && !isHeldListOpen && !shortcutsOpen && !calculatorOpen && !substituteGeneric && !promiseMedicine,
   });
 
   usePosBarcodeBridge({

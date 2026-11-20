@@ -1,0 +1,47 @@
+{
+  "id": "VID-7.3",
+  "series": "Patient Care, Omnichannel Orders & Communications",
+  "part": 3,
+  "totalParts": 5,
+  "title": "Scheduling Chronic Patient Refill & Follow-Up Reminders",
+  "shortcut": "REFILL REMINDERS · CHRONIC CARE",
+  "role": "Pharmacists, Cashiers & Store Managers",
+  "targetDurationSeconds": 55,
+  "voice": "en-IN-PrabhatNeural",
+  "intro": {
+    "duration": 4,
+    "title": "Patient Refill & Follow-Up Reminders",
+    "subtitle": "Automate refill alerts, follow-up check-ins, WhatsApp scheduling, and one-click dispatch",
+    "badge": "PATIENT CARE · REFILL REMINDERS"
+  },
+  "narration": [
+    {
+      "id": "scene-1",
+      "text": "Welcome to Phase 7, Part 3: Scheduling Chronic Patient Refill and Follow-Up Reminders. Ensuring chronic disease patients never run out of maintenance medicines builds loyalty and steady monthly revenue."
+    },
+    {
+      "id": "scene-2",
+      "text": "Go to Reminders. The dashboard highlights due reminders alongside scheduled dates, communication channels, and delivery statuses."
+    },
+    {
+      "id": "scene-3",
+      "text": "Click Schedule Reminder. Enter the customer's name, mobile number, specific maintenance medicine, and the target refill date."
+    },
+    {
+      "id": "scene-4",
+      "text": "Choose the notification channel: WhatsApp, SMS, or Both. Customize the personalized message inviting the patient to reorder before their doses run out."
+    },
+    {
+      "id": "scene-5",
+      "text": "Save the reminder. Use Send Due Reminders to dispatch pending alerts immediately or let the daily automated cron handle dispatch. In Part 4, we connect WhatsApp Cloud API!"
+    }
+  ],
+  "outro": {
+    "duration": 4,
+    "takeaway": "Patient Refill Reminders: Proactively schedule medicine refills via WhatsApp and SMS to safeguard patient health and maximize pharmacy retention.",
+    "nextPart": {
+      "id": "VID-7.4",
+      "title": "Part 4: Connecting Meta WhatsApp Cloud API & SMS Gateways"
+    }
+  }
+}

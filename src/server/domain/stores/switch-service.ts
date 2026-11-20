@@ -1,4 +1,4 @@
-import { and, count, eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { schema, type DbOrTx } from "@/server/db";
 import { DomainError, ForbiddenError, NotFoundError } from "@/server/errors";
 import { writeAudit } from "@/server/audit";
@@ -39,24 +39,46 @@ export async function switchStore(
   database: DbOrTx,
   input: SwitchStoreInput,
 ): Promise<StoreSwitchResult> {
-  // 1. Fetch target store and ensure it exists and belongs to the tenant
-  const [targetStore] = await database
-    .select({
-      id: schema.stores.id,
-      name: schema.stores.name,
-      code: schema.stores.code,
-      kind: schema.stores.kind,
-      isActive: schema.stores.isActive,
-      tenantId: schema.stores.tenantId,
-    })
-    .from(schema.stores)
-    .where(
-      and(
-        eq(schema.stores.id, input.targetStoreId),
-        eq(schema.stores.tenantId, input.tenantId),
-      ),
-    )
-    .limit(1);
+  // 1. Fetch target store and membership (+ switch_any permission) in parallel
+  const [[targetStore], [membershipRow]] = await Promise.all([
+    database
+      .select({
+        id: schema.stores.id,
+        name: schema.stores.name,
+        code: schema.stores.code,
+        kind: schema.stores.kind,
+        isActive: schema.stores.isActive,
+        tenantId: schema.stores.tenantId,
+      })
+      .from(schema.stores)
+      .where(
+        and(
+          eq(schema.stores.id, input.targetStoreId),
+          eq(schema.stores.tenantId, input.tenantId),
+        ),
+      )
+      .limit(1),
+    database
+      .select({
+        membership: schema.memberships,
+        switchAnyPerm: schema.rolePermissions.permission,
+      })
+      .from(schema.memberships)
+      .leftJoin(
+        schema.rolePermissions,
+        and(
+          eq(schema.rolePermissions.roleId, schema.memberships.roleId),
+          eq(schema.rolePermissions.permission, "store.switch_any"),
+        ),
+      )
+      .where(
+        and(
+          eq(schema.memberships.tenantId, input.tenantId),
+          eq(schema.memberships.userId, input.userId),
+        ),
+      )
+      .limit(1),
+  ]);
 
   if (!targetStore) {
     throw new NotFoundError("Store not found");
@@ -66,42 +88,13 @@ export async function switchStore(
     throw new DomainError("STORE_INACTIVE", "Cannot switch to a deactivated store.");
   }
 
-  // 2. Fetch membership and verify active status
-  const [membership] = await database
-    .select()
-    .from(schema.memberships)
-    .where(
-      and(
-        eq(schema.memberships.tenantId, input.tenantId),
-        eq(schema.memberships.userId, input.userId),
-      ),
-    )
-    .limit(1);
-
+  const membership = membershipRow?.membership;
   if (!membership || membership.status !== "active") {
     throw new ForbiddenError("membership.active");
   }
 
-  // 3. Verify store access permission:
-  // Allowed if:
-  // - membership.allStores is true
-  // - user has the "store.switch_any" permission
-  // - membership.storeIds includes targetStoreId
-  let maySwitchAny = membership.allStores;
-  if (!maySwitchAny) {
-    const [perm] = await database
-      .select({ n: count() })
-      .from(schema.rolePermissions)
-      .where(
-        and(
-          eq(schema.rolePermissions.roleId, membership.roleId),
-          eq(schema.rolePermissions.permission, "store.switch_any"),
-        ),
-      );
-    if (Number(perm?.n ?? 0) > 0) {
-      maySwitchAny = true;
-    }
-  }
+  const maySwitchAny =
+    membership.allStores || membershipRow?.switchAnyPerm === "store.switch_any";
 
   const isAllowed =
     maySwitchAny ||
@@ -114,32 +107,29 @@ export async function switchStore(
 
   // 4. Atomic transaction update: session storeId, membership lastStoreId, audit log
   const executeUpdates = async (tx: DbOrTx) => {
-    // Update session store pointer
-    await updateSessionStore(input.sessionId, input.targetStoreId, tx);
-
-    // Update member's last selected store
-    await tx
-      .update(schema.memberships)
-      .set({ lastStoreId: input.targetStoreId })
-      .where(eq(schema.memberships.id, membership.id));
-
-    // Audit log
-    await writeAudit(
-      tx,
-      {
-        tenantId: input.tenantId,
-        storeId: input.targetStoreId,
-        userId: input.userId,
-      },
-      {
-        action: "store_switch",
-        entityType: "session",
-        entityId: input.sessionId,
-        oldValue: { storeId: input.currentStoreId ?? null },
-        newValue: { storeId: input.targetStoreId },
-        ip: input.ip ?? undefined,
-      },
-    );
+    await Promise.all([
+      updateSessionStore(input.sessionId, input.targetStoreId, tx),
+      tx
+        .update(schema.memberships)
+        .set({ lastStoreId: input.targetStoreId })
+        .where(eq(schema.memberships.id, membership.id)),
+      writeAudit(
+        tx,
+        {
+          tenantId: input.tenantId,
+          storeId: input.targetStoreId,
+          userId: input.userId,
+        },
+        {
+          action: "store_switch",
+          entityType: "session",
+          entityId: input.sessionId,
+          oldValue: { storeId: input.currentStoreId ?? null },
+          newValue: { storeId: input.targetStoreId },
+          ip: input.ip ?? undefined,
+        },
+      ),
+    ]);
   };
 
   if ("transaction" in database && typeof database.transaction === "function") {
@@ -166,54 +156,52 @@ export async function listAllowedStores(
   database: DbOrTx,
   params: { tenantId: string; userId: string },
 ): Promise<AllowedStoreItem[]> {
-  const [m] = await database
-    .select()
-    .from(schema.memberships)
-    .where(
-      and(
-        eq(schema.memberships.tenantId, params.tenantId),
-        eq(schema.memberships.userId, params.userId),
-      ),
-    )
-    .limit(1);
-
-  if (!m || m.status !== "active") return [];
-
-  let maySwitchAny = m.allStores;
-  if (!maySwitchAny) {
-    const [perm] = await database
-      .select({ n: count() })
-      .from(schema.rolePermissions)
-      .where(
+  const [membershipRows, allActiveStores] = await Promise.all([
+    database
+      .select({
+        membership: schema.memberships,
+        switchAnyPerm: schema.rolePermissions.permission,
+      })
+      .from(schema.memberships)
+      .leftJoin(
+        schema.rolePermissions,
         and(
-          eq(schema.rolePermissions.roleId, m.roleId),
+          eq(schema.rolePermissions.roleId, schema.memberships.roleId),
           eq(schema.rolePermissions.permission, "store.switch_any"),
         ),
-      );
-    if (Number(perm?.n ?? 0) > 0) {
-      maySwitchAny = true;
-    }
-  }
+      )
+      .where(
+        and(
+          eq(schema.memberships.tenantId, params.tenantId),
+          eq(schema.memberships.userId, params.userId),
+        ),
+      )
+      .limit(1),
+    database
+      .select({
+        id: schema.stores.id,
+        name: schema.stores.name,
+        code: schema.stores.code,
+        kind: schema.stores.kind,
+        stateCode: schema.stores.stateCode,
+        gstin: schema.stores.gstin,
+        isActive: schema.stores.isActive,
+      })
+      .from(schema.stores)
+      .where(
+        and(
+          eq(schema.stores.tenantId, params.tenantId),
+          eq(schema.stores.isActive, true),
+        ),
+      )
+      .orderBy(schema.stores.name),
+  ]);
 
-  const allActiveStores = await database
-    .select({
-      id: schema.stores.id,
-      name: schema.stores.name,
-      code: schema.stores.code,
-      kind: schema.stores.kind,
-      stateCode: schema.stores.stateCode,
-      gstin: schema.stores.gstin,
-      isActive: schema.stores.isActive,
-    })
-    .from(schema.stores)
-    .where(
-      and(
-        eq(schema.stores.tenantId, params.tenantId),
-        eq(schema.stores.isActive, true),
-      ),
-    )
-    .orderBy(schema.stores.name);
+  const row = membershipRows[0];
+  const m = row?.membership;
+  if (!m || m.status !== "active") return [];
 
+  const maySwitchAny = m.allStores || row?.switchAnyPerm === "store.switch_any";
   if (maySwitchAny) {
     return allActiveStores as AllowedStoreItem[];
   }

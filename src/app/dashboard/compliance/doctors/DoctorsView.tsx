@@ -37,7 +37,11 @@ export function DoctorsView({
   initialDoctors: DoctorRecord[];
 }) {
   const router = useRouter();
-  const [doctors, setDoctors] = useState<DoctorRecord[]>(initialDoctors);
+  const [optimisticState, setOptimisticState] = useState<{
+    base: DoctorRecord[];
+    records: DoctorRecord[];
+  } | null>(null);
+  const doctors = optimisticState?.base === initialDoctors ? optimisticState.records : initialDoctors;
   const [searchQuery, setSearchQuery] = useState("");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
@@ -101,6 +105,26 @@ export function DoctorsView({
 
       if (res.success) {
         setIsModalOpen(false);
+        const newDoc: DoctorRecord = {
+          id: res.doctorId || String(Date.now()),
+          name: name.trim(),
+          regNo: regNo.trim(),
+          qualification: qualification.trim() || null,
+          specialization: specialization.trim() || null,
+          hospital: hospital.trim() || null,
+          phone: phone.trim() || null,
+          email: email.trim() || null,
+          address: address.trim() || null,
+          isActive: true,
+          createdAt: new Date(),
+        };
+        setOptimisticState({
+          base: initialDoctors,
+          records: [
+            newDoc,
+            ...doctors.filter((d) => d.id !== (editingId || newDoc.id)),
+          ],
+        });
         router.refresh();
       } else {
         setFormError(res.error || "Failed to save doctor");

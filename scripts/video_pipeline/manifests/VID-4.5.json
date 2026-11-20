@@ -1,0 +1,47 @@
+{
+  "id": "VID-4.5",
+  "series": "Inventory, Batches & Warehouse Operations",
+  "part": 5,
+  "totalParts": 8,
+  "title": "Bulk Stock CSV Import: Upload & Automatic Header Mapping",
+  "shortcut": "CSV IMPORT · FUZZY HEADER MAPPING",
+  "role": "Inventory Controllers & IT Migration Leads",
+  "targetDurationSeconds": 55,
+  "voice": "en-IN-PrabhatNeural",
+  "intro": {
+    "duration": 4,
+    "title": "Bulk Stock CSV Import",
+    "subtitle": "Legacy software migration, CSV file upload, and intelligent fuzzy header mapping",
+    "badge": "BULK IMPORT · HEADER MAPPING"
+  },
+  "narration": [
+    {
+      "id": "scene-1",
+      "text": "Welcome to Phase 4, Part 5: Bulk Stock CSV Import and Automatic Header Mapping. Migrating thousands of medicines from legacy software is seamless with MediFlow's smart import engine."
+    },
+    {
+      "id": "scene-2",
+      "text": "From Inventory, click Import to open the Smart Import portal, designed to ingest spreadsheets from distributors and third-party pharmacy tools."
+    },
+    {
+      "id": "scene-3",
+      "text": "You can prepare your spreadsheet using standard columns: medicine name, batch number, expiry date, quantity, MRP, and purchase rate."
+    },
+    {
+      "id": "scene-4",
+      "text": "Drag and drop your CSV file into the upload zone. MediFlow reads the file instantaneously on your browser without server upload delays."
+    },
+    {
+      "id": "scene-5",
+      "text": "The fuzzy matching engine automatically maps diverse vendor column headers to standard ERP fields. In Part 6, explore Validation and AI Enrichment."
+    }
+  ],
+  "outro": {
+    "duration": 4,
+    "takeaway": "Bulk CSV Import: Upload legacy inventory spreadsheets with automatic fuzzy header mapping to ingest thousands of medicines in seconds.",
+    "nextPart": {
+      "id": "VID-4.6",
+      "title": "Part 6: Bulk Import Preview, Validation & AI Enrichment"
+    }
+  }
+}

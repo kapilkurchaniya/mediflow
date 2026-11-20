@@ -17,24 +17,31 @@ import { recordExpenseAction } from "@/app/actions/expenses";
 import { ExpenseCategoryModal } from "../../_components/ExpenseCategoryModal";
 import { ExpenseVendorFields } from "./ExpenseVendorFields";
 import { formatINR } from "@/lib/format";
+import { getISTTodayString } from "@/lib/date-range";
 
 interface ExpenseFormProps {
   categories: Array<{ id: string; name: string; code: string }>;
   hasOpenShift: boolean;
   storeName: string;
+  initialOperationId?: string;
 }
 
-export function ExpenseForm({ categories: initialCategories, hasOpenShift, storeName }: ExpenseFormProps) {
+export function ExpenseForm({
+  categories: initialCategories,
+  hasOpenShift,
+  storeName,
+  initialOperationId = "",
+}: ExpenseFormProps) {
   const router = useRouter();
   const [categories, setCategories] = useState(initialCategories);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  const [clientOperationId] = useState(() => crypto.randomUUID());
+  const [clientOperationId, setClientOperationId] = useState(initialOperationId);
   const [categoryId, setCategoryId] = useState(categories[0]?.id || "");
   const [rupees, setRupees] = useState("");
   const [method, setMethod] = useState<"cash" | "upi" | "card" | "bank">("cash");
   const [paidFromTill, setPaidFromTill] = useState(hasOpenShift);
-  const [paymentDate, setPaymentDate] = useState(() => new Date().toISOString().split("T")[0]);
+  const [paymentDate, setPaymentDate] = useState(() => getISTTodayString());
   const [payeeName, setPayeeName] = useState("");
   const [reference, setReference] = useState("");
   const [vendorInvoiceNo, setVendorInvoiceNo] = useState("");
@@ -64,8 +71,11 @@ export function ExpenseForm({ categories: initialCategories, hasOpenShift, store
     setError(null);
 
     try {
+      const opId = clientOperationId || crypto.randomUUID();
+      if (!clientOperationId) setClientOperationId(opId);
+
       const res = await recordExpenseAction({
-        clientOperationId,
+        clientOperationId: opId,
         expenseAccountId: categoryId,
         amount: paise,
         method,
@@ -245,7 +255,7 @@ export function ExpenseForm({ categories: initialCategories, hasOpenShift, store
         <div className="flex items-center justify-between pt-2">
           <div className="flex items-center gap-1.5 text-[12px] text-ink-500">
             <ShieldCheck className="h-4 w-4 text-emerald-600" />
-            <span>Idempotent key: <span className="font-mono">{clientOperationId.slice(0, 8)}...</span></span>
+            <span>Idempotent key: <span className="font-mono">{clientOperationId ? `${clientOperationId.slice(0, 8)}...` : "pending"}</span></span>
           </div>
 
           <div className="flex gap-3">

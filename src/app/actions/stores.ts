@@ -18,6 +18,7 @@ import {
 } from "@/server/domain/stores";
 
 const refresh = () => {
+  revalidatePath("/dashboard", "layout");
   revalidatePath("/dashboard/settings/stores");
   revalidatePath("/dashboard/sales/pos");
 };

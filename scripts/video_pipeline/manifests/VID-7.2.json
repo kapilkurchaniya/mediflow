@@ -1,0 +1,47 @@
+{
+  "id": "VID-7.2",
+  "series": "Patient Care, Omnichannel Orders & Communications",
+  "part": 2,
+  "totalParts": 5,
+  "title": "Fulfilling Promise Orders upon Supplier GRN Delivery",
+  "shortcut": "PROMISE ORDERS · FULFILLMENT",
+  "role": "Cashiers & Pharmacists",
+  "targetDurationSeconds": 55,
+  "voice": "en-IN-PrabhatNeural",
+  "intro": {
+    "duration": 4,
+    "title": "Fulfill Promise Orders",
+    "subtitle": "Convert out-of-stock backorders upon supplier inward GRN, notify patients, and bill",
+    "badge": "PROMISE ORDERS · GRN INWARD"
+  },
+  "narration": [
+    {
+      "id": "scene-1",
+      "text": "Welcome to Phase 7, Part 2: Fulfilling Promise Orders upon Supplier GRN Delivery. In Phase 2, we booked out-of-stock medicine requests. Today, we fulfill them as soon as distributors deliver."
+    },
+    {
+      "id": "scene-2",
+      "text": "Go to Sales and select Promise Orders. The dashboard tracks all customer backorders with patient contact details, promised dates, and deposit advances."
+    },
+    {
+      "id": "scene-3",
+      "text": "When distributor stock arrives via inward GRN, MediFlow links received batches directly to pending promise orders, updating their status to Ready."
+    },
+    {
+      "id": "scene-4",
+      "text": "Click Notify Customer. An instant WhatsApp message informs the patient that their requested medicine is in stock and ready for collection."
+    },
+    {
+      "id": "scene-5",
+      "text": "Click Convert to Bill. All items and previous advance deposits transfer into the POS checkout for immediate handover. In Part 3, we schedule Chronic Patient Refills!"
+    }
+  ],
+  "outro": {
+    "duration": 4,
+    "takeaway": "Promise Order Fulfillment: Automatically match inward distributor stock to customer backorders and notify patients for high retention.",
+    "nextPart": {
+      "id": "VID-7.3",
+      "title": "Part 3: Scheduling Chronic Patient Refill & Follow-Up Reminders"
+    }
+  }
+}

@@ -1,0 +1,47 @@
+{
+  "id": "VID-3.1",
+  "series": "Drug Compliance & Regulations",
+  "part": 1,
+  "totalParts": 6,
+  "title": "Dispensing Schedule H Prescription Medicines",
+  "shortcut": "SCHEDULE H · DOCTOR & RX COMPLIANCE",
+  "role": "Retail Pharmacists & Compliance Officers",
+  "targetDurationSeconds": 55,
+  "voice": "en-IN-PrabhatNeural",
+  "intro": {
+    "duration": 4,
+    "title": "Dispensing Schedule H Medicines",
+    "subtitle": "Prescription mandate, doctor registration validation, and automatic statutory register logging",
+    "badge": "SCHEDULE H · DRUGS ACT COMPLIANT"
+  },
+  "narration": [
+    {
+      "id": "scene-1",
+      "text": "Welcome to Phase 3, Part 1: Dispensing Schedule H Prescription Medicines. Under the Drugs and Cosmetics Rules, dispensing Schedule H formulations without a registered medical practitioner's prescription is strictly prohibited."
+    },
+    {
+      "id": "scene-2",
+      "text": "When you search and add a Schedule H drug like Amoxicillin 500mg into the billing cart, MediFlow immediately tags the item with a red Rx badge and flags statutory controlled dispensing."
+    },
+    {
+      "id": "scene-3",
+      "text": "The Doctor and Prescription panel unfolds automatically. Select the prescriber from your registered doctor directory to automatically pull their name and Medical Council registration number."
+    },
+    {
+      "id": "scene-4",
+      "text": "Enter the patient's prescription serial number and prescription date. MediFlow ensures all required regulatory fields are satisfied before enabling counter settlement."
+    },
+    {
+      "id": "scene-5",
+      "text": "The completed invoice is automatically indexed in your statutory Schedule H register for inspection audits. In Part 2, discover strict Schedule H1 and Schedule X Narcotics compliance."
+    }
+  ],
+  "outro": {
+    "duration": 4,
+    "takeaway": "Schedule H Dispensing: Enforce mandatory doctor registration and prescription tracking seamlessly at POS, preventing audit fines and regulatory penalties.",
+    "nextPart": {
+      "id": "VID-3.2",
+      "title": "Part 2: Dispensing Schedule H1 & Schedule X Narcotics"
+    }
+  }
+}

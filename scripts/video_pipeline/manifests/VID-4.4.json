@@ -1,0 +1,47 @@
+{
+  "id": "VID-4.4",
+  "series": "Inventory, Batches & Warehouse Operations",
+  "part": 4,
+  "totalParts": 8,
+  "title": "Adding Initial Inventory via Opening Stock Batches",
+  "shortcut": "OPENING STOCK · BATCH ONBOARDING & PTR",
+  "role": "Inventory Controllers & Store Managers",
+  "targetDurationSeconds": 50,
+  "voice": "en-IN-PrabhatNeural",
+  "intro": {
+    "duration": 4,
+    "title": "Opening Stock Batches",
+    "subtitle": "Recording existing shelf stock, batch numbers, expiry dates, purchase rates (PTR), and initial inventory valuation",
+    "badge": "OPENING STOCK · TRACEABLE BATCHES"
+  },
+  "narration": [
+    {
+      "id": "scene-1",
+      "text": "Welcome to Phase 4, Part 4: Adding Initial Inventory via Opening Stock Batches. When onboarding your pharmacy, existing shelf items must be recorded into traceable batches."
+    },
+    {
+      "id": "scene-2",
+      "text": "Navigate to Batches from the Inventory menu and click Opening Stock to record shelf inventory already physically present in your store."
+    },
+    {
+      "id": "scene-3",
+      "text": "Select the item from your master catalog. MediFlow automatically loads the generic composition, pack size, and default price parameters."
+    },
+    {
+      "id": "scene-4",
+      "text": "Input the physical batch number printed on the packaging, specify the manufacturing expiry date, enter unit quantity, and record the purchase rate."
+    },
+    {
+      "id": "scene-5",
+      "text": "Click Record Stock to commit the batch. Your inventory valuation updates instantly, and the batch is ready for auto-FEFO dispensing. Next: Bulk CSV Import."
+    }
+  ],
+  "outro": {
+    "duration": 4,
+    "takeaway": "Opening Stock: Capture initial physical inventory into audited batches with expiry dates and purchase rates to establish accurate baseline stock valuation.",
+    "nextPart": {
+      "id": "VID-4.5",
+      "title": "Part 5: Bulk Stock CSV Import: Upload & Automatic Header Mapping"
+    }
+  }
+}

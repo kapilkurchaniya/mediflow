@@ -1,0 +1,47 @@
+{
+  "id": "VID-2.7",
+  "series": "POS Counter Mastery",
+  "part": 7,
+  "totalParts": 14,
+  "title": "Parking Active Bills (Hold / Park)",
+  "shortcut": "F6",
+  "role": "Cashier / Pharmacist",
+  "targetDurationSeconds": 48,
+  "voice": "en-IN-PrabhatNeural",
+  "intro": {
+    "duration": 5,
+    "title": "Parking Active Bills with F6",
+    "subtitle": "Unblock the counter when a patient steps away to fetch cash",
+    "badge": "F6 · HOLD BILL"
+  },
+  "narration": [
+    {
+      "id": "scene-1",
+      "text": "Welcome to MediFlow Quick Guides. In this video, you will learn how to park an active bill using shortcut F6."
+    },
+    {
+      "id": "scene-2",
+      "text": "When a customer steps away to fetch cash from an ATM, don't cancel their bill. Press F6 to park their cart."
+    },
+    {
+      "id": "scene-3",
+      "text": "Add a quick reference note, such as 'Customer stepped out for cash', and confirm."
+    },
+    {
+      "id": "scene-4",
+      "text": "The counter clears immediately, ready to serve the next patient in line without locking stock."
+    },
+    {
+      "id": "scene-5",
+      "text": "Your parked bill is safely stored in the queue. To continue this workflow, watch Part 8 to see how to resume parked bills using F7."
+    }
+  ],
+  "outro": {
+    "duration": 5,
+    "takeaway": "Parked bills lock zero inventory and allocate no invoice numbers.",
+    "nextPart": {
+      "id": "VID-2.8",
+      "title": "Recalling Parked Bills & Live Stock Revalidation (F7)"
+    }
+  }
+}

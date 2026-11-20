@@ -111,6 +111,7 @@ export async function upsertDoctor(data: {
           )
         );
       revalidatePath("/dashboard/compliance");
+      revalidatePath("/dashboard/compliance/doctors");
       return { success: true, doctorId: data.id };
     }
 
@@ -130,6 +131,7 @@ export async function upsertDoctor(data: {
       .returning({ id: schema.doctors.id });
 
     revalidatePath("/dashboard/compliance");
+    revalidatePath("/dashboard/compliance/doctors");
     return { success: true, doctorId: inserted.id };
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
@@ -260,8 +262,8 @@ export async function createPrescription(data: {
   }
 
   try {
-    const rxId = await db.transaction(async (tx) => {
-      const [insertedRx] = await tx
+    const insertedRx = await db.transaction(async (tx) => {
+      const [inserted] = await tx
         .insert(schema.prescriptions)
         .values({
           tenantId: ctx.tenantId,
@@ -284,11 +286,11 @@ export async function createPrescription(data: {
           validUntil: data.validUntil || null,
           status: "active",
         })
-        .returning({ id: schema.prescriptions.id });
+        .returning();
 
       const itemsToInsert = data.items.map((item) => ({
         tenantId: ctx.tenantId,
-        prescriptionId: insertedRx.id,
+        prescriptionId: inserted.id,
         medicineId: item.medicineId || null,
         medicineName: item.medicineName.trim(),
         dosage: item.dosage?.trim() || null,
@@ -303,15 +305,16 @@ export async function createPrescription(data: {
       await writeAudit(tx, ctx, {
         action: "create",
         entityType: "prescription",
-        entityId: insertedRx.id,
+        entityId: inserted.id,
         newValue: { patientName: data.patientName, doctorName: data.doctorName, itemsCount: data.items.length },
       });
 
-      return insertedRx.id;
+      return inserted;
     });
 
+    revalidatePath("/dashboard/compliance");
     revalidatePath("/dashboard/compliance/prescriptions");
-    return { success: true, prescriptionId: rxId };
+    return { success: true, prescriptionId: insertedRx.id, prescription: insertedRx };
   } catch (err: unknown) {
     return { error: err instanceof Error ? err.message : String(err) };
   }

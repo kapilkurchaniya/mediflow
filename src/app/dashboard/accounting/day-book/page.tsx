@@ -122,7 +122,7 @@ export default async function DayBookPage({
       {/* Filter Toolbar */}
       <div className="card bg-white border border-slate-200 p-4 shadow-xs">
         <form method="GET" className="flex flex-wrap items-center gap-3">
-          <DateRangeFilter />
+          <DateRangeFilter defaultRange="today" />
 
           {/* Store Selector */}
           {canViewAll && (

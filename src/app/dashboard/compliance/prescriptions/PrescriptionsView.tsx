@@ -42,7 +42,14 @@ export function PrescriptionsView({
   doctorsList: Array<{ id: string; name: string; regNo: string }>;
 }) {
   const router = useRouter();
-  const [prescriptions, setPrescriptions] = useState<PrescriptionRecord[]>(initialPrescriptions);
+  const [optimisticState, setOptimisticState] = useState<{
+    base: PrescriptionRecord[];
+    records: PrescriptionRecord[];
+  } | null>(null);
+  const prescriptions =
+    optimisticState?.base === initialPrescriptions
+      ? optimisticState.records
+      : initialPrescriptions;
   const [searchQuery, setSearchQuery] = useState("");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
@@ -136,8 +143,17 @@ export function PrescriptionsView({
         items: validItems,
       });
 
-      if (res.success) {
+      if (res.success && res.prescription) {
         setIsModalOpen(false);
+        const newRecord: PrescriptionRecord = {
+          rx: res.prescription,
+          doctor: null,
+          customer: null,
+        };
+        setOptimisticState({
+          base: initialPrescriptions,
+          records: [newRecord, ...prescriptions],
+        });
         router.refresh();
       } else {
         setFormError(res.error || "Failed to save prescription");
