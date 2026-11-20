@@ -64,6 +64,22 @@ vi.mock("@/server/db", () => ({
   },
 }));
 
+// Mock rbac & audit modules
+vi.mock("@/server/rbac", () => ({
+  requirePermission: vi.fn().mockResolvedValue({
+    tenantId: "tenant-test-import-uuid",
+    storeId: "store-test-import-uuid",
+    userId: "user-test-import-uuid",
+    user: { id: "user-test-import-uuid", name: "Test", email: "test@example.com", pharmacistRegNo: null },
+    permissions: new Set(["inventory.adjust"]),
+    allowedStoreIds: "all",
+  }),
+}));
+
+vi.mock("@/server/audit", () => ({
+  writeAudit: vi.fn().mockResolvedValue(undefined),
+}));
+
 // Mock auth module
 vi.mock("@/server/auth", () => ({
   requireAuth: vi.fn().mockResolvedValue({

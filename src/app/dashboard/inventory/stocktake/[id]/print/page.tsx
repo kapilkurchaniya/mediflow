@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { format } from "date-fns";
 import { getPrintCountSheetAction } from "@/app/actions/stocktake";
 import { PrintControls } from "./PrintControls";
+import { PrintWatermark } from "@/app/components/PrintWatermark";
 import { formatINR } from "@/lib/format";
 
 export const metadata = {
@@ -28,6 +29,7 @@ export default async function PrintCountSheetPage({
 
   return (
     <div className="min-h-screen bg-ink-50/50 py-6 px-4 print:bg-white print:p-0">
+      <PrintWatermark />
       <div className="mx-auto max-w-5xl">
         <PrintControls sessionId={id} currentMode={mode} />
 

@@ -227,7 +227,7 @@ export function AIProposalCard({ proposal }: AIProposalCardProps) {
           )}
           {Boolean(confirmedData.medicineId) && (
             <Link
-              href={`/dashboard/inventory/catalog`}
+              href="/dashboard/inventory"
               className="text-brand-600 text-[11.5px] font-medium hover:underline inline-flex items-center gap-1"
             >
               View in Catalogue <ExternalLink className="h-3 w-3" />

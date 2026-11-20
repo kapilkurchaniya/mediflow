@@ -1,10 +1,11 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
-import { Mic, Square, X, Send } from "lucide-react";
+import { usePathname } from "next/navigation";
+import { Mic, Square, X, Send, AlertCircle, RotateCcw, Loader2 } from "lucide-react";
 import clsx from "clsx";
 import { useChat } from "@ai-sdk/react";
-import type { UIMessage } from "ai";
+import { isToolUIPart, getToolName, type UIMessage } from "ai";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { AIToolCard, type ToolInvocationRecord } from "./ai/AIToolCard";
@@ -19,18 +20,15 @@ const SUGGESTIONS = [
 
 function formatMarkdownTables(text: string): string {
   if (!text) return "";
-  let formatted = text.replace(/\|\s*\|\s*/g, "|\n|");
-  formatted = formatted.replace(/([^\n])\n?(\| [^\n]+\|)/g, "$1\n\n$2");
-  return formatted;
+  return text.replace(/([^\n])\n?(\| [^\n]+\|)/g, "$1\n\n$2");
 }
 
-interface ToolInvocationPart {
-  type: "tool-invocation";
-  toolInvocation: {
-    toolName: string;
-    state: string;
-    result?: unknown;
-  };
+function getFriendlyErrorMessage(err: Error): string {
+  const msg = err.message || "";
+  if (msg.includes("401")) return "Please sign in to an active store session to use MediFlow Copilot.";
+  if (msg.includes("403")) return "You do not have permission ('ai.use') to use MediFlow Copilot.";
+  if (msg.includes("429")) return "AI rate limit reached. Please wait a moment and try again.";
+  return msg || "MediFlow Copilot encountered an error. Please try again.";
 }
 
 const markdownComponents = {
@@ -64,13 +62,16 @@ const markdownComponents = {
 };
 
 export function AIAssistant() {
+  const pathname = usePathname();
+  const isPosTerminal = pathname === "/dashboard/sales/pos";
   const [isOpen, setIsOpen] = useState(false);
   const [isListening, setIsListening] = useState(false);
   const [input, setInput] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<ISpeechRecognition | null>(null);
+  const dispatchedToolIdsRef = useRef<Set<string>>(new Set());
 
-  const { messages, sendMessage, status } = useChat({});
+  const { messages, sendMessage, status, error, stop, regenerate, clearError } = useChat({});
   const isLoading = status === "submitted" || status === "streaming";
 
   // Global shortcut (Ctrl + J)
@@ -85,7 +86,7 @@ export function AIAssistant() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, []);
 
-  // Auto-scroll and event dispatch for POS
+  // Auto-scroll and event dispatch for POS (AI SDK v7 ToolUIPart)
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
@@ -94,13 +95,13 @@ export function AIAssistant() {
     const lastMessage = messages[messages.length - 1];
     if (lastMessage?.role === "assistant" && lastMessage.parts) {
       for (const p of lastMessage.parts) {
-        if (p.type === "tool-invocation") {
-          const inv = p as unknown as ToolInvocationPart;
-          if (inv.toolInvocation?.state === "result") {
-            const res = inv.toolInvocation.result as { action?: string; payload?: unknown } | undefined;
-            if (res?.action === "DISPATCH_ADD_TO_BILL") {
-              window.dispatchEvent(new CustomEvent("ai-add-to-bill", { detail: res.payload }));
-            }
+        if (isToolUIPart(p) && p.state === "output-available") {
+          const callId = p.toolCallId || `${lastMessage.id}:${getToolName(p)}`;
+          if (dispatchedToolIdsRef.current.has(callId)) continue;
+          const res = p.output as { action?: string; payload?: unknown } | undefined;
+          if (res?.action === "DISPATCH_ADD_TO_BILL") {
+            dispatchedToolIdsRef.current.add(callId);
+            window.dispatchEvent(new CustomEvent("ai-add-to-bill", { detail: res.payload }));
           }
         }
       }
@@ -109,7 +110,8 @@ export function AIAssistant() {
 
   const handleSend = (text: string) => {
     if (!text.trim() || isLoading) return;
-    sendMessage({ role: "user", parts: [{ type: "text", text: text.trim() }] });
+    if (error) clearError();
+    sendMessage({ text: text.trim() });
     setInput("");
   };
 
@@ -158,7 +160,10 @@ export function AIAssistant() {
         aria-expanded={isOpen}
         aria-label="Open assistant"
         className={clsx(
-          "fixed bottom-4 right-4 sm:bottom-5 sm:right-5 z-40 flex h-10 items-center gap-2 rounded-full bg-ink-900 pl-3 pr-3.5 text-[13px] font-medium text-white print:hidden",
+          "fixed z-40 flex h-10 items-center gap-2 rounded-full bg-ink-900 pl-3 pr-3.5 text-[13px] font-medium text-white print:hidden",
+          isPosTerminal
+            ? "bottom-20 right-4 lg:bottom-4 lg:left-4 lg:right-auto"
+            : "bottom-4 right-4 sm:bottom-5 sm:right-5",
           "shadow-[0_8px_24px_-6px_rgb(0_0_0_/_0.35)] ring-1 ring-white/10 transition-all duration-200 hover:bg-ink-800",
           isOpen && "pointer-events-none translate-y-2 opacity-0"
         )}
@@ -232,14 +237,26 @@ export function AIAssistant() {
               const isUser = m.role === "user";
               const textParts: string[] = [];
               const toolInvocations: ToolInvocationRecord[] = [];
+              const pendingTools: string[] = [];
+              const toolErrors: Array<{ name: string; errorText: string }> = [];
 
               for (const p of m.parts) {
                 if (p.type === "text" && "text" in p && typeof (p as { text: unknown }).text === "string") {
                   textParts.push((p as { text: string }).text);
-                } else if (p.type === "tool-invocation") {
-                  const inv = p as unknown as ToolInvocationPart;
-                  if (inv.toolInvocation?.state === "result") {
-                    toolInvocations.push(inv.toolInvocation as ToolInvocationRecord);
+                } else if (isToolUIPart(p)) {
+                  const tName = getToolName(p);
+                  if (p.state === "output-available") {
+                    toolInvocations.push({
+                      toolName: tName,
+                      result: (p.output as Record<string, unknown> | null) ?? null,
+                    });
+                  } else if (p.state === "output-error") {
+                    toolErrors.push({
+                      name: tName,
+                      errorText: p.errorText || "Tool execution failed.",
+                    });
+                  } else {
+                    pendingTools.push(tName);
                   }
                 }
               }
@@ -260,6 +277,23 @@ export function AIAssistant() {
                       <p className="text-[13px] leading-relaxed">{textContent}</p>
                     ) : (
                       <div className="space-y-2">
+                        {pendingTools.map((tName, idx) => (
+                          <div
+                            key={`${tName}-${idx}`}
+                            className="inline-flex items-center gap-1.5 rounded-lg border border-ink-200 bg-white px-2.5 py-1 text-[11.5px] text-ink-600"
+                          >
+                            <Loader2 className="h-3 w-3 animate-spin text-brand-600" />
+                            <span>Running {tName.replace(/_/g, " ")}…</span>
+                          </div>
+                        ))}
+                        {toolErrors.map((te, idx) => (
+                          <div
+                            key={`${te.name}-err-${idx}`}
+                            className="rounded-lg border border-red-200 bg-red-50 px-2.5 py-1.5 text-[11.5px] text-red-700"
+                          >
+                            <strong>{te.name.replace(/_/g, " ")}:</strong> {te.errorText}
+                          </div>
+                        ))}
                         {toolInvocations.map((ti, tiIdx) => (
                           <AIToolCard key={tiIdx} toolInvocation={ti} />
                         ))}
@@ -267,7 +301,7 @@ export function AIAssistant() {
                           <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
                             {formatMarkdownTables(textContent)}
                           </ReactMarkdown>
-                        ) : toolInvocations.length === 0 ? (
+                        ) : toolInvocations.length === 0 && pendingTools.length === 0 && toolErrors.length === 0 ? (
                           <span className="text-ink-400 italic text-[12px]">Fetching data...</span>
                         ) : null}
                       </div>
@@ -288,6 +322,31 @@ export function AIAssistant() {
               </div>
             </div>
           )}
+
+          {error && (
+            <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-[12px] text-red-800 space-y-2">
+              <div className="flex items-start gap-2">
+                <AlertCircle className="h-4 w-4 text-red-600 shrink-0 mt-0.5" />
+                <span className="flex-1">{getFriendlyErrorMessage(error)}</span>
+              </div>
+              <div className="flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => clearError()}
+                  className="text-[11px] text-red-600 hover:underline px-2 py-1"
+                >
+                  Dismiss
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void regenerate()}
+                  className="inline-flex items-center gap-1 rounded-md bg-red-600 px-2.5 py-1 text-[11px] font-medium text-white hover:bg-red-700"
+                >
+                  <RotateCcw className="h-3 w-3" /> Retry
+                </button>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Input Area */}
@@ -300,13 +359,25 @@ export function AIAssistant() {
             value={input}
             onChange={(e) => setInput(e.target.value)}
           />
-          <button
-            type="submit"
-            disabled={isLoading || !input.trim()}
-            className="flex items-center justify-center w-8 h-8 rounded-lg bg-brand-500 text-white disabled:opacity-50 transition-opacity hover:bg-brand-600"
-          >
-            <Send className="h-4 w-4" />
-          </button>
+          {isLoading ? (
+            <button
+              type="button"
+              onClick={() => void stop()}
+              title="Stop generating"
+              aria-label="Stop generating"
+              className="flex items-center justify-center w-8 h-8 rounded-lg bg-red-600 text-white hover:bg-red-700 transition-colors"
+            >
+              <Square className="h-3.5 w-3.5 fill-current" />
+            </button>
+          ) : (
+            <button
+              type="submit"
+              disabled={!input.trim()}
+              className="flex items-center justify-center w-8 h-8 rounded-lg bg-brand-500 text-white disabled:opacity-50 transition-opacity hover:bg-brand-600"
+            >
+              <Send className="h-4 w-4" />
+            </button>
+          )}
         </form>
       </div>
     </>

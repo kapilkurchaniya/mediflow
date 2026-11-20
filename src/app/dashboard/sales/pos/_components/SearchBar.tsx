@@ -28,6 +28,19 @@ export function SearchBar({
   const [results, setResults] = useState<SearchResult[]>([]);
   const [highlightedIndex, setHighlightedIndex] = useState(0);
   const [isSearching, setIsSearching] = useState(false);
+  const [unavailableNotice, setUnavailableNotice] = useState<string | null>(null);
+
+  useEffect(() => {
+    const onBarcodeMiss = (ev: Event) => {
+      const barcode = (ev as CustomEvent<string>).detail;
+      if (barcode) {
+        setQuery(barcode);
+        setUnavailableNotice(null);
+      }
+    };
+    window.addEventListener("pos-barcode-miss", onBarcodeMiss);
+    return () => window.removeEventListener("pos-barcode-miss", onBarcodeMiss);
+  }, []);
 
   // Flattened selectable batches for keyboard navigation
   const flatSelectable = useMemo(() => {
@@ -115,13 +128,23 @@ export function SearchBar({
     } else if (e.key === "Enter") {
       if (flatSelectable.length > 0 && flatSelectable[highlightedIndex]) {
         e.preventDefault();
+        setUnavailableNotice(null);
         const sel = flatSelectable[highlightedIndex];
         handleSelect(sel.medicine, sel.batch, sel.allBatches);
+      } else if (query.trim().length >= 2 && !isSearching) {
+        e.preventDefault();
+        const oosMatch = results.find((r) => r.batches.length === 0);
+        setUnavailableNotice(
+          oosMatch
+            ? `"${oosMatch.medicine.name}" is currently out of stock (0 available). Use Substitutes or Promise Order below.`
+            : `No in-stock medicine found matching "${query.trim()}".`
+        );
       }
     } else if (e.key === "Escape") {
       e.preventDefault();
       setQuery("");
       setResults([]);
+      setUnavailableNotice(null);
     }
   };
 
@@ -135,7 +158,10 @@ export function SearchBar({
           ref={inputRef}
           type="text"
           value={query}
-          onChange={(e) => setQuery(e.target.value)}
+          onChange={(e) => {
+            setQuery(e.target.value);
+            if (unavailableNotice) setUnavailableNotice(null);
+          }}
           onKeyDown={handleInputKeyDown}
           className="input pl-10 pr-24 py-2.5 text-[15px] font-medium"
           placeholder="Insert / F3 / : Search medicine, generic composition or scan barcode..."
@@ -149,6 +175,13 @@ export function SearchBar({
           {isSearching ? "Searching..." : "Search"}
         </button>
       </form>
+
+      {unavailableNotice && (
+        <div className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-medium text-amber-800 flex items-center gap-1.5">
+          <AlertCircle className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+          <span>{unavailableNotice}</span>
+        </div>
+      )}
 
       {/* Results Dropdown */}
       {results.length > 0 && (

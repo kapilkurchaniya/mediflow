@@ -260,6 +260,13 @@
       "when": 1794476817139,
       "tag": "0036_google_oauth",
       "breakpoints": true
+    },
+    {
+      "idx": 37,
+      "version": "7",
+      "when": 1795166386727,
+      "tag": "0037_add_billing_templates",
+      "breakpoints": true
     }
   ]
 }

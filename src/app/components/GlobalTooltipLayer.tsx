@@ -43,9 +43,9 @@ const STATIC_ROUTE_CATALOG: Record<string, RouteMeta> = {
     title: "Add Medicine / Item",
     description: "Create a new item in the master catalog with salt composition, HSN, GST & schedule.",
   },
-  "/dashboard/inventory/import": {
-    title: "Import Stock CSV / Excel",
-    description: "Bulk upload medicines and batch quantities from CSV, Excel or legacy ERP exports.",
+  "/dashboard/import": {
+    title: "Data Import & Migration Hub",
+    description: "Quickly drop stock CSVs or run the staged Marg ERP / GoFrugal migration wizard.",
   },
   "/dashboard/inventory/batches/new": {
     title: "Add Opening Stock Batch",
@@ -136,8 +136,24 @@ const STATIC_ROUTE_CATALOG: Record<string, RouteMeta> = {
     description: "Update your display name, change password, and manage Google OAuth sign-in linking.",
   },
   "/dashboard/settings/printers": {
-    title: "Thermal & A4 Printer Setup",
-    description: "Configure 80mm ESC/POS thermal receipt printers and run a test print.",
+    title: "Printers & Custom HTML Templates",
+    description: "Configure 80mm thermal & A4 printers and build custom HTML billing templates manually or from a physical bill photo via OCR.",
+  },
+  "/dashboard/orders": {
+    title: "Omnichannel Orders (Coming Soon)",
+    description: "Upcoming unified order hub for WhatsApp carts, online storefront & home-delivery dispatch.",
+  },
+  "/dashboard/purchases/reorder": {
+    title: "Smart Reorder Suggestions",
+    description: "Calculate supplier order quantities from net sales velocity, lead time, max stock, and pending POs.",
+  },
+  "/dashboard/reports/commissions": {
+    title: "MR & Doctor Commissions",
+    description: "Track prescription brokerage, field representative incentives, and manufacturer-wise commission payouts.",
+  },
+  "/dashboard/reports/pilot-reconcile": {
+    title: "Pilot Daily ERP Reconciliation",
+    description: "Compare MediFlow daily sales, tax, and tender totals against Marg ERP or Vyapar daybook reports.",
   },
   "/dashboard/settings/gst": {
     title: "GST & E-Invoice Configuration",
@@ -421,6 +437,20 @@ function inferElementTooltip(target: HTMLElement): {
       const label = ariaLabel || text;
       if (label) {
         const lower = label.toLowerCase();
+        if (lower.includes("ocr") || lower.includes("scan")) {
+          return {
+            element: el,
+            title: label.length <= 40 ? label : "AI OCR Scan",
+            description: "Upload a PDF or photo to extract structured medicine, supplier, or bill layout data using Gemini OCR.",
+          };
+        }
+        if (lower.includes("whatsapp")) {
+          return {
+            element: el,
+            title: label.length <= 40 ? label : "Send via WhatsApp",
+            description: "Open WhatsApp with a pre-filled invoice summary, payment link, or refill reminder for this customer.",
+          };
+        }
         if (lower.includes("export") || lower.includes("download") || lower.includes("csv")) {
           return {
             element: el,
@@ -510,11 +540,14 @@ function inferElementTooltip(target: HTMLElement): {
       const aria = inputEl.getAttribute("aria-label")?.trim();
 
       if (labelText || aria || placeholder) {
+        const isToggle = inputEl.type === "checkbox" || inputEl.type === "radio";
         return {
           element: el,
           title: labelText || aria || undefined,
           description: placeholder
             ? `${labelText ? `${labelText} — ` : ""}${placeholder}`
+            : isToggle
+            ? `${inputEl.type === "radio" ? "Select option" : "Toggle option"}: ${labelText || aria || "setting"}.`
             : `Enter or select ${(labelText || aria || "value").toLowerCase()}.`,
           placement: "top",
         };

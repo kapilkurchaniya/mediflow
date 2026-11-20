@@ -10,5 +10,5 @@ export const inventoryNav: NavItem[] = [
   { group: "inventory", order: 27, href: "/dashboard/inventory/transfers", label: "Stock transfers", icon: ArrowLeftRight, description: "Inter-store stock transfers & challans", permission: "inventory.view" },
   { group: "inventory", order: 28, href: "/dashboard/inventory/conflicts", label: "Offline sync conflicts", icon: AlertTriangle, description: "Resolve negative stock & sync discrepancies", permission: "inventory.view" },
   { group: "inventory", order: 30, href: "/dashboard/settings/racks", label: "Racks & shelves", icon: Layers, description: "Map physical store racks, bins & shelf locations for fast picking", permission: "medicine.manage" },
-  { group: "inventory", order: 50, href: "/dashboard/import", label: "Data import & migration", icon: Upload, description: "Import Marg ERP & CSV datasets", permission: "settings.manage" },
+  { group: "inventory", order: 50, href: "/dashboard/import", label: "Data import & migration", icon: Upload, description: "Quick stock CSV drop & Marg ERP / GoFrugal migration", permission: "inventory.adjust" },
 ];

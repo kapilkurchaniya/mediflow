@@ -1,17 +1,33 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { usePathname } from "next/navigation";
 import { Sidebar } from "@/app/components/Sidebar";
 import { Topbar } from "@/app/components/Topbar";
-import { AIAssistant } from "@/app/components/AIAssistant";
 import { ShellProvider, useShell } from "@/app/components/ShellContext";
-import { CommandPalette } from "@/app/components/CommandPalette";
-import { ShortcutsModal } from "@/app/components/ShortcutsModal";
-import { CounterCalculator } from "@/app/components/CounterCalculator";
-import { StoreSwitcherDialog } from "@/app/components/StoreSwitcherDialog";
 import { GlobalTooltipLayer } from "@/app/components/GlobalTooltipLayer";
 import type { AllowedStoreItem } from "@/server/domain/stores";
 import clsx from "clsx";
+
+const AIAssistant = dynamic(() => import("@/app/components/AIAssistant").then((m) => m.AIAssistant), {
+  ssr: false,
+});
+const CommandPalette = dynamic(
+  () => import("@/app/components/CommandPalette").then((m) => m.CommandPalette),
+  { ssr: false }
+);
+const ShortcutsModal = dynamic(
+  () => import("@/app/components/ShortcutsModal").then((m) => m.ShortcutsModal),
+  { ssr: false }
+);
+const CounterCalculator = dynamic(
+  () => import("@/app/components/CounterCalculator").then((m) => m.CounterCalculator),
+  { ssr: false }
+);
+const StoreSwitcherDialog = dynamic(
+  () => import("@/app/components/StoreSwitcherDialog").then((m) => m.StoreSwitcherDialog),
+  { ssr: false }
+);
 
 interface DashboardShellProps {
   children: React.ReactNode;
@@ -30,18 +46,10 @@ function DashboardShellContent({
   userName,
   userEmail,
   storeName,
+  permissions,
 }: DashboardShellProps) {
   const pathname = usePathname();
-  const {
-    mobileOpen,
-    setMobileOpen,
-    calculatorOpen,
-    setCalculatorOpen,
-    currentStore,
-    allowedStores,
-    storeSwitcherOpen,
-    setStoreSwitcherOpen,
-  } = useShell();
+  const { mobileOpen, setMobileOpen, calculatorOpen, setCalculatorOpen } = useShell();
 
   const isPrintMode = pathname?.endsWith("/print") || pathname?.includes("/print");
   const isPosTerminal = pathname === "/dashboard/sales/pos";
@@ -114,7 +122,7 @@ function DashboardShellContent({
             className={clsx(
               "mx-auto w-full transition-[max-width,padding] duration-150 print:p-0 print:m-0 print:max-w-none",
               isPosTerminal
-                ? "max-w-none px-3 py-3 sm:px-4 sm:py-4"
+                ? "max-w-none p-0"
                 : "max-w-[1400px] px-4 py-6 sm:px-6 lg:px-8 lg:py-8"
             )}
           >
@@ -123,10 +131,12 @@ function DashboardShellContent({
         </main>
       </div>
 
-      {/* AIAssistant Interactive Panel */}
-      <div className="print:hidden">
-        <AIAssistant />
-      </div>
+      {/* AIAssistant Interactive Panel (gated by ai.use) */}
+      {permissions.includes("ai.use") && (
+        <div className="print:hidden">
+          <AIAssistant />
+        </div>
+      )}
 
       {/* Global Command Palette (Cmd+K) */}
       <CommandPalette />
@@ -139,18 +149,6 @@ function DashboardShellContent({
         isOpen={calculatorOpen}
         onClose={() => setCalculatorOpen(false)}
       />
-
-      {/* Global Store / Warehouse Switcher Dialog (Sidebar, POS header, Ctrl+Shift+S) */}
-      {storeSwitcherOpen && (
-        <StoreSwitcherDialog
-          currentStore={currentStore}
-          allowedStores={allowedStores}
-          onClose={() => setStoreSwitcherOpen(false)}
-        />
-      )}
-
-      {/* Global Feature Tooltips Layer (controlled via Settings -> Feature Tooltips) */}
-      <GlobalTooltipLayer />
     </div>
   );
 }

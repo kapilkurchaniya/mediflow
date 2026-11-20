@@ -8,6 +8,7 @@ import { eq } from "drizzle-orm";
 import { getPurchaseReturn } from "@/app/actions/purchase-returns";
 import { formatINR } from "@/lib/format";
 import PrintButton from "@/app/dashboard/sales/[id]/print/PrintButton";
+import { PrintWatermark } from "@/app/components/PrintWatermark";
 
 export const metadata = { title: "Print GST Debit Note" };
 
@@ -32,6 +33,7 @@ export default async function PrintPurchaseReturnPage({
 
   return (
     <div className="min-h-screen bg-neutral-100 py-6 px-4 font-sans text-neutral-900 print:bg-white print:p-0 print:m-0 print:min-h-0">
+      <PrintWatermark />
       {/* Print styles for A4 document */}
       <style
         dangerouslySetInnerHTML={{

@@ -10,6 +10,7 @@ import { ExportButton } from "@/app/components/ExportButton";
 import { requirePagePermission } from "@/server/rbac";
 import { BackfillPtrBanner } from "./BackfillPtrBanner";
 import { EditBatchButton } from "./EditBatchModal";
+import { StockOcrButton } from "./_components/StockOcrButton";
 
 export const metadata = { title: "Batches & stock" };
 
@@ -65,7 +66,8 @@ export default async function BatchesPage({
               from={dateRange.from}
               to={dateRange.to}
             />
-            <Link href="/dashboard/inventory/import" className="btn btn-secondary">
+            <StockOcrButton />
+            <Link href="/dashboard/import?tab=quick" className="btn btn-secondary">
               <Upload /> Import CSV
             </Link>
             <Link href="/dashboard/inventory/batches/new" className="btn btn-primary">
@@ -225,7 +227,7 @@ export default async function BatchesPage({
             action={
               !isNearExpiry && (
                 <div className="flex gap-2">
-                  <Link href="/dashboard/inventory/import" className="btn btn-secondary btn-sm">
+                  <Link href="/dashboard/import?tab=quick" className="btn btn-secondary btn-sm">
                     <Upload /> Import CSV
                   </Link>
                   <Link href="/dashboard/inventory/batches/new" className="btn btn-primary btn-sm">

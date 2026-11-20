@@ -24,21 +24,34 @@ import type {
 import type { PurchaseItemInput } from "@/server/domain/purchases";
 import { formatINR } from "@/lib/format";
 
+import type { SupplierCheckResult } from "@/server/domain/import/supplier-matcher";
+
 interface ImportDistributorBillModalProps {
   isOpen: boolean;
   onClose: () => void;
   onImport: (items: PurchaseItemInput[]) => void;
+  selectedSupplierId?: string;
+  onSelectSupplier?: (supplierId: string) => void;
+  onFillHeader?: (header: { invoiceNo?: string; invoiceDate?: string }) => void;
+  onCatalogRefresh?: () => Promise<void> | void;
 }
 
 export function ImportDistributorBillModal({
   isOpen,
   onClose,
   onImport,
+  selectedSupplierId,
+  onSelectSupplier,
+  onFillHeader,
+  onCatalogRefresh,
 }: ImportDistributorBillModalProps) {
   const [file, setFile] = useState<File | null>(null);
   const [isParsing, setIsParsing] = useState(false);
   const [isCreatingMedicines, setIsCreatingMedicines] = useState(false);
   const [parseResult, setParseResult] = useState<ParseDistributorInvoiceResult | null>(null);
+  const [supplierCheck, setSupplierCheck] = useState<SupplierCheckResult | null>(null);
+  const [mismatchOverrideConfirmed, setMismatchOverrideConfirmed] = useState(false);
+  const [ocrHeader, setOcrHeader] = useState<{ invoiceNo?: string; invoiceDate?: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -46,27 +59,58 @@ export function ImportDistributorBillModal({
   if (!isOpen) return null;
 
   const handleFileSelect = (selectedFile: File) => {
-    if (!selectedFile.name.endsWith(".csv") && !selectedFile.name.endsWith(".txt")) {
-      setError("Please select a valid CSV file (.csv or .txt).");
+    const lower = selectedFile.name.toLowerCase();
+    const isCsv = lower.endsWith(".csv") || lower.endsWith(".txt");
+    const isOcr =
+      lower.endsWith(".pdf") ||
+      lower.endsWith(".jpg") ||
+      lower.endsWith(".jpeg") ||
+      lower.endsWith(".png") ||
+      lower.endsWith(".webp");
+
+    if (!isCsv && !isOcr) {
+      setError("Please select a CSV (.csv/.txt) or bill scan (.pdf, .jpg, .png, .webp).");
       return;
     }
     setFile(selectedFile);
     setError(null);
     setSuccessMessage(null);
-    processFile(selectedFile);
+    setSupplierCheck(null);
+    setMismatchOverrideConfirmed(false);
+    setOcrHeader(null);
+    processFile(selectedFile, isOcr);
   };
 
-  const processFile = async (fileToProcess: File) => {
+  const processFile = async (fileToProcess: File, isOcr: boolean) => {
     setIsParsing(true);
     setError(null);
     try {
-      const text = await fileToProcess.text();
-      const res = await parseDistributorInvoiceAction(text);
-      if (!res.success || !res.result) {
-        setError(res.error || "Failed to parse distributor invoice.");
-        setParseResult(null);
+      if (isOcr) {
+        const fd = new FormData();
+        fd.append("file", fileToProcess);
+        if (selectedSupplierId) fd.append("selectedSupplierId", selectedSupplierId);
+        const res = await fetch("/api/ocr/grn-invoice", { method: "POST", body: fd });
+        const data = await res.json();
+        if (!res.ok) {
+          setError(data.error || "Failed to scan distributor bill.");
+          setParseResult(null);
+        } else {
+          setParseResult(data.parseResult);
+          setSupplierCheck(data.supplierCheck ?? null);
+          setOcrHeader(data.header ?? null);
+          if (data.supplierCheck?.status === "auto_matched" && data.supplierCheck.matchedSupplier && onSelectSupplier) {
+            onSelectSupplier(data.supplierCheck.matchedSupplier.id);
+          }
+        }
       } else {
-        setParseResult(res.result);
+        const text = await fileToProcess.text();
+        const res = await parseDistributorInvoiceAction(text);
+        if (!res.success || !res.result) {
+          setError(res.error || "Failed to parse distributor invoice.");
+          setParseResult(null);
+        } else {
+          setParseResult(res.result);
+        }
       }
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Error reading invoice file.");
@@ -150,6 +194,7 @@ export function ImportDistributorBillModal({
         });
 
         setSuccessMessage(`Successfully created ${Object.keys(createdMap).length} medicines in your catalog.`);
+        await onCatalogRefresh?.();
       }
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Error creating medicines.");
@@ -158,8 +203,13 @@ export function ImportDistributorBillModal({
     }
   };
 
+  const isMismatchBlocked = supplierCheck?.status === "mismatch" && !mismatchOverrideConfirmed;
+
   const handleApplyToPurchase = () => {
-    if (!parseResult || parseResult.purchaseItems.length === 0) return;
+    if (!parseResult || parseResult.purchaseItems.length === 0 || isMismatchBlocked) return;
+    if (ocrHeader && onFillHeader) {
+      onFillHeader(ocrHeader);
+    }
     onImport(parseResult.purchaseItems);
     onClose();
   };
@@ -223,7 +273,7 @@ export function ImportDistributorBillModal({
               <input
                 ref={fileInputRef}
                 type="file"
-                accept=".csv,.txt"
+                accept=".csv,.txt,.pdf,.jpg,.jpeg,.png,.webp,application/pdf,image/jpeg,image/png,image/webp"
                 className="hidden"
                 onChange={(e) => {
                   if (e.target.files?.[0]) handleFileSelect(e.target.files[0]);
@@ -233,10 +283,10 @@ export function ImportDistributorBillModal({
                 <Upload className="w-7 h-7" />
               </div>
               <p className="font-medium text-foreground text-sm sm:text-base">
-                Click or drag & drop distributor invoice file here
+                Click or drag &amp; drop distributor invoice (CSV, PDF, or Bill Photo)
               </p>
               <p className="text-xs text-muted-foreground mt-1">
-                Supports standard Pharmarack (.csv), Retailio (.csv), and Marg Bill Export (.csv)
+                Supports Pharmarack/Retailio/Marg CSVs AND AI Vision OCR for scanned PDFs &amp; bill photos with supplier verification
               </p>
             </div>
           )}
@@ -255,6 +305,61 @@ export function ImportDistributorBillModal({
           {/* Parsed Result Display */}
           {parseResult && (
             <div className="space-y-4">
+              {supplierCheck && (
+                <div
+                  className={`p-3.5 rounded-xl border text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
+                    supplierCheck.status === "mismatch"
+                      ? "bg-rose-50 border-rose-300 text-rose-900"
+                      : supplierCheck.status === "matched" || supplierCheck.status === "auto_matched"
+                      ? "bg-emerald-50 border-emerald-200 text-emerald-900"
+                      : "bg-amber-50 border-amber-200 text-amber-900"
+                  }`}
+                >
+                  <div className="flex items-start gap-2.5">
+                    {supplierCheck.status === "matched" || supplierCheck.status === "auto_matched" ? (
+                      <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                    ) : (
+                      <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+                    )}
+                    <div>
+                      <div className="font-bold">
+                        {supplierCheck.status === "mismatch"
+                          ? "Wrong Supplier Bill Detected!"
+                          : supplierCheck.status === "matched"
+                          ? "Supplier Verified"
+                          : supplierCheck.status === "auto_matched"
+                          ? "Supplier Auto-Detected"
+                          : "Supplier Verification Notice"}
+                      </div>
+                      <p className="mt-0.5">{supplierCheck.reason}</p>
+                    </div>
+                  </div>
+                  {supplierCheck.status === "mismatch" && (
+                    <div className="flex flex-wrap items-center gap-2 shrink-0">
+                      {supplierCheck.matchedSupplier && onSelectSupplier && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            onSelectSupplier(supplierCheck.matchedSupplier!.id);
+                            setMismatchOverrideConfirmed(true);
+                          }}
+                          className="btn btn-primary btn-xs"
+                        >
+                          Switch to {supplierCheck.matchedSupplier.name}
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => setMismatchOverrideConfirmed((v) => !v)}
+                        className="btn btn-secondary btn-xs"
+                      >
+                        {mismatchOverrideConfirmed ? "Override Confirmed" : "Keep Selected Anyway"}
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+
               {/* Summary Bar */}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 <div className="card p-3 bg-muted/30 border border-border">
@@ -436,8 +541,8 @@ export function ImportDistributorBillModal({
             {parseResult && (
               <button
                 onClick={handleApplyToPurchase}
-                disabled={parseResult.purchaseItems.length === 0}
-                className="btn btn-primary btn-sm text-xs flex items-center gap-1.5"
+                disabled={parseResult.purchaseItems.length === 0 || isMismatchBlocked}
+                className="btn btn-primary btn-sm text-xs flex items-center gap-1.5 disabled:opacity-50"
               >
                 <span>Import {parseResult.purchaseItems.length} Lines to Purchase Bill</span>
                 <ArrowRight className="w-3.5 h-3.5" />

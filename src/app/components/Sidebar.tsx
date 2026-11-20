@@ -17,6 +17,17 @@ import { logoutAction } from "@/app/actions/auth";
 import { useShell } from "./ShellContext";
 import { visibleNav, settingsItem, type NavItem } from "./nav";
 
+function NavPendingIndicator() {
+  const { pending } = useLinkStatus();
+  if (!pending) return null;
+  return (
+    <span
+      aria-hidden="true"
+      className="ml-auto h-3 w-3 shrink-0 rounded-full border-2 border-brand-600 border-t-transparent animate-spin"
+    />
+  );
+}
+
 function matches(pathname: string, item: NavItem): boolean {
   if (item.exact) return pathname === item.href || pathname === `${item.href}/new`;
   return pathname === item.href || pathname.startsWith(`${item.href}/`);
@@ -30,17 +41,6 @@ export function isNavItemActive(
   if (!matches(pathname, item)) return false;
   return !allItems.some(
     (other) => other !== item && other.href.length > item.href.length && matches(pathname, other)
-  );
-}
-
-function NavPendingIndicator() {
-  const { pending } = useLinkStatus();
-  if (!pending) return null;
-  return (
-    <span
-      aria-hidden="true"
-      className="ml-auto h-1.5 w-1.5 shrink-0 rounded-full bg-brand-600 animate-ping"
-    />
   );
 }
 
@@ -112,10 +112,7 @@ export function Sidebar({
             type="button"
             onClick={toggleCollapsed}
             className="btn btn-ghost btn-icon text-ink-400 hover:text-ink-700"
-            data-tooltip-title={isCollapsed ? "Expand Sidebar" : "Collapse Sidebar"}
-            data-tooltip={isCollapsed ? "Expand the left navigation menu to show full module labels." : "Collapse the left navigation menu to compact icon-only mode for more screen space."}
-            data-tooltip-shortcut="Ctrl+B"
-            data-tooltip-placement="right"
+            title={isCollapsed ? "Expand sidebar (Ctrl+B)" : "Collapse sidebar (Ctrl+B)"}
             aria-label="Toggle sidebar"
           >
             {isCollapsed ? (
@@ -132,10 +129,7 @@ export function Sidebar({
         <button
           type="button"
           onClick={() => setStoreSwitcherOpen(true)}
-          data-tooltip-title={`Active Store: ${currentStore?.name ?? storeName}`}
-          data-tooltip="Switch your active pharmacy branch or central warehouse context."
-          data-tooltip-shortcut="Ctrl+Shift+S"
-          data-tooltip-placement="right"
+          title={isCollapsed ? (currentStore?.name ?? storeName) : "Switch branch or warehouse (Ctrl+Shift+S)"}
           className={clsx(
             "flex w-full items-center gap-2 rounded-lg border border-ink-150 bg-white px-2 py-1.5 text-left shadow-xs transition-colors hover:border-ink-300 hover:bg-ink-50/50",
             isCollapsed && "justify-center px-1"
@@ -178,11 +172,9 @@ export function Sidebar({
                   <li key={item.href}>
                     <Link
                       href={item.href}
+                      prefetch={item.href === "/dashboard/sales/pos" || item.href === "/dashboard" ? undefined : false}
                       onClick={() => isMobile && setMobileOpen(false)}
-                      data-tooltip-title={item.label}
-                      data-tooltip={item.description || `Open ${item.label}`}
-                      data-tooltip-shortcut={item.shortcut}
-                      data-tooltip-placement="right"
+                      title={isCollapsed ? `${item.label} ${item.shortcut ? `(${item.shortcut})` : ""}` : undefined}
                       aria-current={active ? "page" : undefined}
                       className={clsx(
                         "group relative flex h-8.5 items-center rounded-md text-[13px] transition-colors duration-100",
@@ -202,8 +194,13 @@ export function Sidebar({
                       {!isCollapsed && (
                         <>
                           <span className="truncate">{item.label}</span>
+                          {item.badge && (
+                            <span className="ml-auto rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-800">
+                              {item.badge}
+                            </span>
+                          )}
                           <NavPendingIndicator />
-                          {item.shortcut && (
+                          {item.shortcut && !item.badge && (
                             <span className="kbd ml-auto text-[10px]">{item.shortcut}</span>
                           )}
                         </>
@@ -223,9 +220,7 @@ export function Sidebar({
           <Link
             href={settingsItem.href}
             onClick={() => isMobile && setMobileOpen(false)}
-            data-tooltip-title="Settings"
-            data-tooltip={settingsItem.description || "Store profile, GSTIN, thermal printer, tooltips & billing preferences"}
-            data-tooltip-placement="right"
+            title={isCollapsed ? "Settings" : undefined}
             className={clsx(
               "flex h-8 items-center rounded-md text-[13px] text-ink-600 transition-colors hover:bg-ink-100/70 hover:text-ink-900",
               isCollapsed ? "justify-center px-0" : "gap-2.5 px-2.5"
@@ -244,21 +239,13 @@ export function Sidebar({
         >
           <span
             className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-brand-100 text-[11px] font-semibold text-brand-800"
-            data-tooltip-title={userName}
-            data-tooltip={`Signed in as ${userEmail}`}
-            data-tooltip-placement="right"
+            title={isCollapsed ? `${userName} (${userEmail})` : undefined}
           >
             {letters || "U"}
           </span>
           {!isCollapsed && (
             <>
-              <Link
-                href="/dashboard/settings/profile"
-                className="min-w-0 flex-1 rounded hover:bg-ink-50"
-                data-tooltip-title="My Profile & Security"
-                data-tooltip="Update your name, change your password, or link your Google account."
-                data-tooltip-placement="right"
-              >
+              <Link href="/dashboard/settings/profile" className="min-w-0 flex-1 rounded hover:bg-ink-50" title="My profile and password">
                 <p className="truncate text-[12.5px] font-medium text-ink-900 leading-tight">
                   {userName}
                 </p>
@@ -269,9 +256,7 @@ export function Sidebar({
                   type="submit"
                   className="btn btn-ghost btn-icon h-7 w-7 text-ink-400 hover:text-red-600"
                   aria-label="Sign out"
-                  data-tooltip-title="Sign Out"
-                  data-tooltip="End your current session and return to the login screen."
-                  data-tooltip-placement="right"
+                  title="Sign out"
                 >
                   <LogOut className="h-3.5 w-3.5" />
                 </button>

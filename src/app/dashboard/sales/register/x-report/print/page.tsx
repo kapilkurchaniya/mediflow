@@ -6,6 +6,7 @@ import { getXReport } from "@/server/domain/cash-sessions";
 import { db } from "@/server/db";
 import { formatINR } from "@/lib/format";
 import PrintButton from "@/app/dashboard/sales/[id]/print/PrintButton";
+import { PrintWatermark } from "@/app/components/PrintWatermark";
 
 export const metadata = { title: "Print X-Report (Mid-Shift Snapshot)" };
 
@@ -59,6 +60,7 @@ export default async function PrintXReportPage({
 
   return (
     <div className="min-h-screen bg-ink-100 py-6 px-4 font-sans text-ink-900 print:bg-white print:p-0 print:m-0 print:min-h-0">
+      {!isThermal && <PrintWatermark />}
       {/* Dynamic print stylesheet */}
       <style
         dangerouslySetInnerHTML={{

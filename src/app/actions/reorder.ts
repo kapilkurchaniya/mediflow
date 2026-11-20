@@ -5,27 +5,43 @@ import { db, schema } from "@/server/db";
 import { eq, and, inArray } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { protectedAction } from "@/server/action";
-import { requirePermission } from "@/server/rbac";
+import { requirePermission, type AuthCtx } from "@/server/rbac";
+import { ForbiddenError } from "@/server/errors";
 import {
   computeReorderSuggestions,
   ReorderSuggestionsReport,
 } from "@/server/domain/purchasing/reorder";
 import { createPurchaseOrder } from "@/server/domain/purchasing/purchase-orders";
 
+async function assertStoreAccess(ctx: AuthCtx, targetStoreId: string): Promise<string> {
+  if (ctx.allowedStoreIds !== "all" && !ctx.allowedStoreIds.includes(targetStoreId)) {
+    throw new ForbiddenError("store.access");
+  }
+  const [store] = await db
+    .select({ id: schema.stores.id })
+    .from(schema.stores)
+    .where(and(eq(schema.stores.id, targetStoreId), eq(schema.stores.tenantId, ctx.tenantId)))
+    .limit(1);
+  if (!store) {
+    throw new ForbiddenError("store.access");
+  }
+  return store.id;
+}
+
 /**
  * Plain server component read: fetch reorder suggestions for a store
  */
 export async function getReorderSuggestions(
   storeId?: string,
-  filters?: { supplierId?: string; search?: string }
+  filters?: { supplierId?: string; search?: string; includeNeverStocked?: boolean }
 ): Promise<ReorderSuggestionsReport> {
   const ctx = await requirePermission("purchase.view");
-  const targetStoreId = storeId || ctx.storeId;
+  const targetStoreId = storeId ? await assertStoreAccess(ctx, storeId) : ctx.storeId;
   return computeReorderSuggestions(ctx.tenantId, targetStoreId, filters);
 }
 
 /**
- * Get available stores for reorder evaluation
+ * Get available active stores for reorder evaluation
  */
 export async function getReorderStoresAction() {
   const ctx = await requirePermission("purchase.view");
@@ -37,6 +53,7 @@ export async function getReorderStoresAction() {
       .where(
         and(
           eq(schema.stores.tenantId, ctx.tenantId),
+          eq(schema.stores.isActive, true),
           inArray(schema.stores.id, ctx.allowedStoreIds)
         )
       );
@@ -45,12 +62,18 @@ export async function getReorderStoresAction() {
     return db
       .select({ id: schema.stores.id, name: schema.stores.name, code: schema.stores.code })
       .from(schema.stores)
-      .where(and(eq(schema.stores.tenantId, ctx.tenantId), eq(schema.stores.id, ctx.storeId)));
+      .where(
+        and(
+          eq(schema.stores.tenantId, ctx.tenantId),
+          eq(schema.stores.isActive, true),
+          eq(schema.stores.id, ctx.storeId)
+        )
+      );
   }
   return db
     .select({ id: schema.stores.id, name: schema.stores.name, code: schema.stores.code })
     .from(schema.stores)
-    .where(eq(schema.stores.tenantId, ctx.tenantId));
+    .where(and(eq(schema.stores.tenantId, ctx.tenantId), eq(schema.stores.isActive, true)));
 }
 
 const CreatePoFromReorderSchema = z.object({
@@ -76,9 +99,11 @@ const CreatePoFromReorderSchema = z.object({
 export const createPoFromReorderAction = protectedAction("purchase.create")
   .schema(CreatePoFromReorderSchema)
   .action(async ({ parsedInput, ctx }) => {
-    const effectiveCtx = parsedInput.storeId
-      ? { ...ctx, storeId: parsedInput.storeId }
-      : ctx;
+    const validatedStoreId = parsedInput.storeId
+      ? await assertStoreAccess(ctx, parsedInput.storeId)
+      : ctx.storeId;
+
+    const effectiveCtx = { ...ctx, storeId: validatedStoreId };
 
     const result = await db.transaction(async (tx) => {
       return createPurchaseOrder(tx, effectiveCtx, {
@@ -95,4 +120,3 @@ export const createPoFromReorderAction = protectedAction("purchase.create")
 
     return result;
   });
-

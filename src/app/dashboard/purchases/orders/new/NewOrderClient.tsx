@@ -26,13 +26,19 @@ interface OrderLineItem {
 export function NewOrderClient({
   suppliers,
   medicines,
+  canManageSuppliers = false,
+  initialSupplierId = "",
 }: {
   suppliers: { id: string; name: string }[];
   medicines: MedicineOption[];
+  canManageSuppliers?: boolean;
+  initialSupplierId?: string;
 }) {
   const router = useRouter();
 
-  const [supplierId, setSupplierId] = useState("");
+  const [supplierId, setSupplierId] = useState(
+    initialSupplierId && suppliers.some((s) => s.id === initialSupplierId) ? initialSupplierId : ""
+  );
   const [expectedDate, setExpectedDate] = useState("");
   const [notes, setNotes] = useState("");
   const [items, setItems] = useState<OrderLineItem[]>([
@@ -153,23 +159,53 @@ export function NewOrderClient({
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
-              <label htmlFor="po-supplier" className="label text-xs font-semibold block mb-1">
-                Supplier / Wholesaler <span className="text-rose-500">*</span>
-              </label>
-              <select
-                id="po-supplier"
-                value={supplierId}
-                onChange={(e) => setSupplierId(e.target.value)}
-                required
-                className="w-full text-xs p-2 rounded-lg border border-ink-200 bg-white text-ink-900 focus:outline-hidden focus:ring-1 focus:ring-brand-500"
-              >
-                <option value="">-- Choose Supplier --</option>
-                {suppliers.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.name}
-                  </option>
-                ))}
-              </select>
+              <div className="flex items-center justify-between mb-1">
+                <label htmlFor="po-supplier" className="label text-xs font-semibold">
+                  Supplier / Wholesaler <span className="text-rose-500">*</span>
+                </label>
+                {canManageSuppliers && suppliers.length > 0 && (
+                  <Link
+                    href="/dashboard/suppliers/new?returnTo=/dashboard/purchases/orders/new"
+                    className="text-[11px] font-semibold text-brand-600 hover:text-brand-800 hover:underline"
+                  >
+                    + New Supplier
+                  </Link>
+                )}
+              </div>
+              {suppliers.length === 0 ? (
+                <div className="rounded-lg border border-amber-200 bg-amber-50/80 p-3 text-xs text-amber-900 space-y-2">
+                  <p className="font-medium">
+                    No active suppliers found. Add a supplier before raising a Purchase Order.
+                  </p>
+                  {canManageSuppliers ? (
+                    <Link
+                      href="/dashboard/suppliers/new?returnTo=/dashboard/purchases/orders/new"
+                      className="btn btn-primary btn-sm inline-flex items-center gap-1.5"
+                    >
+                      <Plus className="h-3.5 w-3.5" /> Add Supplier
+                    </Link>
+                  ) : (
+                    <p className="text-[11px] text-amber-700">
+                      Ask your store manager or owner to add a supplier first.
+                    </p>
+                  )}
+                </div>
+              ) : (
+                <select
+                  id="po-supplier"
+                  value={supplierId}
+                  onChange={(e) => setSupplierId(e.target.value)}
+                  required
+                  className="w-full text-xs p-2 rounded-lg border border-ink-200 bg-white text-ink-900 focus:outline-hidden focus:ring-1 focus:ring-brand-500"
+                >
+                  <option value="">-- Choose Supplier --</option>
+                  {suppliers.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.name}
+                    </option>
+                  ))}
+                </select>
+              )}
             </div>
 
             <div>

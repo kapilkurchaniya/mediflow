@@ -4,21 +4,39 @@ import { useActionState } from "react";
 import { createSupplier } from "@/app/actions/suppliers";
 import { AlertCircle, Check } from "lucide-react";
 import Link from "next/link";
-import { redirect } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { PageHeader, FormSection, Field } from "@/app/components/ui";
 
+function getSafeReturnTo(raw: string | null): string {
+  if (!raw) return "/dashboard/suppliers";
+  const trimmed = raw.trim();
+  if (!trimmed.startsWith("/dashboard") || trimmed.startsWith("//") || trimmed.includes("\\")) {
+    return "/dashboard/suppliers";
+  }
+  return trimmed;
+}
+
 export default function NewSupplierPage() {
-  const [state, formAction, isPending] = useActionState(async (prevState: { error?: string; success?: boolean } | null, formData: FormData) => {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const returnTo = getSafeReturnTo(searchParams.get("returnTo"));
+
+  const [state, formAction, isPending] = useActionState(async (_prevState: { error?: string; success?: boolean } | null, formData: FormData) => {
     const res = await createSupplier(formData);
     if (res.success) {
-      redirect("/dashboard/suppliers");
+      if (returnTo !== "/dashboard/suppliers" && res.supplierId) {
+        const sep = returnTo.includes("?") ? "&" : "?";
+        router.push(`${returnTo}${sep}supplierId=${encodeURIComponent(res.supplierId)}`);
+      } else {
+        router.push("/dashboard/suppliers");
+      }
     }
     return res;
   }, null);
 
   return (
     <div className="page mx-auto max-w-5xl space-y-6">
-      <PageHeader backHref="/dashboard/suppliers" title="New supplier" description="Add a distributor or stockist you purchase from." />
+      <PageHeader backHref={returnTo} title="New supplier" description="Add a distributor or stockist you purchase from." />
 
       <form action={formAction} className="card">
         <div className="card-body !p-6 lg:!p-8">

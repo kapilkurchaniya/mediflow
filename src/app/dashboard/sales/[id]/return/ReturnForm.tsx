@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { formatINR } from "@/lib/format";
 import { computeSaleLine } from "@/lib/money";
+import { CANCELLATION_REASON_PRESETS } from "@/lib/cancellation-reasons";
 import { createSaleReturnAction } from "@/app/actions/sales";
 import type { ReturnableSaleDetails } from "@/server/domain/sales/return-sale";
 
@@ -234,10 +235,12 @@ export function ReturnForm({ data }: ReturnFormProps) {
   // Keyboard shortcut listener (Alt+S or Ctrl+Enter to submit, Esc to go back)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      const inInput = target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.tagName === "SELECT");
       if ((e.altKey && e.key.toLowerCase() === "s") || (e.ctrlKey && e.key === "Enter")) {
         e.preventDefault();
         handleSubmitReturn();
-      } else if (e.key === "Escape") {
+      } else if (e.key === "Escape" && !inInput) {
         e.preventDefault();
         router.push(`/dashboard/sales/${sale.id}`);
       }
@@ -505,10 +508,36 @@ export function ReturnForm({ data }: ReturnFormProps) {
           </div>
 
           {/* Return Reason (Statutory requirement) */}
-          <div className="space-y-1.5 pt-2">
-            <label htmlFor="return-reason" className="text-[12px] font-bold text-ink-700 uppercase tracking-wider">
+          <div className="space-y-2 pt-2">
+            <label htmlFor="return-reason" className="text-[12px] font-bold text-ink-700 uppercase tracking-wider block">
               Reason for Return <span className="text-rose-600">*</span>
             </label>
+            <div className="flex flex-wrap gap-1.5">
+              {CANCELLATION_REASON_PRESETS.map((preset) => {
+                const isOther = preset === "Other (specify)";
+                const isSelected = isOther
+                  ? reason.trim().length > 0 &&
+                    !CANCELLATION_REASON_PRESETS.some(
+                      (p) => p !== "Other (specify)" && reason.startsWith(p)
+                    )
+                  : reason.startsWith(preset);
+                return (
+                  <button
+                    key={preset}
+                    type="button"
+                    disabled={isPending}
+                    onClick={() => setReason(isOther ? "" : preset)}
+                    className={`px-2.5 py-1 rounded-full text-[11.5px] font-medium border transition-colors ${
+                      isSelected
+                        ? "bg-amber-600 text-white border-amber-600 shadow-2xs"
+                        : "bg-white text-ink-700 border-ink-200 hover:border-amber-300 hover:bg-amber-50/60"
+                    }`}
+                  >
+                    {preset}
+                  </button>
+                );
+              })}
+            </div>
             <input
               id="return-reason"
               type="text"
@@ -517,7 +546,7 @@ export function ReturnForm({ data }: ReturnFormProps) {
               maxLength={255}
               value={reason}
               onChange={(e) => setReason(e.target.value)}
-              placeholder="e.g., Doctor changed medicine, Excess strips, Patient recovered, Defective seal..."
+              placeholder="Select a preset above or type custom reason..."
               className="input w-full text-sm"
             />
             <p className="text-[11px] text-ink-500">

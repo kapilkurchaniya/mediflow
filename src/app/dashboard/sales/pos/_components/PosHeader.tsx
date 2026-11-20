@@ -14,6 +14,8 @@ import {
   AlertTriangle,
   Building2,
   Warehouse,
+  PanelLeftClose,
+  PanelLeftOpen,
 } from "lucide-react";
 import { PosStatusChip } from "./PosStatusChip";
 
@@ -25,6 +27,8 @@ interface PosHeaderProps {
     kind: "retail" | "warehouse";
   } | null;
   onOpenStoreSwitcher: () => void;
+  sidebarCollapsed?: boolean;
+  onToggleSidebar?: () => void;
   soundEnabled: boolean;
   onToggleSound: () => void;
   cartLength: number;
@@ -44,6 +48,8 @@ interface PosHeaderProps {
 export function PosHeader({
   currentStore,
   onOpenStoreSwitcher,
+  sidebarCollapsed = false,
+  onToggleSidebar,
   soundEnabled,
   onToggleSound,
   cartLength,
@@ -62,21 +68,32 @@ export function PosHeader({
   const isWarehouse = currentStore?.kind === "warehouse";
 
   return (
-    <div className="space-y-2.5">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
+    <div className="space-y-2">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex flex-wrap items-center gap-2 min-w-0">
           <Link
             href="/dashboard/sales"
-            className="btn btn-secondary btn-icon"
+            className="btn btn-secondary btn-icon h-8 w-8"
             title="Back to Sales"
           >
             <ArrowLeft className="h-4 w-4" />
           </Link>
-          <div className="flex items-center gap-2">
-            <h1 className="text-lg font-bold text-ink-900 flex items-center gap-2">
-              POS Billing Counter
-              <span className="badge badge-brand !text-[11px] font-mono">
-                F2 New Bill
+          {onToggleSidebar && (
+            <button
+              type="button"
+              onClick={onToggleSidebar}
+              className="hidden lg:inline-flex btn btn-secondary btn-icon h-8 w-8"
+              title={sidebarCollapsed ? "Expand Sidebar (Ctrl+B)" : "Focus Mode — Collapse Sidebar (Ctrl+B)"}
+              aria-label="Toggle Sidebar"
+            >
+              {sidebarCollapsed ? <PanelLeftOpen className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
+            </button>
+          )}
+          <div className="flex flex-wrap items-center gap-2 min-w-0">
+            <h1 className="text-base sm:text-lg font-bold text-ink-900 flex items-center gap-1.5 whitespace-nowrap">
+              POS Counter
+              <span className="badge badge-brand !text-[10.5px] font-mono hidden sm:inline-flex">
+                F3 Search
               </span>
             </h1>
 
@@ -85,16 +102,16 @@ export function PosHeader({
               <button
                 type="button"
                 onClick={onOpenStoreSwitcher}
-                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-brand-50 text-brand-900 border border-brand-200 hover:bg-brand-100 hover:border-brand-300 transition-colors shadow-2xs"
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-brand-50 text-brand-900 border border-brand-200 hover:bg-brand-100 hover:border-brand-300 transition-colors shadow-2xs max-w-[190px]"
                 title="Active Branch - Click to switch (Ctrl+Shift+S)"
               >
                 {isWarehouse ? (
-                  <Warehouse className="w-3.5 h-3.5 text-amber-600" />
+                  <Warehouse className="w-3.5 h-3.5 text-amber-600 shrink-0" />
                 ) : (
-                  <Building2 className="w-3.5 h-3.5 text-brand-600" />
+                  <Building2 className="w-3.5 h-3.5 text-brand-600 shrink-0" />
                 )}
-                <span className="font-medium">{currentStore.name}</span>
-                <span className="font-mono text-[10px] text-brand-600 font-bold">
+                <span className="font-medium truncate">{currentStore.name}</span>
+                <span className="font-mono text-[10px] text-brand-600 font-bold shrink-0">
                   [{currentStore.code}]
                 </span>
               </button>
@@ -113,7 +130,7 @@ export function PosHeader({
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-1.5">
           <button
             type="button"
             onClick={onToggleSound}

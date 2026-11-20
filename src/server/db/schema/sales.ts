@@ -195,3 +195,29 @@ export const cashMovements = pgTable(
       .where(sql`${t.paymentId} is not null`),
   ],
 );
+
+export type BillingTemplateFormat = "a4" | "thermal_80mm";
+export type BillingTemplateSource = "manual" | "ocr";
+
+export const billingTemplates = pgTable(
+  "billing_templates",
+  {
+    id: id(),
+    tenantId: tenantId(),
+    storeId: storeId(),
+    format: text("format").$type<BillingTemplateFormat>().notNull(),
+    name: text("name").notNull(),
+    htmlContent: text("html_content").notNull(),
+    isActive: boolean("is_active").notNull().default(false),
+    sourceType: text("source_type").$type<BillingTemplateSource>().notNull().default("manual"),
+    createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
+    createdAt: createdAt(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [
+    index("billing_templates_store_format_idx").on(t.tenantId, t.storeId, t.format),
+    uniqueIndex("billing_templates_active_uq")
+      .on(t.tenantId, t.storeId, t.format)
+      .where(sql`${t.isActive} = true`),
+  ],
+);

@@ -78,7 +78,8 @@ export async function GET(request: NextRequest) {
       const sessionToken = generateSessionToken();
       await createSession(sessionToken, accepted.userId, accepted.tenantId, accepted.storeId);
       await setSessionCookie(sessionToken);
-      const res = NextResponse.redirect(new URL("/dashboard", request.url));
+      const dest = accepted.needsPasswordSetup ? "/setup-password?next=/dashboard" : "/dashboard";
+      const res = NextResponse.redirect(new URL(dest, request.url));
       res.cookies.delete(OAUTH_TX_COOKIE);
       return res;
     }
@@ -93,7 +94,10 @@ export async function GET(request: NextRequest) {
       await createSession(sessionToken, resolution.userId, resolution.tenantId, resolution.storeId);
       await setSessionCookie(sessionToken);
       const target = sanitizeNextPath(tx.next, "/dashboard");
-      const res = NextResponse.redirect(new URL(target, request.url));
+      const dest = resolution.needsPasswordSetup
+        ? `/setup-password?next=${encodeURIComponent(target)}`
+        : target;
+      const res = NextResponse.redirect(new URL(dest, request.url));
       res.cookies.delete(OAUTH_TX_COOKIE);
       return res;
     }

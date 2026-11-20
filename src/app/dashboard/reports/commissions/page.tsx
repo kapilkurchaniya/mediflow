@@ -3,6 +3,7 @@ import { getCommissionReport, getMedicalReps } from "@/app/actions/medical-reps"
 import { CommissionReportClient } from "./CommissionReportClient";
 import Link from "next/link";
 import { UserCheck } from "lucide-react";
+import { PrintWatermark } from "@/app/components/PrintWatermark";
 
 export const metadata = {
   title: "MR & Doctor Commissions — MediFlow",
@@ -16,6 +17,7 @@ export default async function CommissionsReportPage() {
 
   return (
     <div className="page space-y-6">
+      <PrintWatermark />
       <PageHeader
         backHref="/dashboard/reports"
         title="MR & Doctor Commission Report"

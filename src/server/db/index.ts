@@ -145,7 +145,12 @@ function createPool(): pg.Pool {
   });
 
   // Pre-warm 2 connections in the background so user clicks never pay cold TLS handshake latency
-  if (env.NODE_ENV !== "test" && !env.DATABASE_URL.includes("mediflow_build")) {
+  if (
+    env.NODE_ENV !== "test" &&
+    !env.DATABASE_URL.includes("mediflow_build") &&
+    process.env.ALLOW_E2E_DB_RESET !== "1" &&
+    process.env.SKIP_ENV_VALIDATION !== "1"
+  ) {
     Promise.all([
       instance.connect().then((c) => c.release()).catch(() => {}),
       instance.connect().then((c) => c.release()).catch(() => {}),

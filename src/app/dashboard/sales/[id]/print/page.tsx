@@ -1,3 +1,6 @@
+import { and, eq } from "drizzle-orm";
+import { db, schema } from "@/server/db";
+import { renderBillingTemplate, type BillingTemplateContext } from "@/server/domain/sales/template-engine";
 import { getSaleById } from "@/app/actions/sales";
 import { notFound } from "next/navigation";
 import { format } from "date-fns";
@@ -8,6 +11,7 @@ import { formatINR, formatItemQuantity, formatItemQuantityCompact } from "@/lib/
 import { requirePagePermission } from "@/server/rbac";
 import { buildWhatsAppDirectUrl, buildInvoiceWhatsAppMessage } from "@/lib/whatsapp";
 import { QrCode } from "@/app/components/QrCode";
+import { PrintWatermark } from "@/app/components/PrintWatermark";
 
 export default async function PrintInvoicePage({
   params,
@@ -18,14 +22,103 @@ export default async function PrintInvoicePage({
 }) {
   await requirePagePermission("sale.view");
   const resolvedParams = await params;
-  const { format: printFormat } = await searchParams;
-  const isThermal = printFormat === "thermal";
+  const { format: printFormatParam } = await searchParams;
 
   const data = await getSaleById(resolvedParams.id);
   if (!data) return notFound();
 
-  const { sale, items, customer, store, tenant, gstDoc } = data;
+  const { sale, items, customer, store, tenant, gstDoc, payments } = data;
+  const storeDefaultFormat = store?.settings?.printFormat ?? "a4";
+  const isThermal = printFormatParam
+    ? printFormatParam === "thermal"
+    : storeDefaultFormat === "thermal_80mm" || storeDefaultFormat === "thermal_58mm";
+  const targetTemplateFormat = isThermal ? "thermal_80mm" : "a4";
+
+  const [customTemplate] = store
+    ? await db
+        .select({ htmlContent: schema.billingTemplates.htmlContent })
+        .from(schema.billingTemplates)
+        .where(
+          and(
+            eq(schema.billingTemplates.tenantId, sale.tenantId),
+            eq(schema.billingTemplates.storeId, store.id),
+            eq(schema.billingTemplates.format, targetTemplateFormat),
+            eq(schema.billingTemplates.isActive, true),
+          ),
+        )
+        .limit(1)
+    : [undefined];
+
   const isSimulated = !gstDoc?.einvoiceProvider || gstDoc.einvoiceProvider === "SIMULATOR";
+
+  let customRenderedHtml: string | null = null;
+  if (customTemplate) {
+    const paymentSummary =
+      payments.length > 0
+        ? payments.map((p) => `${p.method.toUpperCase()}: ${formatINR(p.amount)}`).join(", ")
+        : sale.creditAmount > 0
+        ? `Credit Due: ${formatINR(sale.creditAmount)}`
+        : `Paid: ${formatINR(sale.paidAmount || sale.totalAmount)}`;
+
+    const tplCtx: BillingTemplateContext = {
+      store: {
+        name: store?.name || tenant?.name || "MediFlow Pharmacy",
+        legalName: tenant?.legalName || tenant?.name || "",
+        address: store?.address || "",
+        city: store?.city || "",
+        pincode: store?.pincode || "",
+        phone: store?.phone || tenant?.phone || "",
+        gstin: store?.gstin || tenant?.gstin || "N/A",
+        drugLicenseNo: store?.drugLicenseNo || "N/A",
+        fssaiNo: store?.fssaiNo || "",
+      },
+      sale: {
+        invoiceNo: sale.invoiceNo || "DRAFT",
+        invoiceDate: format(new Date(sale.completedAt ?? sale.createdAt!), "dd MMM yyyy, hh:mm a"),
+        customerName: customer?.name || sale.customerName || "Walk-in",
+        customerPhone: customer?.phone || sale.customerPhone || "",
+        doctorName: sale.doctorName || "",
+        paymentSummary,
+        isCancelled: sale.status === "cancelled",
+      },
+      totals: {
+        subtotal: formatINR(sale.taxableAmount || 0),
+        discount: formatINR(sale.discountAmount || 0),
+        cgst: formatINR(sale.cgst || 0),
+        sgst: formatINR(sale.sgst || 0),
+        igst: formatINR(sale.igst || 0),
+        roundOff: formatINR(sale.roundOff || 0),
+        grandTotal: formatINR(sale.totalAmount || 0),
+        amountInWords: formatINR(sale.totalAmount || 0),
+      },
+      gst: {
+        irn: gstDoc?.irn || "",
+        ackNo: gstDoc?.ackNo || "",
+        qrDataUrl: "",
+      },
+      items: items.map((it, idx) => ({
+        sno: idx + 1,
+        name: it.medicineName,
+        hsn: it.hsn || "",
+        batchNo: it.batchNo || "",
+        expiry: it.expiryDate || "",
+        qtyFormatted: formatItemQuantity({
+          qty: it.qty,
+          packQty: it.packQty,
+          looseQty: it.looseQty,
+          unitsPerPack: it.unitsPerPack,
+          packUnit: it.packUnit,
+          looseUnit: it.looseUnit,
+        }),
+        mrp: formatINR(it.mrp || 0),
+        rate: formatINR(it.rate || 0),
+        discount: formatINR(it.discountAmount || 0),
+        gstPct: `${(it.gstRateBp || 0) / 100}%`,
+        amount: formatINR(it.totalAmount || 0),
+      })),
+    };
+    customRenderedHtml = renderBillingTemplate(customTemplate.htmlContent, tplCtx);
+  }
 
   const customerPhone = customer?.phone || sale.customerPhone;
   const whatsappUrl = customerPhone
@@ -44,6 +137,7 @@ export default async function PrintInvoicePage({
 
   return (
     <div className="min-h-screen bg-ink-100 py-6 px-4 font-sans text-ink-900 print:bg-white print:p-0 print:m-0 print:min-h-0">
+      {!isThermal && <PrintWatermark />}
       {/* Dynamic print page styling tailored for 80mm thermal roll vs A4 GST Tax invoice */}
       <style
         dangerouslySetInnerHTML={{
@@ -106,7 +200,17 @@ export default async function PrintInvoicePage({
         </div>
       </div>
 
-      {isThermal ? (
+      {customRenderedHtml ? (
+        <div
+          id="invoice-printable"
+          className={
+            isThermal
+              ? "max-w-[80mm] mx-auto bg-white p-3 shadow-xl border border-ink-200 print:shadow-none print:border-none print:p-0 print:m-0 thermal-slip"
+              : "max-w-3xl mx-auto bg-white p-6 shadow-xl border border-ink-200 print:shadow-none print:border-none print:p-0 print:m-0"
+          }
+          dangerouslySetInnerHTML={{ __html: customRenderedHtml }}
+        />
+      ) : isThermal ? (
         /* ──────────────── 80mm Thermal POS Slip Format ──────────────── */
         <div
           id="invoice-printable"
@@ -133,7 +237,7 @@ export default async function PrintInvoicePage({
           </div>
           {gstDoc?.irn && (
             <div className="py-1 border-b border-dashed border-black text-[9px] text-center">
-              <p className="font-bold">*** SIMULATED IRN – NOT A VALID E-INVOICE ***</p>
+              {isSimulated && <p className="font-bold">*** SIMULATED IRN – NOT A VALID E-INVOICE ***</p>}
               <p className="font-mono break-all text-[8px]">IRN: {gstDoc.irn}</p>
               {gstDoc.ackNo && <p>Ack: {gstDoc.ackNo}</p>}
             </div>

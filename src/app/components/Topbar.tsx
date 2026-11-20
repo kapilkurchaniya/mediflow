@@ -43,9 +43,11 @@ export function Topbar() {
   } = useShell();
 
   const isWarehouse = currentStore?.kind === "warehouse";
+  const isPosTerminal = pathname === "/dashboard/sales/pos";
 
-  // Global F2 shortcut for new POS bill (active retail counter only)
+  // Global F2 shortcut for new POS bill (disabled when already on POS so POS Clear/New Bill handles F2)
   useEffect(() => {
+    if (isPosTerminal) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "F2") {
         e.preventDefault();
@@ -56,7 +58,7 @@ export function Topbar() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [router, isWarehouse]);
+  }, [router, isWarehouse, isPosTerminal]);
 
   const segments = pathname.split("/").filter(Boolean);
   const crumbs = segments.map((seg, i) => ({
@@ -105,8 +107,8 @@ export function Topbar() {
         </ol>
       </nav>
 
-      {/* Offline Status Sentinel Pill */}
-      {!isOnline && (
+      {/* Offline Status Sentinel Pill (POS has its own PosStatusChip) */}
+      {!isOnline && !isPosTerminal && (
         <div
           role="alert"
           data-tooltip-title="Offline Billing Mode Active"
@@ -158,8 +160,8 @@ export function Topbar() {
         {/* Notifications Popover */}
         <NotificationsPopover />
 
-        {/* New POS Bill Action (or Transfer Stock for Warehouse) */}
-        {isWarehouse ? (
+        {/* New POS Bill Action (hidden when already on POS counter) */}
+        {!isPosTerminal && (isWarehouse ? (
           <Link
             href="/dashboard/inventory/transfers/new"
             className="btn btn-primary btn-sm ml-1 shrink-0"
@@ -185,7 +187,7 @@ export function Topbar() {
               F2
             </span>
           </Link>
-        )}
+        ))}
       </div>
     </header>
   );
