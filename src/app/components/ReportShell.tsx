@@ -4,6 +4,7 @@ import React from "react";
 import Link from "next/link";
 import { Printer, Download, ArrowLeft } from "lucide-react";
 import { PageHeader } from "./ui";
+import { PrintWatermark } from "./PrintWatermark";
 
 interface ReportShellProps {
   eyebrow?: string;
@@ -40,6 +41,7 @@ export function ReportShell({
 
   return (
     <div className="page space-y-6">
+      <PrintWatermark />
       {backHref && (
         <div className="print:hidden">
           <Link
@@ -65,6 +67,7 @@ export function ReportShell({
                 onClick={onExportCsv}
                 disabled={exportLoading}
                 className="btn btn-secondary btn-sm"
+                data-tooltip="Download this report's filtered rows as a CSV spreadsheet"
               >
                 <Download className="h-4 w-4" />
                 {exportLoading ? "Exporting..." : "Export CSV"}
@@ -74,6 +77,7 @@ export function ReportShell({
               type="button"
               onClick={handlePrint}
               className="btn btn-secondary btn-sm"
+              data-tooltip="Print or Save as PDF with the official MediFlow watermark"
             >
               <Printer className="h-4 w-4" />
               Print Report

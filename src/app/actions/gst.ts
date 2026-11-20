@@ -40,22 +40,19 @@ export async function getGstDashboard(params?: { month?: number; year?: number; 
   const year = params?.year || now.getFullYear();
   const gstin = params?.gstin?.trim() || undefined;
 
-  // Auto-sync any existing completed sales/purchases that don't have gstDocuments yet
-  await syncPendingGstDocuments(ctx.tenantId, ctx.storeId);
+  // Schedule background GST doc sync so it never blocks page rendering
+  try {
+    const { after } = await import("next/server");
+    after(() => syncPendingGstDocuments(ctx.tenantId, ctx.storeId).catch(() => {}));
+  } catch {
+    // non-request context
+  }
 
   const queryParams = gstin
     ? { tenantId: ctx.tenantId, gstin, month, year }
     : { tenantId: ctx.tenantId, storeId: ctx.storeId, month, year };
 
-  const [gstr1, gstr2, recon] = await Promise.all([
-    buildGstr1Data(db, queryParams),
-    buildGstr2Data(db, queryParams),
-    reconcileGst(db, queryParams),
-  ]);
-
-  // Base conditions scoped by tenant and optionally by GSTIN
   const baseConditions = [eq(schema.gstDocuments.tenantId, ctx.tenantId)];
-
   if (gstin) {
     const matchingStores = await db
       .select({ id: schema.stores.id })
@@ -67,37 +64,39 @@ export async function getGstDashboard(params?: { month?: number; year?: number; 
     }
   }
 
-  const eInvoicesPending = await db
-    .select({ count: sql<number>`count(*)` })
-    .from(schema.gstDocuments)
-    .where(
-      and(
-        ...baseConditions,
-        eq(schema.gstDocuments.supplyType, "B2B"),
-        eq(schema.gstDocuments.refType, "sale"),
-        sql`${schema.gstDocuments.irn} is null`,
-        eq(schema.gstDocuments.status, "active")
-      )
-    );
-
-  const activeEwb = await db
-    .select({ count: sql<number>`count(*)` })
-    .from(schema.gstDocuments)
-    .where(
-      and(
-        ...baseConditions,
-        sql`${schema.gstDocuments.eWayBillNo} is not null`,
-        eq(schema.gstDocuments.status, "active")
-      )
-    );
-
-  // Recent 10 GST Documents
-  const recentDocs = await db
-    .select()
-    .from(schema.gstDocuments)
-    .where(and(...baseConditions))
-    .orderBy(desc(schema.gstDocuments.docDate), desc(schema.gstDocuments.createdAt))
-    .limit(10);
+  const [gstr1, gstr2, recon, eInvoicesPending, activeEwb, recentDocs] = await Promise.all([
+    buildGstr1Data(db, queryParams),
+    buildGstr2Data(db, queryParams),
+    reconcileGst(db, queryParams),
+    db
+      .select({ count: sql<number>`count(*)` })
+      .from(schema.gstDocuments)
+      .where(
+        and(
+          ...baseConditions,
+          eq(schema.gstDocuments.supplyType, "B2B"),
+          eq(schema.gstDocuments.refType, "sale"),
+          sql`${schema.gstDocuments.irn} is null`,
+          eq(schema.gstDocuments.status, "active")
+        )
+      ),
+    db
+      .select({ count: sql<number>`count(*)` })
+      .from(schema.gstDocuments)
+      .where(
+        and(
+          ...baseConditions,
+          sql`${schema.gstDocuments.eWayBillNo} is not null`,
+          eq(schema.gstDocuments.status, "active")
+        )
+      ),
+    db
+      .select()
+      .from(schema.gstDocuments)
+      .where(and(...baseConditions))
+      .orderBy(desc(schema.gstDocuments.docDate), desc(schema.gstDocuments.createdAt))
+      .limit(10),
+  ]);
 
   return {
     month,

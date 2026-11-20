@@ -20,13 +20,13 @@ export function MobileTenderBar({
   onOpenPayment,
 }: MobileTenderBarProps) {
   return (
-    <div className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-md border-t border-ink-200 px-4 py-3 shadow-pop flex items-center justify-between">
+    <div className="lg:hidden fixed bottom-0 left-0 right-0 z-30 bg-white/95 backdrop-blur-md border-t border-ink-200 px-4 py-3 shadow-pop flex items-center justify-between">
       <div className="flex flex-col">
         <span className="text-[11px] font-medium text-ink-500 uppercase tracking-wider">
           {itemCount} {itemCount === 1 ? "item" : "items"}
         </span>
         <span className="text-lg font-bold font-mono text-ink-950">
-          {formatINR(totalPaise / 100)}
+          {formatINR(totalPaise)}
         </span>
       </div>
       <div className="flex items-center gap-2">

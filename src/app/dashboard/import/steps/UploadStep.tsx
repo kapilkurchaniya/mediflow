@@ -1,10 +1,11 @@
 "use client";
 
-import React, { useState, useRef } from "react";
+import React, { useState } from "react";
 import Papa from "papaparse";
-import { UploadCloud, FileText, CheckCircle2, AlertCircle, Loader2, ArrowLeft } from "lucide-react";
+import { FileText, CheckCircle2, AlertCircle, Loader2, ArrowLeft } from "lucide-react";
 import { ImportEntity, ImportSource } from "@/server/domain/import/types";
 import { detectPresetAction, createImportJobAction, uploadJobChunkAction } from "@/app/actions/import";
+import { CsvDropzone } from "../_components/CsvDropzone";
 
 interface UploadStepProps {
   entity: ImportEntity;
@@ -22,7 +23,6 @@ interface UploadStepProps {
 }
 
 export function UploadStep({ entity, storeId, onJobReady, onBack }: UploadStepProps) {
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const [file, setFile] = useState<File | null>(null);
   const [isParsing, setIsParsing] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
@@ -46,9 +46,18 @@ export function UploadStep({ entity, storeId, onJobReady, onBack }: UploadStepPr
       complete: async (results) => {
         setIsParsing(false);
         const rawHeaders = (results.meta.fields || []).map((h) => h.trim()).filter(Boolean);
-        const rows = (results.data as Record<string, string>[]).filter((r) =>
-          Object.values(r).some((v) => v !== null && v !== undefined && String(v).trim().length > 0)
-        );
+        const rows = (results.data as Record<string, string>[])
+          .map((r) => {
+            const trimmed: Record<string, string> = {};
+            for (const [k, v] of Object.entries(r)) {
+              const cleanKey = k.trim();
+              if (cleanKey) trimmed[cleanKey] = v;
+            }
+            return trimmed;
+          })
+          .filter((r) =>
+            Object.values(r).some((v) => v !== null && v !== undefined && String(v).trim().length > 0)
+          );
 
         if (rawHeaders.length === 0 || rows.length === 0) {
           setErrorMessage("The uploaded file contains no data rows or valid header columns.");
@@ -145,37 +154,14 @@ export function UploadStep({ entity, storeId, onJobReady, onBack }: UploadStepPr
       )}
 
       {/* Dropzone */}
-      {!file ? (
-        <div
-          onClick={() => fileInputRef.current?.click()}
-          onDragOver={(e) => e.preventDefault()}
-          onDrop={(e) => {
-            e.preventDefault();
-            const droppedFile = e.dataTransfer.files?.[0];
-            if (droppedFile) handleFileChange(droppedFile);
-          }}
-          className="border-2 border-dashed border-slate-300 hover:border-brand-500 hover:bg-brand-50/20 rounded-2xl p-10 text-center cursor-pointer transition-all flex flex-col items-center justify-center space-y-3"
-        >
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept=".csv, .tsv, .txt"
-            className="hidden"
-            onChange={(e) => {
-              const selected = e.target.files?.[0];
-              if (selected) handleFileChange(selected);
-            }}
-          />
-          <div className="h-14 w-14 rounded-full bg-slate-100 flex items-center justify-center text-slate-500">
-            <UploadCloud className="h-7 w-7 text-brand-600" />
-          </div>
-          <div>
-            <span className="text-sm font-semibold text-brand-600 hover:underline">Click to upload</span>{" "}
-            <span className="text-sm text-ink-500">or drag and drop</span>
-          </div>
-          <p className="text-xs text-ink-400">Supports Marg CSV, GoFrugal CSV, and standard Tab-delimited files up to 50 MB</p>
-        </div>
-      ) : (
+      <CsvDropzone
+        onFileSelected={handleFileChange}
+        isLoading={isParsing}
+        selectedFileName={file?.name ?? null}
+        title="Drop your CSV or TSV file here"
+        subtitle="Supports Marg CSV, GoFrugal CSV, and standard Tab-delimited files up to 50 MB"
+      />
+      {file && (
         <div className="p-5 rounded-2xl border border-slate-200 bg-white space-y-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">

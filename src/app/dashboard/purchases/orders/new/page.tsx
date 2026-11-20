@@ -1,15 +1,20 @@
-import { requirePagePermission } from "@/server/rbac";
+import { can, requirePagePermission } from "@/server/rbac";
 import { getSuppliers } from "@/app/actions/suppliers";
 import { getMedicines } from "@/app/actions/inventory";
 import { NewOrderClient } from "./NewOrderClient";
 
 export const metadata = { title: "New Purchase Order" };
 
-export default async function NewPurchaseOrderPage() {
-  await requirePagePermission("purchase.create");
+export default async function NewPurchaseOrderPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ supplierId?: string }>;
+}) {
+  const ctx = await requirePagePermission("purchase.create");
+  const { supplierId } = await searchParams;
 
   const [suppliers, medicinesRes] = await Promise.all([
-    getSuppliers(),
+    getSuppliers("", 500, 0, true),
     getMedicines("", 1000),
   ]);
 
@@ -21,6 +26,12 @@ export default async function NewPurchaseOrderPage() {
     mrp: m.medicine.mrp,
   }));
 
-  return <NewOrderClient suppliers={suppliers} medicines={medicines} />;
+  return (
+    <NewOrderClient
+      suppliers={suppliers}
+      medicines={medicines}
+      canManageSuppliers={can(ctx, "supplier.manage")}
+      initialSupplierId={supplierId}
+    />
+  );
 }
-

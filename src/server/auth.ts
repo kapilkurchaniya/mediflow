@@ -72,13 +72,22 @@ export async function validateSessionToken(token: string) {
       return { session: null, user: null };
     }
 
-    // Extend session if less than 15 days left
+    // Extend session if less than 15 days left (non-blocking via next/server after)
     if (Date.now() >= session.expiresAt.getTime() - 1000 * 60 * 60 * 24 * 15) {
-      session.expiresAt = new Date(Date.now() + 1000 * 60 * 60 * 24 * SESSION_MAX_AGE_DAYS);
-      await db
-        .update(schema.sessions)
-        .set({ expiresAt: session.expiresAt })
-        .where(eq(schema.sessions.id, session.id));
+      const nextExpiresAt = new Date(Date.now() + 1000 * 60 * 60 * 24 * SESSION_MAX_AGE_DAYS);
+      session.expiresAt = nextExpiresAt;
+      const extendSession = () =>
+        db
+          .update(schema.sessions)
+          .set({ expiresAt: nextExpiresAt })
+          .where(eq(schema.sessions.id, session.id))
+          .catch((e) => console.error("[auth] Failed to extend session:", e));
+      try {
+        const { after } = await import("next/server");
+        after(extendSession);
+      } catch {
+        void extendSession();
+      }
     }
 
     return { session, user };

@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import Link from "next/link";
+import Link, { useLinkStatus } from "next/link";
 import { usePathname } from "next/navigation";
 import clsx from "clsx";
 import {
@@ -16,6 +16,17 @@ import { Logo, LogoMark } from "./ui";
 import { logoutAction } from "@/app/actions/auth";
 import { useShell } from "./ShellContext";
 import { visibleNav, settingsItem, type NavItem } from "./nav";
+
+function NavPendingIndicator() {
+  const { pending } = useLinkStatus();
+  if (!pending) return null;
+  return (
+    <span
+      aria-hidden="true"
+      className="ml-auto h-3 w-3 shrink-0 rounded-full border-2 border-brand-600 border-t-transparent animate-spin"
+    />
+  );
+}
 
 function matches(pathname: string, item: NavItem): boolean {
   if (item.exact) return pathname === item.href || pathname === `${item.href}/new`;
@@ -161,6 +172,7 @@ export function Sidebar({
                   <li key={item.href}>
                     <Link
                       href={item.href}
+                      prefetch={item.href === "/dashboard/sales/pos" || item.href === "/dashboard" ? undefined : false}
                       onClick={() => isMobile && setMobileOpen(false)}
                       title={isCollapsed ? `${item.label} ${item.shortcut ? `(${item.shortcut})` : ""}` : undefined}
                       aria-current={active ? "page" : undefined}
@@ -182,7 +194,13 @@ export function Sidebar({
                       {!isCollapsed && (
                         <>
                           <span className="truncate">{item.label}</span>
-                          {item.shortcut && (
+                          {item.badge && (
+                            <span className="ml-auto rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-800">
+                              {item.badge}
+                            </span>
+                          )}
+                          <NavPendingIndicator />
+                          {item.shortcut && !item.badge && (
                             <span className="kbd ml-auto text-[10px]">{item.shortcut}</span>
                           )}
                         </>

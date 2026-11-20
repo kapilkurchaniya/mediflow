@@ -24,7 +24,7 @@ import type { CurrentShiftStats } from "@/server/domain/cash-sessions";
 export function RetailPosTerminal() {
   const router = useRouter();
   const searchInputRef = useRef<HTMLInputElement>(null);
-  const { toggleCalculator, setShortcutsOpen, calculatorOpen, shortcutsOpen, currentStore, setStoreSwitcherOpen, userId, tenantId } = useShell();
+  const { toggleCalculator, setShortcutsOpen, calculatorOpen, shortcutsOpen, currentStore, setStoreSwitcherOpen, collapsed, toggleCollapsed, userId, tenantId } = useShell();
   const cartIdentity = useMemo(() => ({ tenantId, storeId: currentStore?.id, userId }), [tenantId, currentStore?.id, userId]);
   const { state, dispatch, totals, loyaltyDiscountPaise, rxWarning, controlledItems, playSound } = usePosCart(cartIdentity);
 
@@ -43,6 +43,24 @@ export function RetailPosTerminal() {
   const [promiseMedicine, setPromiseMedicine] = useState<{ id: string; name: string } | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
+
+  const hasStockShortage = useMemo(() => {
+    return state.cart.some((line) => {
+      const upp = Math.max(1, line.unitsPerPack ?? 1);
+      const requested = line.packQty * upp + line.looseQty;
+      const available = line.autoFefo ? (line.totalAvailableStock ?? line.qtyOnHand) : line.qtyOnHand;
+      return requested > available;
+    });
+  }, [state.cart]);
+
+  const handleSafeResetSale = useCallback(() => {
+    if (state.cart.length > 0 && !window.confirm("Clear current bill? All items in the cart will be removed.")) {
+      return;
+    }
+    dispatch({ type: "RESET_SALE" });
+    setSubmitError("");
+    searchInputRef.current?.focus();
+  }, [state.cart.length, dispatch]);
   const [revalidationAlert, setRevalidationAlert] = useState<{
     hasIssues: boolean;
     hasStockShortage: boolean;
@@ -77,8 +95,37 @@ export function RetailPosTerminal() {
     return () => window.removeEventListener("mediflow:store-switch", onStoreSwitch);
   }, [dispatch, refreshMeta]);
 
+  useEffect(() => {
+    const onAiAddToBill = async (ev: Event) => {
+      const detail = (ev as CustomEvent<{ medicineName?: string }>).detail;
+      const query = detail?.medicineName?.trim();
+      if (!query) return;
+      try {
+        const results = await ds.searchItems(query);
+        const match = results.find((r) => r.batches && r.batches.length > 0);
+        if (match && match.batches[0]) {
+          dispatch({
+            type: "ADD_LINE",
+            payload: { medicine: match.medicine, batch: match.batches[0], allBatches: match.batches },
+          });
+          playSound("beep");
+        } else {
+          setSubmitError(`Could not add "${query}" from AI Copilot: out of stock or not found.`);
+        }
+      } catch (err) {
+        console.error("AI add-to-bill failed:", err);
+      }
+    };
+    window.addEventListener("ai-add-to-bill", onAiAddToBill);
+    return () => window.removeEventListener("ai-add-to-bill", onAiAddToBill);
+  }, [ds, dispatch, playSound]);
+
   const handleCompleteSale = async (method = state.paymentMethod) => {
     if (state.cart.length === 0 || isSubmitting) return;
+    if (hasStockShortage) {
+      setSubmitError("One or more items exceed available stock. Adjust quantities or choose a substitute first.");
+      return;
+    }
     if (requireShift && !activeShift) {
       alert("Please open a cash register shift before completing sales.");
       return;
@@ -135,7 +182,7 @@ export function RetailPosTerminal() {
 
   usePosShortcuts({
     onFocusSearch: () => searchInputRef.current?.focus(),
-    onResetSale: () => { dispatch({ type: "RESET_SALE" }); searchInputRef.current?.focus(); },
+    onResetSale: handleSafeResetSale,
     onOpenSubstitutes: () => {
       const item = state.cart.find((c) => c.genericName);
       if (item?.genericName) setSubstituteGeneric(item.genericName);
@@ -160,26 +207,26 @@ export function RetailPosTerminal() {
     onSelectBatch: (m, b, all) => dispatch({ type: "ADD_LINE", payload: { medicine: m, batch: b, allBatches: all } }),
     playSound,
     onBarcodeMiss: (barcode) => {
-      if (searchInputRef.current) {
-        searchInputRef.current.focus();
-        searchInputRef.current.value = barcode;
-      }
+      searchInputRef.current?.focus();
+      window.dispatchEvent(new CustomEvent("pos-barcode-miss", { detail: barcode }));
     },
   });
 
   return (
-    <div className="flex flex-col lg:flex-row h-auto lg:h-[calc(100vh-4rem)] p-3 lg:p-4 gap-4 overflow-y-auto lg:overflow-hidden pb-24 lg:pb-4 bg-ink-50/50">
+    <div className="flex flex-col lg:flex-row h-auto lg:h-[calc(100vh-3.5rem)] p-3 lg:p-4 gap-4 overflow-y-auto lg:overflow-hidden pb-24 lg:pb-4 bg-ink-50/50">
       <div className="flex-1 flex flex-col space-y-3 min-w-0">
         <PosHeader
           currentStore={currentStore}
           onOpenStoreSwitcher={() => setStoreSwitcherOpen(true)}
+          sidebarCollapsed={collapsed}
+          onToggleSidebar={toggleCollapsed}
           soundEnabled={state.soundEnabled}
           onToggleSound={() => dispatch({ type: "SET_SOUND_ENABLED", payload: !state.soundEnabled })}
           cartLength={state.cart.length}
           onHoldBill={() => { if (state.cart.length > 0) setIsParkOpen(true); }}
           heldCount={heldCount}
           onOpenHeldBills={() => setIsHeldListOpen(true)}
-          onResetSale={() => { dispatch({ type: "RESET_SALE" }); searchInputRef.current?.focus(); }}
+          onResetSale={handleSafeResetSale}
           activeShift={activeShift}
           requireShift={requireShift}
           isOffline={posDs.isOffline}
@@ -192,7 +239,7 @@ export function RetailPosTerminal() {
         <SearchBar
           inputRef={searchInputRef}
           dataSource={ds}
-          onSelectBatch={(m, b, all) => dispatch({ type: "ADD_LINE", payload: { medicine: m, batch: b, allBatches: all } })}
+          onSelectBatch={(m, b, all) => { setSubmitError(""); dispatch({ type: "ADD_LINE", payload: { medicine: m, batch: b, allBatches: all } }); }}
           onOpenSubstitutes={(gen) => setSubstituteGeneric(gen)}
           onOpenPromiseOrder={(med) => setPromiseMedicine(med)}
           playSound={playSound}
@@ -206,11 +253,12 @@ export function RetailPosTerminal() {
           revalidationAlert={revalidationAlert}
           rxWarning={rxWarning}
           controlledItems={controlledItems}
-          onUpdatePackQty={(batchId, pQty) => dispatch({ type: "UPDATE_LINE_PACK_QTY", payload: { batchId, packQty: pQty } })}
-          onUpdateLooseQty={(batchId, lQty) => dispatch({ type: "UPDATE_LINE_LOOSE_QTY", payload: { batchId, looseQty: lQty } })}
+          onUpdatePackQty={(batchId, pQty) => { setSubmitError(""); dispatch({ type: "UPDATE_LINE_PACK_QTY", payload: { batchId, packQty: pQty } }); }}
+          onUpdateLooseQty={(batchId, lQty) => { setSubmitError(""); dispatch({ type: "UPDATE_LINE_LOOSE_QTY", payload: { batchId, looseQty: lQty } }); }}
           onUpdateDiscount={(batchId, dBp) => dispatch({ type: "UPDATE_LINE_DISCOUNT", payload: { batchId, discountBp: dBp } })}
-          onUpdateBatch={(oldId, newB, reason) => dispatch({ type: "UPDATE_LINE_BATCH", payload: { oldBatchId: oldId, newBatch: newB, reason } })}
-          onRemoveLine={(batchId) => dispatch({ type: "REMOVE_LINE", payload: { batchId } })}
+          onUpdateBatch={(oldId, newB, reason) => { setSubmitError(""); dispatch({ type: "UPDATE_LINE_BATCH", payload: { oldBatchId: oldId, newBatch: newB, reason } }); }}
+          onCapToMax={(batchId, maxUnits) => { setSubmitError(""); dispatch({ type: "CAP_LINE_TO_MAX", payload: { batchId, maxUnits } }); }}
+          onRemoveLine={(batchId) => { setSubmitError(""); dispatch({ type: "REMOVE_LINE", payload: { batchId } }); }}
           onOpenSubstitutes={(gen) => setSubstituteGeneric(gen)}
           onFocusSearch={() => searchInputRef.current?.focus()}
         />
@@ -219,7 +267,7 @@ export function RetailPosTerminal() {
       <div className="w-full lg:w-80 flex flex-col space-y-3 shrink-0">
         <CustomerPicker customer={state.customer} dataSource={ds} onSelectCustomer={(c) => dispatch({ type: "SET_CUSTOMER", payload: c })} onCustomerRedeemableLoaded={(pts, val) => dispatch({ type: "SET_CUSTOMER_REDEEMABLE", payload: { redeemablePoints: pts, redeemableValuePaise: val } })} />
         <CompliancePanel compliance={state.compliance} hasControlledItems={controlledItems.length > 0} dataSource={ds} onChange={(patch) => dispatch({ type: "SET_COMPLIANCE", payload: patch })} />
-        <TotalsBar totals={totals} loyaltyDiscountPaise={loyaltyDiscountPaise} itemCount={state.cart.length} paymentMethod={state.paymentMethod} isSubmitting={isSubmitting} canBill={!requireShift || Boolean(activeShift)} onSetPaymentMethod={(m) => dispatch({ type: "SET_PAYMENT_METHOD", payload: m })} onOpenSplitModal={() => setIsPaymentOpen(true)} onCompleteSale={() => handleCompleteSale()} />
+        <TotalsBar totals={totals} loyaltyDiscountPaise={loyaltyDiscountPaise} itemCount={state.cart.length} paymentMethod={state.paymentMethod} isSubmitting={isSubmitting} canBill={!requireShift || Boolean(activeShift)} hasStockShortage={hasStockShortage} submitError={submitError} onDismissError={() => setSubmitError("")} onSetPaymentMethod={(m) => dispatch({ type: "SET_PAYMENT_METHOD", payload: m })} onOpenSplitModal={() => setIsPaymentOpen(true)} onCompleteSale={() => handleCompleteSale()} />
       </div>
 
       <MobileTenderBar

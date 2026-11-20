@@ -21,4 +21,6 @@ export type NavItem = {
   paletteOnly?: boolean;
   /** Hidden when operating in warehouse mode (Task A3.5: retail counter sales only). */
   retailOnly?: boolean;
+  /** Optional status pill shown in sidebar (e.g. "Soon"). */
+  badge?: string;
 };

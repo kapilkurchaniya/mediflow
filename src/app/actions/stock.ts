@@ -7,6 +7,7 @@ import { writeAudit } from "@/server/audit";
 import { requirePermission, checkPermission } from "@/server/rbac";
 import { revalidatePath } from "next/cache";
 import { addDays, format } from "date-fns";
+import { protectedAction } from "@/server/action";
 
 export async function getBatches(
   opts?:
@@ -389,3 +390,190 @@ export async function backfillZeroPurchaseRates() {
     return { error: (err instanceof Error ? err.message : String(err)) || "Failed to backfill purchase rates" };
   }
 }
+
+const OcrStockItemSchema = z.object({
+  medicineId: z.string().uuid().nullable(),
+  medicineName: z.string().trim().min(1),
+  genericName: z.string().optional(),
+  manufacturer: z.string().optional(),
+  hsn: z.string().optional(),
+  batchNo: z.string().trim().min(1),
+  expiryDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  unitsPerPack: z.number().int().min(1).default(1),
+  baseQty: z.number().int().min(0),
+  ptrPaise: z.number().int().min(0).default(0),
+  mrpPaise: z.number().int().min(0).default(0),
+  saleRatePaise: z.number().int().min(0).default(0),
+  gstRateBp: z.number().int().min(0).default(1200),
+});
+
+const OcrStockCommitSchema = z.object({
+  mode: z.enum(["add", "set"]),
+  createMissingMedicines: z.boolean().default(true),
+  items: z.array(OcrStockItemSchema).min(1),
+});
+
+export const commitOcrStockUpdateAction = protectedAction("inventory.adjust")
+  .schema(OcrStockCommitSchema)
+  .action(async ({ parsedInput, ctx }) => {
+    const updatedCount = await db.transaction(async (tx) => {
+      let processed = 0;
+
+      for (const item of parsedInput.items) {
+        let medicineId = item.medicineId;
+
+        if (!medicineId) {
+          const [existingMed] = await tx
+            .select({ id: schema.medicines.id })
+            .from(schema.medicines)
+            .where(
+              and(
+                eq(schema.medicines.tenantId, ctx.tenantId),
+                sql`lower(${schema.medicines.name}) = lower(${item.medicineName})`,
+              ),
+            )
+            .limit(1);
+
+          if (existingMed) {
+            medicineId = existingMed.id;
+          } else if (parsedInput.createMissingMedicines) {
+            let manufacturerId: string | null = null;
+            const mfgName = item.manufacturer?.trim();
+            if (mfgName) {
+              const [existingMfg] = await tx
+                .select({ id: schema.manufacturers.id })
+                .from(schema.manufacturers)
+                .where(
+                  and(
+                    eq(schema.manufacturers.tenantId, ctx.tenantId),
+                    sql`lower(${schema.manufacturers.name}) = lower(${mfgName})`,
+                  ),
+                )
+                .limit(1);
+              if (existingMfg) {
+                manufacturerId = existingMfg.id;
+              } else {
+                const [createdMfg] = await tx
+                  .insert(schema.manufacturers)
+                  .values({ tenantId: ctx.tenantId, name: mfgName })
+                  .returning({ id: schema.manufacturers.id });
+                manufacturerId = createdMfg.id;
+              }
+            }
+
+            const [createdMed] = await tx
+              .insert(schema.medicines)
+              .values({
+                tenantId: ctx.tenantId,
+                name: item.medicineName,
+                genericName: item.genericName?.trim() || null,
+                manufacturerId,
+                hsn: item.hsn?.trim() || null,
+                unitsPerPack: item.unitsPerPack,
+                gstRateBp: item.gstRateBp,
+                mrp: item.mrpPaise > 0 ? item.mrpPaise : 0,
+                purchasePrice: item.ptrPaise > 0 ? item.ptrPaise : 0,
+                salePrice:
+                  item.saleRatePaise > 0
+                    ? item.saleRatePaise
+                    : item.mrpPaise > 0
+                      ? item.mrpPaise
+                      : 0,
+              })
+              .returning({ id: schema.medicines.id });
+            medicineId = createdMed.id;
+          } else {
+            throw new Error(
+              `Medicine "${item.medicineName}" is not in your catalog. Enable "Create missing medicines in catalog" or remove the row.`,
+            );
+          }
+        }
+
+        const cleanBatchNo = item.batchNo.trim().toUpperCase();
+        const [existingBatch] = await tx
+          .select({
+            id: schema.batches.id,
+            qtyOnHand: schema.batches.qtyOnHand,
+          })
+          .from(schema.batches)
+          .where(
+            and(
+              eq(schema.batches.tenantId, ctx.tenantId),
+              eq(schema.batches.storeId, ctx.storeId),
+              eq(schema.batches.medicineId, medicineId),
+              eq(schema.batches.batchNo, cleanBatchNo),
+            ),
+          )
+          .limit(1);
+
+        const resolvedSaleRate =
+          item.saleRatePaise > 0 ? item.saleRatePaise : item.mrpPaise;
+
+        let batchId: string;
+        let currentQty = 0;
+
+        if (existingBatch) {
+          batchId = existingBatch.id;
+          currentQty = existingBatch.qtyOnHand;
+        } else {
+          const [createdBatch] = await tx
+            .insert(schema.batches)
+            .values({
+              tenantId: ctx.tenantId,
+              storeId: ctx.storeId,
+              medicineId,
+              batchNo: cleanBatchNo,
+              expiryDate: item.expiryDate,
+              purchaseRate: item.ptrPaise > 0 ? item.ptrPaise : 0,
+              mrp: item.mrpPaise > 0 ? item.mrpPaise : 0,
+              saleRate: resolvedSaleRate > 0 ? resolvedSaleRate : 0,
+              qtyOnHand: 0,
+            })
+            .returning({ id: schema.batches.id });
+          batchId = createdBatch.id;
+        }
+
+        const qtyDelta =
+          parsedInput.mode === "add" ? item.baseQty : item.baseQty - currentQty;
+
+        if (qtyDelta !== 0) {
+          await recordStockMovement({
+            tx,
+            tenantId: ctx.tenantId,
+            storeId: ctx.storeId,
+            batchId,
+            medicineId,
+            type: existingBatch ? "adjustment" : "opening",
+            qtyChange: qtyDelta,
+            unitCost: item.ptrPaise > 0 ? item.ptrPaise : null,
+            refType: "ocr_stock_update",
+            note:
+              parsedInput.mode === "add"
+                ? `OCR stock sheet (+${item.baseQty})`
+                : `OCR stock count set to ${item.baseQty}`,
+            userId: ctx.userId,
+          });
+        }
+
+        processed++;
+      }
+
+      await writeAudit(tx, ctx, {
+        action: "stock_adjust",
+        entityType: "batch",
+        newValue: {
+          source: "ocr_stock_sheet",
+          mode: parsedInput.mode,
+          updatedCount: processed,
+        },
+      });
+
+      return processed;
+    });
+
+    revalidatePath("/dashboard/inventory/batches");
+    revalidatePath("/dashboard/inventory", "layout");
+    revalidatePath("/dashboard/pos");
+    revalidatePath("/dashboard");
+    return { updatedCount };
+  });

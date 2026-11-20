@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import Link from "next/link";
 import { Scale, ArrowLeft, CheckCircle2, AlertTriangle, Download, Calendar, RefreshCw } from "lucide-react";
 import { reconcileDailyReportAction, exportReconciliationCsvAction } from "@/app/actions/pilot";
+import { PrintWatermark } from "@/app/components/PrintWatermark";
 import { type DailyReconciliationResult, type LegacyDailyReportInput } from "@/server/domain/pilot/reconciliation";
 
 export default function PilotReconcilePage() {
@@ -76,6 +77,7 @@ export default function PilotReconcilePage() {
 
   return (
     <div className="space-y-6 max-w-5xl mx-auto p-4 md:p-6">
+      <PrintWatermark />
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b border-ink-150 pb-5">
         <div>
           <Link href="/dashboard/reports" className="text-xs font-semibold text-primary-600 hover:text-primary-700 flex items-center gap-1 mb-1">

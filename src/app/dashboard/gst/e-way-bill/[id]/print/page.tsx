@@ -4,6 +4,7 @@ import { QrCode } from "@/app/components/QrCode";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { Printer, ArrowLeft, CheckCircle2 } from "lucide-react";
+import { PrintWatermark } from "@/app/components/PrintWatermark";
 
 export const dynamic = "force-dynamic";
 
@@ -34,6 +35,7 @@ export default async function EWayBillPrintPage({
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 p-4 sm:p-8 print:p-0 print:bg-white text-slate-900">
+      <PrintWatermark />
       {/* Top action bar (hidden during print) */}
       <div className="max-w-4xl mx-auto mb-6 flex items-center justify-between print:hidden">
         <Link

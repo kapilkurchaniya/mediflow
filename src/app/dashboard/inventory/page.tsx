@@ -39,7 +39,7 @@ export default async function InventoryPage({
           (canAdjust || canManage) ? (
             <>
               {canAdjust && (
-                <Link href="/dashboard/inventory/import" className="btn btn-secondary">
+                <Link href="/dashboard/import?tab=quick" className="btn btn-secondary">
                   <Upload /> Import
                 </Link>
               )}
@@ -152,7 +152,7 @@ export default async function InventoryPage({
               !q && (canAdjust || canManage) ? (
                 <div className="flex gap-2">
                   {canAdjust && (
-                    <Link href="/dashboard/inventory/import" className="btn btn-secondary btn-sm">
+                    <Link href="/dashboard/import?tab=quick" className="btn btn-secondary btn-sm">
                       <Upload /> Import CSV
                     </Link>
                   )}

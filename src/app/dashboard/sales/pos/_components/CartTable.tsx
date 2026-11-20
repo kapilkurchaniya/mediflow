@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ShoppingCart, Trash2, AlertTriangle, ShieldAlert, Sparkles, Tag, Zap } from "lucide-react";
+import { ShoppingCart, Trash2, AlertTriangle, AlertCircle, ShieldAlert, Sparkles, Tag, Zap } from "lucide-react";
 import { formatINR } from "@/lib/format";
 import { computeSaleLine } from "@/lib/money";
 import { computeFefoPreview, isFefoOverride } from "@/lib/fefo";
@@ -61,6 +61,7 @@ interface CartTableProps {
   onUpdateLooseQty: (batchId: string, looseQty: number) => void;
   onUpdateDiscount: (batchId: string, discountBp: number) => void;
   onUpdateBatch: (oldBatchId: string, newBatch: SearchResultBatch, reason?: string) => void;
+  onCapToMax?: (batchId: string, maxUnits: number) => void;
   onRemoveLine: (batchId: string) => void;
   onOpenSubstitutes: (genericName: string) => void;
   onFocusSearch?: () => void;
@@ -75,6 +76,7 @@ export function CartTable({
   onUpdateLooseQty,
   onUpdateDiscount,
   onUpdateBatch,
+  onCapToMax,
   onRemoveLine,
   onOpenSubstitutes,
   onFocusSearch,
@@ -173,6 +175,7 @@ export function CartTable({
                     ? (fefoPreview?.totalAvailable ?? line.totalAvailableStock ?? line.qtyOnHand)
                     : line.qtyOnHand;
                   const isStockShortage = availableStock < lineCalc.baseQty;
+                  const isAtStockLimit = availableStock > 0 && availableStock === lineCalc.baseQty;
 
                   return (
                     <tr
@@ -185,10 +188,10 @@ export function CartTable({
                       onClick={() => setSelectedRowIndex(idx)}
                       onKeyDown={(e) => handleRowKeyDown(e, idx)}
                       className={`transition-colors outline-none cursor-pointer ${
-                        selectedRowIndex === idx
+                        isStockShortage
+                          ? "bg-rose-50/70 ring-1 ring-inset ring-rose-300"
+                          : selectedRowIndex === idx
                           ? "bg-brand-50/50 ring-1 ring-inset ring-brand-400"
-                          : isStockShortage
-                          ? "bg-rose-50/50"
                           : ""
                       }`}
                     >
@@ -216,6 +219,33 @@ export function CartTable({
                         {line.overrideBatch && line.overrideReason && (
                           <div className="inline-flex items-center gap-1 text-[10px] font-mono text-amber-800 bg-amber-50 border border-amber-200 rounded px-1.5 py-0.5 mt-1 max-w-fit" title={line.overrideReason}>
                             <span>Override: {line.overrideReason}</span>
+                          </div>
+                        )}
+                        {isStockShortage && (
+                          <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[11px] font-medium text-rose-700 bg-rose-100/80 border border-rose-200 rounded-md px-2 py-0.5 max-w-fit">
+                            <AlertCircle className="w-3 h-3 shrink-0" />
+                            <span>
+                              {availableStock <= 0
+                                ? "Out of stock (0 available)"
+                                : `Stock limit exceeded: requested ${lineCalc.baseQty}, only ${availableStock} ${line.looseUnit}s available`}
+                            </span>
+                            {availableStock > 0 && onCapToMax && (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  onCapToMax(line.batchId, availableStock);
+                                }}
+                                className="underline font-bold text-rose-900 hover:text-rose-700 ml-1"
+                              >
+                                Cap to {availableStock}
+                              </button>
+                            )}
+                          </div>
+                        )}
+                        {isAtStockLimit && (
+                          <div className="mt-1 inline-flex items-center gap-1 text-[10.5px] font-medium text-amber-700 bg-amber-50 border border-amber-200 rounded px-1.5 py-0.5">
+                            <span>Max stock limit reached ({availableStock} {line.looseUnit}s)</span>
                           </div>
                         )}
                       </td>

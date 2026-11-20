@@ -37,6 +37,7 @@ export function posCartReducer(state: PosState, action: PosAction): PosState {
     case "ADD_LINE": {
       const { medicine, batch, allBatches, schemeText } = action.payload;
       const unitsPerPack = Math.max(1, medicine.unitsPerPack ?? 1);
+      const totalAvailable = allBatches?.reduce((s, b) => s + b.qtyOnHand, 0) ?? batch.qtyOnHand;
       const existingIdx = state.cart.findIndex((i) => i.batchId === batch.id);
 
       if (existingIdx >= 0) {
@@ -47,13 +48,18 @@ export function posCartReducer(state: PosState, action: PosAction): PosState {
         return { ...state, cart: nextCart };
       }
 
+      // If available stock is less than 1 full pack (partial strip), add loose units instead of exceeding stock
+      const initialPackQty = totalAvailable > 0 && totalAvailable < unitsPerPack ? 0 : 1;
+      const initialLooseQty = totalAvailable > 0 && totalAvailable < unitsPerPack ? totalAvailable : 0;
+      const initialQty = initialPackQty * unitsPerPack + initialLooseQty;
+
       const newLine: PosCartLine = {
         batchId: batch.id, medicineId: medicine.id, medicineName: medicine.name,
         genericName: medicine.genericName, batchNo: batch.batchNo, expiryDate: batch.expiryDate,
-        mrp: batch.mrp, saleRate: batch.saleRate ?? batch.mrp, packQty: 1, looseQty: 0,
-        qty: unitsPerPack * 1, unitsPerPack, packUnit: medicine.packUnit ?? "strip",
+        mrp: batch.mrp, saleRate: batch.saleRate ?? batch.mrp, packQty: initialPackQty, looseQty: initialLooseQty,
+        qty: initialQty, unitsPerPack, packUnit: medicine.packUnit ?? "strip",
         looseUnit: medicine.looseUnit ?? "tablet", qtyOnHand: batch.qtyOnHand,
-        totalAvailableStock: allBatches?.reduce((s, b) => s + b.qtyOnHand, 0) ?? batch.qtyOnHand,
+        totalAvailableStock: totalAvailable,
         discountBp: 0, gstRateBp: medicine.gstRateBp, rxRequired: medicine.rxRequired,
         schedule: medicine.schedule, schemeText, autoFefo: true, availableBatches: allBatches,
       };
@@ -89,6 +95,23 @@ export function posCartReducer(state: PosState, action: PosAction): PosState {
           ...line, batchId: newBatch.id, batchNo: newBatch.batchNo, expiryDate: newBatch.expiryDate,
           mrp: newBatch.mrp, saleRate: newBatch.saleRate ?? newBatch.mrp, qtyOnHand: newBatch.qtyOnHand,
           autoFefo: !isOverride, overrideBatch: isOverride, overrideReason: reason,
+        }),
+      };
+    }
+
+    case "CAP_LINE_TO_MAX": {
+      const safeMax = Math.max(0, Math.floor(action.payload.maxUnits));
+      return {
+        ...state,
+        cart: state.cart.map((line) => {
+          if (line.batchId !== action.payload.batchId) return line;
+          const upp = Math.max(1, line.unitsPerPack ?? 1);
+          return {
+            ...line,
+            packQty: Math.floor(safeMax / upp),
+            looseQty: safeMax % upp,
+            qty: safeMax,
+          };
         }),
       };
     }

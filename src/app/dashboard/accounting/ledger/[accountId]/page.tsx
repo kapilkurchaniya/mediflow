@@ -17,6 +17,7 @@ import { getAccountsListAction } from "@/app/actions/accounting-reports";
 import { LedgerFilterBar } from "../_components/LedgerFilterBar";
 import { LedgerTable } from "../_components/LedgerTable";
 import { ReconciliationCard } from "../_components/ReconciliationCard";
+import { PrintWatermark } from "@/app/components/PrintWatermark";
 import { Scale, ArrowDownLeft, ArrowUpRight, Landmark } from "lucide-react";
 
 export const metadata = {
@@ -122,6 +123,7 @@ export default async function AccountLedgerPage({
 
   return (
     <div className="page space-y-6">
+      <PrintWatermark />
       <PageHeader
         eyebrow={`Ledger Account • ${currentAccount.type.toUpperCase()}`}
         title={`${currentAccount.code} — ${currentAccount.name}`}

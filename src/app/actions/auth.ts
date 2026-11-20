@@ -4,14 +4,17 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 import { db, schema } from "@/server/db";
-import { sql } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { seedSystemRoles } from "@/server/roles";
 import { hashPassword, verifyPassword, createSession, setSessionCookie, deleteSessionCookie, invalidateSession, getCurrentSession, requireAuth } from "@/server/auth";
 import { attemptLogin, changePassword } from "@/server/domain/login";
+import { sanitizeNextPath } from "@/server/oauth/google";
+import { writeAudit } from "@/server/audit";
 
 export async function loginAction(prevState: { error?: string; success?: boolean } | null, formData: FormData) {
   const email = (formData.get("email") as string) ?? "";
   const password = (formData.get("password") as string) ?? "";
+  const rawRedirect = (formData.get("redirect") as string) ?? "";
 
   const h = await headers();
   const ip = h.get("x-forwarded-for")?.split(",")[0]?.trim() || h.get("x-real-ip") || null;
@@ -23,8 +26,43 @@ export async function loginAction(prevState: { error?: string; success?: boolean
   await createSession(token, result.userId, result.tenantId, result.storeId);
   await setSessionCookie(token);
 
-  // Redirect to dashboard
-  redirect("/dashboard");
+  redirect(sanitizeNextPath(rawRedirect, "/dashboard"));
+}
+
+/** Mandatory initial password setup for newly signed-in passwordless (Google OAuth) users. */
+export async function setupInitialPasswordAction(
+  _prevState: { error?: string } | null,
+  formData: FormData,
+): Promise<{ error?: string }> {
+  const { session, user } = await requireAuth();
+  const password = (formData.get("password") as string) ?? "";
+  const confirm = (formData.get("confirm") as string) ?? "";
+  const nextPath = sanitizeNextPath((formData.get("next") as string) ?? "", "/dashboard");
+
+  if (user.passwordHash) {
+    redirect(nextPath);
+  }
+  if (password.length < 8) {
+    return { error: "Password must be at least 8 characters long." };
+  }
+  if (password !== confirm) {
+    return { error: "Passwords do not match." };
+  }
+
+  const passwordHash = await hashPassword(password);
+  await db
+    .update(schema.users)
+    .set({ passwordHash })
+    .where(eq(schema.users.id, user.id));
+
+  await writeAudit(
+    db,
+    { tenantId: session.tenantId, storeId: session.storeId, userId: user.id },
+    { action: "update", entityType: "user", entityId: user.id, reason: "Initial password setup completed" },
+  );
+
+  revalidatePath("/dashboard/settings/profile");
+  redirect(nextPath);
 }
 
 /** Change the signed-in user's own password and sign out every other device. */
@@ -62,6 +100,9 @@ export async function registerAction(prevState: { error?: string; success?: bool
 
   if (!name || !email || !password || !pharmacyName) {
     return { error: "All fields are required" };
+  }
+  if (password.length < 8) {
+    return { error: "Password must be at least 8 characters long" };
   }
 
   const emailLower = email.trim().toLowerCase();

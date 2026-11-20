@@ -13,6 +13,7 @@ import {
   type VoucherTypeFilter,
 } from "@/server/domain/accounting-reports";
 import { DayBookTable } from "./_components/DayBookTable";
+import { PrintWatermark } from "@/app/components/PrintWatermark";
 import { BookOpen, CheckCircle2, AlertTriangle, ArrowDownLeft, ArrowUpRight } from "lucide-react";
 
 export const metadata = {
@@ -80,6 +81,7 @@ export default async function DayBookPage({
 
   return (
     <div className="page space-y-6">
+      <PrintWatermark />
       <PageHeader
         eyebrow="Financial Registers"
         title="Day Book"

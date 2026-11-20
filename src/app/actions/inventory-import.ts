@@ -2,8 +2,9 @@
 
 import { db, schema } from "@/server/db";
 import { eq, and, sql } from "drizzle-orm";
-import { getCurrentSession, requireAuth } from "@/server/auth";
+import { requirePermission } from "@/server/rbac";
 import { recordStockMovement } from "@/server/domain/stock";
+import { writeAudit } from "@/server/audit";
 import { revalidatePath } from "next/cache";
 
 export type ImportRow = {
@@ -20,7 +21,7 @@ export type ImportRow = {
 };
 
 export async function processInventoryImport(rows: ImportRow[]) {
-  const { session, user } = await requireAuth();
+  const ctx = await requirePermission("inventory.adjust");
 
   if (!rows || rows.length === 0) return { error: "No data to import" };
 
@@ -31,26 +32,24 @@ export async function processInventoryImport(rows: ImportRow[]) {
       for (const row of rows) {
         if (!row.medicineName || !row.medicineName.trim()) continue;
 
-        // Sanitize all numeric fields to prevent NaN, null, or negative values from failing Postgres queries
         const cleanMrp = Number.isFinite(row.mrp) && row.mrp >= 0 ? Math.round(row.mrp) : 0;
-        let cleanPurchaseRate = Number.isFinite(row.purchaseRate) && row.purchaseRate >= 0 ? Math.round(row.purchaseRate) : 0;
-        // If purchase rate was not provided or 0, fallback to standard Indian pharma PTR (80% of MRP)
+        let cleanPurchaseRate =
+          Number.isFinite(row.purchaseRate) && row.purchaseRate >= 0 ? Math.round(row.purchaseRate) : 0;
         if (cleanPurchaseRate === 0 && cleanMrp > 0) {
           cleanPurchaseRate = Math.round(cleanMrp * 0.8);
         }
-        const cleanSaleRate = Number.isFinite(row.saleRate) && row.saleRate > 0 ? Math.round(row.saleRate) : cleanMrp;
+        const cleanSaleRate =
+          Number.isFinite(row.saleRate) && row.saleRate > 0 ? Math.round(row.saleRate) : cleanMrp;
         const cleanQty = Number.isFinite(row.qty) && row.qty >= 0 ? Math.round(row.qty) : 0;
 
         // 1. Resolve or Create Medicine
         let medicineId: string;
-        
-        // Find existing medicine by exact name (case-insensitive)
         const [existingMed] = await tx
           .select({ id: schema.medicines.id })
           .from(schema.medicines)
           .where(
             and(
-              eq(schema.medicines.tenantId, session.tenantId),
+              eq(schema.medicines.tenantId, ctx.tenantId),
               sql`lower(${schema.medicines.name}) = lower(${row.medicineName.trim()})`
             )
           );
@@ -58,18 +57,24 @@ export async function processInventoryImport(rows: ImportRow[]) {
         if (existingMed) {
           medicineId = existingMed.id;
         } else {
-          // Create new medicine
-          // 1.5 Resolve Manufacturer and Category
           let manufacturerId: string | null = null;
           if (row.manufacturer && row.manufacturer !== "Unknown" && row.manufacturer.trim().length > 0) {
             const trimmedMfg = row.manufacturer.trim();
-            const [m] = await tx.select().from(schema.manufacturers)
-              .where(and(eq(schema.manufacturers.tenantId, session.tenantId), sql`lower(${schema.manufacturers.name}) = lower(${trimmedMfg})`));
+            const [m] = await tx
+              .select({ id: schema.manufacturers.id })
+              .from(schema.manufacturers)
+              .where(
+                and(
+                  eq(schema.manufacturers.tenantId, ctx.tenantId),
+                  sql`lower(${schema.manufacturers.name}) = lower(${trimmedMfg})`
+                )
+              );
             if (m) {
               manufacturerId = m.id;
             } else {
-              const [newM] = await tx.insert(schema.manufacturers)
-                .values({ tenantId: session.tenantId, name: trimmedMfg })
+              const [newM] = await tx
+                .insert(schema.manufacturers)
+                .values({ tenantId: ctx.tenantId, name: trimmedMfg })
                 .returning({ id: schema.manufacturers.id });
               manufacturerId = newM.id;
             }
@@ -78,100 +83,99 @@ export async function processInventoryImport(rows: ImportRow[]) {
           let categoryId: string | null = null;
           if (row.category && row.category !== "General" && row.category.trim().length > 0) {
             const trimmedCat = row.category.trim();
-            const [c] = await tx.select().from(schema.categories)
-              .where(and(eq(schema.categories.tenantId, session.tenantId), sql`lower(${schema.categories.name}) = lower(${trimmedCat})`));
+            const [c] = await tx
+              .select({ id: schema.categories.id })
+              .from(schema.categories)
+              .where(
+                and(
+                  eq(schema.categories.tenantId, ctx.tenantId),
+                  sql`lower(${schema.categories.name}) = lower(${trimmedCat})`
+                )
+              );
             if (c) {
               categoryId = c.id;
             } else {
-              const [newC] = await tx.insert(schema.categories)
-                .values({ tenantId: session.tenantId, name: trimmedCat })
+              const [newC] = await tx
+                .insert(schema.categories)
+                .values({ tenantId: ctx.tenantId, name: trimmedCat })
                 .returning({ id: schema.categories.id });
               categoryId = newC.id;
             }
           }
 
-          const [newMed] = await tx.insert(schema.medicines).values({
-            tenantId: session.tenantId,
-            name: row.medicineName.trim(),
-            manufacturerId,
-            categoryId,
-            mrp: cleanMrp,
-            purchasePrice: cleanPurchaseRate,
-            salePrice: cleanSaleRate,
-          }).returning({ id: schema.medicines.id });
+          const [newMed] = await tx
+            .insert(schema.medicines)
+            .values({
+              tenantId: ctx.tenantId,
+              name: row.medicineName.trim(),
+              manufacturerId,
+              categoryId,
+              mrp: cleanMrp,
+              purchasePrice: cleanPurchaseRate,
+              salePrice: cleanSaleRate,
+            })
+            .returning({ id: schema.medicines.id });
           medicineId = newMed.id;
         }
 
-        // 2. Resolve or Create Batch
-        let batchId: string;
-        const cleanBatchNo = (row.batchNo || "DEFAULT").trim();
-
+        // 2. Resolve or Create Batch (uppercase normalized)
+        const cleanBatchNo = (row.batchNo || "DEFAULT").trim().toUpperCase();
         const [existingBatch] = await tx
-          .select({ id: schema.batches.id, qtyOnHand: schema.batches.qtyOnHand })
+          .select({ id: schema.batches.id })
           .from(schema.batches)
           .where(
             and(
-              eq(schema.batches.storeId, session.storeId),
+              eq(schema.batches.storeId, ctx.storeId),
               eq(schema.batches.medicineId, medicineId),
               eq(schema.batches.batchNo, cleanBatchNo)
             )
           );
 
+        let batchId: string;
         if (existingBatch) {
           batchId = existingBatch.id;
-          
-          // Only add stock if quantity is provided
-          if (cleanQty > 0) {
-            // Update physical stock through domain
-            await recordStockMovement({
-              tx,
-              tenantId: session.tenantId,
-              storeId: session.storeId,
-              medicineId,
-              batchId,
-              type: "opening", // using opening balance for import
-              qtyChange: cleanQty,
-              unitCost: cleanPurchaseRate,
-              note: "Bulk CSV Import",
-              userId: user.id
-            });
-          }
         } else {
-          // Create new batch
-          const [newBatch] = await tx.insert(schema.batches).values({
-            tenantId: session.tenantId,
-            storeId: session.storeId,
-            medicineId,
-            batchNo: cleanBatchNo,
-            expiryDate: row.expiryDate,
-            mfgDate: row.mfgDate || null,
-            mrp: cleanMrp,
-            purchaseRate: cleanPurchaseRate,
-            saleRate: cleanSaleRate,
-            qtyOnHand: cleanQty // Initial insert sets it directly
-          }).returning({ id: schema.batches.id });
-          
-          batchId = newBatch.id;
-
-          // Record initial ledger entry
-          if (cleanQty > 0) {
-            await tx.insert(schema.stockMovements).values({
-              tenantId: session.tenantId,
-              storeId: session.storeId,
+          const [newBatch] = await tx
+            .insert(schema.batches)
+            .values({
+              tenantId: ctx.tenantId,
+              storeId: ctx.storeId,
               medicineId,
-              batchId,
-              type: "opening",
-              qtyChange: cleanQty,
-              balanceAfter: cleanQty,
-              unitCost: cleanPurchaseRate,
-              note: "Bulk CSV Import Initial Stock",
-              userId: user.id
-            });
-          }
+              batchNo: cleanBatchNo,
+              expiryDate: row.expiryDate,
+              mfgDate: row.mfgDate || null,
+              mrp: cleanMrp,
+              purchaseRate: cleanPurchaseRate,
+              saleRate: cleanSaleRate,
+              qtyOnHand: 0,
+            })
+            .returning({ id: schema.batches.id });
+          batchId = newBatch.id;
+        }
+
+        if (cleanQty > 0) {
+          await recordStockMovement({
+            tx,
+            tenantId: ctx.tenantId,
+            storeId: ctx.storeId,
+            medicineId,
+            batchId,
+            type: "opening",
+            qtyChange: cleanQty,
+            unitCost: cleanPurchaseRate,
+            note: existingBatch ? "Quick CSV Import (added)" : "Quick CSV Import (opening)",
+            userId: ctx.userId,
+          });
         }
 
         processed++;
       }
+
+      await writeAudit(tx, ctx, {
+        action: "stock_adjust",
+        entityType: "batch",
+        newValue: { rowCount: processed, source: "quick_csv_import" },
+      });
 
       return processed;
     });
@@ -183,6 +187,8 @@ export async function processInventoryImport(rows: ImportRow[]) {
     return { success: true, count: importCount };
   } catch (error: unknown) {
     console.error("Import error:", error);
-    return { error: (error instanceof Error ? error.message : String(error)) || "Failed to process import" };
+    return {
+      error: (error instanceof Error ? error.message : String(error)) || "Failed to process import",
+    };
   }
 }

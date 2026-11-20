@@ -13,6 +13,7 @@ import {
 import { resolveStoreScope } from "@/server/domain/accounting-reports/balances";
 import { ReceivablesTable } from "./_components/ReceivablesTable";
 import { ReceivablesFilterBar } from "./_components/ReceivablesFilterBar";
+import { PrintWatermark } from "@/app/components/PrintWatermark";
 import {
   Users,
   CheckCircle2,
@@ -90,6 +91,7 @@ export default async function ReceivablesPage({
 
   return (
     <div className="page space-y-6">
+      <PrintWatermark />
       <PageHeader
         eyebrow="Credit Risk & Working Capital"
         title="Receivables & Credit Control"

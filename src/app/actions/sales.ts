@@ -22,7 +22,7 @@ import {
 } from "@/server/domain/sales/return-sale";
 import { searchPosMedicines } from "@/server/domain/pos/search";
 
-export async function getSales(dateFrom?: string | null, dateTo?: string | null) {
+export async function getSales(dateFrom?: string | null, dateTo?: string | null, query?: string | null) {
   const ctx = await requirePermission("sale.view");
 
   const conditions = [
@@ -39,6 +39,14 @@ export async function getSales(dateFrom?: string | null, dateTo?: string | null)
     conditions.push(lte(schema.sales.createdAt, new Date(dateTo + "T23:59:59.999")));
   }
 
+  const trimmedQ = query?.trim();
+  if (trimmedQ) {
+    const pattern = `%${trimmedQ}%`;
+    conditions.push(
+      sql`(${schema.sales.invoiceNo} ILIKE ${pattern} OR ${schema.sales.customerName} ILIKE ${pattern} OR ${schema.customers.name} ILIKE ${pattern} OR ${schema.customers.phone} ILIKE ${pattern})`
+    );
+  }
+
   return db
     .select({
       sale: schema.sales,
@@ -47,7 +55,8 @@ export async function getSales(dateFrom?: string | null, dateTo?: string | null)
     .from(schema.sales)
     .leftJoin(schema.customers, eq(schema.sales.customerId, schema.customers.id))
     .where(and(...conditions))
-    .orderBy(desc(schema.sales.createdAt));
+    .orderBy(desc(schema.sales.createdAt))
+    .limit(200);
 }
 
 // POS Search: Returns medicines with their nearest expiry batches that have stock
@@ -315,27 +324,45 @@ export async function cancelSaleAction(saleId: string, reason: string) {
 
 export async function getSaleById(id: string) {
   const ctx = await requirePermission("sale.view");
-  const [sale] = await db.select().from(schema.sales).where(and(eq(schema.sales.id, id), eq(schema.sales.tenantId, ctx.tenantId)));
-  if (!sale) return null;
-  const items = await db.select().from(schema.saleItems).where(eq(schema.saleItems.saleId, id));
-  const [customer] = sale.customerId ? await db.select().from(schema.customers).where(eq(schema.customers.id, sale.customerId)) : [null];
-  const [store] = await db.select().from(schema.stores).where(eq(schema.stores.id, sale.storeId));
-  const [tenant] = await db.select().from(schema.tenants).where(eq(schema.tenants.id, sale.tenantId));
-  const [gstDoc] = await db
+  const [sale] = await db
     .select()
-    .from(schema.gstDocuments)
-    .where(and(eq(schema.gstDocuments.refType, "sale"), eq(schema.gstDocuments.refId, id), eq(schema.gstDocuments.tenantId, ctx.tenantId)))
+    .from(schema.sales)
+    .where(and(eq(schema.sales.id, id), eq(schema.sales.tenantId, ctx.tenantId)))
     .limit(1);
-  const returns = await db
-    .select()
-    .from(schema.saleReturns)
-    .where(eq(schema.saleReturns.saleId, id))
-    .orderBy(desc(schema.saleReturns.createdAt));
-  const payments = await db
-    .select()
-    .from(schema.salePayments)
-    .where(eq(schema.salePayments.saleId, id));
-  return { sale, items, customer, store, tenant, gstDoc: gstDoc || null, returns, payments };
+  if (!sale) return null;
+
+  const [items, customerRows, storeRows, tenantRows, gstDocRows, returns, payments] = await Promise.all([
+    db.select().from(schema.saleItems).where(eq(schema.saleItems.saleId, id)),
+    sale.customerId
+      ? db.select().from(schema.customers).where(eq(schema.customers.id, sale.customerId)).limit(1)
+      : Promise.resolve([]),
+    db.select().from(schema.stores).where(eq(schema.stores.id, sale.storeId)).limit(1),
+    db.select().from(schema.tenants).where(eq(schema.tenants.id, sale.tenantId)).limit(1),
+    db
+      .select()
+      .from(schema.gstDocuments)
+      .where(
+        and(
+          eq(schema.gstDocuments.refType, "sale"),
+          eq(schema.gstDocuments.refId, id),
+          eq(schema.gstDocuments.tenantId, ctx.tenantId)
+        )
+      )
+      .limit(1),
+    db.select().from(schema.saleReturns).where(eq(schema.saleReturns.saleId, id)).orderBy(desc(schema.saleReturns.createdAt)),
+    db.select().from(schema.salePayments).where(eq(schema.salePayments.saleId, id)),
+  ]);
+
+  return {
+    sale,
+    items,
+    customer: customerRows[0] ?? null,
+    store: storeRows[0] ?? null,
+    tenant: tenantRows[0] ?? null,
+    gstDoc: gstDocRows[0] ?? null,
+    returns,
+    payments,
+  };
 }
 
 export async function createSaleReturnAction(input: ReturnSaleInput) {
@@ -420,55 +447,41 @@ export async function getSaleReturnById(id: string) {
 
   if (!returnRow) return null;
 
-  const items = await db
-    .select({
-      returnItem: schema.saleReturnItems,
-      saleItem: schema.saleItems,
-    })
-    .from(schema.saleReturnItems)
-    .innerJoin(schema.saleItems, eq(schema.saleReturnItems.saleItemId, schema.saleItems.id))
-    .where(eq(schema.saleReturnItems.returnId, id));
-
-  const [customer] = returnRow.sale.customerId
-    ? await db
-        .select()
-        .from(schema.customers)
-        .where(eq(schema.customers.id, returnRow.sale.customerId))
-        .limit(1)
-    : [null];
-
-  const [store] = await db
-    .select()
-    .from(schema.stores)
-    .where(eq(schema.stores.id, returnRow.saleReturn.storeId))
-    .limit(1);
-
-  const [tenant] = await db
-    .select()
-    .from(schema.tenants)
-    .where(eq(schema.tenants.id, returnRow.saleReturn.tenantId))
-    .limit(1);
-
-  const [gstDoc] = await db
-    .select()
-    .from(schema.gstDocuments)
-    .where(
-      and(
-        eq(schema.gstDocuments.refType, "return"),
-        eq(schema.gstDocuments.refId, id),
-        eq(schema.gstDocuments.tenantId, ctx.tenantId),
-      ),
-    )
-    .limit(1);
+  const [items, customerRows, storeRows, tenantRows, gstDocRows] = await Promise.all([
+    db
+      .select({
+        returnItem: schema.saleReturnItems,
+        saleItem: schema.saleItems,
+      })
+      .from(schema.saleReturnItems)
+      .innerJoin(schema.saleItems, eq(schema.saleReturnItems.saleItemId, schema.saleItems.id))
+      .where(eq(schema.saleReturnItems.returnId, id)),
+    returnRow.sale.customerId
+      ? db.select().from(schema.customers).where(eq(schema.customers.id, returnRow.sale.customerId)).limit(1)
+      : Promise.resolve([]),
+    db.select().from(schema.stores).where(eq(schema.stores.id, returnRow.saleReturn.storeId)).limit(1),
+    db.select().from(schema.tenants).where(eq(schema.tenants.id, returnRow.saleReturn.tenantId)).limit(1),
+    db
+      .select()
+      .from(schema.gstDocuments)
+      .where(
+        and(
+          eq(schema.gstDocuments.refType, "return"),
+          eq(schema.gstDocuments.refId, id),
+          eq(schema.gstDocuments.tenantId, ctx.tenantId),
+        ),
+      )
+      .limit(1),
+  ]);
 
   return {
     saleReturn: returnRow.saleReturn,
     sale: returnRow.sale,
     user: returnRow.user,
     items,
-    customer,
-    store,
-    tenant,
-    gstDoc: gstDoc || null,
+    customer: customerRows[0] ?? null,
+    store: storeRows[0] ?? null,
+    tenant: tenantRows[0] ?? null,
+    gstDoc: gstDocRows[0] ?? null,
   };
 }

@@ -121,7 +121,7 @@ export async function searchMedicines(
 
     for (const batch of activeBatches) {
       const summary = await getBatchAvailableStock(db, storeId, batch.id);
-      if (summary) {
+      if (summary && summary.availableQty > 0) {
         batchSummaries.push(summary);
         totalStock += summary.availableQty;
       }

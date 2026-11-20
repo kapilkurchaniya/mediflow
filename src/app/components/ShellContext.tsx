@@ -19,6 +19,42 @@ function getServerSnapshot() {
   return true;
 }
 
+const SHELL_PREFS_EVENT = "mediflow:shell-prefs";
+const STORAGE_KEY_TOOLTIPS = "mediflow:tooltips-enabled";
+
+function subscribeShellPrefs(callback: () => void) {
+  window.addEventListener("storage", callback);
+  window.addEventListener(SHELL_PREFS_EVENT, callback);
+  return () => {
+    window.removeEventListener("storage", callback);
+    window.removeEventListener(SHELL_PREFS_EVENT, callback);
+  };
+}
+
+function getCollapsedSnapshot() {
+  try {
+    return localStorage.getItem("mediflow:sidebar-collapsed") === "true";
+  } catch {
+    return false;
+  }
+}
+
+function getCollapsedServerSnapshot() {
+  return false;
+}
+
+function getTooltipsSnapshot() {
+  try {
+    return localStorage.getItem("mediflow:tooltips-enabled") !== "false";
+  } catch {
+    return true;
+  }
+}
+
+function getTooltipsServerSnapshot() {
+  return true;
+}
+
 interface ShellContextType {
   // Mobile drawer state
   mobileOpen: boolean;
@@ -29,6 +65,11 @@ interface ShellContextType {
   collapsed: boolean;
   setCollapsed: (collapsed: boolean) => void;
   toggleCollapsed: () => void;
+
+  // Global hover tooltips state
+  tooltipsEnabled: boolean;
+  setTooltipsEnabled: (enabled: boolean) => void;
+  toggleTooltips: () => void;
 
   // Command palette state
   commandOpen: boolean;
@@ -95,43 +136,61 @@ export function ShellProvider({
   const pathname = usePathname();
   const router = useRouter();
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [collapsed, setCollapsedState] = useState(() => {
-    if (typeof window === "undefined") return false;
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY_COLLAPSED);
-      return saved !== null ? saved === "true" : false;
-    } catch {
-      return false;
-    }
-  });
   const [commandOpen, setCommandOpen] = useState(false);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const [calculatorOpen, setCalculatorOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [storeSwitcherOpen, setStoreSwitcherOpen] = useState(false);
+
+  const collapsed = useSyncExternalStore(
+    subscribeShellPrefs,
+    getCollapsedSnapshot,
+    getCollapsedServerSnapshot
+  );
+  const tooltipsEnabled = useSyncExternalStore(
+    subscribeShellPrefs,
+    getTooltipsSnapshot,
+    getTooltipsServerSnapshot
+  );
   const isOnline = useSyncExternalStore(subscribeOnline, getOnlineSnapshot, getServerSnapshot);
 
   const toggleCalculator = useCallback(() => setCalculatorOpen((o) => !o), []);
 
+  const setTooltipsEnabled = useCallback((val: boolean) => {
+    try {
+      localStorage.setItem(STORAGE_KEY_TOOLTIPS, String(val));
+      window.dispatchEvent(new Event(SHELL_PREFS_EVENT));
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  const toggleTooltips = useCallback(() => {
+    const next = !getTooltipsSnapshot();
+    try {
+      localStorage.setItem(STORAGE_KEY_TOOLTIPS, String(next));
+      window.dispatchEvent(new Event(SHELL_PREFS_EVENT));
+    } catch {
+      // ignore
+    }
+  }, []);
   const setCollapsed = useCallback((val: boolean) => {
-    setCollapsedState(val);
     try {
       localStorage.setItem(STORAGE_KEY_COLLAPSED, String(val));
+      window.dispatchEvent(new Event(SHELL_PREFS_EVENT));
     } catch {
       // ignore
     }
   }, []);
 
   const toggleCollapsed = useCallback(() => {
-    setCollapsedState((prev) => {
-      const next = !prev;
-      try {
-        localStorage.setItem(STORAGE_KEY_COLLAPSED, String(next));
-      } catch {
-        // ignore
-      }
-      return next;
-    });
+    const next = !getCollapsedSnapshot();
+    try {
+      localStorage.setItem(STORAGE_KEY_COLLAPSED, String(next));
+      window.dispatchEvent(new Event(SHELL_PREFS_EVENT));
+    } catch {
+      // ignore
+    }
   }, []);
 
   const toggleMobile = useCallback(() => setMobileOpen((o) => !o), []);
@@ -190,7 +249,7 @@ export function ShellProvider({
       // Alt + [Key] -> Global ERP Hotkeys
       if (e.altKey && !e.ctrlKey && !e.metaKey) {
         const k = e.key.toLowerCase();
-        if (k === "n") {
+        if (k === "n" && pathname !== "/dashboard/sales/pos") {
           e.preventDefault();
           if (currentStore?.kind === "warehouse") {
             router.push("/dashboard/inventory/transfers/new");
@@ -201,7 +260,7 @@ export function ShellProvider({
         }
         if (k === "p") {
           e.preventDefault();
-          router.push("/dashboard/purchasing/bills/new");
+          router.push("/dashboard/purchases/new");
           return;
         }
         if (k === "m") {
@@ -247,6 +306,9 @@ export function ShellProvider({
         collapsed,
         setCollapsed,
         toggleCollapsed,
+        tooltipsEnabled,
+        setTooltipsEnabled,
+        toggleTooltips,
         commandOpen,
         setCommandOpen,
         shortcutsOpen,
