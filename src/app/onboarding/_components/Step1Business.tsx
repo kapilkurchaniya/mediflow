@@ -82,21 +82,21 @@ export function Step1Business({ initialData, onSuccess, onSave }: Step1BusinessP
   };
 
   return (
-    <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm p-6 sm:p-8">
-      <div className="flex items-center gap-3 pb-6 border-b border-slate-100 dark:border-slate-800">
-        <div className="w-10 h-10 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 flex items-center justify-center font-bold">
+    <div className="bg-white rounded-2xl border border-ink-200 shadow-sm p-6 sm:p-8">
+      <div className="flex items-center gap-3 pb-6 border-b border-ink-100">
+        <div className="w-10 h-10 rounded-xl bg-brand-50 text-brand-600 flex items-center justify-center font-bold">
           <Building2 className="w-5 h-5" />
         </div>
         <div>
-          <h2 className="text-xl font-bold text-slate-900 dark:text-white">Business & Tax Identity</h2>
-          <p className="text-sm text-slate-500 dark:text-slate-400">
+          <h2 className="text-xl font-bold text-ink-900">Business & Tax Identity</h2>
+          <p className="text-sm text-ink-500">
             Configure statutory business details and derive your 2-digit GST state code.
           </p>
         </div>
       </div>
 
       {error && (
-        <div className="mt-6 p-4 rounded-xl bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-900/40 text-rose-700 dark:text-rose-300 flex items-center gap-3 text-sm">
+        <div className="mt-6 p-4 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 flex items-center gap-3 text-sm">
           <AlertCircle className="w-5 h-5 flex-shrink-0" />
           <span>{error}</span>
         </div>
@@ -104,7 +104,7 @@ export function Step1Business({ initialData, onSuccess, onSave }: Step1BusinessP
 
       <form onSubmit={handleSubmit} className="mt-6 space-y-6">
         <div>
-          <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-2">
+          <label className="block text-xs font-semibold text-ink-700 uppercase tracking-wider mb-2">
             Legal Business / Pharmacy Name <span className="text-rose-500">*</span>
           </label>
           <input
@@ -113,13 +113,13 @@ export function Step1Business({ initialData, onSuccess, onSave }: Step1BusinessP
             value={legalName}
             onChange={(e) => setLegalName(e.target.value)}
             placeholder="e.g. Sanjeevani Medicos Pvt Ltd"
-            className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm font-medium"
+            className="w-full px-4 py-2.5 rounded-xl border border-ink-200 bg-white text-ink-900 focus:outline-none focus:ring-2 focus:ring-brand-500 text-sm font-medium"
           />
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div>
-            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-2">
+            <label className="block text-xs font-semibold text-ink-700 uppercase tracking-wider mb-2">
               GSTIN (15 Digits)
             </label>
             <input
@@ -128,10 +128,10 @@ export function Step1Business({ initialData, onSuccess, onSave }: Step1BusinessP
               value={gstin}
               onChange={(e) => handleGstinChange(e.target.value)}
               placeholder="e.g. 27AABCU9603R1ZM"
-              className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm font-mono uppercase"
+              className="w-full px-4 py-2.5 rounded-xl border border-ink-200 bg-white text-ink-900 focus:outline-none focus:ring-2 focus:ring-brand-500 text-sm font-mono uppercase"
             />
             {gstin.length >= 2 && stateName && (
-              <p className="mt-2 text-xs text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5 font-medium">
+              <p className="mt-2 text-xs text-emerald-600 flex items-center gap-1.5 font-medium">
                 <CheckCircle2 className="w-3.5 h-3.5" />
                 State Code {stateCode}: {stateName}
               </p>
@@ -139,7 +139,7 @@ export function Step1Business({ initialData, onSuccess, onSave }: Step1BusinessP
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-2">
+            <label className="block text-xs font-semibold text-ink-700 uppercase tracking-wider mb-2">
               Operating State / UT <span className="text-rose-500">*</span>
             </label>
             <select
@@ -148,7 +148,7 @@ export function Step1Business({ initialData, onSuccess, onSave }: Step1BusinessP
                 setStateCode(e.target.value);
                 setStateName(GST_STATE_CODES[e.target.value] || "");
               }}
-              className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm font-medium"
+              className="w-full px-4 py-2.5 rounded-xl border border-ink-200 bg-white text-ink-900 focus:outline-none focus:ring-2 focus:ring-brand-500 text-sm font-medium"
             >
               {Object.entries(GST_STATE_CODES).map(([code, name]) => (
                 <option key={code} value={code}>
@@ -161,7 +161,7 @@ export function Step1Business({ initialData, onSuccess, onSave }: Step1BusinessP
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div>
-            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-2">
+            <label className="block text-xs font-semibold text-ink-700 uppercase tracking-wider mb-2">
               Permanent Account Number (PAN)
             </label>
             <input
@@ -170,12 +170,12 @@ export function Step1Business({ initialData, onSuccess, onSave }: Step1BusinessP
               value={pan}
               onChange={(e) => setPan(e.target.value.toUpperCase())}
               placeholder="e.g. AABCU9603R"
-              className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm font-mono uppercase"
+              className="w-full px-4 py-2.5 rounded-xl border border-ink-200 bg-white text-ink-900 focus:outline-none focus:ring-2 focus:ring-brand-500 text-sm font-mono uppercase"
             />
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-2">
+            <label className="block text-xs font-semibold text-ink-700 uppercase tracking-wider mb-2">
               GST Registration Scheme
             </label>
             <div className="grid grid-cols-2 gap-3">
@@ -184,8 +184,8 @@ export function Step1Business({ initialData, onSuccess, onSave }: Step1BusinessP
                 onClick={() => setTaxScheme("regular")}
                 className={`py-2 px-3 rounded-xl border text-xs font-semibold transition-all ${
                   taxScheme === "regular"
-                    ? "border-indigo-600 bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 ring-2 ring-indigo-200 dark:ring-indigo-900"
-                    : "border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-600 dark:text-slate-400"
+                    ? "border-brand-600 bg-brand-50 text-brand-700 ring-2 ring-brand-200"
+                    : "border-ink-200 bg-white text-ink-600"
                 }`}
               >
                 Regular Dealer
@@ -195,8 +195,8 @@ export function Step1Business({ initialData, onSuccess, onSave }: Step1BusinessP
                 onClick={() => setTaxScheme("composition")}
                 className={`py-2 px-3 rounded-xl border text-xs font-semibold transition-all ${
                   taxScheme === "composition"
-                    ? "border-indigo-600 bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 ring-2 ring-indigo-200 dark:ring-indigo-900"
-                    : "border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-600 dark:text-slate-400"
+                    ? "border-brand-600 bg-brand-50 text-brand-700 ring-2 ring-brand-200"
+                    : "border-ink-200 bg-white text-ink-600"
                 }`}
               >
                 Composition Scheme
@@ -205,11 +205,11 @@ export function Step1Business({ initialData, onSuccess, onSave }: Step1BusinessP
           </div>
         </div>
 
-        <div className="pt-6 border-t border-slate-100 dark:border-slate-800 flex justify-end">
+        <div className="pt-6 border-t border-ink-100 flex justify-end">
           <button
             type="submit"
             disabled={loading}
-            className="flex items-center gap-2 px-6 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-sm shadow-sm transition-all focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50"
+            className="flex items-center gap-2 px-6 py-2.5 rounded-xl bg-brand-600 hover:bg-brand-700 text-white font-semibold text-sm shadow-sm transition-all focus:outline-none focus:ring-2 focus:ring-brand-500 disabled:opacity-50"
           >
             <span>{loading ? "Saving..." : "Save & Proceed to Store Profile"}</span>
             <ArrowRight className="w-4 h-4" />

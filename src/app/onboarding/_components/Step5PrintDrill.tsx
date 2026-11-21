@@ -58,21 +58,21 @@ export function Step5PrintDrill({ businessData, storeData, onBack, onComplete }:
   };
 
   return (
-    <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm p-6 sm:p-8">
-      <div className="flex items-center gap-3 pb-6 border-b border-slate-100 dark:border-slate-800">
-        <div className="w-10 h-10 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 flex items-center justify-center font-bold">
+    <div className="bg-white rounded-2xl border border-ink-200 shadow-sm p-6 sm:p-8">
+      <div className="flex items-center gap-3 pb-6 border-b border-ink-100">
+        <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold">
           <Printer className="w-5 h-5" />
         </div>
         <div>
-          <h2 className="text-xl font-bold text-slate-900 dark:text-white">Counter Test Print Drill</h2>
-          <p className="text-sm text-slate-500 dark:text-slate-400">
+          <h2 className="text-xl font-bold text-ink-900">Counter Test Print Drill</h2>
+          <p className="text-sm text-ink-500">
             Verify 80mm thermal receipt rendering, statutory GST splits, and counter readiness.
           </p>
         </div>
       </div>
 
       {error && (
-        <div className="mt-6 p-4 rounded-xl bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-900/40 text-rose-700 dark:text-rose-300 flex items-center gap-3 text-sm">
+        <div className="mt-6 p-4 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 flex items-center gap-3 text-sm">
           <AlertCircle className="w-5 h-5 flex-shrink-0" />
           <span>{error}</span>
         </div>
@@ -80,22 +80,22 @@ export function Step5PrintDrill({ businessData, storeData, onBack, onComplete }:
 
       <div className="mt-6 grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
         {/* Receipt Thermal Preview (80mm styling) */}
-        <div className="bg-amber-50/40 dark:bg-slate-950 p-6 rounded-2xl border-2 border-dashed border-amber-200 dark:border-slate-800 flex justify-center">
+        <div className="bg-amber-50/40 p-6 rounded-2xl border-2 border-dashed border-amber-200 flex justify-center">
           <div
             id="thermal-receipt"
-            className="w-full max-w-[340px] bg-white text-slate-900 p-5 rounded-lg shadow-sm font-mono text-[11px] leading-tight border border-slate-200"
+            className="w-full max-w-[340px] bg-white text-ink-900 p-5 rounded-lg shadow-sm font-mono text-[11px] leading-tight border border-ink-200"
           >
             {/* Header */}
-            <div className="text-center pb-3 border-b border-dashed border-slate-300">
+            <div className="text-center pb-3 border-b border-dashed border-ink-300">
               <p className="text-sm font-bold uppercase">{storeName}</p>
-              <p className="text-[10px] text-slate-600">{businessData.legalName}</p>
+              <p className="text-[10px] text-ink-600">{businessData.legalName}</p>
               <p className="text-[10px]">GSTIN: {gstin}</p>
               {storeData?.form20No && <p className="text-[9px]">DL No: {storeData.form20No}</p>}
               <p className="text-[10px] mt-1 font-bold">TAX INVOICE</p>
             </div>
 
             {/* Meta */}
-            <div className="py-2 border-b border-dashed border-slate-300 flex justify-between text-[10px]">
+            <div className="py-2 border-b border-dashed border-ink-300 flex justify-between text-[10px]">
               <div>
                 <p>Inv: {invoiceNo}</p>
                 <p>Patient: Walk-in Test</p>
@@ -107,7 +107,7 @@ export function Step5PrintDrill({ businessData, storeData, onBack, onComplete }:
             </div>
 
             {/* Items */}
-            <div className="py-2 border-b border-dashed border-slate-300">
+            <div className="py-2 border-b border-dashed border-ink-300">
               <div className="flex justify-between font-bold pb-1 text-[10px]">
                 <span>Item</span>
                 <span>Qty x Rate</span>
@@ -118,7 +118,7 @@ export function Step5PrintDrill({ businessData, storeData, onBack, onComplete }:
                 <div className="flex justify-between">
                   <div>
                     <p className="font-semibold">Dolo 650mg Tab (15s)</p>
-                    <p className="text-[9px] text-slate-500">B: DEMO-8821 E: 10/27</p>
+                    <p className="text-[9px] text-ink-500">B: DEMO-8821 E: 10/27</p>
                   </div>
                   <span>1 x 33.50</span>
                   <span className="font-bold">₹33.50</span>
@@ -127,7 +127,7 @@ export function Step5PrintDrill({ businessData, storeData, onBack, onComplete }:
                 <div className="flex justify-between">
                   <div>
                     <p className="font-semibold">Augmentin 625 Duo (10s)</p>
-                    <p className="text-[9px] text-slate-500">B: DEMO-4102 E: 08/27</p>
+                    <p className="text-[9px] text-ink-500">B: DEMO-4102 E: 08/27</p>
                   </div>
                   <span>1 x 204.00</span>
                   <span className="font-bold">₹204.00</span>
@@ -136,7 +136,7 @@ export function Step5PrintDrill({ businessData, storeData, onBack, onComplete }:
             </div>
 
             {/* Calculations & GST */}
-            <div className="py-2 border-b border-dashed border-slate-300 space-y-1 text-[10px]">
+            <div className="py-2 border-b border-dashed border-ink-300 space-y-1 text-[10px]">
               <div className="flex justify-between">
                 <span>Taxable Amount</span>
                 <span>₹226.19</span>
@@ -149,14 +149,14 @@ export function Step5PrintDrill({ businessData, storeData, onBack, onComplete }:
                 <span>SGST @ 2.5%</span>
                 <span>₹5.66</span>
               </div>
-              <div className="flex justify-between text-xs font-bold pt-1 border-t border-slate-200">
+              <div className="flex justify-between text-xs font-bold pt-1 border-t border-ink-200">
                 <span>Net Payable Amount</span>
                 <span>₹237.50</span>
               </div>
             </div>
 
             {/* Footer */}
-            <div className="pt-3 text-center text-[9px] text-slate-600 space-y-1">
+            <div className="pt-3 text-center text-[9px] text-ink-600 space-y-1">
               <p>Payment: CASH (Confirmed)</p>
               <p className="font-semibold">Thank you for visiting {storeName}!</p>
               <p className="text-[8px] italic">Prescription required for Schedule H/H1 medicines.</p>
@@ -166,12 +166,12 @@ export function Step5PrintDrill({ businessData, storeData, onBack, onComplete }:
 
         {/* Action Panel */}
         <div className="space-y-6">
-          <div className="p-5 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-800 space-y-3">
-            <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+          <div className="p-5 rounded-xl bg-ink-50 border border-ink-200 space-y-3">
+            <h3 className="text-sm font-bold text-ink-900 flex items-center gap-2">
               <CheckCircle2 className="w-4 h-4 text-emerald-500" />
               Counter Verification Checklist
             </h3>
-            <ul className="text-xs text-slate-600 dark:text-slate-400 space-y-2">
+            <ul className="text-xs text-ink-600 space-y-2">
               <li className="flex items-center gap-2">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
                 GSTIN state code ({businessData.stateCode}) matches POS store configuration
@@ -195,9 +195,9 @@ export function Step5PrintDrill({ businessData, storeData, onBack, onComplete }:
             <button
               type="button"
               onClick={handlePrint}
-              className="w-full flex items-center justify-center gap-2 px-5 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-900 dark:text-white text-sm font-semibold transition-all shadow-sm"
+              className="w-full flex items-center justify-center gap-2 px-5 py-3 rounded-xl border border-ink-300 bg-white hover:bg-ink-50 text-ink-900 text-sm font-semibold transition-all shadow-sm"
             >
-              <Printer className="w-4 h-4 text-slate-600 dark:text-slate-400" />
+              <Printer className="w-4 h-4 text-ink-600" />
               <span>Print 80mm Thermal Receipt</span>
             </button>
 
@@ -214,11 +214,11 @@ export function Step5PrintDrill({ businessData, storeData, onBack, onComplete }:
         </div>
       </div>
 
-      <div className="pt-6 mt-8 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between">
+      <div className="pt-6 mt-8 border-t border-ink-100 flex items-center justify-between">
         <button
           type="button"
           onClick={onBack}
-          className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 font-semibold text-sm transition-all"
+          className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-ink-200 hover:bg-ink-50 text-ink-700 font-semibold text-sm transition-all"
         >
           <ArrowLeft className="w-4 h-4" />
           <span>Back</span>

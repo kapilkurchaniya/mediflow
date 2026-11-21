@@ -3,6 +3,7 @@
 import { useActionState } from "react";
 import Link from "next/link";
 import { registerAction } from "@/app/actions/auth";
+import { PasswordInput } from "@/app/components/PasswordInput";
 import { GoogleAuthButton } from "@/app/components/GoogleAuthButton";
 
 export function RegisterForm({
@@ -96,10 +97,9 @@ export function RegisterForm({
               <label htmlFor="reg-password" className="block text-sm font-medium text-slate-700 mb-1.5">
                 Password
               </label>
-              <input
+              <PasswordInput
                 id="reg-password"
                 name="password"
-                type="password"
                 autoComplete="new-password"
                 required
                 minLength={8}

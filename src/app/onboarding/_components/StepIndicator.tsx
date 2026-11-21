@@ -32,26 +32,27 @@ export function StepIndicator({ currentStep, onStepClick }: StepIndicatorProps) 
             >
               <div
                 onClick={() => onStepClick && isDone && onStepClick(step.id)}
+                data-tooltip={`Step ${step.id}: ${step.title}`}
                 className={`flex items-center gap-2 sm:gap-3 transition-colors ${
-                  isDone ? "cursor-pointer text-emerald-600 dark:text-emerald-400" : ""
-                } ${isCurrent ? "text-indigo-600 dark:text-indigo-400 font-semibold" : "text-slate-400"}`}
+                  isDone ? "cursor-pointer text-emerald-700" : ""
+                } ${isCurrent ? "text-brand-700 font-semibold" : "text-ink-400"}`}
               >
                 <div
-                  className={`flex items-center justify-center w-8 h-8 sm:w-10 sm:h-10 rounded-full border-2 transition-all ${
+                  className={`flex items-center justify-center w-8 h-8 sm:w-9 sm:h-9 rounded-full border-2 transition-all ${
                     isDone
-                      ? "bg-emerald-500 border-emerald-500 text-white shadow-sm"
+                      ? "bg-emerald-600 border-emerald-600 text-white shadow-xs"
                       : isCurrent
-                        ? "border-indigo-600 dark:border-indigo-400 bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-300 ring-4 ring-indigo-100 dark:ring-indigo-950/60"
-                        : "border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-400"
+                        ? "border-brand-600 bg-brand-50 text-brand-700 ring-4 ring-brand-100"
+                        : "border-ink-200 bg-white text-ink-400"
                   }`}
                 >
-                  {isDone ? <Check className="w-4 h-4 sm:w-5 sm:h-5 stroke-[2.5]" /> : <Icon className="w-4 h-4 sm:w-5 sm:h-5" />}
+                  {isDone ? <Check className="w-4 h-4 stroke-[2.5]" /> : <Icon className="w-4 h-4" />}
                 </div>
                 <div className="hidden md:block text-left">
-                  <p className="text-xs uppercase tracking-wider font-mono opacity-80">
+                  <p className="text-[10.5px] uppercase tracking-wider font-mono text-ink-400">
                     Step {step.id}
                   </p>
-                  <p className="text-xs sm:text-sm font-medium leading-tight">
+                  <p className="text-xs sm:text-[13px] font-semibold leading-tight text-ink-800">
                     {step.title}
                   </p>
                 </div>
@@ -60,9 +61,7 @@ export function StepIndicator({ currentStep, onStepClick }: StepIndicatorProps) 
               {idx !== STEPS.length - 1 && (
                 <div
                   className={`flex-1 h-0.5 mx-2 sm:mx-4 transition-colors ${
-                    currentStep > step.id
-                      ? "bg-emerald-500"
-                      : "bg-slate-200 dark:bg-slate-700"
+                    currentStep > step.id ? "bg-emerald-500" : "bg-ink-150"
                   }`}
                 />
               )}
@@ -73,4 +72,3 @@ export function StepIndicator({ currentStep, onStepClick }: StepIndicatorProps) 
     </nav>
   );
 }
-

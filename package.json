@@ -21,6 +21,7 @@
     "prepare": "git config core.hooksPath .githooks || true"
   },
   "dependencies": {
+    "@ai-sdk/cohere": "^4.0.86",
     "@ai-sdk/google": "^4.0.93",
     "@ai-sdk/groq": "^4.0.59",
     "@ai-sdk/react": "^4.0.140",
