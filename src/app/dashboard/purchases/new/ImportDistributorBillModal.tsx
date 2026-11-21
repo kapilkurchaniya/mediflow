@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   X,
   Upload,
@@ -8,42 +8,46 @@ import {
   CheckCircle2,
   AlertTriangle,
   ArrowRight,
-  Sparkles,
   RefreshCw,
   PlusCircle,
-  HelpCircle,
+  UserPlus,
 } from "lucide-react";
 import {
   parseDistributorInvoiceAction,
   quickCreateDistributorMedicinesAction,
 } from "@/app/actions/distributor-invoice";
-import type {
-  ParseDistributorInvoiceResult,
-  ParsedDistributorInvoiceItem,
-} from "@/server/domain/import/distributor-invoice";
+import type { ParseDistributorInvoiceResult } from "@/server/domain/import/distributor-invoice";
 import type { PurchaseItemInput } from "@/server/domain/purchases";
 import { formatINR } from "@/lib/format";
-
 import type { SupplierCheckResult } from "@/server/domain/import/supplier-matcher";
+import type { PendingSupplierMeta } from "@/lib/pending-supplier";
+import { detectBinaryContentMismatch } from "@/lib/stock-csv-validator";
+import { QuickRegisterSupplierModal } from "@/app/components/QuickRegisterSupplierModal";
 
 interface ImportDistributorBillModalProps {
   isOpen: boolean;
   onClose: () => void;
   onImport: (items: PurchaseItemInput[]) => void;
+  initialFile?: File | null;
   selectedSupplierId?: string;
   onSelectSupplier?: (supplierId: string) => void;
+  onPendingSupplier?: (meta: PendingSupplierMeta | null) => void;
   onFillHeader?: (header: { invoiceNo?: string; invoiceDate?: string }) => void;
   onCatalogRefresh?: () => Promise<void> | void;
+  onSuppliersRefresh?: () => Promise<void> | void;
 }
 
 export function ImportDistributorBillModal({
   isOpen,
   onClose,
   onImport,
+  initialFile,
   selectedSupplierId,
   onSelectSupplier,
+  onPendingSupplier,
   onFillHeader,
   onCatalogRefresh,
+  onSuppliersRefresh,
 }: ImportDistributorBillModalProps) {
   const [file, setFile] = useState<File | null>(null);
   const [isParsing, setIsParsing] = useState(false);
@@ -51,35 +55,15 @@ export function ImportDistributorBillModal({
   const [parseResult, setParseResult] = useState<ParseDistributorInvoiceResult | null>(null);
   const [supplierCheck, setSupplierCheck] = useState<SupplierCheckResult | null>(null);
   const [mismatchOverrideConfirmed, setMismatchOverrideConfirmed] = useState(false);
+  const [registeredSupplierId, setRegisteredSupplierId] = useState<string | null>(null);
+  const [showRegisterModal, setShowRegisterModal] = useState(false);
+  const [pendingImportAfterRegister, setPendingImportAfterRegister] = useState(false);
+  const [showSupplierPromptOnImport, setShowSupplierPromptOnImport] = useState(false);
   const [ocrHeader, setOcrHeader] = useState<{ invoiceNo?: string; invoiceDate?: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-
-  if (!isOpen) return null;
-
-  const handleFileSelect = (selectedFile: File) => {
-    const lower = selectedFile.name.toLowerCase();
-    const isCsv = lower.endsWith(".csv") || lower.endsWith(".txt");
-    const isOcr =
-      lower.endsWith(".pdf") ||
-      lower.endsWith(".jpg") ||
-      lower.endsWith(".jpeg") ||
-      lower.endsWith(".png") ||
-      lower.endsWith(".webp");
-
-    if (!isCsv && !isOcr) {
-      setError("Please select a CSV (.csv/.txt) or bill scan (.pdf, .jpg, .png, .webp).");
-      return;
-    }
-    setFile(selectedFile);
-    setError(null);
-    setSuccessMessage(null);
-    setSupplierCheck(null);
-    setMismatchOverrideConfirmed(false);
-    setOcrHeader(null);
-    processFile(selectedFile, isOcr);
-  };
+  const handledInitialFileRef = useRef<File | null>(null);
 
   const processFile = async (fileToProcess: File, isOcr: boolean) => {
     setIsParsing(true);
@@ -103,13 +87,24 @@ export function ImportDistributorBillModal({
           }
         }
       } else {
+        const binaryErr = await detectBinaryContentMismatch(fileToProcess);
+        if (binaryErr) {
+          setError(binaryErr);
+          setParseResult(null);
+          return;
+        }
         const text = await fileToProcess.text();
-        const res = await parseDistributorInvoiceAction(text);
+        const res = await parseDistributorInvoiceAction(text, selectedSupplierId);
         if (!res.success || !res.result) {
           setError(res.error || "Failed to parse distributor invoice.");
           setParseResult(null);
         } else {
           setParseResult(res.result);
+          setSupplierCheck(res.supplierCheck ?? null);
+          setOcrHeader(res.header ?? null);
+          if (res.supplierCheck?.status === "auto_matched" && res.supplierCheck.matchedSupplier && onSelectSupplier) {
+            onSelectSupplier(res.supplierCheck.matchedSupplier.id);
+          }
         }
       }
     } catch (err: unknown) {
@@ -119,6 +114,44 @@ export function ImportDistributorBillModal({
       setIsParsing(false);
     }
   };
+
+  const handleFileSelect = (selectedFile: File) => {
+    const lower = selectedFile.name.toLowerCase();
+    const isCsv = lower.endsWith(".csv") || lower.endsWith(".txt");
+    const isOcr =
+      lower.endsWith(".pdf") ||
+      lower.endsWith(".jpg") ||
+      lower.endsWith(".jpeg") ||
+      lower.endsWith(".png") ||
+      lower.endsWith(".webp");
+
+    if (!isCsv && !isOcr) {
+      setError("Please select a CSV (.csv/.txt) or bill scan (.pdf, .jpg, .png, .webp).");
+      return;
+    }
+    setFile(selectedFile);
+    setError(null);
+    setSuccessMessage(null);
+    setSupplierCheck(null);
+    setMismatchOverrideConfirmed(false);
+    setRegisteredSupplierId(null);
+    setShowSupplierPromptOnImport(false);
+    setOcrHeader(null);
+    void processFile(selectedFile, isOcr);
+  };
+
+  useEffect(() => {
+    if (isOpen && initialFile && handledInitialFileRef.current !== initialFile) {
+      handledInitialFileRef.current = initialFile;
+      handleFileSelect(initialFile);
+    }
+    if (!isOpen) {
+      handledInitialFileRef.current = null;
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, initialFile]);
+
+  if (!isOpen) return null;
 
   const handleQuickCreateAllMissing = async () => {
     if (!parseResult) return;
@@ -144,7 +177,6 @@ export function ImportDistributorBillModal({
         setError(res.error || "Failed to create missing medicines.");
       } else {
         const createdMap = res.createdMap;
-        // Update local items with newly created medicine IDs
         const updatedItems = parseResult.items.map((item) => {
           if (!item.matchedMedicineId) {
             const key = item.name.trim().toLowerCase();
@@ -162,7 +194,6 @@ export function ImportDistributorBillModal({
           return item;
         });
 
-        // Rebuild purchaseItems
         const newPurchaseItems: PurchaseItemInput[] = [];
         for (const it of updatedItems) {
           if (it.matchedMedicineId && it.errors.length === 0) {
@@ -203,15 +234,42 @@ export function ImportDistributorBillModal({
     }
   };
 
+  const isUnknownSupplier =
+    supplierCheck?.status === "unknown_supplier" &&
+    !registeredSupplierId &&
+    !selectedSupplierId;
+
   const isMismatchBlocked = supplierCheck?.status === "mismatch" && !mismatchOverrideConfirmed;
 
-  const handleApplyToPurchase = () => {
-    if (!parseResult || parseResult.purchaseItems.length === 0 || isMismatchBlocked) return;
+  const extractedMeta: PendingSupplierMeta | null = supplierCheck?.extracted?.name?.trim()
+    ? {
+        name: supplierCheck.extracted.name.trim(),
+        gstin: supplierCheck.extracted.gstin ?? null,
+        phone: supplierCheck.extracted.phone ?? null,
+        drugLicenseNo: supplierCheck.extracted.drugLicenseNo ?? null,
+        address: supplierCheck.extracted.address ?? null,
+      }
+    : null;
+
+  const finalizeImport = (pendingMeta: PendingSupplierMeta | null) => {
+    if (!parseResult || parseResult.purchaseItems.length === 0) return;
     if (ocrHeader && onFillHeader) {
       onFillHeader(ocrHeader);
     }
+    if (onPendingSupplier) {
+      onPendingSupplier(pendingMeta);
+    }
     onImport(parseResult.purchaseItems);
     onClose();
+  };
+
+  const handleApplyToPurchase = () => {
+    if (!parseResult || parseResult.purchaseItems.length === 0 || isMismatchBlocked) return;
+    if (isUnknownSupplier && extractedMeta) {
+      setShowSupplierPromptOnImport(true);
+      return;
+    }
+    finalizeImport(null);
   };
 
   return (
@@ -225,13 +283,13 @@ export function ImportDistributorBillModal({
             </div>
             <div>
               <h3 className="font-semibold text-foreground text-base sm:text-lg flex items-center gap-2">
-                Import Electronic Distributor Bill
+                Import Distributor Bill
                 <span className="text-xs px-2 py-0.5 rounded-full bg-brand-100 text-brand-800 dark:bg-brand-900/60 dark:text-brand-300 font-mono">
-                  Pharmarack · Retailio · Marg
+                  Pharmarack · Retailio · Marg · OCR
                 </span>
               </h3>
               <p className="text-xs text-muted-foreground">
-                Drop your distributor CSV invoice. Automatically matches catalog medicines, extracts batches, and calculates landed rates.
+                Drop a CSV, PDF, or photo. Auto-fills supplier, invoice details, batches, and landed rates for verification.
               </p>
             </div>
           </div>
@@ -277,6 +335,7 @@ export function ImportDistributorBillModal({
                 className="hidden"
                 onChange={(e) => {
                   if (e.target.files?.[0]) handleFileSelect(e.target.files[0]);
+                  e.target.value = "";
                 }}
               />
               <div className="w-14 h-14 mx-auto rounded-full bg-brand-50 dark:bg-brand-950/50 border border-brand-200 dark:border-brand-800 flex items-center justify-center text-brand-600 dark:text-brand-400 mb-4 group-hover:scale-105 transition-transform">
@@ -296,34 +355,67 @@ export function ImportDistributorBillModal({
             <div className="py-16 text-center space-y-3">
               <RefreshCw className="w-8 h-8 mx-auto text-brand-600 animate-spin" />
               <p className="text-sm font-medium text-foreground">
-                Analyzing invoice lines & matching medicines against catalog...
+                Analyzing {file?.name || "invoice"} &amp; extracting supplier, header &amp; line items...
               </p>
-              <p className="text-xs text-muted-foreground">Checking barcodes, batch numbers, and landed costs</p>
+              <p className="text-xs text-muted-foreground">Checking supplier directory, barcodes, batch numbers, and landed costs</p>
             </div>
           )}
 
           {/* Parsed Result Display */}
           {parseResult && (
             <div className="space-y-4">
+              {/* Auto-Extracted Header Preview */}
+              {(ocrHeader?.invoiceNo || ocrHeader?.invoiceDate || extractedMeta) && (
+                <div className="p-3 rounded-xl border border-ink-200 bg-ink-50/60 flex flex-wrap items-center gap-x-6 gap-y-1.5 text-xs">
+                  {extractedMeta?.name && (
+                    <div>
+                      <span className="text-ink-500">Extracted Supplier: </span>
+                      <span className="font-semibold text-ink-900">{extractedMeta.name}</span>
+                      {extractedMeta.gstin && (
+                        <span className="ml-1.5 font-mono text-ink-600">({extractedMeta.gstin})</span>
+                      )}
+                    </div>
+                  )}
+                  {ocrHeader?.invoiceNo && (
+                    <div>
+                      <span className="text-ink-500">Invoice No.: </span>
+                      <span className="font-mono font-semibold text-ink-900">{ocrHeader.invoiceNo}</span>
+                    </div>
+                  )}
+                  {ocrHeader?.invoiceDate && (
+                    <div>
+                      <span className="text-ink-500">Invoice Date: </span>
+                      <span className="font-mono font-semibold text-ink-900">{ocrHeader.invoiceDate}</span>
+                    </div>
+                  )}
+                </div>
+              )}
+
               {supplierCheck && (
                 <div
                   className={`p-3.5 rounded-xl border text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
                     supplierCheck.status === "mismatch"
                       ? "bg-rose-50 border-rose-300 text-rose-900"
-                      : supplierCheck.status === "matched" || supplierCheck.status === "auto_matched"
+                      : supplierCheck.status === "matched" ||
+                        supplierCheck.status === "auto_matched" ||
+                        registeredSupplierId
                       ? "bg-emerald-50 border-emerald-200 text-emerald-900"
                       : "bg-amber-50 border-amber-200 text-amber-900"
                   }`}
                 >
                   <div className="flex items-start gap-2.5">
-                    {supplierCheck.status === "matched" || supplierCheck.status === "auto_matched" ? (
+                    {supplierCheck.status === "matched" ||
+                    supplierCheck.status === "auto_matched" ||
+                    registeredSupplierId ? (
                       <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
                     ) : (
-                      <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+                      <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
                     )}
                     <div>
                       <div className="font-bold">
-                        {supplierCheck.status === "mismatch"
+                        {registeredSupplierId
+                          ? "Supplier Registered & Selected"
+                          : supplierCheck.status === "mismatch"
                           ? "Wrong Supplier Bill Detected!"
                           : supplierCheck.status === "matched"
                           ? "Supplier Verified"
@@ -331,9 +423,28 @@ export function ImportDistributorBillModal({
                           ? "Supplier Auto-Detected"
                           : "Supplier Verification Notice"}
                       </div>
-                      <p className="mt-0.5">{supplierCheck.reason}</p>
+                      <p className="mt-0.5">
+                        {registeredSupplierId
+                          ? `"${extractedMeta?.name || "Supplier"}" has been added to your directory and linked to this purchase bill.`
+                          : supplierCheck.reason}
+                      </p>
                     </div>
                   </div>
+
+                  {isUnknownSupplier && extractedMeta && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPendingImportAfterRegister(false);
+                        setShowRegisterModal(true);
+                      }}
+                      className="btn btn-primary btn-xs shrink-0 flex items-center gap-1"
+                    >
+                      <UserPlus className="w-3.5 h-3.5" />
+                      Add &ldquo;{extractedMeta.name}&rdquo; to Directory
+                    </button>
+                  )}
+
                   {supplierCheck.status === "mismatch" && (
                     <div className="flex flex-wrap items-center gap-2 shrink-0">
                       {supplierCheck.matchedSupplier && onSelectSupplier && (
@@ -357,6 +468,43 @@ export function ImportDistributorBillModal({
                       </button>
                     </div>
                   )}
+                </div>
+              )}
+
+              {/* Prompt when clicking Import while supplier is not registered */}
+              {showSupplierPromptOnImport && isUnknownSupplier && extractedMeta && (
+                <div className="p-4 rounded-xl border-2 border-amber-300 bg-amber-50/90 text-amber-950 space-y-2.5 text-xs">
+                  <div className="flex items-start gap-2">
+                    <UserPlus className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
+                    <div>
+                      <p className="font-bold text-sm">
+                        Register &ldquo;{extractedMeta.name}&rdquo; before importing?
+                      </p>
+                      <p className="text-amber-900 mt-0.5">
+                        We retrieved supplier details from this invoice{extractedMeta.gstin ? ` (GSTIN: ${extractedMeta.gstin})` : ""}. Register them in one click with pre-filled details, or skip for now (a reminder warning will stay visible until you register them).
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2 pl-6">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPendingImportAfterRegister(true);
+                        setShowRegisterModal(true);
+                      }}
+                      className="btn btn-primary btn-xs flex items-center gap-1"
+                    >
+                      <UserPlus className="w-3.5 h-3.5" />
+                      Register Supplier (Pre-filled) &amp; Import Lines
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => finalizeImport(extractedMeta)}
+                      className="btn btn-secondary btn-xs"
+                    >
+                      Import Lines Anyway (Register Later)
+                    </button>
+                  </div>
                 </div>
               )}
 
@@ -526,6 +674,8 @@ export function ImportDistributorBillModal({
                   setFile(null);
                   setError(null);
                   setSuccessMessage(null);
+                  setSupplierCheck(null);
+                  setShowSupplierPromptOnImport(false);
                 }}
                 className="btn btn-secondary btn-sm text-xs"
               >
@@ -551,7 +701,28 @@ export function ImportDistributorBillModal({
           </div>
         </div>
       </div>
+
+      {extractedMeta && (
+        <QuickRegisterSupplierModal
+          isOpen={showRegisterModal}
+          onClose={() => {
+            setShowRegisterModal(false);
+            setPendingImportAfterRegister(false);
+          }}
+          initialMeta={extractedMeta}
+          submitLabel={pendingImportAfterRegister ? "Save Supplier & Import Lines" : "Save Supplier"}
+          onRegistered={async (sup) => {
+            setRegisteredSupplierId(sup.id);
+            onSelectSupplier?.(sup.id);
+            onPendingSupplier?.(null);
+            await onSuppliersRefresh?.();
+            setShowSupplierPromptOnImport(false);
+            if (pendingImportAfterRegister) {
+              finalizeImport(null);
+            }
+          }}
+        />
+      )}
     </div>
   );
 }
-

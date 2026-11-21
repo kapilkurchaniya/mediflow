@@ -16,6 +16,7 @@ import { RETAILIO_INVOICE_MAPPINGS } from "./presets/retailio";
 import { MARG_MEDICINE_MAPPINGS, MARG_BATCH_MAPPINGS } from "./presets/marg";
 import { isValidGstRateBp, DEFAULT_GST_RATE_BP, type GstRateBp } from "@/lib/regulatory";
 import type { PurchaseItemInput } from "@/server/domain/purchases";
+import type { ExtractedSupplierInfo } from "@/server/domain/import/supplier-matcher";
 
 export type DistributorSource = "pharmarack" | "retailio" | "marg" | "generic";
 
@@ -57,6 +58,11 @@ export interface ParseDistributorInvoiceResult {
   totalInvoiceAmountPaise: number;
   items: ParsedDistributorInvoiceItem[];
   purchaseItems: PurchaseItemInput[];
+  header?: {
+    invoiceNo?: string;
+    invoiceDate?: string;
+  };
+  extractedSupplier?: ExtractedSupplierInfo;
 }
 
 /**
@@ -235,6 +241,66 @@ export async function parseDistributorInvoice(
   let totalInvoiceAmountPaise = 0;
   let validLines = 0;
   let unmatchedMedicinesCount = 0;
+
+  let extractedInvoiceNo = "";
+  let extractedInvoiceDate = "";
+  const extractedSupplier: ExtractedSupplierInfo = {};
+
+  const pickMetaVal = (row: Record<string, string>, candidates: string[]): string => {
+    for (const [k, v] of Object.entries(row)) {
+      const cleanK = k.trim().toUpperCase().replace(/[^A-Z0-9 ]/g, " ").replace(/\s+/g, " ").trim();
+      if (candidates.includes(cleanK) && v !== undefined && String(v).trim()) {
+        return String(v).trim();
+      }
+    }
+    return "";
+  };
+
+  for (const row of parsed.data) {
+    if (!extractedInvoiceNo) {
+      extractedInvoiceNo = pickMetaVal(row, ["INVOICE NO", "INV NO", "BILL NO", "INVOICE NUMBER", "BILL NUMBER", "SUPPLIER INVOICE NO", "DOC NO"]);
+    }
+    if (!extractedInvoiceDate) {
+      const rawDate = pickMetaVal(row, ["INVOICE DATE", "INV DATE", "BILL DATE", "DATE", "DOC DATE"]);
+      if (rawDate) {
+        if (/^\d{4}-\d{2}-\d{2}$/.test(rawDate)) {
+          extractedInvoiceDate = rawDate;
+        } else {
+          const dmy = rawDate.match(/^(\d{1,2})[-/.](\d{1,2})[-/.](\d{2,4})$/);
+          if (dmy) {
+            const d = parseInt(dmy[1], 10);
+            const m = parseInt(dmy[2], 10);
+            let y = parseInt(dmy[3], 10);
+            if (y < 100) y += 2000;
+            if (m >= 1 && m <= 12 && d >= 1 && d <= 31) {
+              extractedInvoiceDate = `${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+            }
+          }
+        }
+      }
+    }
+    if (!extractedSupplier.name) {
+      const sName = pickMetaVal(row, ["SUPPLIER", "SUPPLIER NAME", "DISTRIBUTOR", "DISTRIBUTOR NAME", "PARTY", "PARTY NAME", "VENDOR", "VENDOR NAME", "SELLER NAME"]);
+      if (sName) extractedSupplier.name = sName;
+    }
+    if (!extractedSupplier.gstin) {
+      const sGstin = pickMetaVal(row, ["SUPPLIER GSTIN", "PARTY GSTIN", "GSTIN", "GST NO", "GSTIN NO"]);
+      if (sGstin) extractedSupplier.gstin = sGstin.toUpperCase();
+    }
+    if (!extractedSupplier.phone) {
+      const sPhone = pickMetaVal(row, ["SUPPLIER PHONE", "PHONE", "MOBILE", "CONTACT NO"]);
+      if (sPhone) extractedSupplier.phone = sPhone;
+    }
+    if (!extractedSupplier.drugLicenseNo) {
+      const sDl = pickMetaVal(row, ["SUPPLIER DL", "DL NO", "DRUG LICENSE", "DRUG LICENCE", "DRUG LICENSE NO"]);
+      if (sDl) extractedSupplier.drugLicenseNo = sDl.toUpperCase();
+    }
+    if (!extractedSupplier.address) {
+      const sAddr = pickMetaVal(row, ["SUPPLIER ADDRESS", "PARTY ADDRESS", "ADDRESS"]);
+      if (sAddr) extractedSupplier.address = sAddr;
+    }
+    if (extractedInvoiceNo && extractedInvoiceDate && extractedSupplier.name) break;
+  }
 
   // Inverted mapping: targetField -> csvHeader
   const targetToCsv: Record<string, string> = {};
@@ -432,6 +498,13 @@ export async function parseDistributorInvoice(
     }
   }
 
+  const hasSupplierInfo = Boolean(
+    extractedSupplier.name ||
+      extractedSupplier.gstin ||
+      extractedSupplier.phone ||
+      extractedSupplier.drugLicenseNo
+  );
+
   return {
     detectedSource: source,
     confidence,
@@ -441,6 +514,14 @@ export async function parseDistributorInvoice(
     totalInvoiceAmountPaise,
     items,
     purchaseItems,
+    header:
+      extractedInvoiceNo || extractedInvoiceDate
+        ? {
+            invoiceNo: extractedInvoiceNo || undefined,
+            invoiceDate: extractedInvoiceDate || undefined,
+          }
+        : undefined,
+    extractedSupplier: hasSupplierInfo ? extractedSupplier : undefined,
   };
 }
 

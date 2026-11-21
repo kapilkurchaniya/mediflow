@@ -14,10 +14,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { format } from "date-fns";
-import { eq } from "drizzle-orm";
-import { db, schema } from "@/server/db";
 import { getDashboardStats } from "@/app/actions/dashboard";
-import { getCurrentSession } from "@/server/auth";
 import { PageHeader, StatCard, EmptyState, Avatar } from "@/app/components/ui";
 import { formatINR, formatNumber } from "@/lib/format";
 import { DateRangeFilter } from "@/app/components/DateRangeFilter";

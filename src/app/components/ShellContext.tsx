@@ -20,7 +20,7 @@ function getServerSnapshot() {
 }
 
 const SHELL_PREFS_EVENT = "mediflow:shell-prefs";
-const STORAGE_KEY_TOOLTIPS = "mediflow:tooltips-enabled";
+export const STORAGE_KEY_TOOLTIPS = "mediflow:tooltips-enabled";
 
 function subscribeShellPrefs(callback: () => void) {
   window.addEventListener("storage", callback);

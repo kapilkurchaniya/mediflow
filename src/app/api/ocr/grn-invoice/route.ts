@@ -20,6 +20,7 @@ const GrnOcrSchema = z.object({
   supplierGstin: z.string().nullable().optional(),
   supplierPhone: z.string().nullable().optional(),
   supplierDrugLicense: z.string().nullable().optional(),
+  supplierAddress: z.string().nullable().optional(),
   invoiceNo: z.string().nullable().optional(),
   invoiceDate: z.string().nullable().optional(),
   items: z.array(
@@ -94,6 +95,10 @@ export async function POST(req: Request) {
 Rules:
 - supplierName: the distributor / seller company name at the top of the bill (NOT the buyer pharmacy name).
 - supplierGstin: 15-character GSTIN of the supplier if visible.
+- supplierPhone: supplier phone/mobile number if visible.
+- supplierDrugLicense: supplier drug licence number (DL No / Form 20B/21B) if visible.
+- supplierAddress: supplier street/city address if visible.
+- invoiceNo: supplier invoice / bill number if visible.
 - invoiceDate: format as YYYY-MM-DD if visible.
 - For each line item: extract medicine name, batch number (uppercase), expiryDate (YYYY-MM-DD, using last day of month if MM/YY), pack (e.g. "10T"), unitsPerPack (integer), billedQty (packs), freeQty, rateRupees (PTR per pack in INR), mrpRupees (MRP per pack in INR), discountPct, gstPct (0, 5, 12, 18, or 28), hsn, and barcode if printed.`;
 
@@ -137,6 +142,7 @@ Rules:
         gstin: extracted.supplierGstin,
         phone: extracted.supplierPhone,
         drugLicenseNo: extracted.supplierDrugLicense,
+        address: extracted.supplierAddress,
       },
     });
 

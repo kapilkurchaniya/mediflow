@@ -1,17 +1,36 @@
 "use client";
 
-import { useActionState, useEffect, useState, Suspense } from "react";
+import { useActionState, useEffect, useRef, useState, Suspense } from "react";
 import { useSearchParams, redirect } from "next/navigation";
 import Link from "next/link";
 import { createPurchaseInvoice, PurchaseItemInput } from "@/app/actions/purchases";
 import { getSuppliers } from "@/app/actions/suppliers";
 import { getMedicines } from "@/app/actions/inventory";
 import { getPurchaseOrder } from "@/app/actions/purchase-orders";
-import { Save, Plus, Trash2, FileText, Truck, AlertCircle, ClipboardList, Layers, FileSpreadsheet } from "lucide-react";
+import {
+  Save,
+  Plus,
+  Trash2,
+  FileText,
+  Truck,
+  AlertCircle,
+  AlertTriangle,
+  ClipboardList,
+  Layers,
+  FileSpreadsheet,
+  UploadCloud,
+  UserPlus,
+} from "lucide-react";
 import { PageHeader } from "@/app/components/ui";
 import { formatINR } from "@/lib/format";
 import { computePurchaseTotals } from "@/lib/money";
 import { DEFAULT_GST_RATE_BP, isValidGstRateBp, type GstRateBp } from "@/lib/regulatory";
+import {
+  consumePendingPurchaseImportFile,
+  isSupportedPurchaseBillFile,
+} from "@/lib/pending-purchase-file";
+import type { PendingSupplierMeta } from "@/lib/pending-supplier";
+import { QuickRegisterSupplierModal } from "@/app/components/QuickRegisterSupplierModal";
 import { ImportDistributorBillModal } from "./ImportDistributorBillModal";
 
 function NewPurchaseForm() {
@@ -35,8 +54,22 @@ function NewPurchaseForm() {
 
   const [items, setItems] = useState<PurchaseItemInput[]>([]);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [droppedImportFile, setDroppedImportFile] = useState<File | null>(null);
+  const [pendingSupplierMeta, setPendingSupplierMeta] = useState<PendingSupplierMeta | null>(null);
+  const [showQuickRegisterSupplier, setShowQuickRegisterSupplier] = useState(false);
+  const [isDraggingBill, setIsDraggingBill] = useState(false);
+  const [dropError, setDropError] = useState<string | null>(null);
+  const dragDepthRef = useRef(0);
 
   useEffect(() => {
+    const handedOffFile = consumePendingPurchaseImportFile();
+    if (handedOffFile) {
+      void Promise.resolve().then(() => {
+        setDroppedImportFile(handedOffFile);
+        setIsImportModalOpen(true);
+      });
+    }
+
     getSuppliers().then(setSuppliers);
     getMedicines("", 500).then((data) => {
       setMedicines(
@@ -83,8 +116,10 @@ function NewPurchaseForm() {
   }, [poId]);
 
   const [state, formAction, isPending] = useActionState(
-    async (_prevState: { error?: string; success?: boolean } | null, _formData: FormData) => {
-      if (!supplierId) return { error: "Please select a supplier." };
+    async () => {
+      if (!supplierId && !pendingSupplierMeta?.name) {
+        return { error: "Please select a supplier (or import an invoice)." };
+      }
       if (!supplierInvoiceNo.trim()) return { error: "Supplier invoice number is required." };
       if (items.length === 0) return { error: "Please add at least one line item." };
 
@@ -94,7 +129,8 @@ function NewPurchaseForm() {
         invoiceDate,
         items,
         undefined,
-        linkedPo?.id
+        linkedPo?.id,
+        !supplierId ? pendingSupplierMeta : null
       );
       if (res.success) redirect("/dashboard/purchases");
       return res;
@@ -147,14 +183,57 @@ function NewPurchaseForm() {
     }))
   );
 
+  const hasFiles = (e: React.DragEvent) => Array.from(e.dataTransfer?.types ?? []).includes("Files");
+
   return (
-    <div className="page space-y-6">
+    <div
+      className="page space-y-6 relative"
+      onDragEnter={(e) => {
+        if (!hasFiles(e)) return;
+        e.preventDefault();
+        dragDepthRef.current += 1;
+        setIsDraggingBill(true);
+      }}
+      onDragOver={(e) => {
+        if (!hasFiles(e)) return;
+        e.preventDefault();
+        e.dataTransfer.dropEffect = "copy";
+      }}
+      onDragLeave={(e) => {
+        if (!hasFiles(e)) return;
+        e.preventDefault();
+        dragDepthRef.current = Math.max(0, dragDepthRef.current - 1);
+        if (dragDepthRef.current === 0) setIsDraggingBill(false);
+      }}
+      onDrop={(e) => {
+        if (!hasFiles(e)) return;
+        e.preventDefault();
+        dragDepthRef.current = 0;
+        setIsDraggingBill(false);
+        const f = e.dataTransfer.files?.[0];
+        if (!f) return;
+        if (!isSupportedPurchaseBillFile(f)) {
+          setDropError(`Unsupported file "${f.name}". Drop a PDF, image (.jpg/.png/.webp), or CSV bill.`);
+          return;
+        }
+        setDropError(null);
+        setDroppedImportFile(f);
+        setIsImportModalOpen(true);
+      }}
+    >
       <PageHeader
         backHref="/dashboard/purchases"
         eyebrow="Inventory Inward"
         title="Record Purchase Invoice (GRN)"
-        description="Receive stock from suppliers, update batch inventories, and book payable journals."
+        description="Drop a supplier PDF, photo, or CSV anywhere on this page to auto-fill header & lines, then verify and post."
       />
+
+      {dropError && (
+        <div className="alert alert-error">
+          <AlertCircle className="h-4 w-4 shrink-0" />
+          <span>{dropError}</span>
+        </div>
+      )}
 
       {linkedPo && (
         <div className="card p-3.5 bg-brand-50 border border-brand-200 text-brand-900 text-xs flex flex-wrap items-center justify-between gap-2">
@@ -192,11 +271,18 @@ function NewPurchaseForm() {
                 <select
                   id="grn-supplier-select"
                   value={supplierId}
-                  onChange={(e) => setSupplierId(e.target.value)}
+                  onChange={(e) => {
+                    setSupplierId(e.target.value);
+                    if (e.target.value) setPendingSupplierMeta(null);
+                  }}
                   className="input pl-9"
-                  required
+                  required={!pendingSupplierMeta}
                 >
-                  <option value="">Select Supplier</option>
+                  <option value="">
+                    {pendingSupplierMeta
+                      ? `Pending: ${pendingSupplierMeta.name} (Unregistered)`
+                      : "Select Supplier"}
+                  </option>
                   {suppliers.map((s) => (
                     <option key={s.id} value={s.id}>
                       {s.name}
@@ -234,6 +320,28 @@ function NewPurchaseForm() {
               />
             </div>
           </div>
+
+          {!supplierId && pendingSupplierMeta && (
+            <div className="p-3.5 rounded-xl border border-amber-300 bg-amber-50 text-amber-950 text-xs flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-start gap-2">
+                <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
+                <div>
+                  <span className="font-semibold">
+                    Supplier &ldquo;{pendingSupplierMeta.name}&rdquo; is not registered yet.
+                  </span>{" "}
+                  You can register them now with pre-filled invoice details, or post stock first (a warning will appear on Purchases &amp; Suppliers until registered).
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowQuickRegisterSupplier(true)}
+                className="btn btn-primary btn-xs shrink-0 flex items-center gap-1"
+              >
+                <UserPlus className="h-3.5 w-3.5" />
+                Quick Register (Pre-filled)
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Batch Line Items Card */}
@@ -527,12 +635,24 @@ function NewPurchaseForm() {
 
       <ImportDistributorBillModal
         isOpen={isImportModalOpen}
-        onClose={() => setIsImportModalOpen(false)}
+        initialFile={droppedImportFile}
+        onClose={() => {
+          setIsImportModalOpen(false);
+          setDroppedImportFile(null);
+        }}
         selectedSupplierId={supplierId}
-        onSelectSupplier={(id) => setSupplierId(id)}
+        onSelectSupplier={(id) => {
+          setSupplierId(id);
+          setPendingSupplierMeta(null);
+        }}
+        onPendingSupplier={(meta) => setPendingSupplierMeta(meta)}
         onFillHeader={(hdr) => {
-          if (hdr.invoiceNo && !supplierInvoiceNo.trim()) setSupplierInvoiceNo(hdr.invoiceNo);
+          if (hdr.invoiceNo) setSupplierInvoiceNo(hdr.invoiceNo);
           if (hdr.invoiceDate) setInvoiceDate(hdr.invoiceDate);
+        }}
+        onSuppliersRefresh={async () => {
+          const fresh = await getSuppliers();
+          setSuppliers(fresh);
         }}
         onCatalogRefresh={async () => {
           const data = await getMedicines("", 500);
@@ -551,6 +671,34 @@ function NewPurchaseForm() {
           setItems(importedItems);
         }}
       />
+
+      {pendingSupplierMeta && (
+        <QuickRegisterSupplierModal
+          isOpen={showQuickRegisterSupplier}
+          onClose={() => setShowQuickRegisterSupplier(false)}
+          initialMeta={pendingSupplierMeta}
+          onRegistered={async (sup) => {
+            const fresh = await getSuppliers();
+            setSuppliers(fresh);
+            setSupplierId(sup.id);
+            setPendingSupplierMeta(null);
+          }}
+        />
+      )}
+
+      {isDraggingBill && (
+        <div className="fixed inset-0 z-40 bg-brand-950/35 backdrop-blur-xs flex items-center justify-center p-6 pointer-events-none">
+          <div className="rounded-3xl border-2 border-dashed border-brand-400 bg-white/95 px-10 py-8 shadow-2xl text-center space-y-2 max-w-md">
+            <div className="mx-auto w-14 h-14 rounded-full bg-brand-100 text-brand-700 flex items-center justify-center">
+              <UploadCloud className="w-7 h-7" />
+            </div>
+            <p className="text-base font-bold text-ink-900">Drop Supplier Invoice Here</p>
+            <p className="text-xs text-ink-500">
+              Supports PDF, bill photo (.jpg/.png/.webp), or Pharmarack/Retailio/Marg CSV.
+            </p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

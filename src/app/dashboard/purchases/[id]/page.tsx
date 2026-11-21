@@ -2,11 +2,12 @@ import React from "react";
 import { getPurchaseById } from "@/app/actions/purchases";
 import { notFound } from "next/navigation";
 import { format } from "date-fns";
-import { Truck, FileInput, Printer, Building2, CheckCircle2 } from "lucide-react";
+import { Truck, FileInput, AlertTriangle } from "lucide-react";
 import Link from "next/link";
 import { PageHeader } from "@/app/components/ui";
 import { formatINR, formatNumber } from "@/lib/format";
 import { requirePagePermission } from "@/server/rbac";
+import { RegisterPendingSupplierButton } from "@/app/components/QuickRegisterSupplierModal";
 
 export const metadata = { title: "Goods Receipt Note (GRN) Details | MediFlow" };
 
@@ -43,25 +44,59 @@ export default async function PurchaseDetailPage({
         }
       />
 
+      {/* Unregistered Supplier Warning Banner */}
+      {purchase.pendingSupplierMeta && (
+        <div className="rounded-xl border border-amber-300 bg-amber-50/90 p-4 text-amber-950 flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-start gap-2.5">
+            <AlertTriangle className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
+            <div>
+              <p className="text-sm font-bold">
+                Supplier &ldquo;{purchase.pendingSupplierMeta.name}&rdquo; is not registered in your directory yet
+              </p>
+              <p className="text-xs text-amber-900 mt-0.5">
+                Stock was imported from this invoice, but you need to add this supplier to link payables, supplier ledger, and GST ITC.
+              </p>
+            </div>
+          </div>
+          <RegisterPendingSupplierButton
+            meta={purchase.pendingSupplierMeta}
+            purchaseId={purchase.id}
+            label="Register & Link Supplier (Pre-filled)"
+            size="sm"
+          />
+        </div>
+      )}
+
       {/* Overview Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {/* Supplier Card */}
         <div className="card p-4 space-y-2 shadow-xs">
-          <div className="flex items-center gap-2 text-ink-500 text-[12px] font-medium uppercase tracking-wider">
-            <Truck className="h-4 w-4 text-brand-600" />
-            <span>Supplier / Distributor</span>
+          <div className="flex items-center justify-between gap-2 text-ink-500 text-[12px] font-medium uppercase tracking-wider">
+            <span className="flex items-center gap-2">
+              <Truck className="h-4 w-4 text-brand-600" />
+              <span>Supplier / Distributor</span>
+            </span>
+            {purchase.pendingSupplierMeta && (
+              <span className="badge badge-warning !text-[10px]">Unregistered</span>
+            )}
           </div>
-          <div className="text-[15px] font-bold text-ink-900">{supplier.name}</div>
-          {supplier.phone && (
+          <div className="text-[15px] font-bold text-ink-900">
+            {purchase.pendingSupplierMeta ? purchase.pendingSupplierMeta.name : supplier.name}
+          </div>
+          {(purchase.pendingSupplierMeta?.phone || supplier.phone) && (
             <div className="text-[13px] text-ink-600 font-mono">
-              Phone: {supplier.phone}
+              Phone: {purchase.pendingSupplierMeta?.phone || supplier.phone}
             </div>
           )}
-          {supplier.gstin && (
-            <div className="text-[12px] text-ink-500 font-mono">GSTIN: {supplier.gstin}</div>
+          {(purchase.pendingSupplierMeta?.gstin || supplier.gstin) && (
+            <div className="text-[12px] text-ink-500 font-mono">
+              GSTIN: {purchase.pendingSupplierMeta?.gstin || supplier.gstin}
+            </div>
           )}
-          {supplier.drugLicenseNo && (
-            <div className="text-[12px] text-ink-500 font-mono">D.L.: {supplier.drugLicenseNo}</div>
+          {(purchase.pendingSupplierMeta?.drugLicenseNo || supplier.drugLicenseNo) && (
+            <div className="text-[12px] text-ink-500 font-mono">
+              D.L.: {purchase.pendingSupplierMeta?.drugLicenseNo || supplier.drugLicenseNo}
+            </div>
           )}
         </div>
 

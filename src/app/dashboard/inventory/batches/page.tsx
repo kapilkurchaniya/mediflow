@@ -1,5 +1,5 @@
 import { getBatches } from "@/app/actions/stock";
-import { Plus, Boxes, Upload, IndianRupee, Layers, CalendarClock } from "lucide-react";
+import { Plus, Boxes, IndianRupee, Layers, CalendarClock } from "lucide-react";
 import Link from "next/link";
 import clsx from "clsx";
 import { PageHeader, StatCard, EmptyState, TableWrapper } from "@/app/components/ui";
@@ -11,6 +11,8 @@ import { requirePagePermission } from "@/server/rbac";
 import { BackfillPtrBanner } from "./BackfillPtrBanner";
 import { EditBatchButton } from "./EditBatchModal";
 import { StockOcrButton } from "./_components/StockOcrButton";
+import { BatchCsvImportButton } from "./_components/BatchCsvImportButton";
+import { BatchesDropWrapper } from "./_components/BatchesDropWrapper";
 
 export const metadata = { title: "Batches & stock" };
 
@@ -55,27 +57,26 @@ export default async function BatchesPage({
   const expiringCount = batches.filter((b) => daysUntil(b.batch.expiryDate) <= 90).length;
 
   return (
-    <div className="page space-y-6">
-      <PageHeader
-        title="Batches & stock"
-        description="Batch-level stock on hand, expiry exposure and purchase-cost valuation."
-        actions={
-          <>
-            <ExportButton
-              endpoint="/api/export/batches"
-              from={dateRange.from}
-              to={dateRange.to}
-            />
-            <StockOcrButton />
-            <Link href="/dashboard/import?tab=quick" className="btn btn-secondary">
-              <Upload /> Import CSV
-            </Link>
-            <Link href="/dashboard/inventory/batches/new" className="btn btn-primary">
-              <Plus /> Opening stock
-            </Link>
-          </>
-        }
-      />
+    <BatchesDropWrapper>
+      <div className="page space-y-6">
+        <PageHeader
+          title="Batches & stock"
+          description="Batch-level stock on hand, expiry exposure and purchase-cost valuation. Drag & drop a CSV anywhere to import."
+          actions={
+            <>
+              <ExportButton
+                endpoint="/api/export/batches"
+                from={dateRange.from}
+                to={dateRange.to}
+              />
+              <StockOcrButton />
+              <BatchCsvImportButton />
+              <Link href="/dashboard/inventory/batches/new" className="btn btn-primary">
+                <Plus /> Opening stock
+              </Link>
+            </>
+          }
+        />
 
       <section className="grid grid-cols-1 gap-4 md:grid-cols-3">
         <StatCard
@@ -227,9 +228,7 @@ export default async function BatchesPage({
             action={
               !isNearExpiry && (
                 <div className="flex gap-2">
-                  <Link href="/dashboard/import?tab=quick" className="btn btn-secondary btn-sm">
-                    <Upload /> Import CSV
-                  </Link>
+                  <BatchCsvImportButton size="sm" />
                   <Link href="/dashboard/inventory/batches/new" className="btn btn-primary btn-sm">
                     <Plus /> Opening stock
                   </Link>
@@ -240,5 +239,6 @@ export default async function BatchesPage({
         )}
       </div>
     </div>
+    </BatchesDropWrapper>
   );
 }

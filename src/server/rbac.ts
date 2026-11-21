@@ -5,6 +5,7 @@ import { and, eq } from "drizzle-orm";
 import type { Permission } from "@/lib/permissions";
 import { db, schema, type DbOrTx } from "@/server/db";
 import { requireAuth } from "@/server/auth";
+import { getPreloadedMembershipRows, type PreloadedMembershipRow } from "@/server/auth-preload";
 import { ForbiddenError } from "@/server/errors";
 
 /**
@@ -27,25 +28,11 @@ export function assertPermission(ctx: Pick<AuthCtx, "permissions">, p: Permissio
   if (!can(ctx, p)) throw new ForbiddenError(p);
 }
 
-/**
- * Loads membership + permissions for a signed-in user. Pure with respect to Next.js (takes the db and the
- * already-validated session), so it can be tested directly.
- * Throws ForbiddenError when the membership is missing/suspended or the session's store is no longer allowed.
- */
-export async function loadAuthCtx(
-  database: DbOrTx,
+function buildAuthCtxFromMembershipRows(
+  rows: PreloadedMembershipRow[],
   session: { tenantId: string; storeId: string },
   user: { id: string; name: string; email: string; pharmacistRegNo: string | null },
-): Promise<AuthCtx> {
-  const rows = await database
-    .select({
-      membership: schema.memberships,
-      permission: schema.rolePermissions.permission,
-    })
-    .from(schema.memberships)
-    .leftJoin(schema.rolePermissions, eq(schema.rolePermissions.roleId, schema.memberships.roleId))
-    .where(and(eq(schema.memberships.tenantId, session.tenantId), eq(schema.memberships.userId, user.id)));
-
+): AuthCtx {
   const m = rows[0]?.membership;
   if (!m || m.status !== "active") throw new ForbiddenError("membership.active");
 
@@ -70,9 +57,35 @@ export async function loadAuthCtx(
   };
 }
 
+/**
+ * Loads membership + permissions for a signed-in user. Pure with respect to Next.js (takes the db and the
+ * already-validated session), so it can be tested directly.
+ * Throws ForbiddenError when the membership is missing/suspended or the session's store is no longer allowed.
+ */
+export async function loadAuthCtx(
+  database: DbOrTx,
+  session: { tenantId: string; storeId: string },
+  user: { id: string; name: string; email: string; pharmacistRegNo: string | null },
+): Promise<AuthCtx> {
+  const rows = await database
+    .select({
+      membership: schema.memberships,
+      permission: schema.rolePermissions.permission,
+    })
+    .from(schema.memberships)
+    .leftJoin(schema.rolePermissions, eq(schema.rolePermissions.roleId, schema.memberships.roleId))
+    .where(and(eq(schema.memberships.tenantId, session.tenantId), eq(schema.memberships.userId, user.id)));
+
+  return buildAuthCtxFromMembershipRows(rows, session, user);
+}
+
 /** Per-request cached. Redirects to /login when not signed in (requireAuth). */
 export const getAuthCtx = cache(async (): Promise<AuthCtx> => {
   const { session, user } = await requireAuth();
+  const preloaded = getPreloadedMembershipRows(session);
+  if (preloaded) {
+    return buildAuthCtxFromMembershipRows(preloaded, session, user);
+  }
   return loadAuthCtx(db, session, user);
 });
 

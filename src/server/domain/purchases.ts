@@ -18,6 +18,10 @@ import { postPurchaseJournalEntry } from "@/server/domain/accounting";
 import { createGstDocumentFromPurchase } from "@/server/domain/gst";
 import { enqueue } from "@/server/jobs/outbox";
 import { DomainError } from "@/server/errors";
+import {
+  PENDING_SUPPLIER_PLACEHOLDER_NAME,
+  type PendingSupplierMeta,
+} from "@/lib/pending-supplier";
 
 export const PurchaseItemInputSchema = z.object({
   medicineId: z.string().min(1, "Medicine is required"),
@@ -61,22 +65,37 @@ export interface CreatePurchaseItemInput {
   gstRateBp: number; // basis points (must be in GST_RATES_BP)
 }
 
-export const CreatePurchaseSchema = z.object({
-  supplierId: z.string().min(1, "Supplier is required"),
-  supplierInvoiceNo: z.string().min(1, "Supplier invoice number is required"),
-  invoiceDate: z.string().min(1, "Invoice date is required"),
-  items: z.array(PurchaseItemInputSchema).min(1, "At least one item is required"),
-  purchaseOrderId: z.string().uuid().optional(),
-  notes: z.string().optional(),
+export const PendingSupplierMetaSchema = z.object({
+  name: z.string().trim().min(1, "Pending supplier name is required"),
+  gstin: z.string().nullable().optional(),
+  phone: z.string().nullable().optional(),
+  drugLicenseNo: z.string().nullable().optional(),
+  address: z.string().nullable().optional(),
 });
 
+export const CreatePurchaseSchema = z
+  .object({
+    supplierId: z.string().optional().default(""),
+    supplierInvoiceNo: z.string().min(1, "Supplier invoice number is required"),
+    invoiceDate: z.string().min(1, "Invoice date is required"),
+    items: z.array(PurchaseItemInputSchema).min(1, "At least one item is required"),
+    purchaseOrderId: z.string().uuid().optional(),
+    notes: z.string().optional(),
+    pendingSupplierMeta: PendingSupplierMetaSchema.nullable().optional(),
+  })
+  .refine(
+    (data) => Boolean(data.supplierId?.trim() || data.pendingSupplierMeta?.name?.trim()),
+    { message: "Supplier is required", path: ["supplierId"] }
+  );
+
 export interface CreatePurchaseInput {
-  supplierId: string;
+  supplierId?: string;
   supplierInvoiceNo: string;
   invoiceDate: string; // YYYY-MM-DD
   items: CreatePurchaseItemInput[];
   purchaseOrderId?: string;
   notes?: string;
+  pendingSupplierMeta?: PendingSupplierMeta | null;
 }
 
 export interface PurchaseContext {
@@ -98,7 +117,19 @@ export async function createPurchase(
     throw new DomainError("EMPTY_PURCHASE", "At least one purchase item is required.");
   }
 
-  if (!input.supplierId?.trim()) {
+  const hasSupplierId = Boolean(input.supplierId?.trim());
+  const cleanPendingMeta: PendingSupplierMeta | null =
+    !hasSupplierId && input.pendingSupplierMeta?.name?.trim()
+      ? {
+          name: input.pendingSupplierMeta.name.trim(),
+          gstin: input.pendingSupplierMeta.gstin?.trim().toUpperCase() || null,
+          phone: input.pendingSupplierMeta.phone?.trim() || null,
+          drugLicenseNo: input.pendingSupplierMeta.drugLicenseNo?.trim().toUpperCase() || null,
+          address: input.pendingSupplierMeta.address?.trim() || null,
+        }
+      : null;
+
+  if (!hasSupplierId && !cleanPendingMeta) {
     throw new DomainError("INVALID_SUPPLIER", "Supplier is required.");
   }
 
@@ -146,22 +177,62 @@ export async function createPurchase(
     }
   }
 
-  // 2. Fetch Supplier & Store to determine Inter-State status
-  const [supplier] = await tx
-    .select({
-      id: schema.suppliers.id,
-      name: schema.suppliers.name,
-      gstin: schema.suppliers.gstin,
-      stateCode: schema.suppliers.stateCode,
-    })
-    .from(schema.suppliers)
-    .where(
-      and(
-        eq(schema.suppliers.id, input.supplierId.trim()),
-        eq(schema.suppliers.tenantId, ctx.tenantId)
+  // 2. Fetch Supplier (or resolve internal pending-supplier placeholder) & Store to determine Inter-State status
+  let supplier: { id: string; name: string; gstin: string | null; stateCode: string | null } | undefined;
+
+  if (hasSupplierId) {
+    const [found] = await tx
+      .select({
+        id: schema.suppliers.id,
+        name: schema.suppliers.name,
+        gstin: schema.suppliers.gstin,
+        stateCode: schema.suppliers.stateCode,
+      })
+      .from(schema.suppliers)
+      .where(
+        and(
+          eq(schema.suppliers.id, input.supplierId!.trim()),
+          eq(schema.suppliers.tenantId, ctx.tenantId)
+        )
       )
-    )
-    .limit(1);
+      .limit(1);
+    supplier = found;
+  } else if (cleanPendingMeta) {
+    const [existingPlaceholder] = await tx
+      .select({
+        id: schema.suppliers.id,
+        name: schema.suppliers.name,
+        gstin: schema.suppliers.gstin,
+        stateCode: schema.suppliers.stateCode,
+      })
+      .from(schema.suppliers)
+      .where(
+        and(
+          eq(schema.suppliers.tenantId, ctx.tenantId),
+          eq(schema.suppliers.name, PENDING_SUPPLIER_PLACEHOLDER_NAME)
+        )
+      )
+      .limit(1);
+
+    if (existingPlaceholder) {
+      supplier = existingPlaceholder;
+    } else {
+      const [createdPlaceholder] = await tx
+        .insert(schema.suppliers)
+        .values({
+          tenantId: ctx.tenantId,
+          name: PENDING_SUPPLIER_PLACEHOLDER_NAME,
+          isActive: false,
+        })
+        .returning({
+          id: schema.suppliers.id,
+          name: schema.suppliers.name,
+          gstin: schema.suppliers.gstin,
+          stateCode: schema.suppliers.stateCode,
+        });
+      supplier = createdPlaceholder;
+    }
+  }
 
   if (!supplier) {
     throw new DomainError("SUPPLIER_NOT_FOUND", "Supplier not found or does not belong to this tenant.");
@@ -183,7 +254,11 @@ export async function createPurchase(
     .limit(1);
 
   const storeStateCode = (store?.stateCode || extractStateCodeFromGstin(store?.gstin) || "27").padStart(2, "0");
-  const supplierStateCode = (supplier.stateCode || extractStateCodeFromGstin(supplier.gstin) || storeStateCode).padStart(2, "0");
+  const supplierStateCode = (
+    supplier.stateCode ||
+    extractStateCodeFromGstin(supplier.gstin ?? cleanPendingMeta?.gstin) ||
+    storeStateCode
+  ).padStart(2, "0");
   const isInterState = supplierStateCode !== storeStateCode;
 
   // 2b. Fetch Medicines for packaging conversion & metadata snapshots
@@ -240,6 +315,7 @@ export async function createPurchase(
       roundOff: totals.roundOff,
       totalAmount: totals.total,
       status: "posted",
+      pendingSupplierMeta: cleanPendingMeta,
       notes: input.notes ?? null,
       createdBy: ctx.userId,
     })
@@ -465,4 +541,136 @@ export async function createPurchase(
   }
 
   return { purchase, items: insertedItems, totals };
+}
+
+/**
+ * Links an existing or newly created supplier to a purchase GRN that was posted
+ * before the supplier was registered in the store directory.
+ */
+export async function resolvePendingPurchaseSupplier(
+  tx: Tx,
+  ctx: { tenantId: string },
+  params: {
+    purchaseId: string;
+    supplierId: string;
+  }
+) {
+  const [purchase] = await tx
+    .select({
+      id: schema.purchases.id,
+      storeId: schema.purchases.storeId,
+      supplierId: schema.purchases.supplierId,
+      pendingSupplierMeta: schema.purchases.pendingSupplierMeta,
+    })
+    .from(schema.purchases)
+    .where(
+      and(
+        eq(schema.purchases.id, params.purchaseId),
+        eq(schema.purchases.tenantId, ctx.tenantId)
+      )
+    )
+    .limit(1);
+
+  if (!purchase) {
+    throw new DomainError("PURCHASE_NOT_FOUND", "Purchase invoice not found.");
+  }
+
+  const [targetSupplier] = await tx
+    .select({
+      id: schema.suppliers.id,
+      name: schema.suppliers.name,
+      gstin: schema.suppliers.gstin,
+      stateCode: schema.suppliers.stateCode,
+    })
+    .from(schema.suppliers)
+    .where(
+      and(
+        eq(schema.suppliers.id, params.supplierId),
+        eq(schema.suppliers.tenantId, ctx.tenantId)
+      )
+    )
+    .limit(1);
+
+  if (!targetSupplier) {
+    throw new DomainError("SUPPLIER_NOT_FOUND", "Target supplier not found.");
+  }
+
+  const oldSupplierId = purchase.supplierId;
+
+  await tx
+    .update(schema.purchases)
+    .set({
+      supplierId: targetSupplier.id,
+      pendingSupplierMeta: null,
+    })
+    .where(eq(schema.purchases.id, purchase.id));
+
+  // Re-link batches created by this GRN if they still point to the placeholder
+  const purchaseBatchRows = await tx
+    .select({ batchId: schema.purchaseItems.batchId })
+    .from(schema.purchaseItems)
+    .where(eq(schema.purchaseItems.purchaseId, purchase.id));
+
+  const batchIds = purchaseBatchRows.map((b) => b.batchId);
+  if (batchIds.length > 0 && oldSupplierId !== targetSupplier.id) {
+    await tx
+      .update(schema.batches)
+      .set({ supplierId: targetSupplier.id })
+      .where(
+        and(
+          eq(schema.batches.tenantId, ctx.tenantId),
+          eq(schema.batches.supplierId, oldSupplierId),
+          inArray(schema.batches.id, batchIds)
+        )
+      );
+  }
+
+  // Re-link journal lines for this purchase
+  if (oldSupplierId !== targetSupplier.id) {
+    const entries = await tx
+      .select({ id: schema.journalEntries.id })
+      .from(schema.journalEntries)
+      .where(
+        and(
+          eq(schema.journalEntries.tenantId, ctx.tenantId),
+          eq(schema.journalEntries.refType, "purchase"),
+          eq(schema.journalEntries.refId, purchase.id)
+        )
+      );
+
+    const entryIds = entries.map((e) => e.id);
+    if (entryIds.length > 0) {
+      await tx
+        .update(schema.journalLines)
+        .set({ partyId: targetSupplier.id })
+        .where(
+          and(
+            eq(schema.journalLines.tenantId, ctx.tenantId),
+            eq(schema.journalLines.partyType, "supplier"),
+            eq(schema.journalLines.partyId, oldSupplierId),
+            inArray(schema.journalLines.entryId, entryIds)
+          )
+        );
+    }
+  }
+
+  // Update inward GST document counterparty metadata
+  const derivedStateCode =
+    targetSupplier.stateCode || extractStateCodeFromGstin(targetSupplier.gstin) || null;
+  await tx
+    .update(schema.gstDocuments)
+    .set({
+      partyName: targetSupplier.name,
+      partyGstin: targetSupplier.gstin || null,
+      ...(derivedStateCode ? { partyStateCode: derivedStateCode.padStart(2, "0") } : {}),
+    })
+    .where(
+      and(
+        eq(schema.gstDocuments.tenantId, ctx.tenantId),
+        eq(schema.gstDocuments.refType, "purchase"),
+        eq(schema.gstDocuments.refId, purchase.id)
+      )
+    );
+
+  return { purchaseId: purchase.id, supplierId: targetSupplier.id };
 }

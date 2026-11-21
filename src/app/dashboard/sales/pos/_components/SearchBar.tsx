@@ -1,9 +1,15 @@
 "use client";
 
-import { useState, useCallback, useEffect, useMemo, type FormEvent } from "react";
+import { useState, useCallback, useEffect, useMemo, useRef, type FormEvent } from "react";
 import { Search, Sparkles, BookmarkCheck, Layers, AlertCircle } from "lucide-react";
 import { formatINR } from "@/lib/format";
-import type { PosDataSource, SearchResult, SearchResultBatch, SearchResultMedicine } from "../_data/posData";
+import {
+  lookupInstantPosSearchCache,
+  type PosDataSource,
+  type SearchResult,
+  type SearchResultBatch,
+  type SearchResultMedicine,
+} from "../_data/posData";
 
 interface SearchBarProps {
   inputRef: React.RefObject<HTMLInputElement | null>;
@@ -29,6 +35,8 @@ export function SearchBar({
   const [highlightedIndex, setHighlightedIndex] = useState(0);
   const [isSearching, setIsSearching] = useState(false);
   const [unavailableNotice, setUnavailableNotice] = useState<string | null>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
+  const searchSeqRef = useRef(0);
 
   useEffect(() => {
     const onBarcodeMiss = (ev: Event) => {
@@ -56,14 +64,28 @@ export function SearchBar({
   const performSearch = useCallback(
     async (q: string) => {
       const trimmed = q.trim();
-      if (!trimmed) {
+      abortControllerRef.current?.abort();
+      const seq = ++searchSeqRef.current;
+
+      if (trimmed.length < 2) {
         setResults([]);
         setHighlightedIndex(0);
+        setIsSearching(false);
         return;
       }
-      setIsSearching(true);
+
+      const controller = new AbortController();
+      abortControllerRef.current = controller;
+
+      const instantCached = lookupInstantPosSearchCache(trimmed);
+      if (instantCached === null) {
+        setIsSearching(true);
+      }
+
       try {
-        const items = await dataSource.searchItems(trimmed);
+        const items = await dataSource.searchItems(trimmed, controller.signal);
+        if (controller.signal.aborted || seq !== searchSeqRef.current) return;
+
         setResults(items);
         setHighlightedIndex(0);
 
@@ -77,9 +99,12 @@ export function SearchBar({
           setResults([]);
         }
       } catch (err) {
+        if ((err as { name?: string })?.name === "AbortError") return;
         console.error("POS Search error:", err);
       } finally {
-        setIsSearching(false);
+        if (seq === searchSeqRef.current) {
+          setIsSearching(false);
+        }
       }
     },
     [dataSource, onSelectBatch, playSound]
@@ -87,21 +112,30 @@ export function SearchBar({
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
-    performSearch(query);
+    void performSearch(query);
   };
 
-  // Debounced auto-search when query changes
+  // Fast debounced auto-search (0ms on cache/prefix hit, 90ms on network query)
   useEffect(() => {
+    const trimmed = query.trim();
+    if (trimmed.length < 2) {
+      abortControllerRef.current?.abort();
+      searchSeqRef.current++;
+      return;
+    }
+
+    const delay = lookupInstantPosSearchCache(trimmed) !== null ? 0 : 90;
     const timer = setTimeout(() => {
-      if (!query.trim()) {
-        setResults([]);
-        setHighlightedIndex(0);
-      } else {
-        performSearch(query);
-      }
-    }, 280);
+      void performSearch(query);
+    }, delay);
     return () => clearTimeout(timer);
   }, [query, performSearch]);
+
+  useEffect(() => {
+    return () => {
+      abortControllerRef.current?.abort();
+    };
+  }, []);
 
   const handleSelect = (medicine: SearchResultMedicine, batch: SearchResultBatch, allBatches: SearchResultBatch[]) => {
     onSelectBatch(medicine, batch, allBatches);
@@ -159,7 +193,13 @@ export function SearchBar({
           type="text"
           value={query}
           onChange={(e) => {
-            setQuery(e.target.value);
+            const nextVal = e.target.value;
+            setQuery(nextVal);
+            if (nextVal.trim().length < 2) {
+              setResults([]);
+              setHighlightedIndex(0);
+              setIsSearching(false);
+            }
             if (unavailableNotice) setUnavailableNotice(null);
           }}
           onKeyDown={handleInputKeyDown}

@@ -80,6 +80,7 @@ export async function searchMedicines(
 
   // 2. If no barcode match or query might be a name, search name and genericName
   if (matchedMeds.length === 0) {
+    const tokens = q.split(/\s+/).filter(Boolean);
     const allTenantMeds = tenantId === "default-tenant"
       ? await db.medicines.toArray()
       : await db.medicines
@@ -90,9 +91,9 @@ export async function searchMedicines(
     matchedMeds = allTenantMeds
       .filter((m) => {
         if (!m.isActive) return false;
-        const nameMatch = m.name.toLowerCase().includes(q);
-        const genericMatch = m.genericName ? m.genericName.toLowerCase().includes(q) : false;
-        return nameMatch || genericMatch;
+        const nameLower = m.name.toLowerCase();
+        const genericLower = m.genericName ? m.genericName.toLowerCase() : "";
+        return tokens.every((tok) => nameLower.includes(tok) || genericLower.includes(tok));
       })
       .sort((a, b) => {
         const aName = a.name.toLowerCase();
@@ -105,25 +106,45 @@ export async function searchMedicines(
       .slice(0, limit);
   }
 
-  // 3. For each matched medicine, fetch active batches for this store and calculate stock
+  if (matchedMeds.length === 0) return [];
+
+  // 3. Batch-fetch active batches and store provisional allocations (avoids N+1 IndexedDB queries)
+  const [batchesPerMed, allStoreAllocations] = await Promise.all([
+    Promise.all(
+      matchedMeds.map((medicine) =>
+        db.batches.where("[storeId+medicineId]").equals([storeId, medicine.id]).toArray(),
+      ),
+    ),
+    db.provisionalAllocations.where("storeId").equals(storeId).toArray(),
+  ]);
+
+  const allocatedByBatch = new Map<string, number>();
+  for (const alloc of allStoreAllocations) {
+    allocatedByBatch.set(alloc.batchId, (allocatedByBatch.get(alloc.batchId) ?? 0) + alloc.qty);
+  }
+
+  const nowMs = Date.now();
   const results: MedicineSearchResult[] = [];
 
-  for (const medicine of matchedMeds) {
-    const storeBatches = await db.batches
-      .where("[storeId+medicineId]")
-      .equals([storeId, medicine.id])
-      .toArray();
-
-    const activeBatches = storeBatches.filter(isBatchActive);
+  for (let i = 0; i < matchedMeds.length; i++) {
+    const medicine = matchedMeds[i];
+    const activeBatches = batchesPerMed[i].filter(isBatchActive);
 
     const batchSummaries: BatchStockSummary[] = [];
     let totalStock = 0;
 
     for (const batch of activeBatches) {
-      const summary = await getBatchAvailableStock(db, storeId, batch.id);
-      if (summary && summary.availableQty > 0) {
-        batchSummaries.push(summary);
-        totalStock += summary.availableQty;
+      const allocatedQty = allocatedByBatch.get(batch.id) ?? 0;
+      const availableQty = Math.max(0, batch.qtyOnHand - allocatedQty);
+      if (availableQty > 0) {
+        batchSummaries.push({
+          batch,
+          serverQty: batch.qtyOnHand,
+          allocatedQty,
+          availableQty,
+          isExpired: new Date(batch.expiryDate).getTime() < nowMs,
+        });
+        totalStock += availableQty;
       }
     }
 

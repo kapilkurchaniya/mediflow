@@ -1,0 +1,73 @@
+"use client";
+
+import React, { useRef, useState } from "react";
+import { UploadCloud } from "lucide-react";
+import { BatchCsvImportModal } from "./BatchCsvImportModal";
+
+export function BatchesDropWrapper({ children }: { children: React.ReactNode }) {
+  const dragDepthRef = useRef(0);
+  const [isDragging, setIsDragging] = useState(false);
+  const [droppedFile, setDroppedFile] = useState<File | null>(null);
+  const [modalOpen, setModalOpen] = useState(false);
+
+  const hasFiles = (e: React.DragEvent) => Array.from(e.dataTransfer?.types ?? []).includes("Files");
+
+  return (
+    <div
+      className="relative"
+      onDragEnter={(e) => {
+        if (!hasFiles(e)) return;
+        e.preventDefault();
+        dragDepthRef.current += 1;
+        setIsDragging(true);
+      }}
+      onDragOver={(e) => {
+        if (!hasFiles(e)) return;
+        e.preventDefault();
+        e.dataTransfer.dropEffect = "copy";
+      }}
+      onDragLeave={(e) => {
+        if (!hasFiles(e)) return;
+        e.preventDefault();
+        dragDepthRef.current = Math.max(0, dragDepthRef.current - 1);
+        if (dragDepthRef.current === 0) setIsDragging(false);
+      }}
+      onDrop={(e) => {
+        if (!hasFiles(e)) return;
+        e.preventDefault();
+        dragDepthRef.current = 0;
+        setIsDragging(false);
+        const file = e.dataTransfer.files?.[0];
+        if (file) {
+          setDroppedFile(file);
+          setModalOpen(true);
+        }
+      }}
+    >
+      {children}
+
+      {isDragging && (
+        <div className="fixed inset-0 z-40 bg-brand-950/35 backdrop-blur-xs flex items-center justify-center p-6 pointer-events-none">
+          <div className="rounded-3xl border-2 border-dashed border-brand-400 bg-white/95 px-10 py-8 shadow-2xl text-center space-y-2 max-w-md">
+            <div className="mx-auto w-14 h-14 rounded-full bg-brand-100 text-brand-700 flex items-center justify-center">
+              <UploadCloud className="w-7 h-7" />
+            </div>
+            <p className="text-base font-bold text-ink-900">Drop CSV to Import Batches</p>
+            <p className="text-xs text-ink-500">
+              Non-CSV files and unrelated spreadsheets are automatically rejected before import.
+            </p>
+          </div>
+        </div>
+      )}
+
+      <BatchCsvImportModal
+        isOpen={modalOpen}
+        initialFile={droppedFile}
+        onClose={() => {
+          setModalOpen(false);
+          setDroppedFile(null);
+        }}
+      />
+    </div>
+  );
+}

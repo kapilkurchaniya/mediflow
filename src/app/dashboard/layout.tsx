@@ -6,12 +6,17 @@ import { type AllowedStoreItem } from "@/server/domain/stores";
 import { getCachedTenantStores } from "@/server/domain/stores/cached";
 import { DashboardShell } from "./DashboardShell";
 
+/**
+ * What the user may do, so the menu can hide the rest. This is for display only: every page and action
+ * enforces permissions itself. A membership problem (suspended, store no longer allowed) means an empty
+ * menu; the pages then show the 403 screen.
+ */
 async function getSafeAuthCtx(): Promise<AuthCtx | null> {
   try {
     return await getAuthCtx();
   } catch (e) {
     if (e instanceof ForbiddenError) return null;
-    throw e;
+    throw e; // includes the redirect to /login when there is no session
   }
 }
 
