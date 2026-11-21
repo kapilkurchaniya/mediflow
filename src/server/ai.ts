@@ -90,9 +90,9 @@ async function callCohere(prompt: string): Promise<string> {
 }
 
 const PROVIDERS: { name: string; fn: (p: string) => Promise<string> }[] = [
+  { name: "cohere", fn: callCohere },
   { name: "gemini", fn: callGemini },
   { name: "groq", fn: callGroq },
-  { name: "cohere", fn: callCohere },
 ];
 
 const MAX_RETRIES = 3;

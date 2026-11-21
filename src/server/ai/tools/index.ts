@@ -11,6 +11,7 @@ import { addToBillTool } from "./add-to-bill";
 import { draftPurchaseOrderTool } from "./draft-po";
 import { expiryRedistributionTool } from "./expiry-redistribution";
 import { explainGstMismatchTool } from "./explain-gst";
+import { webSearchTool } from "./web-search";
 
 export {
   stockDetailsTool,
@@ -25,6 +26,7 @@ export {
   draftPurchaseOrderTool,
   expiryRedistributionTool,
   explainGstMismatchTool,
+  webSearchTool,
 };
 
 export const ALL_AI_TOOLS: MediFlowAiTool[] = [
@@ -40,5 +42,6 @@ export const ALL_AI_TOOLS: MediFlowAiTool[] = [
   draftPurchaseOrderTool as MediFlowAiTool,
   expiryRedistributionTool as MediFlowAiTool,
   explainGstMismatchTool as MediFlowAiTool,
+  webSearchTool as MediFlowAiTool,
 ];
 

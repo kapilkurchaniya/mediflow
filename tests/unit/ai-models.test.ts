@@ -1,10 +1,16 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { getConfiguredModelChain, getGeminiApiKey, getGroqApiKey } from "@/server/ai/models";
+import {
+  getCohereApiKey,
+  getConfiguredModelChain,
+  getGeminiApiKey,
+  getGroqApiKey,
+} from "@/server/ai/models";
 
 describe("AI Model Chain Configuration", () => {
   const origEnv = { ...process.env };
 
   beforeEach(() => {
+    delete process.env.COHERE_API_KEY;
     delete process.env.GEMINI_API_KEY;
     delete process.env.GOOGLE_GENERATIVE_AI_API_KEY;
     delete process.env.GROQ_API_KEY;
@@ -27,12 +33,15 @@ describe("AI Model Chain Configuration", () => {
     expect(getGeminiApiKey()).toBe("AQ.PrimaryKey");
   });
 
-  it("builds Gemini 2.5 Flash primary + Groq fallbacks when both keys are set", () => {
+  it("builds Cohere primary -> Gemini fallback -> Groq secondary fallback when all keys are set", () => {
+    process.env.COHERE_API_KEY = "  test-cohere  ";
     process.env.GEMINI_API_KEY = "test-gem";
     process.env.GROQ_API_KEY = "  test-groq  ";
 
+    expect(getCohereApiKey()).toBe("test-cohere");
     expect(getGroqApiKey()).toBe("test-groq");
     expect(getConfiguredModelChain()).toEqual([
+      { provider: "cohere", id: "command-a-03-2025", label: "Cohere Command A" },
       { provider: "google", id: "gemini-2.5-flash", label: "Gemini 2.5 Flash" },
       { provider: "groq", id: "openai/gpt-oss-120b", label: "Groq GPT-OSS 120B" },
       { provider: "groq", id: "openai/gpt-oss-20b", label: "Groq GPT-OSS 20B" },
@@ -44,4 +53,3 @@ describe("AI Model Chain Configuration", () => {
     expect(getConfiguredModelChain().map((m) => m.provider)).toEqual(["groq", "groq"]);
   });
 });
-
