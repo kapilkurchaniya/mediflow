@@ -1,7 +1,6 @@
 "use client";
 
 import {
-  searchPosItems,
   createSaleInvoice,
   findSubstitutes,
   holdSaleAction,
@@ -94,7 +93,7 @@ export interface HeldSaleItem {
 }
 
 export interface PosDataSource {
-  searchItems(query: string): Promise<SearchResult[]>;
+  searchItems(query: string, signal?: AbortSignal): Promise<SearchResult[]>;
   findSubstitutes(genericName: string): Promise<SubstituteItem[]>;
   getCustomers(query?: string): Promise<CustomerRow[]>;
   createQuickCustomer(name: string, phone?: string, consentReminders?: boolean): Promise<{ customer?: CustomerRow; error?: string }>;
@@ -128,9 +127,118 @@ export interface PosDataSource {
   }): Promise<{ saleId?: string; invoiceNo?: string; changeDue?: number; error?: string }>;
 }
 
+const POS_SEARCH_LIMIT = 25;
+const POS_SEARCH_CACHE_TTL_MS = 20_000;
+const POS_SEARCH_CACHE_MAX_ENTRIES = 80;
+
+interface PosSearchCacheEntry {
+  items: SearchResult[];
+  complete: boolean;
+  ts: number;
+}
+
+const posSearchCache = new Map<string, PosSearchCacheEntry>();
+
+export function clearPosSearchCache(): void {
+  posSearchCache.clear();
+}
+
+export function filterCachedSearchResults(items: SearchResult[], query: string): SearchResult[] {
+  const tokens = query.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  if (tokens.length === 0) return items;
+
+  return items.filter((entry) => {
+    const name = entry.medicine.name.toLowerCase();
+    const generic = entry.medicine.genericName?.toLowerCase() ?? "";
+    const matchTarget = `${name} ${generic}`;
+    let pos = 0;
+    const matchesName = tokens.every((tok) => {
+      const idx = name.indexOf(tok, pos);
+      if (idx === -1) return false;
+      pos = idx + tok.length;
+      return true;
+    });
+    if (matchesName) return true;
+
+    let gPos = 0;
+    const matchesGeneric = tokens.every((tok) => {
+      const idx = generic.indexOf(tok, gPos);
+      if (idx === -1) return false;
+      gPos = idx + tok.length;
+      return true;
+    });
+    if (matchesGeneric) return true;
+
+    return tokens.every((tok) => matchTarget.includes(tok));
+  });
+}
+
+function getFreshCachedSearchEntry(key: string, now: number): PosSearchCacheEntry | null {
+  const entry = posSearchCache.get(key);
+  if (!entry) return null;
+  if (now - entry.ts > POS_SEARCH_CACHE_TTL_MS) {
+    posSearchCache.delete(key);
+    return null;
+  }
+  return entry;
+}
+
+export function lookupInstantPosSearchCache(query: string, now = Date.now()): SearchResult[] | null {
+  const trimmed = query.trim();
+  if (trimmed.length < 2) return [];
+  const key = trimmed.toLowerCase();
+
+  const exact = getFreshCachedSearchEntry(key, now);
+  if (exact) return exact.items;
+
+  // Narrow from longest cached prefix when that prefix returned all matching rows (< limit)
+  for (let len = key.length - 1; len >= 2; len--) {
+    const prefixKey = key.slice(0, len);
+    const prefixEntry = getFreshCachedSearchEntry(prefixKey, now);
+    if (prefixEntry && prefixEntry.complete) {
+      return filterCachedSearchResults(prefixEntry.items, trimmed);
+    }
+  }
+  return null;
+}
+
+function setPosSearchCacheEntry(key: string, items: SearchResult[], now = Date.now()): void {
+  if (posSearchCache.size >= POS_SEARCH_CACHE_MAX_ENTRIES) {
+    const oldestKey = posSearchCache.keys().next().value;
+    if (oldestKey !== undefined) posSearchCache.delete(oldestKey);
+  }
+  posSearchCache.set(key, {
+    items,
+    complete: items.length < POS_SEARCH_LIMIT,
+    ts: now,
+  });
+}
+
 export const defaultPosDataSource: PosDataSource = {
-  async searchItems(query: string) {
-    return (await searchPosItems(query)) as unknown as SearchResult[];
+  async searchItems(query: string, signal?: AbortSignal) {
+    const trimmed = query.trim();
+    if (trimmed.length < 2) return [];
+
+    const cached = lookupInstantPosSearchCache(trimmed);
+    if (cached !== null) {
+      return cached;
+    }
+
+    const res = await fetch(
+      `/api/pos/search?q=${encodeURIComponent(trimmed)}&limit=${POS_SEARCH_LIMIT}`,
+      {
+        method: "GET",
+        credentials: "same-origin",
+        signal,
+      },
+    );
+    if (!res.ok) {
+      throw new Error(`POS search failed with status ${res.status}`);
+    }
+    const data = (await res.json()) as { success?: boolean; items?: SearchResult[] };
+    const items = Array.isArray(data.items) ? data.items : [];
+    setPosSearchCacheEntry(trimmed.toLowerCase(), items);
+    return items;
   },
   async findSubstitutes(genericName: string) {
     return (await findSubstitutes(genericName)) as unknown as SubstituteItem[];
@@ -179,7 +287,7 @@ export const defaultPosDataSource: PosDataSource = {
     return createPromiseOrder(data);
   },
   async createSale(params) {
-    return createSaleInvoice(
+    const res = await createSaleInvoice(
       params.customerId,
       params.doctorName,
       params.items,
@@ -191,6 +299,10 @@ export const defaultPosDataSource: PosDataSource = {
       params.heldSaleId,
       params.redeemPoints
     );
+    if (res.saleId) {
+      clearPosSearchCache();
+    }
+    return res;
   },
 };
 

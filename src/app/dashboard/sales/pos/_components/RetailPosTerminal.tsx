@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
+import { clearPosSearchCache } from "../_data/posData";
 import { usePosDataSource } from "@/offline/usePosDataSource";
 import { PendingBillsDrawer } from "./PendingBillsDrawer";
 import { OfflineReceiptModal } from "./OfflineReceiptModal";
@@ -88,6 +89,7 @@ export function RetailPosTerminal() {
 
   useEffect(() => {
     const onStoreSwitch = () => {
+      clearPosSearchCache();
       dispatch({ type: "RESET_SALE" });
       void refreshMeta();
     };

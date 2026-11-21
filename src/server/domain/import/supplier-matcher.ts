@@ -11,6 +11,7 @@ export interface ExtractedSupplierInfo {
   gstin?: string | null;
   phone?: string | null;
   drugLicenseNo?: string | null;
+  address?: string | null;
 }
 
 export type SupplierCheckStatus =

@@ -4,12 +4,14 @@ import {
   date,
   index,
   integer,
+  jsonb,
   pgTable,
   text,
   timestamp,
   uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
+import type { PendingSupplierMeta } from "@/lib/pending-supplier";
 import { id, money, createdAt, updatedAt } from "./_helpers";
 import { categories, medicines } from "./catalog";
 import { batches } from "./inventory";
@@ -90,6 +92,7 @@ export const purchases = pgTable(
     totalAmount: money("total_amount"),
     paidAmount: money("paid_amount"),
     returnedAmount: money("returned_amount"),
+    pendingSupplierMeta: jsonb("pending_supplier_meta").$type<PendingSupplierMeta | null>(),
     notes: text("notes"),
     createdBy: uuid("created_by").notNull(),
     createdAt: createdAt(),

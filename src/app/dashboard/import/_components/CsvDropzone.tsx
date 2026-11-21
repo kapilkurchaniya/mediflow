@@ -3,6 +3,10 @@
 import React, { useRef, useState } from "react";
 import { UploadCloud, Loader2, FileSpreadsheet, AlertCircle } from "lucide-react";
 import clsx from "clsx";
+import {
+  detectBinaryContentMismatch,
+  validateStockCsvMetadata,
+} from "@/lib/stock-csv-validator";
 
 interface CsvDropzoneProps {
   onFileSelected: (file: File) => void;
@@ -14,22 +18,6 @@ interface CsvDropzoneProps {
   subtitle?: string;
   selectedFileName?: string | null;
   className?: string;
-}
-
-const ALLOWED_EXTENSIONS = [".csv", ".tsv", ".txt"];
-
-function isSupportedSpreadsheetFile(file: File): boolean {
-  const lowerName = file.name.toLowerCase();
-  if (ALLOWED_EXTENSIONS.some((ext) => lowerName.endsWith(ext))) return true;
-  if (
-    file.type === "text/csv" ||
-    file.type === "text/tab-separated-values" ||
-    file.type === "text/plain" ||
-    file.type === "application/vnd.ms-excel"
-  ) {
-    return true;
-  }
-  return false;
 }
 
 export function CsvDropzone({
@@ -48,17 +36,19 @@ export function CsvDropzone({
   const [isDragging, setIsDragging] = useState(false);
   const [validationError, setValidationError] = useState<string | null>(null);
 
-  const handleFile = (file: File | undefined | null) => {
+  const handleFile = async (file: File | undefined | null) => {
     if (!file) return;
     setValidationError(null);
 
-    if (!isSupportedSpreadsheetFile(file)) {
-      setValidationError(`Unsupported file "${file.name}". Please drop a .csv, .tsv, or .txt file.`);
+    const metaErr = validateStockCsvMetadata(file, maxSizeMb);
+    if (metaErr) {
+      setValidationError(metaErr);
       return;
     }
 
-    if (file.size > maxSizeMb * 1024 * 1024) {
-      setValidationError(`File "${file.name}" exceeds the ${maxSizeMb} MB limit.`);
+    const binaryErr = await detectBinaryContentMismatch(file);
+    if (binaryErr) {
+      setValidationError(binaryErr);
       return;
     }
 
@@ -95,7 +85,7 @@ export function CsvDropzone({
     setIsDragging(false);
     if (isLoading) return;
     const droppedFile = e.dataTransfer.files?.[0];
-    handleFile(droppedFile);
+    void handleFile(droppedFile);
   };
 
   return (
@@ -131,7 +121,7 @@ export function CsvDropzone({
           className="hidden"
           onChange={(e) => {
             const picked = e.target.files?.[0];
-            handleFile(picked);
+            void handleFile(picked);
             // Reset input so re-selecting the same file still fires onChange
             e.target.value = "";
           }}

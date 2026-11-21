@@ -1,6 +1,7 @@
 "use server";
 
-import { db } from "@/server/db";
+import { and, eq } from "drizzle-orm";
+import { db, schema } from "@/server/db";
 import { requirePermission } from "@/server/rbac";
 import { revalidatePath } from "next/cache";
 import {
@@ -8,6 +9,11 @@ import {
   quickCreateDistributorMedicines,
   type ParseDistributorInvoiceResult,
 } from "@/server/domain/import/distributor-invoice";
+import {
+  evaluateGrnSupplierMatch,
+  type SupplierCheckResult,
+} from "@/server/domain/import/supplier-matcher";
+import { PENDING_SUPPLIER_PLACEHOLDER_NAME } from "@/lib/pending-supplier";
 import type { GstRateBp } from "@/lib/regulatory";
 
 /**
@@ -15,8 +21,15 @@ import type { GstRateBp } from "@/lib/regulatory";
  * detect columns, match against catalog, and compute landed unit costs.
  */
 export async function parseDistributorInvoiceAction(
-  csvContent: string
-): Promise<{ success: boolean; result?: ParseDistributorInvoiceResult; error?: string }> {
+  csvContent: string,
+  selectedSupplierId?: string | null
+): Promise<{
+  success: boolean;
+  result?: ParseDistributorInvoiceResult;
+  header?: { invoiceNo?: string; invoiceDate?: string };
+  supplierCheck?: SupplierCheckResult | null;
+  error?: string;
+}> {
   try {
     const ctx = await requirePermission("purchase.create");
 
@@ -29,7 +42,33 @@ export async function parseDistributorInvoiceAction(
       tenantId: ctx.tenantId,
     });
 
-    return { success: true, result };
+    let supplierCheck: SupplierCheckResult | null = null;
+    if (result.extractedSupplier) {
+      const suppliers = await db
+        .select({
+          id: schema.suppliers.id,
+          name: schema.suppliers.name,
+          gstin: schema.suppliers.gstin,
+          phone: schema.suppliers.phone,
+          drugLicenseNo: schema.suppliers.drugLicenseNo,
+        })
+        .from(schema.suppliers)
+        .where(and(eq(schema.suppliers.tenantId, ctx.tenantId), eq(schema.suppliers.isActive, true)));
+
+      const visibleSuppliers = suppliers.filter((s) => s.name !== PENDING_SUPPLIER_PLACEHOLDER_NAME);
+      supplierCheck = evaluateGrnSupplierMatch({
+        selectedSupplierId: selectedSupplierId || null,
+        suppliers: visibleSuppliers,
+        extracted: result.extractedSupplier,
+      });
+    }
+
+    return {
+      success: true,
+      result,
+      header: result.header,
+      supplierCheck,
+    };
   } catch (err: unknown) {
     console.error("[parseDistributorInvoiceAction] Error:", err);
     return {
@@ -67,7 +106,6 @@ export async function quickCreateDistributorMedicinesAction(
     revalidatePath("/dashboard/inventory");
     revalidatePath("/dashboard/purchases/new");
 
-    // Convert Map to plain object for Server Action serializability
     const mapObj: Record<string, string> = {};
     for (const [k, v] of createdMap.entries()) {
       mapObj[k] = v;
@@ -82,4 +120,3 @@ export async function quickCreateDistributorMedicinesAction(
     };
   }
 }
-
