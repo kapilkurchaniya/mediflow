@@ -3,6 +3,7 @@
 import { useActionState } from "react";
 import Link from "next/link";
 import { loginAction } from "@/app/actions/auth";
+import { PasswordInput } from "@/app/components/PasswordInput";
 import { GoogleAuthButton } from "@/app/components/GoogleAuthButton";
 
 export function LoginForm({
@@ -67,10 +68,9 @@ export function LoginForm({
               <label htmlFor="login-password" className="block text-sm font-medium text-slate-700 mb-2">
                 Password
               </label>
-              <input
+              <PasswordInput
                 id="login-password"
                 name="password"
-                type="password"
                 autoComplete="current-password"
                 required
                 className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent transition-all"

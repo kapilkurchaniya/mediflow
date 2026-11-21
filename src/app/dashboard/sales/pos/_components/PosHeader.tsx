@@ -75,6 +75,8 @@ export function PosHeader({
             href="/dashboard/sales"
             className="btn btn-secondary btn-icon h-8 w-8"
             title="Back to Sales"
+            data-tooltip-title="Back to Sales & Invoices"
+            data-tooltip="Leave the POS billing counter and view invoice history"
           >
             <ArrowLeft className="h-4 w-4" />
           </Link>
@@ -84,6 +86,9 @@ export function PosHeader({
               onClick={onToggleSidebar}
               className="hidden lg:inline-flex btn btn-secondary btn-icon h-8 w-8"
               title={sidebarCollapsed ? "Expand Sidebar (Ctrl+B)" : "Focus Mode — Collapse Sidebar (Ctrl+B)"}
+              data-tooltip-title="Focus Mode"
+              data-tooltip={sidebarCollapsed ? "Expand navigation sidebar" : "Collapse sidebar for full-width POS billing"}
+              data-tooltip-shortcut="Ctrl+B"
               aria-label="Toggle Sidebar"
             >
               {sidebarCollapsed ? <PanelLeftOpen className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
@@ -104,6 +109,9 @@ export function PosHeader({
                 onClick={onOpenStoreSwitcher}
                 className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-brand-50 text-brand-900 border border-brand-200 hover:bg-brand-100 hover:border-brand-300 transition-colors shadow-2xs max-w-[190px]"
                 title="Active Branch - Click to switch (Ctrl+Shift+S)"
+                data-tooltip-title="Switch Branch"
+                data-tooltip="Change the active pharmacy branch or warehouse for billing"
+                data-tooltip-shortcut="Ctrl+Shift+S"
               >
                 {isWarehouse ? (
                   <Warehouse className="w-3.5 h-3.5 text-amber-600 shrink-0" />
@@ -136,6 +144,8 @@ export function PosHeader({
             onClick={onToggleSound}
             className="btn btn-secondary btn-icon"
             title={soundEnabled ? "Audio On — Click to mute scan chime" : "Audio Muted — Click to enable scan chime"}
+            data-tooltip-title="Barcode Scan Audio"
+            data-tooltip={soundEnabled ? "Mute barcode scan & error audio chimes" : "Enable barcode scan & error audio chimes"}
             aria-label={soundEnabled ? "Mute scan chime" : "Enable scan chime"}
           >
             {soundEnabled ? (
@@ -151,6 +161,9 @@ export function PosHeader({
             disabled={cartLength === 0 || isWarehouse}
             className="btn btn-secondary text-xs"
             title="Park current bill (F6)"
+            data-tooltip-title="Hold / Park Bill"
+            data-tooltip="Temporarily park the current cart so you can serve the next customer"
+            data-tooltip-shortcut="F6"
           >
             <BookmarkCheck className="h-3.5 w-3.5 mr-1 text-amber-600" /> Hold (F6)
           </button>
@@ -160,6 +173,9 @@ export function PosHeader({
             onClick={onOpenHeldBills}
             className="btn btn-secondary text-xs relative"
             title="View parked bills (F7)"
+            data-tooltip-title="Resume Parked Bill"
+            data-tooltip="View and resume held customer carts in this counter"
+            data-tooltip-shortcut="F7"
           >
             <Layers className="h-3.5 w-3.5 mr-1 text-brand-600" /> Parked ({heldCount}) [F7]
           </button>
@@ -169,12 +185,17 @@ export function PosHeader({
             onClick={onResetSale}
             className="btn btn-secondary text-xs"
             title="New bill (F2)"
+            data-tooltip-title="Clear Cart & New Bill"
+            data-tooltip="Reset all line items, customer selection & discounts for a fresh bill"
+            data-tooltip-shortcut="F2"
           >
             <RotateCcw className="h-3.5 w-3.5 mr-1" /> Clear (F2)
           </button>
 
           <Link
             href="/dashboard/sales/register"
+            data-tooltip-title="Cash Register Shift"
+            data-tooltip={activeShift ? "View active cash drawer shift, X-Report & shift closing" : "Open a cash register shift before counter billing"}
             className={`btn btn-secondary text-xs flex items-center gap-1.5 ${
               activeShift
                 ? "text-emerald-700 bg-emerald-50"

@@ -153,10 +153,18 @@ export function ReorderClient({
         </div>
 
         <div className="flex items-center gap-2">
-          <Link href="/dashboard/purchases/orders" className="btn btn-secondary btn-sm">
+          <Link
+            href="/dashboard/purchases/orders"
+            className="btn btn-secondary btn-sm"
+            data-tooltip="View all draft, sent, and received supplier Purchase Orders"
+          >
             View All POs
           </Link>
-          <Link href="/dashboard/purchases/orders/central" className="btn btn-primary btn-sm flex items-center gap-1.5">
+          <Link
+            href="/dashboard/purchases/orders/central"
+            className="btn btn-primary btn-sm flex items-center gap-1.5"
+            data-tooltip="Create multi-branch split Purchase Orders from the central warehouse"
+          >
             <Truck className="h-3.5 w-3.5" />
             Central Purchasing
           </Link>

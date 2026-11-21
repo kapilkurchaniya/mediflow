@@ -2,6 +2,7 @@
 
 import { useActionState } from "react";
 import { changePasswordAction } from "@/app/actions/auth";
+import { PasswordInput } from "@/app/components/PasswordInput";
 
 export function ProfileClient({ hasPassword = true }: { hasPassword?: boolean }) {
   const [state, formAction, pending] = useActionState(changePasswordAction, null);
@@ -22,16 +23,16 @@ export function ProfileClient({ hasPassword = true }: { hasPassword?: boolean })
       {hasPassword && (
         <label className="block text-xs font-medium text-ink-700">
           Current password
-          <input type="password" name="current" autoComplete="current-password" required className="input mt-1" />
+          <PasswordInput name="current" autoComplete="current-password" required wrapperClassName="mt-1" className="input" />
         </label>
       )}
       <label className="block text-xs font-medium text-ink-700">
         {hasPassword ? "New password" : "Password"}
-        <input type="password" name="next" autoComplete="new-password" required minLength={8} className="input mt-1" />
+        <PasswordInput name="next" autoComplete="new-password" required minLength={8} wrapperClassName="mt-1" className="input" />
       </label>
       <label className="block text-xs font-medium text-ink-700">
         {hasPassword ? "Confirm new password" : "Confirm password"}
-        <input type="password" name="confirm" autoComplete="new-password" required minLength={8} className="input mt-1" />
+        <PasswordInput name="confirm" autoComplete="new-password" required minLength={8} wrapperClassName="mt-1" className="input" />
       </label>
 
       {state?.error && <div className="rounded-lg border border-red-200 bg-red-50 p-2.5 text-[12.5px] text-red-700">{state.error}</div>}

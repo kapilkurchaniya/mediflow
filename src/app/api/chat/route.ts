@@ -29,6 +29,7 @@ Capabilities:
   - Draft Purchase Orders for low-stock items via draft_purchase_order (generates a PROPOSAL).
   - Inter-branch expiry redistribution via expiry_redistribution (generates a PROPOSAL).
   - Explain GSTR-2B discrepancies via explain_gst_mismatch.
+- Live Internet Search: Look up external regulatory updates (CDSCO, GST notifications), drug monographs, or manufacturer info via web_search (powered by Tavily) when the user asks for internet/external information; always cite source URLs.
 
 Rules & Guardrails:
 1. Tool-Only Data: Always call tools to fetch live data — NEVER fabricate numbers.
@@ -68,7 +69,7 @@ export async function POST(req: Request) {
   if (activeChain.length === 0) {
     return new Response(
       JSON.stringify({
-        error: "AI assistant is not configured. Add GEMINI_API_KEY or GROQ_API_KEY to .env.",
+        error: "AI assistant is not configured. Add COHERE_API_KEY, GEMINI_API_KEY, or GROQ_API_KEY to .env.",
       }),
       { status: 503, headers: { "Content-Type": "application/json" } },
     );

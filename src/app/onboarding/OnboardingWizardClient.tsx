@@ -27,7 +27,7 @@ export function OnboardingWizardClient({ initialStatus }: OnboardingWizardClient
   return (
     <div className="space-y-8">
       {/* Stepper Navigation */}
-      <div className="bg-white dark:bg-slate-900 p-4 sm:p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
+      <div className="card p-4 sm:p-6">
         <StepIndicator
           currentStep={currentStep}
           onStepClick={(step) => setCurrentStep(step)}
