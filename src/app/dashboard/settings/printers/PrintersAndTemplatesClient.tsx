@@ -325,6 +325,7 @@ export function PrintersAndTemplatesClient({
             <button
               type="button"
               onClick={() => setActiveTab("templates")}
+              data-tooltip="Create, upload, or scan a physical bill photo (OCR) into a custom HTML A4 or 80mm invoice template"
               className={`px-4 py-2 rounded-xl text-sm font-semibold inline-flex items-center gap-2 transition-colors ${
                 activeTab === "templates"
                   ? "bg-brand-600 text-white shadow-xs"
@@ -336,6 +337,7 @@ export function PrintersAndTemplatesClient({
             <button
               type="button"
               onClick={() => setActiveTab("printers")}
+              data-tooltip="Choose whether this branch prints 80mm thermal, 58mm thermal, or A4 invoices by default"
               className={`px-4 py-2 rounded-xl text-sm font-semibold inline-flex items-center gap-2 transition-colors ${
                 activeTab === "printers"
                   ? "bg-brand-600 text-white shadow-xs"

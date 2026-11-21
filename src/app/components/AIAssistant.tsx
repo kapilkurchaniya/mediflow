@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useRef } from "react";
 import { usePathname } from "next/navigation";
-import { Mic, Square, X, Send, AlertCircle, RotateCcw, Loader2 } from "lucide-react";
+import { Mic, Square, X, Send, AlertCircle, RotateCcw, Loader2, ArrowLeft } from "lucide-react";
 import clsx from "clsx";
 import { useChat } from "@ai-sdk/react";
 import { isToolUIPart, getToolName, type UIMessage } from "ai";
@@ -71,8 +71,16 @@ export function AIAssistant() {
   const recognitionRef = useRef<ISpeechRecognition | null>(null);
   const dispatchedToolIdsRef = useRef<Set<string>>(new Set());
 
-  const { messages, sendMessage, status, error, stop, regenerate, clearError } = useChat({});
+  const { messages, setMessages, sendMessage, status, error, stop, regenerate, clearError } = useChat({});
   const isLoading = status === "submitted" || status === "streaming";
+
+  const handleBackToQuickChat = () => {
+    if (isLoading) stop();
+    if (error) clearError();
+    dispatchedToolIdsRef.current.clear();
+    setMessages([]);
+    setInput("");
+  };
 
   // Global shortcut (Ctrl + J)
   useEffect(() => {
@@ -189,11 +197,28 @@ export function AIAssistant() {
         {/* Header */}
         <div className="flex items-center justify-between border-b border-ink-150 px-4 h-12 shrink-0 bg-white/80 backdrop-blur-xs">
           <div className="flex items-center gap-2">
+            {(messages.length > 0 || Boolean(error)) && (
+              <button
+                type="button"
+                onClick={handleBackToQuickChat}
+                className="btn btn-ghost btn-icon -ml-1.5 h-7 w-7 text-ink-600 hover:text-ink-900"
+                aria-label="Back to quick chat"
+                data-tooltip-title="Back to Quick Chat"
+                data-tooltip="Clear this conversation and return to quick chat suggestions"
+              >
+                <ArrowLeft className="h-4 w-4" />
+              </button>
+            )}
             <span className="h-2 w-2 rounded-full bg-brand-500" />
             <span className="text-[13px] font-semibold text-ink-900">MediFlow Copilot</span>
             <span className="badge badge-neutral !h-5 !text-[10.5px]">Live Store</span>
           </div>
-          <button onClick={() => setIsOpen(false)} className="btn btn-ghost btn-icon" aria-label="Close">
+          <button
+            onClick={() => setIsOpen(false)}
+            className="btn btn-ghost btn-icon"
+            aria-label="Close"
+            data-tooltip="Close MediFlow Copilot"
+          >
             <X className="h-4 w-4" />
           </button>
         </div>
