@@ -3,6 +3,7 @@
 import { useActionState } from "react";
 import { Lock, ShieldCheck } from "lucide-react";
 import { setupInitialPasswordAction } from "@/app/actions/auth";
+import { PasswordInput } from "@/app/components/PasswordInput";
 
 export function SetupPasswordForm({
   userName,
@@ -51,10 +52,9 @@ export function SetupPasswordForm({
               <label htmlFor="setup-password" className="block text-sm font-medium text-slate-700 mb-1.5">
                 New Password
               </label>
-              <input
+              <PasswordInput
                 id="setup-password"
                 name="password"
-                type="password"
                 required
                 minLength={8}
                 autoFocus
@@ -68,10 +68,9 @@ export function SetupPasswordForm({
               <label htmlFor="setup-confirm" className="block text-sm font-medium text-slate-700 mb-1.5">
                 Confirm Password
               </label>
-              <input
+              <PasswordInput
                 id="setup-confirm"
                 name="confirm"
-                type="password"
                 required
                 minLength={8}
                 autoComplete="new-password"

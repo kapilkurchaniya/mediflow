@@ -2,6 +2,7 @@
 
 import { useActionState } from "react";
 import { acceptInviteAction } from "@/app/actions/users";
+import { PasswordInput } from "@/app/components/PasswordInput";
 import { GoogleAuthButton } from "@/app/components/GoogleAuthButton";
 
 export function AcceptInviteForm({
@@ -57,7 +58,7 @@ export function AcceptInviteForm({
         )}
         <div>
           <label className="block text-sm font-medium text-slate-700 mb-2">{existingUser ? "Your password" : "Choose a password (8 or more characters)"}</label>
-          <input name="password" type="password" required minLength={existingUser ? undefined : 8} className={field} autoComplete={existingUser ? "current-password" : "new-password"} />
+          <PasswordInput name="password" required minLength={existingUser ? undefined : 8} className={field} autoComplete={existingUser ? "current-password" : "new-password"} />
         </div>
         <button type="submit" disabled={pending} className="w-full bg-brand-600 hover:bg-brand-700 text-white font-medium py-3 px-4 rounded-xl disabled:opacity-70">
           {pending ? "Joining…" : "Join and sign in"}
