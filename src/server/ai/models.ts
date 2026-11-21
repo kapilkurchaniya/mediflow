@@ -58,7 +58,7 @@ export function getConfiguredModelChain(): AiModelEntry[] {
 export function resolveLanguageModel(entry: AiModelEntry): LanguageModel {
   if (entry.provider === "cohere") {
     const cohere = createCohere({ apiKey: getCohereApiKey() });
-    return cohere(entry.id);
+    return cohere(entry.id) as unknown as LanguageModel;
   }
   if (entry.provider === "google") {
     const google = createGoogleGenerativeAI({ apiKey: getGeminiApiKey() });
