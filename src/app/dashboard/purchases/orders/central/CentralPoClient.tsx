@@ -357,20 +357,42 @@ export function CentralPoClient({
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
-            <label className="block text-xs font-medium text-slate-700 mb-1">
-              Select Supplier <span className="text-rose-500">*</span>
-            </label>
-            <select
-              value={supplierId}
-              onChange={(e) => setSupplierId(e.target.value)}
-              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-teal-500 focus:outline-none focus:ring-1 focus:ring-teal-500"
-            >
-              {initialSuppliers.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.name} {s.gstin ? `(${s.gstin})` : ""}
-                </option>
-              ))}
-            </select>
+            <div className="flex items-center justify-between mb-1">
+              <label className="block text-xs font-medium text-slate-700">
+                Select Supplier <span className="text-rose-500">*</span>
+              </label>
+              {initialSuppliers.length > 0 && (
+                <Link
+                  href="/dashboard/suppliers/new?returnTo=/dashboard/purchases/orders/central"
+                  className="text-[11px] font-semibold text-teal-700 hover:underline"
+                >
+                  + New Supplier
+                </Link>
+              )}
+            </div>
+            {initialSuppliers.length === 0 ? (
+              <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900 space-y-2">
+                <p className="font-medium">No active suppliers added yet.</p>
+                <Link
+                  href="/dashboard/suppliers/new?returnTo=/dashboard/purchases/orders/central"
+                  className="btn btn-primary btn-sm inline-flex items-center gap-1.5"
+                >
+                  <Plus className="h-3.5 w-3.5" /> Add Supplier
+                </Link>
+              </div>
+            ) : (
+              <select
+                value={supplierId}
+                onChange={(e) => setSupplierId(e.target.value)}
+                className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-teal-500 focus:outline-none focus:ring-1 focus:ring-teal-500"
+              >
+                {initialSuppliers.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name} {s.gstin ? `(${s.gstin})` : ""}
+                  </option>
+                ))}
+              </select>
+            )}
             {selectedSupplier && (
               <p className="mt-1 text-xs text-slate-500">
                 Lead Time: {selectedSupplier.leadTimeDays} days

@@ -8,6 +8,7 @@ import { eq } from "drizzle-orm";
 import { getPurchaseOrder } from "@/app/actions/purchase-orders";
 import { formatINR } from "@/lib/format";
 import PrintButton from "@/app/dashboard/sales/[id]/print/PrintButton";
+import { PrintWatermark } from "@/app/components/PrintWatermark";
 
 export const metadata = { title: "Print Purchase Order" };
 
@@ -32,6 +33,7 @@ export default async function PrintPurchaseOrderPage({
 
   return (
     <div className="min-h-screen bg-ink-100 py-6 px-4 font-sans text-ink-900 print:bg-white print:p-0 print:m-0 print:min-h-0">
+      <PrintWatermark />
       {/* Print styles for A4 document */}
       <style
         dangerouslySetInnerHTML={{

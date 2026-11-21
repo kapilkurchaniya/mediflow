@@ -1,6 +1,6 @@
 "use client";
 
-import { CreditCard, Banknote, QrCode, Lock, Loader2, Printer } from "lucide-react";
+import { CreditCard, Banknote, QrCode, Lock, Loader2, Printer, AlertCircle, X } from "lucide-react";
 import { formatINR } from "@/lib/format";
 import type { DocTotals } from "@/lib/money";
 
@@ -11,6 +11,9 @@ interface TotalsBarProps {
   paymentMethod: string;
   isSubmitting: boolean;
   canBill: boolean;
+  hasStockShortage?: boolean;
+  submitError?: string;
+  onDismissError?: () => void;
   onSetPaymentMethod: (method: string) => void;
   onOpenSplitModal: () => void;
   onCompleteSale: () => void;
@@ -23,6 +26,9 @@ export function TotalsBar({
   paymentMethod,
   isSubmitting,
   canBill,
+  hasStockShortage = false,
+  submitError,
+  onDismissError,
   onSetPaymentMethod,
   onOpenSplitModal,
   onCompleteSale,
@@ -125,13 +131,27 @@ export function TotalsBar({
         </button>
       </div>
 
+      {(submitError || hasStockShortage) && (
+        <div className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-800 flex items-start gap-2">
+          <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+          <span className="flex-1 font-medium">
+            {submitError || "One or more items exceed available stock. Adjust quantities or pick a substitute before billing."}
+          </span>
+          {submitError && onDismissError && (
+            <button type="button" onClick={onDismissError} className="text-rose-500 hover:text-rose-800" aria-label="Dismiss error">
+              <X className="w-3.5 h-3.5" />
+            </button>
+          )}
+        </div>
+      )}
+
       {/* Complete Sale Primary Action */}
       <div>
         <button
           type="button"
           onClick={onCompleteSale}
-          disabled={!canBill || itemCount === 0 || isSubmitting}
-          className="btn btn-primary w-full py-3 text-sm font-bold flex items-center justify-center gap-2 shadow-sm"
+          disabled={!canBill || itemCount === 0 || isSubmitting || hasStockShortage}
+          className="btn btn-primary w-full py-3 text-sm font-bold flex items-center justify-center gap-2 shadow-sm disabled:opacity-50"
           title="Complete and print invoice (F10)"
         >
           {isSubmitting ? (

@@ -14,8 +14,6 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { format } from "date-fns";
-import { eq } from "drizzle-orm";
-import { db, schema } from "@/server/db";
 import { getDashboardStats } from "@/app/actions/dashboard";
 import { PageHeader, StatCard, EmptyState, Avatar } from "@/app/components/ui";
 import { formatINR, formatNumber } from "@/lib/format";
@@ -36,7 +34,7 @@ function greeting() {
 const QUICK_ACTIONS = [
   { href: "/dashboard/sales/pos", label: "New bill", desc: "Open the POS counter", icon: ScanLine, kbd: "F2" },
   { href: "/dashboard/purchases/new", label: "Record purchase", desc: "Post a supplier GRN", icon: FileInput },
-  { href: "/dashboard/inventory/import", label: "Import stock", desc: "Upload a CSV / Excel export", icon: Upload },
+  { href: "/dashboard/import?tab=quick", label: "Import stock", desc: "Upload a CSV / Excel export", icon: Upload },
   { href: "/dashboard/customers/new", label: "Add customer", desc: "Create a credit account", icon: UserPlus },
 ];
 
@@ -48,13 +46,10 @@ export default async function DashboardPage({
   const ctx = await requirePagePermission("dashboard.view");
   const { range, from, to } = await searchParams;
   const dateRange = resolveDateRange({ range, from, to });
-  const [stats, storeRows, licenseAlerts] = await Promise.all([
+  const { getCachedTenantStores } = await import("@/server/domain/stores/cached");
+  const [stats, tenantStores, licenseAlerts] = await Promise.all([
     getDashboardStats(dateRange),
-    db
-      .select({ kind: schema.stores.kind })
-      .from(schema.stores)
-      .where(eq(schema.stores.id, ctx.storeId))
-      .limit(1),
+    getCachedTenantStores(ctx.tenantId).catch(() => []),
     getAllStoreLicenseAlerts(ctx.tenantId).catch(() => []),
   ]);
   const firstName = ctx.user.name?.split(" ")[0] ?? "there";
@@ -62,13 +57,14 @@ export default async function DashboardPage({
   const attention = stats.lowStockCount + stats.expiringSoonCount;
   const isFiltered = Boolean((range && range !== "today") || from || to);
   const revenueLabel = range === "today" || !isFiltered ? "Today’s revenue" : "Period revenue";
-  const isWarehouse = storeRows[0]?.kind === "warehouse";
+  const currentStoreRow = tenantStores.find((s) => s.id === ctx.storeId);
+  const isWarehouse = currentStoreRow?.kind === "warehouse";
 
   const quickActions = isWarehouse
     ? [
         { href: "/dashboard/inventory/transfers/new", label: "Transfer stock", desc: "Dispatch to retail branch", icon: ArrowLeftRight },
         { href: "/dashboard/purchases/new", label: "Record purchase", desc: "Post a supplier GRN", icon: FileInput },
-        { href: "/dashboard/inventory/import", label: "Import stock", desc: "Upload a CSV / Excel export", icon: Upload },
+        { href: "/dashboard/import?tab=quick", label: "Import stock", desc: "Upload a CSV / Excel export", icon: Upload },
         { href: "/dashboard/inventory/batches", label: "Stock batches", desc: "View warehouse lot balances", icon: PackageOpen },
       ]
     : QUICK_ACTIONS;

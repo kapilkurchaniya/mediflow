@@ -2,7 +2,7 @@ import { BookmarkCheck, Coins, Package, UserPlus, Users } from "lucide-react";
 import type { NavItem } from "./types";
 
 export const crmNav: NavItem[] = [
-  { group: "operations", order: 20, href: "/dashboard/orders", label: "Omnichannel orders", icon: Package, description: "Manage incoming WhatsApp, online & home-delivery orders", permission: "sale.view" },
+  { group: "operations", order: 20, href: "/dashboard/orders", label: "Omnichannel orders", icon: Package, description: "Coming Soon — Unified WhatsApp, eRetail app & online pharmacy orders", permission: "sale.view", badge: "Soon" },
   { group: "operations", order: 40, href: "/dashboard/sales/promise-orders", label: "Promise orders", icon: BookmarkCheck, description: "Track customer requests for out-of-stock or special-order items", permission: "sale.view" },
   { group: "directory", order: 20, href: "/dashboard/customers", label: "Customers", icon: Users, description: "Directory & outstanding balances", permission: "customer.view" },
   { group: "directory", order: 21, href: "/dashboard/customers/new", label: "Add customer", icon: UserPlus, description: "Register patient or credit account", paletteOnly: true, permission: "customer.manage" },

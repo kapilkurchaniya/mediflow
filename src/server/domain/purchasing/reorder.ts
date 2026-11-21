@@ -41,6 +41,7 @@ export interface ReorderSuggestionsReport {
   totalSuggestionsCount: number;
   totalEstimatedCostPaise: number;
   suppliers: SupplierReorderGroup[];
+  activeSuppliers: Array<{ id: string; name: string; phone: string | null; leadTimeDays: number }>;
 }
 
 /**
@@ -92,34 +93,195 @@ export function calculateReorderQuantity(params: {
 export async function computeReorderSuggestions(
   tenantId: string,
   storeId: string,
-  filters?: { supplierId?: string; search?: string }
+  filters?: { supplierId?: string; search?: string; includeNeverStocked?: boolean }
 ): Promise<ReorderSuggestionsReport> {
   const today = new Date();
   const todayStr = format(today, "yyyy-MM-dd");
   const thirtyDaysAgo = subDays(today, 30);
 
-  // 1. Fetch store info
-  const store = await db.query.stores.findFirst({
-    where: and(eq(schema.stores.tenantId, tenantId), eq(schema.stores.id, storeId)),
-  });
+  // 1. Fetch store info, active medicines, branch settings, active suppliers, stock, open POs, in-transit, sales, and posted GRNs in parallel
+  const [
+    store,
+    allMeds,
+    branchSettingsRows,
+    activeSuppliersRows,
+    onHandRows,
+    historicalBatchRows,
+    openPoRows,
+    inTransitRows,
+    salesRows,
+    recentPurchases,
+    batchSupplierRows,
+  ] = await Promise.all([
+    db.query.stores.findFirst({
+      where: and(eq(schema.stores.tenantId, tenantId), eq(schema.stores.id, storeId)),
+    }),
+    db
+      .select({
+        id: schema.medicines.id,
+        name: schema.medicines.name,
+        genericName: schema.medicines.genericName,
+        packUnit: schema.medicines.packUnit,
+        looseUnit: schema.medicines.looseUnit,
+        unitsPerPack: schema.medicines.unitsPerPack,
+        reorderLevel: schema.medicines.reorderLevel,
+        maxStock: schema.medicines.maxStock,
+        purchasePrice: schema.medicines.purchasePrice,
+      })
+      .from(schema.medicines)
+      .where(and(eq(schema.medicines.tenantId, tenantId), eq(schema.medicines.isActive, true))),
+    db
+      .select({
+        medicineId: schema.storeMedicineSettings.medicineId,
+        reorderLevel: schema.storeMedicineSettings.reorderLevel,
+        maxStock: schema.storeMedicineSettings.maxStock,
+      })
+      .from(schema.storeMedicineSettings)
+      .where(
+        and(
+          eq(schema.storeMedicineSettings.tenantId, tenantId),
+          eq(schema.storeMedicineSettings.storeId, storeId)
+        )
+      ),
+    db
+      .select({
+        id: schema.suppliers.id,
+        name: schema.suppliers.name,
+        phone: schema.suppliers.phone,
+        leadTimeDays: schema.suppliers.leadTimeDays,
+      })
+      .from(schema.suppliers)
+      .where(and(eq(schema.suppliers.tenantId, tenantId), eq(schema.suppliers.isActive, true)))
+      .orderBy(schema.suppliers.name),
+    db
+      .select({
+        medicineId: schema.batches.medicineId,
+        totalOnHand: sql<number>`COALESCE(SUM(${schema.batches.qtyOnHand}), 0)`,
+        avgCost: sql<number>`COALESCE(AVG(${schema.batches.purchaseRate}), 0)`,
+      })
+      .from(schema.batches)
+      .where(
+        and(
+          eq(schema.batches.tenantId, tenantId),
+          eq(schema.batches.storeId, storeId),
+          eq(schema.batches.status, "active"),
+          gte(schema.batches.expiryDate, todayStr),
+          gt(schema.batches.qtyOnHand, 0)
+        )
+      )
+      .groupBy(schema.batches.medicineId),
+    db
+      .select({
+        medicineId: schema.batches.medicineId,
+      })
+      .from(schema.batches)
+      .where(and(eq(schema.batches.tenantId, tenantId), eq(schema.batches.storeId, storeId)))
+      .groupBy(schema.batches.medicineId),
+    // PO items are stored in PACKS — multiply by medicines.unitsPerPack to get base units
+    db
+      .select({
+        medicineId: schema.purchaseOrderItems.medicineId,
+        pendingUnits: sql<number>`COALESCE(SUM(GREATEST(${schema.purchaseOrderItems.qty} + ${schema.purchaseOrderItems.freeQty} - ${schema.purchaseOrderItems.receivedQty}, 0) * GREATEST(${schema.medicines.unitsPerPack}, 1)), 0)`,
+      })
+      .from(schema.purchaseOrderItems)
+      .innerJoin(schema.purchaseOrders, eq(schema.purchaseOrderItems.purchaseOrderId, schema.purchaseOrders.id))
+      .innerJoin(schema.medicines, eq(schema.purchaseOrderItems.medicineId, schema.medicines.id))
+      .where(
+        and(
+          eq(schema.purchaseOrders.tenantId, tenantId),
+          eq(schema.purchaseOrders.storeId, storeId),
+          inArray(schema.purchaseOrders.status, ["draft", "approved", "sent", "partially_received"])
+        )
+      )
+      .groupBy(schema.purchaseOrderItems.medicineId),
+    // Incoming inter-branch stock transfers
+    db
+      .select({
+        medicineId: schema.stockTransferItems.medicineId,
+        pendingUnits: sql<number>`COALESCE(SUM(GREATEST(${schema.stockTransferItems.qtyDispatched} - ${schema.stockTransferItems.receivedQty} - ${schema.stockTransferItems.qtyDamaged} - ${schema.stockTransferItems.qtyShortage}, 0)), 0)`,
+      })
+      .from(schema.stockTransferItems)
+      .innerJoin(schema.stockTransfers, eq(schema.stockTransferItems.transferId, schema.stockTransfers.id))
+      .where(
+        and(
+          eq(schema.stockTransfers.tenantId, tenantId),
+          eq(schema.stockTransfers.toStoreId, storeId),
+          inArray(schema.stockTransfers.status, ["dispatched", "partially_received"])
+        )
+      )
+      .groupBy(schema.stockTransferItems.medicineId),
+    // Net 30-day sales velocity (subtracting returnedQty, using completedAt ?? createdAt)
+    db
+      .select({
+        medicineId: schema.saleItems.medicineId,
+        totalSold: sql<number>`COALESCE(SUM(GREATEST(${schema.saleItems.qty} - ${schema.saleItems.returnedQty}, 0)), 0)`,
+      })
+      .from(schema.saleItems)
+      .innerJoin(schema.sales, eq(schema.saleItems.saleId, schema.sales.id))
+      .where(
+        and(
+          eq(schema.sales.tenantId, tenantId),
+          eq(schema.sales.storeId, storeId),
+          eq(schema.sales.status, "completed"),
+          gte(sql`COALESCE(${schema.sales.completedAt}, ${schema.sales.createdAt})`, thirtyDaysAgo)
+        )
+      )
+      .groupBy(schema.saleItems.medicineId),
+    // Preferred supplier & pack rate from POSTED purchases (preferring current storeId first, then tenant-wide)
+    db
+      .select({
+        medicineId: schema.purchaseItems.medicineId,
+        storeId: schema.purchases.storeId,
+        supplierId: schema.purchases.supplierId,
+        supplierName: schema.suppliers.name,
+        supplierPhone: schema.suppliers.phone,
+        leadTimeDays: schema.suppliers.leadTimeDays,
+        ratePaise: schema.purchaseItems.rate,
+      })
+      .from(schema.purchaseItems)
+      .innerJoin(schema.purchases, eq(schema.purchaseItems.purchaseId, schema.purchases.id))
+      .innerJoin(schema.suppliers, eq(schema.purchases.supplierId, schema.suppliers.id))
+      .where(
+        and(
+          eq(schema.purchases.tenantId, tenantId),
+          eq(schema.purchases.status, "posted"),
+          eq(schema.suppliers.isActive, true)
+        )
+      )
+      .orderBy(
+        sql`CASE WHEN ${schema.purchases.storeId} = ${storeId} THEN 0 ELSE 1 END`,
+        desc(schema.purchases.invoiceDate),
+        desc(schema.purchases.createdAt)
+      ),
+    // Fallback supplier from batches.supplierId if no GRN exists
+    db
+      .select({
+        medicineId: schema.batches.medicineId,
+        supplierId: schema.suppliers.id,
+        supplierName: schema.suppliers.name,
+        supplierPhone: schema.suppliers.phone,
+        leadTimeDays: schema.suppliers.leadTimeDays,
+        purchaseRate: schema.batches.purchaseRate,
+      })
+      .from(schema.batches)
+      .innerJoin(schema.suppliers, eq(schema.batches.supplierId, schema.suppliers.id))
+      .where(
+        and(
+          eq(schema.batches.tenantId, tenantId),
+          eq(schema.batches.storeId, storeId),
+          eq(schema.suppliers.isActive, true)
+        )
+      )
+      .orderBy(desc(schema.batches.createdAt)),
+  ]);
 
   const storeName = store ? `${store.name} (${store.code})` : "Store";
-
-  // 2. Fetch all active medicines
-  const medConds = [eq(schema.medicines.tenantId, tenantId), eq(schema.medicines.isActive, true)];
-  const allMeds = await db
-    .select({
-      id: schema.medicines.id,
-      name: schema.medicines.name,
-      genericName: schema.medicines.genericName,
-      packUnit: schema.medicines.packUnit,
-      looseUnit: schema.medicines.looseUnit,
-      unitsPerPack: schema.medicines.unitsPerPack,
-      reorderLevel: schema.medicines.reorderLevel,
-      maxStock: schema.medicines.maxStock,
-    })
-    .from(schema.medicines)
-    .where(and(...medConds));
+  const activeSuppliers = activeSuppliersRows.map((s) => ({
+    id: s.id,
+    name: s.name,
+    phone: s.phone,
+    leadTimeDays: s.leadTimeDays || 2,
+  }));
 
   if (allMeds.length === 0) {
     return {
@@ -129,27 +291,12 @@ export async function computeReorderSuggestions(
       totalSuggestionsCount: 0,
       totalEstimatedCostPaise: 0,
       suppliers: [],
+      activeSuppliers,
     };
   }
 
-  // 3. Query on-hand active non-expired stock for this store
-  const onHandRows = await db
-    .select({
-      medicineId: schema.batches.medicineId,
-      totalOnHand: sql<number>`COALESCE(SUM(${schema.batches.qtyOnHand}), 0)`,
-      avgCost: sql<number>`COALESCE(AVG(${schema.batches.purchaseRate}), 0)`,
-    })
-    .from(schema.batches)
-    .where(
-      and(
-        eq(schema.batches.tenantId, tenantId),
-        eq(schema.batches.storeId, storeId),
-        eq(schema.batches.status, "active"),
-        gte(schema.batches.expiryDate, todayStr),
-        gt(schema.batches.qtyOnHand, 0)
-      )
-    )
-    .groupBy(schema.batches.medicineId);
+  const branchSettingsMap = new Map(branchSettingsRows.map((s) => [s.medicineId, s]));
+  const historicalBatchSet = new Set(historicalBatchRows.map((b) => b.medicineId));
 
   const onHandMap = new Map<string, { onHand: number; avgCost: number }>();
   for (const row of onHandRows) {
@@ -159,66 +306,20 @@ export async function computeReorderSuggestions(
     });
   }
 
-  // 4. Query pending purchase orders (approved or sent, not yet received)
-  const openPoRows = await db
-    .select({
-      medicineId: schema.purchaseOrderItems.medicineId,
-      pendingQty: sql<number>`COALESCE(SUM(${schema.purchaseOrderItems.qty} + ${schema.purchaseOrderItems.freeQty} - ${schema.purchaseOrderItems.receivedQty}), 0)`,
-    })
-    .from(schema.purchaseOrderItems)
-    .innerJoin(schema.purchaseOrders, eq(schema.purchaseOrderItems.purchaseOrderId, schema.purchaseOrders.id))
-    .where(
-      and(
-        eq(schema.purchaseOrders.tenantId, tenantId),
-        eq(schema.purchaseOrders.storeId, storeId),
-        inArray(schema.purchaseOrders.status, ["approved", "sent"])
-      )
-    )
-    .groupBy(schema.purchaseOrderItems.medicineId);
-
   const onOrderMap = new Map<string, number>();
   for (const row of openPoRows) {
-    onOrderMap.set(row.medicineId, Number(row.pendingQty));
+    onOrderMap.set(row.medicineId, Number(row.pendingUnits));
   }
 
-  // 5. Query 30-day sales velocity
-  const salesRows = await db
-    .select({
-      medicineId: schema.saleItems.medicineId,
-      totalSold: sql<number>`COALESCE(SUM(${schema.saleItems.qty}), 0)`,
-    })
-    .from(schema.saleItems)
-    .innerJoin(schema.sales, eq(schema.saleItems.saleId, schema.sales.id))
-    .where(
-      and(
-        eq(schema.sales.tenantId, tenantId),
-        eq(schema.sales.storeId, storeId),
-        eq(schema.sales.status, "completed"),
-        gte(schema.sales.createdAt, thirtyDaysAgo)
-      )
-    )
-    .groupBy(schema.saleItems.medicineId);
+  const inTransitMap = new Map<string, number>();
+  for (const row of inTransitRows) {
+    inTransitMap.set(row.medicineId, Number(row.pendingUnits));
+  }
 
   const velocityMap = new Map<string, number>();
   for (const row of salesRows) {
     velocityMap.set(row.medicineId, Number(row.totalSold) / 30);
   }
-
-  // 6. Query preferred supplier and last rate from recent purchases
-  const recentPurchases = await db
-    .select({
-      medicineId: schema.purchaseItems.medicineId,
-      supplierId: schema.purchases.supplierId,
-      supplierName: schema.suppliers.name,
-      supplierPhone: schema.suppliers.phone,
-      leadTimeDays: schema.suppliers.leadTimeDays,
-      ratePaise: schema.purchaseItems.rate,
-    })
-    .from(schema.purchaseItems)
-    .innerJoin(schema.purchases, eq(schema.purchaseItems.purchaseId, schema.purchases.id))
-    .innerJoin(schema.suppliers, eq(schema.purchases.supplierId, schema.suppliers.id))
-    .where(and(eq(schema.purchases.tenantId, tenantId), eq(schema.purchases.status, "completed")))
-    .orderBy(desc(schema.purchases.invoiceDate));
 
   const supplierMap = new Map<
     string,
@@ -243,10 +344,28 @@ export async function computeReorderSuggestions(
     }
   }
 
-  // 7. Evaluate each medicine
+  const batchSupplierMap = new Map<
+    string,
+    {
+      supplierId: string;
+      supplierName: string;
+      supplierPhone: string | null;
+      leadTimeDays: number;
+      purchaseRate: number;
+    }
+  >();
+  for (const b of batchSupplierRows) {
+    if (!batchSupplierMap.has(b.medicineId)) {
+      batchSupplierMap.set(b.medicineId, b);
+    }
+  }
+
+  // Evaluate each medicine
   const suggestions: ReorderItemSuggestion[] = [];
 
   for (const med of allMeds) {
+    const branchSetting = branchSettingsMap.get(med.id);
+
     if (filters?.search) {
       const q = filters.search.toLowerCase();
       const matchName = med.name.toLowerCase().includes(q);
@@ -257,31 +376,64 @@ export async function computeReorderSuggestions(
     const onHandData = onHandMap.get(med.id);
     const onHand = onHandData?.onHand || 0;
     const onOrder = onOrderMap.get(med.id) || 0;
+    const inTransit = inTransitMap.get(med.id) || 0;
     const avgDailySales = velocityMap.get(med.id) || 0;
-    const prefSupplier = supplierMap.get(med.id);
 
-    if (filters?.supplierId && prefSupplier?.supplierId !== filters.supplierId) {
+    // Skip never-stocked / zero-sales catalog items unless explicitly requested
+    const hasStorePresence =
+      onHand > 0 ||
+      onOrder > 0 ||
+      inTransit > 0 ||
+      avgDailySales > 0 ||
+      historicalBatchSet.has(med.id) ||
+      Boolean(branchSetting);
+    if (!filters?.includeNeverStocked && !hasStorePresence) {
       continue;
     }
 
-    const leadTimeDays = prefSupplier?.leadTimeDays || 2;
-    const reorderLevel = med.reorderLevel !== null ? med.reorderLevel : 10;
+    const prefSupplier = supplierMap.get(med.id);
+    const fallbackBatchSup = batchSupplierMap.get(med.id);
+    const effectiveSupplierId = prefSupplier?.supplierId ?? fallbackBatchSup?.supplierId ?? null;
+    const effectiveSupplierName = prefSupplier?.supplierName ?? fallbackBatchSup?.supplierName ?? null;
+    const effectiveSupplierPhone = prefSupplier?.supplierPhone ?? fallbackBatchSup?.supplierPhone ?? null;
+
+    if (filters?.supplierId && effectiveSupplierId !== filters.supplierId) {
+      continue;
+    }
+
+    const leadTimeDays = prefSupplier?.leadTimeDays ?? fallbackBatchSup?.leadTimeDays ?? 2;
+    const reorderLevel =
+      branchSetting?.reorderLevel !== undefined && branchSetting?.reorderLevel !== null
+        ? branchSetting.reorderLevel
+        : med.reorderLevel !== null
+        ? med.reorderLevel
+        : 10;
+    const effectiveMaxStock =
+      branchSetting?.maxStock !== undefined && branchSetting?.maxStock !== null
+        ? branchSetting.maxStock
+        : med.maxStock;
     const upp = med.unitsPerPack || 1;
 
     const { suggestedQty, suggestedPacks } = calculateReorderQuantity({
       onHand,
       onOrder,
-      inTransit: 0,
+      inTransit,
       avgDailySales,
       leadTimeDays,
       reorderLevel,
-      maxStock: med.maxStock,
+      maxStock: effectiveMaxStock,
       unitsPerPack: upp,
     });
 
     if (suggestedQty > 0) {
-      const lastRate = prefSupplier?.ratePaise || onHandData?.avgCost || 0;
-      const estimatedCost = suggestedPacks * lastRate;
+      // Convert per-base-unit batch cost to per-pack rate when falling back from GRN pack rate
+      const packRate =
+        prefSupplier?.ratePaise ||
+        (onHandData?.avgCost ? Math.round(onHandData.avgCost * upp) : 0) ||
+        (fallbackBatchSup?.purchaseRate ? Math.round(fallbackBatchSup.purchaseRate * upp) : 0) ||
+        med.purchasePrice ||
+        0;
+      const estimatedCost = suggestedPacks * packRate;
 
       suggestions.push({
         medicineId: med.id,
@@ -292,23 +444,25 @@ export async function computeReorderSuggestions(
         unitsPerPack: upp,
         onHand,
         onOrder,
-        inTransit: 0,
+        inTransit,
         avgDailySales: Math.round(avgDailySales * 100) / 100,
         reorderLevel,
-        maxStock: med.maxStock,
+        maxStock: effectiveMaxStock,
         leadTimeDays,
         suggestedQty,
         suggestedPacks,
-        lastPurchaseRatePaise: lastRate,
+        lastPurchaseRatePaise: packRate,
         estimatedCostPaise: estimatedCost,
-        preferredSupplierId: prefSupplier?.supplierId || null,
-        preferredSupplierName: prefSupplier?.supplierName || null,
-      });
+        preferredSupplierId: effectiveSupplierId,
+        preferredSupplierName: effectiveSupplierName,
+        ...(effectiveSupplierPhone ? { preferredSupplierPhone: effectiveSupplierPhone } : {}),
+      } as ReorderItemSuggestion & { preferredSupplierPhone?: string });
     }
   }
 
-  // 8. Group suggestions by preferred supplier
+  // Group suggestions by preferred supplier
   const supplierGroupsMap = new Map<string, SupplierReorderGroup>();
+  const phoneLookup = new Map(activeSuppliers.map((s) => [s.id, s.phone]));
 
   for (const item of suggestions) {
     const key = item.preferredSupplierId || "unassigned";
@@ -321,7 +475,7 @@ export async function computeReorderSuggestions(
         supplierId: key,
         supplierName: name,
         leadTimeDays: leadTime,
-        phone: null,
+        phone: item.preferredSupplierId ? phoneLookup.get(item.preferredSupplierId) ?? null : null,
         items: [],
         totalSuggestedItems: 0,
         totalEstimatedCostPaise: 0,
@@ -347,6 +501,6 @@ export async function computeReorderSuggestions(
     totalSuggestionsCount: suggestions.length,
     totalEstimatedCostPaise: totalCost,
     suppliers,
+    activeSuppliers,
   };
 }
-

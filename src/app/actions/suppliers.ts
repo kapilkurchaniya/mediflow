@@ -37,9 +37,12 @@ export async function getSuppliersCount(searchQuery?: string): Promise<number> {
   return row?.count ?? 0;
 }
 
-export async function getSuppliers(searchQuery?: string, limit = 50, offset = 0) {
+export async function getSuppliers(searchQuery?: string, limit = 50, offset = 0, activeOnly = false) {
   const ctx = await requirePermission("supplier.view");
   const conditions = [eq(schema.suppliers.tenantId, ctx.tenantId)];
+  if (activeOnly) {
+    conditions.push(eq(schema.suppliers.isActive, true));
+  }
 
   if (searchQuery?.trim()) {
     const q = `%${searchQuery.trim().toLowerCase()}%`;
@@ -123,6 +126,9 @@ export async function createSupplier(formData: FormData) {
     });
 
     revalidatePath("/dashboard/suppliers");
+    revalidatePath("/dashboard/purchases/orders/new");
+    revalidatePath("/dashboard/purchases/orders/central");
+    revalidatePath("/dashboard/purchases/new");
     return { success: true, supplierId: supplier.id };
   } catch (err: unknown) {
     return { error: (err instanceof Error ? err.message : String(err)) || "Failed to create supplier" };

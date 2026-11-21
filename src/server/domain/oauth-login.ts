@@ -10,7 +10,7 @@ import { chooseStore } from "./login";
 const sha256 = (s: string) => crypto.createHash("sha256").update(s).digest("hex");
 
 export type GoogleAuthResolution =
-  | { ok: true; status: "authenticated"; userId: string; tenantId: string; storeId: string | null; email: string }
+  | { ok: true; status: "authenticated"; userId: string; tenantId: string; storeId: string; email: string; needsPasswordSetup: boolean }
   | { ok: true; status: "needs_signup"; profile: GoogleProfile }
   | { ok: false; error: string };
 
@@ -101,7 +101,10 @@ export async function resolveGoogleAuth(
     .where(and(eq(schema.rolePermissions.roleId, active.roleId), eq(schema.rolePermissions.permission, "store.switch_any")));
 
   const storeId = await chooseStore(database, active, Number(switchAny?.n ?? 0) > 0);
-  if (storeId && storeId !== active.lastStoreId) {
+  if (!storeId) {
+    return { ok: false, error: "No active branch is assigned to your account." };
+  }
+  if (storeId !== active.lastStoreId) {
     await database
       .update(schema.memberships)
       .set({ lastStoreId: storeId })
@@ -119,11 +122,19 @@ export async function resolveGoogleAuth(
 
   await writeAudit(
     database,
-    { tenantId: active.tenantId, storeId: storeId ?? "", userId: user.id },
+    { tenantId: active.tenantId, storeId, userId: user.id },
     { action: "login", entityType: "user", entityId: user.id, reason: "Google OAuth login", ip: ip ?? undefined },
   );
 
-  return { ok: true, status: "authenticated", userId: user.id, tenantId: active.tenantId, storeId, email: user.email };
+  return {
+    ok: true,
+    status: "authenticated",
+    userId: user.id,
+    tenantId: active.tenantId,
+    storeId,
+    email: user.email,
+    needsPasswordSetup: !user.passwordHash,
+  };
 }
 
 /** Creates a new pharmacy tenant, main store, Owner role, user, and Google OAuth link. */
@@ -196,7 +207,7 @@ export async function acceptInviteWithGoogle(
   tx: Tx,
   input: { token: string; profile: GoogleProfile; ip?: string | null },
   now = new Date(),
-): Promise<{ userId: string; tenantId: string; storeId: string }> {
+): Promise<{ userId: string; tenantId: string; storeId: string; needsPasswordSetup: boolean }> {
   const [inv] = await tx
     .select()
     .from(schema.userInvites)
@@ -220,13 +231,16 @@ export async function acceptInviteWithGoogle(
     .where(sql`lower(${schema.users.email}) = ${emailLower}`);
 
   let userId: string;
+  let needsPasswordSetup = false;
   if (existing) {
     userId = existing.id;
+    needsPasswordSetup = !existing.passwordHash;
     await tx
       .update(schema.users)
       .set({ emailVerifiedAt: existing.emailVerifiedAt ?? now, avatarUrl: input.profile.picture ?? existing.avatarUrl })
       .where(eq(schema.users.id, userId));
   } else {
+    needsPasswordSetup = true;
     const [u] = await tx
       .insert(schema.users)
       .values({
@@ -282,7 +296,7 @@ export async function acceptInviteWithGoogle(
     { action: "create", entityType: "user_invite", entityId: inv.id, reason: "Google OAuth invite accept", ip: input.ip ?? undefined },
   );
 
-  return { userId, tenantId: inv.tenantId, storeId };
+  return { userId, tenantId: inv.tenantId, storeId, needsPasswordSetup };
 }
 
 /** Links a verified Google profile to a signed-in MediFlow user. */

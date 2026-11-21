@@ -78,60 +78,103 @@ export async function generateCaMonthEndPack(
   const year = parseInt(yearStr, 10);
   const month = parseInt(monthStr, 10);
 
-  const [tenant] = await db
-    .select({ id: schema.tenants.id, name: schema.tenants.name, gstin: schema.tenants.gstin })
-    .from(schema.tenants)
-    .where(eq(schema.tenants.id, tenantId))
-    .limit(1);
-
-  if (!tenant) throw new Error("Tenant not found");
-
-  const [store] = storeId
-    ? await db.select({ name: schema.stores.name }).from(schema.stores).where(eq(schema.stores.id, storeId)).limit(1)
-    : [{ name: "All Branches Consolidated" }];
-
   const fromDate = `${year}-${String(month).padStart(2, "0")}-01`;
   const lastDay = new Date(year, month, 0).getDate();
   const toDate = `${year}-${String(month).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
 
-  // 1. GSTR-1 Data & Official JSON Payload
-  const gstr1 = await buildGstr1Data(db, {
-    tenantId,
-    month,
-    year,
-    storeId,
-    gstin: tenant.gstin || undefined,
-  });
+  const [[tenant], [store], gstr1, purchaseRecords, saleRecords, trialBalanceReport, batchStock] =
+    await Promise.all([
+      db
+        .select({ id: schema.tenants.id, name: schema.tenants.name, gstin: schema.tenants.gstin })
+        .from(schema.tenants)
+        .where(eq(schema.tenants.id, tenantId))
+        .limit(1),
+      storeId
+        ? db.select({ name: schema.stores.name }).from(schema.stores).where(eq(schema.stores.id, storeId)).limit(1)
+        : Promise.resolve([{ name: "All Branches Consolidated" }]),
+      buildGstr1Data(db, {
+        tenantId,
+        month,
+        year,
+        storeId,
+        gstin: undefined,
+      }),
+      (() => {
+        const purchaseQueryConditions = [
+          eq(schema.purchases.tenantId, tenantId),
+          gte(schema.purchases.invoiceDate, fromDate),
+          lte(schema.purchases.invoiceDate, toDate),
+        ];
+        if (storeId) purchaseQueryConditions.push(eq(schema.purchases.storeId, storeId));
+        return db
+          .select({
+            invoiceNumber: schema.purchases.supplierInvoiceNo,
+            invoiceDate: schema.purchases.invoiceDate,
+            supplierName: schema.suppliers.name,
+            supplierGstin: schema.suppliers.gstin,
+            subtotal: schema.purchases.taxableAmount,
+            cgst: schema.purchases.cgst,
+            sgst: schema.purchases.sgst,
+            igst: schema.purchases.igst,
+            total: schema.purchases.totalAmount,
+          })
+          .from(schema.purchases)
+          .innerJoin(schema.suppliers, eq(schema.purchases.supplierId, schema.suppliers.id))
+          .where(and(...purchaseQueryConditions));
+      })(),
+      (() => {
+        const salesQueryConditions = [
+          eq(schema.sales.tenantId, tenantId),
+          gte(schema.sales.createdAt, new Date(`${fromDate}T00:00:00.000Z`)),
+          lte(schema.sales.createdAt, new Date(`${toDate}T23:59:59.999Z`)),
+          eq(schema.sales.status, "completed"),
+        ];
+        if (storeId) salesQueryConditions.push(eq(schema.sales.storeId, storeId));
+        return db
+          .select({
+            invoiceNumber: schema.sales.invoiceNo,
+            createdAt: schema.sales.createdAt,
+            customerName: schema.customers.name,
+            customerGstin: schema.customers.gstin,
+            subtotal: schema.sales.taxableAmount,
+            cgst: schema.sales.cgst,
+            sgst: schema.sales.sgst,
+            igst: schema.sales.igst,
+            total: schema.sales.totalAmount,
+          })
+          .from(schema.sales)
+          .leftJoin(schema.customers, eq(schema.sales.customerId, schema.customers.id))
+          .where(and(...salesQueryConditions));
+      })(),
+      generateTrialBalance(tenantId, storeId || "all", {
+        from: fromDate,
+        to: toDate,
+      }),
+      (() => {
+        const batchConditions = [
+          eq(schema.batches.tenantId, tenantId),
+          eq(schema.batches.status, "active"),
+        ];
+        if (storeId) batchConditions.push(eq(schema.batches.storeId, storeId));
+        return db
+          .select({
+            count: sql<number>`count(*)::int`,
+            totalUnits: sql<number>`coalesce(sum(${schema.batches.qtyOnHand}), 0)::int`,
+            totalCost: sql<number>`coalesce(sum(${schema.batches.qtyOnHand} * ${schema.batches.purchaseRate}), 0)::bigint`,
+            totalMrp: sql<number>`coalesce(sum(${schema.batches.qtyOnHand} * ${schema.batches.mrp}), 0)::bigint`,
+          })
+          .from(schema.batches)
+          .where(and(...batchConditions));
+      })(),
+    ]);
+
+  if (!tenant) throw new Error("Tenant not found");
 
   const gstr1JsonPayload = buildGstr1JsonPayload(gstr1, tenant.gstin || "27AABCU9603R1ZM");
 
   const b2bTaxable = gstr1.b2b.reduce((acc, row) => acc + row.taxableAmount, 0);
   const b2cTaxable = gstr1.b2cs.reduce((acc, row) => acc + row.taxableAmount, 0);
   const totalTax = gstr1.hsnSummary.reduce((acc, row) => acc + row.cgst + row.sgst + row.igst, 0);
-
-  // 2. Inward Purchase Register (with ITC classification)
-  const purchaseQueryConditions = [
-    eq(schema.purchases.tenantId, tenantId),
-    gte(schema.purchases.invoiceDate, fromDate),
-    lte(schema.purchases.invoiceDate, toDate),
-  ];
-  if (storeId) purchaseQueryConditions.push(eq(schema.purchases.storeId, storeId));
-
-  const purchaseRecords = await db
-    .select({
-      invoiceNumber: schema.purchases.supplierInvoiceNo,
-      invoiceDate: schema.purchases.invoiceDate,
-      supplierName: schema.suppliers.name,
-      supplierGstin: schema.suppliers.gstin,
-      subtotal: schema.purchases.taxableAmount,
-      cgst: schema.purchases.cgst,
-      sgst: schema.purchases.sgst,
-      igst: schema.purchases.igst,
-      total: schema.purchases.totalAmount,
-    })
-    .from(schema.purchases)
-    .innerJoin(schema.suppliers, eq(schema.purchases.supplierId, schema.suppliers.id))
-    .where(and(...purchaseQueryConditions));
 
   const purchases: CaPurchaseRegisterRow[] = purchaseRecords.map((p) => ({
     invoiceNumber: p.invoiceNumber,
@@ -146,31 +189,6 @@ export async function generateCaMonthEndPack(
     itcEligible: Boolean(p.supplierGstin && p.supplierGstin.length === 15),
   }));
 
-  // 3. Outward Sales Register
-  const salesQueryConditions = [
-    eq(schema.sales.tenantId, tenantId),
-    gte(schema.sales.createdAt, new Date(`${fromDate}T00:00:00.000Z`)),
-    lte(schema.sales.createdAt, new Date(`${toDate}T23:59:59.999Z`)),
-    eq(schema.sales.status, "completed"),
-  ];
-  if (storeId) salesQueryConditions.push(eq(schema.sales.storeId, storeId));
-
-  const saleRecords = await db
-    .select({
-      invoiceNumber: schema.sales.invoiceNo,
-      createdAt: schema.sales.createdAt,
-      customerName: schema.customers.name,
-      customerGstin: schema.customers.gstin,
-      subtotal: schema.sales.taxableAmount,
-      cgst: schema.sales.cgst,
-      sgst: schema.sales.sgst,
-      igst: schema.sales.igst,
-      total: schema.sales.totalAmount,
-    })
-    .from(schema.sales)
-    .leftJoin(schema.customers, eq(schema.sales.customerId, schema.customers.id))
-    .where(and(...salesQueryConditions));
-
   const sales: CaSalesRegisterRow[] = saleRecords.map((s) => ({
     invoiceNumber: s.invoiceNumber || "INV-COUNTER",
     invoiceDate: s.createdAt.toISOString().slice(0, 10),
@@ -184,33 +202,12 @@ export async function generateCaMonthEndPack(
     totalPaise: s.total || 0,
   }));
 
-  // 4. Financial Snapshot (Trial Balance & P&L)
-  const trialBalanceReport = await generateTrialBalance(tenantId, storeId || "all", {
-    from: fromDate,
-    to: toDate,
-  });
-
-  const pnlReport = await generateProfitAndLoss(tenantId, storeId || "all", {
-    from: fromDate,
-    to: toDate,
-  });
-
-  // 5. Stock Valuation Ledger Snapshot
-  const batchConditions = [
-    eq(schema.batches.tenantId, tenantId),
-    eq(schema.batches.status, "active"),
-  ];
-  if (storeId) batchConditions.push(eq(schema.batches.storeId, storeId));
-
-  const batchStock = await db
-    .select({
-      count: sql<number>`count(*)::int`,
-      totalUnits: sql<number>`coalesce(sum(${schema.batches.qtyOnHand}), 0)::int`,
-      totalCost: sql<number>`coalesce(sum(${schema.batches.qtyOnHand} * ${schema.batches.purchaseRate}), 0)::bigint`,
-      totalMrp: sql<number>`coalesce(sum(${schema.batches.qtyOnHand} * ${schema.batches.mrp}), 0)::bigint`,
-    })
-    .from(schema.batches)
-    .where(and(...batchConditions));
+  const pnlReport = await generateProfitAndLoss(
+    tenantId,
+    storeId || "all",
+    { from: fromDate, to: toDate },
+    trialBalanceReport
+  );
 
   const stockSummary = batchStock[0] || { count: 0, totalUnits: 0, totalCost: 0, totalMrp: 0 };
 

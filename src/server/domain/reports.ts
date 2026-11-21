@@ -81,24 +81,49 @@ export async function generateTrialBalance(
   storeScope: StoreScope = "all",
   dateRange: DateRangeFilter = {}
 ): Promise<TrialBalanceReport> {
-  await getOrSeedAccounts(db, tenantId);
-
   const { from, to } = dateRange;
 
-  // 1. Fetch all accounts
-  const accs = await db
+  // 1. Fetch active accounts; only seed defaults if none exist yet
+  let accs = await db
     .select()
     .from(schema.accounts)
     .where(and(eq(schema.accounts.tenantId, tenantId), eq(schema.accounts.isActive, true)))
     .orderBy(schema.accounts.code);
 
-  // 2. Fetch all journal lines with entry metadata
-  const linesQuery = db
+  if (accs.length === 0) {
+    await getOrSeedAccounts(db, tenantId);
+    accs = await db
+      .select()
+      .from(schema.accounts)
+      .where(and(eq(schema.accounts.tenantId, tenantId), eq(schema.accounts.isActive, true)))
+      .orderBy(schema.accounts.code);
+  }
+
+  // 2. Aggregate opening & period debits/credits directly in PostgreSQL
+  const openingDebitExpr = from
+    ? sql<number>`coalesce(sum(case when ${schema.journalEntries.entryDate} < ${from} then ${schema.journalLines.debit} else 0 end), 0)::bigint`
+    : sql<number>`0::bigint`;
+  const openingCreditExpr = from
+    ? sql<number>`coalesce(sum(case when ${schema.journalEntries.entryDate} < ${from} then ${schema.journalLines.credit} else 0 end), 0)::bigint`
+    : sql<number>`0::bigint`;
+
+  const periodConds = [];
+  if (from) periodConds.push(gte(schema.journalEntries.entryDate, from));
+  if (to) periodConds.push(lte(schema.journalEntries.entryDate, to));
+
+  const periodConditionSql =
+    periodConds.length > 0 ? and(...periodConds) : sql`true`;
+
+  const periodDebitExpr = sql<number>`coalesce(sum(case when ${periodConditionSql} then ${schema.journalLines.debit} else 0 end), 0)::bigint`;
+  const periodCreditExpr = sql<number>`coalesce(sum(case when ${periodConditionSql} then ${schema.journalLines.credit} else 0 end), 0)::bigint`;
+
+  const aggRows = await db
     .select({
       accountId: schema.journalLines.accountId,
-      debit: schema.journalLines.debit,
-      credit: schema.journalLines.credit,
-      entryDate: schema.journalEntries.entryDate,
+      openingDebit: openingDebitExpr,
+      openingCredit: openingCreditExpr,
+      periodDebit: periodDebitExpr,
+      periodCredit: periodCreditExpr,
     })
     .from(schema.journalLines)
     .innerJoin(schema.journalEntries, eq(schema.journalLines.entryId, schema.journalEntries.id))
@@ -107,60 +132,47 @@ export async function generateTrialBalance(
         eq(schema.journalLines.tenantId, tenantId),
         getStoreOrNullCondition(schema.journalEntries.storeId, storeScope)
       )
-    );
+    )
+    .groupBy(schema.journalLines.accountId);
 
-  const allLines = await linesQuery;
+  const aggMap = new Map(aggRows.map((r) => [r.accountId, r]));
 
-  const items: TrialBalanceItem[] = accs.map((acc) => {
-    let openingDebit = 0;
-    let openingCredit = 0;
-    let periodDebit = 0;
-    let periodCredit = 0;
+  const items: TrialBalanceItem[] = accs
+    .map((acc) => {
+      const agg = aggMap.get(acc.id);
+      const openingDebit = Number(agg?.openingDebit || 0);
+      const openingCredit = Number(agg?.openingCredit || 0);
+      const periodDebit = Number(agg?.periodDebit || 0);
+      const periodCredit = Number(agg?.periodCredit || 0);
 
-    for (const line of allLines) {
-      if (line.accountId !== acc.id) continue;
+      const totalDebit = openingDebit + periodDebit;
+      const totalCredit = openingCredit + periodCredit;
+      const net = totalDebit - totalCredit;
 
-      const lineDate = line.entryDate;
-      const isBeforePeriod = from ? lineDate < from : false;
-      const isInPeriod =
-        (!from || lineDate >= from) && (!to || lineDate <= to);
-
-      if (isBeforePeriod) {
-        openingDebit += line.debit;
-        openingCredit += line.credit;
-      } else if (isInPeriod) {
-        periodDebit += line.debit;
-        periodCredit += line.credit;
+      let closingDebit = 0;
+      let closingCredit = 0;
+      if (net > 0) {
+        closingDebit = net;
+      } else {
+        closingCredit = Math.abs(net);
       }
-    }
 
-    const totalDebit = openingDebit + periodDebit;
-    const totalCredit = openingCredit + periodCredit;
-    const net = totalDebit - totalCredit;
-
-    let closingDebit = 0;
-    let closingCredit = 0;
-    if (net > 0) {
-      closingDebit = net;
-    } else {
-      closingCredit = Math.abs(net);
-    }
-
-    return {
-      id: acc.id,
-      code: acc.code,
-      name: acc.name,
-      type: acc.type,
-      systemKey: acc.systemKey,
-      openingDebit,
-      openingCredit,
-      periodDebit,
-      periodCredit,
-      closingDebit,
-      closingCredit,
-      netBalance: net,
-    };
-  }).filter((item) => item.periodDebit > 0 || item.periodCredit > 0 || item.openingDebit > 0 || item.openingCredit > 0);
+      return {
+        id: acc.id,
+        code: acc.code,
+        name: acc.name,
+        type: acc.type,
+        systemKey: acc.systemKey,
+        openingDebit,
+        openingCredit,
+        periodDebit,
+        periodCredit,
+        closingDebit,
+        closingCredit,
+        netBalance: net,
+      };
+    })
+    .filter((item) => item.periodDebit > 0 || item.periodCredit > 0 || item.openingDebit > 0 || item.openingCredit > 0);
 
   const totals = items.reduce(
     (acc, it) => {
@@ -213,9 +225,10 @@ export interface ProfitAndLossReport {
 export async function generateProfitAndLoss(
   tenantId: string,
   storeScope: StoreScope = "all",
-  dateRange: DateRangeFilter = {}
+  dateRange: DateRangeFilter = {},
+  precomputedTb?: TrialBalanceReport
 ): Promise<ProfitAndLossReport> {
-  const tb = await generateTrialBalance(tenantId, storeScope, dateRange);
+  const tb = precomputedTb ?? (await generateTrialBalance(tenantId, storeScope, dateRange));
 
   const revenueAccounts: Array<{ code: string; name: string; amount: number }> = [];
   const cogsAccounts: Array<{ code: string; name: string; amount: number }> = [];
@@ -293,7 +306,7 @@ export async function generateBalanceSheet(
   asOfDate: string = format(new Date(), "yyyy-MM-dd")
 ): Promise<BalanceSheetReport> {
   const tb = await generateTrialBalance(tenantId, storeScope, { to: asOfDate });
-  const pnl = await generateProfitAndLoss(tenantId, storeScope, { to: asOfDate });
+  const pnl = await generateProfitAndLoss(tenantId, storeScope, { to: asOfDate }, tb);
 
   const currentAssets: Array<{ code: string; name: string; amount: number }> = [];
   const fixedAssets: Array<{ code: string; name: string; amount: number }> = [];
@@ -998,27 +1011,49 @@ export async function generateChainOverviewReport(
     salesConds.push(lte(schema.sales.createdAt, new Date(dateRange.to + "T23:59:59.999")));
   }
 
-  const sales = await db
-    .select({
-      id: schema.sales.id,
-      storeId: schema.sales.storeId,
-      totalAmount: schema.sales.totalAmount,
-      createdAt: schema.sales.createdAt,
-    })
-    .from(schema.sales)
-    .where(and(...salesConds));
-
-  // 3. Query sale items with purchase cost to derive COGS
-  const saleItems = await db
-    .select({
-      storeId: schema.sales.storeId,
-      qty: schema.saleItems.qty,
-      purchaseRate: schema.batches.purchaseRate,
-    })
-    .from(schema.saleItems)
-    .innerJoin(schema.sales, eq(schema.saleItems.saleId, schema.sales.id))
-    .leftJoin(schema.batches, eq(schema.saleItems.batchId, schema.batches.id))
-    .where(and(...salesConds));
+  const [sales, saleItems, batches, activeMeds] = await Promise.all([
+    db
+      .select({
+        id: schema.sales.id,
+        storeId: schema.sales.storeId,
+        totalAmount: schema.sales.totalAmount,
+        createdAt: schema.sales.createdAt,
+      })
+      .from(schema.sales)
+      .where(and(...salesConds)),
+    db
+      .select({
+        storeId: schema.sales.storeId,
+        qty: schema.saleItems.qty,
+        purchaseRate: schema.batches.purchaseRate,
+        createdAt: schema.sales.createdAt,
+      })
+      .from(schema.saleItems)
+      .innerJoin(schema.sales, eq(schema.saleItems.saleId, schema.sales.id))
+      .leftJoin(schema.batches, eq(schema.saleItems.batchId, schema.batches.id))
+      .where(and(...salesConds)),
+    db
+      .select({
+        storeId: schema.batches.storeId,
+        medicineId: schema.batches.medicineId,
+        qtyOnHand: schema.batches.qtyOnHand,
+        purchaseRate: schema.batches.purchaseRate,
+        expiryDate: schema.batches.expiryDate,
+        status: schema.batches.status,
+      })
+      .from(schema.batches)
+      .where(
+        and(
+          eq(schema.batches.tenantId, tenantId),
+          inArray(schema.batches.storeId, targetStoreIds),
+          gt(schema.batches.qtyOnHand, 0)
+        )
+      ),
+    db
+      .select({ id: schema.medicines.id })
+      .from(schema.medicines)
+      .where(and(eq(schema.medicines.tenantId, tenantId), eq(schema.medicines.isActive, true))),
+  ]);
 
   // Map store sales and cogs
   const revenueMap = new Map<string, number>();
@@ -1033,25 +1068,6 @@ export async function generateChainOverviewReport(
     const cost = (item.qty || 0) * (item.purchaseRate || 0);
     cogsMap.set(item.storeId, (cogsMap.get(item.storeId) || 0) + cost);
   }
-
-  // 4. Query batches for stock and expiry valuation
-  const batches = await db
-    .select({
-      storeId: schema.batches.storeId,
-      medicineId: schema.batches.medicineId,
-      qtyOnHand: schema.batches.qtyOnHand,
-      purchaseRate: schema.batches.purchaseRate,
-      expiryDate: schema.batches.expiryDate,
-      status: schema.batches.status,
-    })
-    .from(schema.batches)
-    .where(
-      and(
-        eq(schema.batches.tenantId, tenantId),
-        inArray(schema.batches.storeId, targetStoreIds),
-        gt(schema.batches.qtyOnHand, 0)
-      )
-    );
 
   const stockValMap = new Map<string, number>();
   const nearExpiryValMap = new Map<string, number>();
@@ -1075,11 +1091,6 @@ export async function generateChainOverviewReport(
     }
   }
 
-  // 5. Total active medicines in catalog
-  const activeMeds = await db
-    .select({ id: schema.medicines.id })
-    .from(schema.medicines)
-    .where(and(eq(schema.medicines.tenantId, tenantId), eq(schema.medicines.isActive, true)));
   const totalCatalogMeds = activeMeds.length;
 
   // 6. Build per-store summary
@@ -1140,6 +1151,14 @@ export async function generateChainOverviewReport(
     const entry = monthlyTrendMap.get(mStr);
     if (entry) {
       entry.revenue += s.totalAmount || 0;
+    }
+  }
+
+  for (const item of saleItems) {
+    const mStr = format(new Date(item.createdAt), "yyyy-MM");
+    const entry = monthlyTrendMap.get(mStr);
+    if (entry) {
+      entry.cogs += (item.qty || 0) * (item.purchaseRate || 0);
     }
   }
 

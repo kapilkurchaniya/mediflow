@@ -296,6 +296,9 @@ async function main() {
   - Medicine 2: ${med2.name} (100 units, batch B-DOLO-001 @ ₹30.50)`);
 
   await pool.end();
+  const { pool: appPool } = await import("../src/server/db");
+  await appPool.end().catch(() => {});
+  process.exit(0);
 }
 
 main().catch((err) => {

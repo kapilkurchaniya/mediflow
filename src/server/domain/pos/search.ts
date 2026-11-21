@@ -78,6 +78,7 @@ export async function searchPosMedicines(
     .where(
       and(
         eq(schema.batches.storeId, ctx.storeId),
+        eq(schema.batches.status, "active"),
         gt(schema.batches.qtyOnHand, 0),
         gt(schema.batches.expiryDate, todayStr),
         inArray(schema.batches.medicineId, medicineIds),

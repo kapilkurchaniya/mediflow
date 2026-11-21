@@ -4,6 +4,7 @@ import React, { useState, useEffect, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Ban, AlertTriangle, Loader2, X, CheckCircle2 } from "lucide-react";
 import { cancelSaleAction } from "@/app/actions/sales";
+import { CANCELLATION_REASON_PRESETS } from "@/lib/cancellation-reasons";
 
 interface CancelSaleButtonProps {
   saleId: string;
@@ -182,6 +183,45 @@ export function CancelSaleButton({
                 </ul>
               </div>
 
+              {/* Quick-select Reason Presets */}
+              <div className="space-y-1.5">
+                <span className="block text-[12px] font-semibold text-ink-700">
+                  Quick Reason Presets
+                </span>
+                <div className="flex flex-wrap gap-1.5">
+                  {CANCELLATION_REASON_PRESETS.map((preset) => {
+                    const isOther = preset === "Other (specify)";
+                    const isSelected = isOther
+                      ? reason.trim().length > 0 &&
+                        !CANCELLATION_REASON_PRESETS.some(
+                          (p) => p !== "Other (specify)" && reason.startsWith(p)
+                        )
+                      : reason.startsWith(preset);
+                    return (
+                      <button
+                        key={preset}
+                        type="button"
+                        disabled={isPending}
+                        onClick={() => {
+                          if (isOther) {
+                            setReason("");
+                          } else {
+                            setReason(preset);
+                          }
+                        }}
+                        className={`px-2.5 py-1 rounded-full text-[11.5px] font-medium border transition-colors ${
+                          isSelected
+                            ? "bg-rose-600 text-white border-rose-600 shadow-2xs"
+                            : "bg-white text-ink-700 border-ink-200 hover:border-rose-300 hover:bg-rose-50/50"
+                        }`}
+                      >
+                        {preset}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
               {/* Reason Input */}
               <div className="space-y-1.5">
                 <label
@@ -193,14 +233,15 @@ export function CancelSaleButton({
                 <textarea
                   id="cancel-reason"
                   rows={3}
+                  maxLength={255}
                   value={reason}
                   onChange={(e) => setReason(e.target.value)}
                   disabled={isPending}
-                  placeholder="e.g. Customer cancelled before leaving counter, wrong doctor details entered, duplicate bill entry..."
-                  className="w-full text-[13px] p-2.5 rounded-lg border border-ink-250 focus:border-rose-500 focus:ring-2 focus:ring-rose-200 outline-none transition"
+                  placeholder="Select a preset above or enter details (e.g. Accidental purchase, wrong dosage selected)..."
+                  className="w-full text-[13px] p-2.5 rounded-lg border border-ink-200 focus:border-rose-500 focus:ring-2 focus:ring-rose-200 outline-none transition"
                   autoFocus
                   onKeyDown={(e) => {
-                    if (e.key === "Enter" && !e.shiftKey) {
+                    if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
                       e.preventDefault();
                       handleConfirm();
                     }
@@ -236,7 +277,7 @@ export function CancelSaleButton({
                   type="button"
                   onClick={handleConfirm}
                   disabled={isPending || reason.trim().length < 3}
-                  className="btn btn-danger text-[13px] bg-rose-600 hover:bg-rose-700 text-white font-medium shadow-xs"
+                  className="btn text-[13px] bg-rose-600 hover:bg-rose-700 text-white font-medium shadow-xs disabled:opacity-50"
                 >
                   {isPending ? (
                     <>

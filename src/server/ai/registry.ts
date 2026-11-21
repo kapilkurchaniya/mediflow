@@ -39,22 +39,29 @@ export function getAvailableAiTools(
           result = { error: err instanceof Error ? err.message : String(err) };
           return result;
         } finally {
-          const latencyMs = Date.now() - start;
-          // Asynchronously log execution telemetry to ai_actions
-          logAiToolCall({
-            tenantId: ctx.tenantId,
-            storeId: ctx.storeId,
-            userId: ctx.userId,
-            tool: t.name,
-            input: JSON.stringify(args || {}),
-            arguments: (args as Record<string, unknown>) || {},
-            result,
-            latencyMs,
-            safetyLevel: t.isWriteAction ? 2 : 1,
-            status,
-          }).catch((logErr) => {
-            console.error(`[AI Registry] Failed to log tool execution for ${t.name}:`, logErr);
-          });
+          const isProposal =
+            result &&
+            typeof result === "object" &&
+            (result as { type?: string; proposalId?: string }).type === "PROPOSAL" &&
+            Boolean((result as { proposalId?: string }).proposalId);
+          if (!isProposal) {
+            const latencyMs = Date.now() - start;
+            // Asynchronously log execution telemetry to ai_actions
+            logAiToolCall({
+              tenantId: ctx.tenantId,
+              storeId: ctx.storeId,
+              userId: ctx.userId,
+              tool: t.name,
+              input: JSON.stringify(args || {}),
+              arguments: (args as Record<string, unknown>) || {},
+              result,
+              latencyMs,
+              safetyLevel: t.isWriteAction ? 2 : 1,
+              status,
+            }).catch((logErr) => {
+              console.error(`[AI Registry] Failed to log tool execution for ${t.name}:`, logErr);
+            });
+          }
         }
       },
     });

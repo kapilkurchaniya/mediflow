@@ -250,7 +250,7 @@ function NewPurchaseForm() {
                 className="btn btn-secondary text-xs flex items-center gap-1.5 border-brand-300 dark:border-brand-700 text-brand-700 dark:text-brand-300 hover:bg-brand-50/50"
               >
                 <FileSpreadsheet className="h-3.5 w-3.5 text-brand-600 dark:text-brand-400" />
-                Import Distributor Bill (CSV)
+                Import Bill (CSV / PDF / Photo OCR)
               </button>
               <button
                 type="button"
@@ -528,6 +528,25 @@ function NewPurchaseForm() {
       <ImportDistributorBillModal
         isOpen={isImportModalOpen}
         onClose={() => setIsImportModalOpen(false)}
+        selectedSupplierId={supplierId}
+        onSelectSupplier={(id) => setSupplierId(id)}
+        onFillHeader={(hdr) => {
+          if (hdr.invoiceNo && !supplierInvoiceNo.trim()) setSupplierInvoiceNo(hdr.invoiceNo);
+          if (hdr.invoiceDate) setInvoiceDate(hdr.invoiceDate);
+        }}
+        onCatalogRefresh={async () => {
+          const data = await getMedicines("", 500);
+          setMedicines(
+            data.map((m) => ({
+              id: m.medicine.id,
+              name: m.medicine.name,
+              gstRateBp: m.medicine.gstRateBp,
+              unitsPerPack: m.medicine.unitsPerPack ?? 1,
+              packUnit: m.medicine.packUnit ?? "strip",
+              looseUnit: m.medicine.looseUnit ?? "tablet",
+            }))
+          );
+        }}
         onImport={(importedItems) => {
           setItems(importedItems);
         }}

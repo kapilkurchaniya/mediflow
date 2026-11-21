@@ -4,6 +4,7 @@ import { requirePermission } from "@/server/rbac";
 import { getTransferById } from "@/server/domain/inventory/transfers";
 import { formatINR } from "@/lib/format";
 import { PrintButton } from "./PrintButton";
+import { PrintWatermark } from "@/app/components/PrintWatermark";
 
 interface PrintPageProps {
   params: Promise<{ id: string }>;
@@ -27,6 +28,7 @@ export default async function PrintTransferPage({ params }: PrintPageProps) {
 
   return (
     <div className="min-h-screen bg-ink-50/50 p-6 print:p-0 print:bg-white text-ink-900 font-sans">
+      <PrintWatermark />
       <div className="max-w-4xl mx-auto bg-white border border-ink-200 print:border-0 rounded-xl p-8 shadow-xs print:shadow-none space-y-6">
         {/* Print Action Header (Hidden in Print) */}
         <div className="flex items-center justify-between pb-4 border-b border-ink-200 print:hidden">

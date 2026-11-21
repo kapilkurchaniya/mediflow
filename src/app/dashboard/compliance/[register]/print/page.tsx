@@ -5,6 +5,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Printer } from "lucide-react";
 import { queryComplianceRegister, type StatutoryRegisterType } from "@/server/domain/compliance";
+import { PrintWatermark } from "@/app/components/PrintWatermark";
 
 const REGISTER_CONFIGS: Record<
   string,
@@ -121,6 +122,7 @@ export default async function PrintRegisterPage({
 
   return (
     <div className="min-h-screen bg-neutral-100 py-6 px-4 font-sans text-neutral-900 print:bg-white print:p-0 print:m-0 print:min-h-0">
+      <PrintWatermark />
       {/* Print-specific landscape layout styling */}
       <style
         dangerouslySetInnerHTML={{

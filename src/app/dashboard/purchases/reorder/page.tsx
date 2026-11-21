@@ -1,5 +1,5 @@
 import React from "react";
-import { requirePermission } from "@/server/rbac";
+import { can, requirePagePermission } from "@/server/rbac";
 import {
   getReorderSuggestions,
   getReorderStoresAction,
@@ -13,7 +13,7 @@ export const metadata = {
 };
 
 export default async function ReorderPage() {
-  const ctx = await requirePermission("purchase.view");
+  const ctx = await requirePagePermission("purchase.view");
 
   const [stores, initialReport] = await Promise.all([
     getReorderStoresAction(),
@@ -25,7 +25,7 @@ export default async function ReorderPage() {
       initialReport={initialReport}
       stores={stores}
       currentStoreId={ctx.storeId}
+      canCreatePo={can(ctx, "purchase.create")}
     />
   );
 }
-

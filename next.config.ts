@@ -7,6 +7,10 @@ const nextConfig: NextConfig = {
   experimental: {
     // Enables forbidden() (403 page) used by requirePagePermission in src/server/rbac.ts.
     authInterrupts: true,
+    optimizePackageImports: ["lucide-react", "recharts", "date-fns"],
+    serverActions: {
+      bodySizeLimit: "10mb",
+    },
   },
   typescript: {
     // Type checking is strictly verified via npm run typecheck

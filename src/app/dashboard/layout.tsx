@@ -1,9 +1,9 @@
+import { redirect } from "next/navigation";
 import { getCurrentSession } from "@/server/auth";
-import { db, schema } from "@/server/db";
-import { eq } from "drizzle-orm";
 import { getAuthCtx, type AuthCtx } from "@/server/rbac";
 import { ForbiddenError } from "@/server/errors";
 import { type AllowedStoreItem } from "@/server/domain/stores";
+import { getCachedTenantStores } from "@/server/domain/stores/cached";
 import { DashboardShell } from "./DashboardShell";
 
 /**
@@ -23,24 +23,13 @@ async function getSafeAuthCtx(): Promise<AuthCtx | null> {
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { session, user } = await getCurrentSession().catch(() => ({ session: null, user: null }));
 
+  if (user && !user.passwordHash) {
+    redirect("/setup-password?next=/dashboard");
+  }
+
   const [authCtx, tenantStores] = await Promise.all([
     getSafeAuthCtx(),
-    session?.tenantId
-      ? db
-          .select({
-            id: schema.stores.id,
-            name: schema.stores.name,
-            code: schema.stores.code,
-            kind: schema.stores.kind,
-            stateCode: schema.stores.stateCode,
-            gstin: schema.stores.gstin,
-            isActive: schema.stores.isActive,
-          })
-          .from(schema.stores)
-          .where(eq(schema.stores.tenantId, session.tenantId))
-          .orderBy(schema.stores.name)
-          .catch(() => [])
-      : Promise.resolve([]),
+    session?.tenantId ? getCachedTenantStores(session.tenantId).catch(() => []) : Promise.resolve([]),
   ]);
 
   let storeName = "My Pharmacy";

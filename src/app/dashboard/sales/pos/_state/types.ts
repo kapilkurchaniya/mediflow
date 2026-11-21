@@ -74,6 +74,7 @@ export type PosAction =
   | { type: "UPDATE_LINE_LOOSE_QTY"; payload: { batchId: string; looseQty: number } }
   | { type: "UPDATE_LINE_DISCOUNT"; payload: { batchId: string; discountBp: number } }
   | { type: "UPDATE_LINE_BATCH"; payload: { oldBatchId: string; newBatch: SearchResultBatch; reason?: string } }
+  | { type: "CAP_LINE_TO_MAX"; payload: { batchId: string; maxUnits: number } }
   | { type: "REMOVE_LINE"; payload: { batchId: string } }
   | { type: "CLEAR_CART" }
   | { type: "SET_CUSTOMER"; payload: SelectedCustomer | null }

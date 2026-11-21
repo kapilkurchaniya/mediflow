@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useTransition } from "react";
+import React, { useState, useTransition, useRef, useEffect, useMemo } from "react";
 import Link from "next/link";
 import { formatINR } from "@/lib/money";
 import {
@@ -28,50 +28,82 @@ interface ReorderClientProps {
   initialReport: ReorderSuggestionsReport;
   stores: StoreOption[];
   currentStoreId: string;
+  canCreatePo?: boolean;
 }
 
 export function ReorderClient({
   initialReport,
   stores,
   currentStoreId,
+  canCreatePo = true,
 }: ReorderClientProps) {
   const [report, setReport] = useState<ReorderSuggestionsReport>(initialReport);
   const [selectedStoreId, setSelectedStoreId] = useState<string>(currentStoreId);
   const [search, setSearch] = useState<string>("");
+  const [includeNeverStocked, setIncludeNeverStocked] = useState<boolean>(false);
   const [isPending, startTransition] = useTransition();
   const [creatingPoSupplierId, setCreatingPoSupplierId] = useState<string | null>(null);
   const [createdPoNotice, setCreatedPoNotice] = useState<{ poNo: string; id: string } | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [packQtyOverrides, setPackQtyOverrides] = useState<Record<string, number>>({});
+  const [unassignedSupplierId, setUnassignedSupplierId] = useState<string>("");
+  const requestSeqRef = useRef(0);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const handleRefresh = (storeId: string, q: string) => {
+  useEffect(() => {
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+  }, []);
+
+  const fetchReport = (storeId: string, q: string, includeUnstocked: boolean) => {
+    const seq = ++requestSeqRef.current;
     startTransition(async () => {
       try {
-        const res = await getReorderSuggestions(storeId, { search: q || undefined });
-        setReport(res);
+        const res = await getReorderSuggestions(storeId, {
+          search: q.trim() || undefined,
+          includeNeverStocked: includeUnstocked,
+        });
+        if (seq === requestSeqRef.current) {
+          setReport(res);
+        }
       } catch (err: unknown) {
-        setErrorMessage(err instanceof Error ? err.message : "Failed to load reorder suggestions");
+        if (seq === requestSeqRef.current) {
+          setErrorMessage(err instanceof Error ? err.message : "Failed to load reorder suggestions");
+        }
       }
     });
   };
 
-  const handleCreatePo = (supplierId: string) => {
-    if (supplierId === "unassigned") {
-      alert("Cannot create automated PO for unassigned items. Please assign a supplier first.");
+  const liveTotalCostPaise = useMemo(() => {
+    let sum = 0;
+    for (const g of report.suppliers) {
+      for (const item of g.items) {
+        const packs = packQtyOverrides[item.medicineId] ?? item.suggestedPacks;
+        sum += packs * item.lastPurchaseRatePaise;
+      }
+    }
+    return sum;
+  }, [report.suppliers, packQtyOverrides]);
+
+  const handleCreatePo = (groupKey: string, overrideTargetSupplierId?: string) => {
+    const targetSupplierId = overrideTargetSupplierId || groupKey;
+    if (!targetSupplierId || targetSupplierId === "unassigned") {
+      setErrorMessage("Please select a supplier before creating a Draft PO.");
       return;
     }
 
-    const group = report.suppliers.find((s) => s.supplierId === supplierId);
+    const group = report.suppliers.find((s) => s.supplierId === groupKey);
     if (!group || group.items.length === 0) return;
 
-    setCreatingPoSupplierId(supplierId);
+    setCreatingPoSupplierId(groupKey);
     setErrorMessage(null);
     setCreatedPoNotice(null);
 
     startTransition(async () => {
       try {
         const res = await createPoFromReorderAction({
-          supplierId,
+          supplierId: targetSupplierId,
           storeId: selectedStoreId,
           notes: `Automated reorder PO for ${group.items.length} items (${report.storeName})`,
           items: group.items.map((i) => {
@@ -87,11 +119,15 @@ export function ReorderClient({
 
         if (res?.data) {
           setCreatedPoNotice({ poNo: res.data.poNo, id: res.data.id });
-          // Refresh list to exclude ordered items
-          const updated = await getReorderSuggestions(selectedStoreId, { search });
+          const updated = await getReorderSuggestions(selectedStoreId, {
+            search: search.trim() || undefined,
+            includeNeverStocked,
+          });
           setReport(updated);
         } else if (res?.serverError) {
           setErrorMessage(res.serverError);
+        } else if (res?.validationErrors) {
+          setErrorMessage("Please check item quantities and supplier selection.");
         }
       } catch (err: unknown) {
         setErrorMessage(err instanceof Error ? err.message : "Error creating purchase order");
@@ -108,11 +144,11 @@ export function ReorderClient({
         <div>
           <div className="text-xs font-semibold text-teal-700 uppercase tracking-wider flex items-center gap-1.5">
             <Sparkles className="h-3.5 w-3.5" />
-            Procurement Intelligence (Task B3.2)
+            Procurement Intelligence
           </div>
           <h1 className="text-2xl font-bold text-ink-900 mt-1">Reorder Suggestions Engine</h1>
           <p className="text-xs text-ink-500 mt-0.5">
-            Algorithmic replenishment calculating 30-day dispensing velocity, supplier lead time, and safety buffer.
+            Algorithmic replenishment calculating 30-day dispensing velocity, branch thresholds, supplier lead time, and pipeline stock.
           </p>
         </div>
 
@@ -168,8 +204,12 @@ export function ReorderClient({
                 id="store-select"
                 value={selectedStoreId}
                 onChange={(e) => {
-                  setSelectedStoreId(e.target.value);
-                  handleRefresh(e.target.value, search);
+                  const nextStore = e.target.value;
+                  setSelectedStoreId(nextStore);
+                  setPackQtyOverrides({});
+                  setCreatedPoNotice(null);
+                  setErrorMessage(null);
+                  fetchReport(nextStore, search, includeNeverStocked);
                 }}
                 className="select select-sm text-sm border-ink-200"
                 disabled={isPending}
@@ -190,18 +230,36 @@ export function ReorderClient({
               placeholder="Search medicine name or generic..."
               value={search}
               onChange={(e) => {
-                setSearch(e.target.value);
-                handleRefresh(selectedStoreId, e.target.value);
+                const nextQ = e.target.value;
+                setSearch(nextQ);
+                if (debounceRef.current) clearTimeout(debounceRef.current);
+                debounceRef.current = setTimeout(() => {
+                  fetchReport(selectedStoreId, nextQ, includeNeverStocked);
+                }, 300);
               }}
               className="input input-sm pl-9 text-xs border-ink-200 w-64"
             />
           </div>
+
+          <label className="inline-flex items-center gap-1.5 text-xs text-ink-600 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={includeNeverStocked}
+              onChange={(e) => {
+                const nextVal = e.target.checked;
+                setIncludeNeverStocked(nextVal);
+                fetchReport(selectedStoreId, search, nextVal);
+              }}
+              className="rounded border-ink-300 text-brand-600 focus:ring-brand-500"
+            />
+            <span>Include never-stocked catalog items</span>
+          </label>
         </div>
 
         <div className="text-xs text-ink-500 flex items-center gap-2">
           <span>Formula:</span>
           <code className="bg-ink-50 px-2 py-0.5 rounded text-[11px] font-mono border border-ink-200 text-ink-700">
-            ceil(avgDaily × (leadTime + 7)) + reorderLevel − onHand − onOrder
+            ceil(avgDaily × (leadTime + 7)) + reorderLevel − onHand − onOrder − inTransit
           </code>
         </div>
       </div>
@@ -231,8 +289,8 @@ export function ReorderClient({
             <span className="text-xs font-medium text-ink-500 uppercase tracking-wider">Estimated PO Value</span>
             <span className="text-xs font-bold text-emerald-600">₹</span>
           </div>
-          <div className="mt-2 text-2xl font-bold text-emerald-700">{formatINR(report.totalEstimatedCostPaise)}</div>
-          <div className="mt-1 text-xs text-ink-500">Based on last GRN rates</div>
+          <div className="mt-2 text-2xl font-bold text-emerald-700">{formatINR(liveTotalCostPaise)}</div>
+          <div className="mt-1 text-xs text-ink-500">Based on last GRN / batch rates</div>
         </div>
 
         <div className="card p-4 bg-white border border-ink-100 shadow-sm rounded-xl">
@@ -251,7 +309,7 @@ export function ReorderClient({
           <CheckCircle2 className="h-12 w-12 text-emerald-500 mx-auto" />
           <h3 className="text-base font-semibold text-ink-900 mt-4">All Inventory Levels Are Healthy!</h3>
           <p className="text-xs text-ink-500 max-w-md mx-auto mt-1">
-            No medicines in {report.storeName} currently breach safety stock or reorder levels based on 30-day velocity.
+            No stocked medicines in {report.storeName} currently breach safety stock or reorder levels based on 30-day velocity.
           </p>
         </div>
       ) : (
@@ -259,6 +317,10 @@ export function ReorderClient({
           {report.suppliers.map((group) => {
             const isUnassigned = group.supplierId === "unassigned";
             const isSubmitting = creatingPoSupplierId === group.supplierId;
+            const groupLiveTotal = group.items.reduce(
+              (sum, i) => sum + (packQtyOverrides[i.medicineId] ?? i.suggestedPacks) * i.lastPurchaseRatePaise,
+              0
+            );
 
             return (
               <div
@@ -276,17 +338,18 @@ export function ReorderClient({
                         {!isUnassigned && (
                           <span className="text-[11px] font-normal text-ink-500 flex items-center gap-1">
                             <Clock className="h-3 w-3" /> Lead Time: {group.leadTimeDays} days
+                            {group.phone ? ` · ${group.phone}` : ""}
                           </span>
                         )}
                       </div>
                       <div className="text-xs text-ink-500">
                         {group.totalSuggestedItems} {group.totalSuggestedItems === 1 ? "medicine" : "medicines"} to order · Estimated:{" "}
-                        <span className="font-semibold text-ink-900">{formatINR(group.totalEstimatedCostPaise)}</span>
+                        <span className="font-semibold text-ink-900">{formatINR(groupLiveTotal)}</span>
                       </div>
                     </div>
                   </div>
 
-                  {!isUnassigned ? (
+                  {canCreatePo && (!isUnassigned ? (
                     <button
                       type="button"
                       onClick={() => handleCreatePo(group.supplierId)}
@@ -296,11 +359,39 @@ export function ReorderClient({
                       <ShoppingCart className="h-3.5 w-3.5" />
                       {isSubmitting ? "Generating Draft PO..." : `Create Draft PO (${group.totalSuggestedItems})`}
                     </button>
+                  ) : report.activeSuppliers.length > 0 ? (
+                    <div className="flex flex-wrap items-center gap-2">
+                      <select
+                        value={unassignedSupplierId}
+                        onChange={(e) => setUnassignedSupplierId(e.target.value)}
+                        className="select select-sm text-xs border-ink-200"
+                        aria-label="Assign supplier for unassigned items"
+                      >
+                        <option value="">-- Assign Supplier --</option>
+                        {report.activeSuppliers.map((sup) => (
+                          <option key={sup.id} value={sup.id}>
+                            {sup.name}
+                          </option>
+                        ))}
+                      </select>
+                      <button
+                        type="button"
+                        onClick={() => handleCreatePo("unassigned", unassignedSupplierId)}
+                        disabled={!unassignedSupplierId || isSubmitting || isPending}
+                        className="btn btn-primary btn-sm flex items-center gap-1.5 shadow-sm disabled:opacity-50"
+                      >
+                        <ShoppingCart className="h-3.5 w-3.5" />
+                        {isSubmitting ? "Generating..." : `Create Draft PO (${group.totalSuggestedItems})`}
+                      </button>
+                    </div>
                   ) : (
-                    <span className="text-xs text-amber-700 font-medium bg-amber-50 px-2.5 py-1 rounded border border-amber-200">
-                      Requires manual vendor assignment
-                    </span>
-                  )}
+                    <Link
+                      href="/dashboard/suppliers/new?returnTo=/dashboard/purchases/reorder"
+                      className="btn btn-secondary btn-sm text-amber-800 border-amber-300 bg-amber-50 hover:bg-amber-100"
+                    >
+                      + Add Supplier to Create PO
+                    </Link>
+                  ))}
                 </div>
 
                 <div className="overflow-x-auto">
@@ -311,7 +402,7 @@ export function ReorderClient({
                         <th className="py-2.5 px-4 text-center">Packaging</th>
                         <th className="py-2.5 px-4 text-right">On Hand</th>
                         <th className="py-2.5 px-4 text-right">30-Day Avg/Day</th>
-                        <th className="py-2.5 px-4 text-right">On Order</th>
+                        <th className="py-2.5 px-4 text-right">Pipeline (PO / Transit)</th>
                         <th className="py-2.5 px-4 text-right">Reorder Level</th>
                         <th className="py-2.5 px-4 text-right">Suggested Qty</th>
                         <th className="py-2.5 px-4 text-right">Pack Rate</th>
@@ -341,7 +432,15 @@ export function ReorderClient({
                             {item.avgDailySales} /day
                           </td>
                           <td className="py-3 px-4 text-right font-mono text-ink-500">
-                            {item.onOrder > 0 ? `${item.onOrder} ${item.looseUnit}s` : "—"}
+                            {item.onOrder > 0 || item.inTransit > 0 ? (
+                              <span>
+                                {item.onOrder > 0 ? `${item.onOrder} PO` : ""}
+                                {item.onOrder > 0 && item.inTransit > 0 ? " · " : ""}
+                                {item.inTransit > 0 ? `${item.inTransit} Transit` : ""}
+                              </span>
+                            ) : (
+                              "—"
+                            )}
                           </td>
                           <td className="py-3 px-4 text-right font-mono text-ink-500">
                             {item.reorderLevel} {item.looseUnit}s
@@ -368,7 +467,7 @@ export function ReorderClient({
                             </div>
                           </td>
                           <td className="py-3 px-4 text-right font-mono text-ink-600">
-                            {item.lastPurchaseRatePaise > 0 ? formatINR(item.lastPurchaseRatePaise) : "—"}
+                            {item.lastPurchaseRatePaise > 0 ? formatINR(item.lastPurchaseRatePaise) : "Rate TBD"}
                           </td>
                           <td className="py-3 px-4 text-right font-semibold text-ink-900">
                             {formatINR((packQtyOverrides[item.medicineId] ?? item.suggestedPacks) * item.lastPurchaseRatePaise)}
@@ -386,4 +485,3 @@ export function ReorderClient({
     </div>
   );
 }
-

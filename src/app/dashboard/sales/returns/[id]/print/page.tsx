@@ -6,6 +6,7 @@ import { requirePagePermission } from "@/server/rbac";
 import { getSaleReturnById } from "@/app/actions/sales";
 import { formatINR } from "@/lib/format";
 import PrintButton from "@/app/dashboard/sales/[id]/print/PrintButton";
+import { PrintWatermark } from "@/app/components/PrintWatermark";
 
 export const metadata = { title: "Print Credit Note" };
 
@@ -33,6 +34,7 @@ export default async function PrintCreditNotePage({
 
   return (
     <div className="min-h-screen bg-ink-100 py-6 px-4 font-sans text-ink-900 print:bg-white print:p-0 print:m-0 print:min-h-0">
+      {!isThermal && <PrintWatermark />}
       {/* Dynamic print page styling tailored for 80mm thermal roll vs A4 GST Credit Note */}
       <style
         dangerouslySetInnerHTML={{

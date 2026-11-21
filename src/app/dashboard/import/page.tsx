@@ -1,5 +1,6 @@
 import React from "react";
 import Link from "next/link";
+import { forbidden } from "next/navigation";
 import { format } from "date-fns";
 import {
   Upload,
@@ -11,50 +12,63 @@ import {
   ArrowRight,
   Database,
 } from "lucide-react";
-import { requirePagePermission } from "@/server/rbac";
+import { getAuthCtx, can } from "@/server/rbac";
 import { db, schema } from "@/server/db";
 import { desc, eq } from "drizzle-orm";
 import { PageHeader } from "@/app/components/ui";
+import { ImportHubClient, type ImportHubTab } from "./_components/ImportHubClient";
 
 export const metadata = {
   title: "Data Import & Migration Hub — MediFlow",
 };
 
-export default async function ImportHubPage() {
-  const ctx = await requirePagePermission("settings.manage");
+export default async function ImportHubPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ tab?: string }>;
+}) {
+  const ctx = await getAuthCtx();
+  const canQuickImport = can(ctx, "inventory.adjust");
+  const canMigration = can(ctx, "settings.manage");
 
-  const jobs = await db
-    .select({
-      id: schema.importJobs.id,
-      entity: schema.importJobs.entity,
-      source: schema.importJobs.source,
-      fileName: schema.importJobs.fileName,
-      status: schema.importJobs.status,
-      totals: schema.importJobs.totals,
-      createdAt: schema.importJobs.createdAt,
-      finishedAt: schema.importJobs.finishedAt,
-    })
-    .from(schema.importJobs)
-    .where(eq(schema.importJobs.tenantId, ctx.tenantId))
-    .orderBy(desc(schema.importJobs.createdAt))
-    .limit(50);
+  if (!canQuickImport && !canMigration) {
+    forbidden();
+  }
+
+  const { tab } = await searchParams;
+  const initialTab: ImportHubTab =
+    tab === "quick" && canQuickImport
+      ? "quick"
+      : tab === "migration" && canMigration
+      ? "migration"
+      : canQuickImport
+      ? "quick"
+      : "migration";
+
+  const jobs = canMigration
+    ? await db
+        .select({
+          id: schema.importJobs.id,
+          entity: schema.importJobs.entity,
+          source: schema.importJobs.source,
+          fileName: schema.importJobs.fileName,
+          status: schema.importJobs.status,
+          totals: schema.importJobs.totals,
+          createdAt: schema.importJobs.createdAt,
+          finishedAt: schema.importJobs.finishedAt,
+        })
+        .from(schema.importJobs)
+        .where(eq(schema.importJobs.tenantId, ctx.tenantId))
+        .orderBy(desc(schema.importJobs.createdAt))
+        .limit(50)
+    : [];
 
   const totalImports = jobs.length;
   const completedJobs = jobs.filter((j) => j.status === "done");
   const totalCreatedRecords = completedJobs.reduce((acc, j) => acc + (j.totals?.created || 0), 0);
 
-  return (
-    <div className="page space-y-6">
-      <PageHeader
-        title="Data Import & Migration Hub"
-        description="Migrate item masters, opening stock batches, customer balances, and supplier accounts from Marg ERP, GoFrugal, or custom CSV spreadsheets."
-        actions={
-          <Link href="/dashboard/import/new" className="btn btn-primary flex items-center gap-2 shadow-xs">
-            <Plus className="h-4 w-4" /> Start New Import
-          </Link>
-        }
-      />
-
+  const migrationContent = canMigration ? (
+    <div className="space-y-6">
       {/* KPI Stats */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div className="p-5 rounded-2xl border border-slate-200 bg-white">
@@ -81,7 +95,7 @@ export default async function ImportHubPage() {
             <Database className="h-4 w-4 text-brand-600" />
           </div>
           <div className="text-2xl font-bold text-brand-900 mt-2">{totalCreatedRecords.toLocaleString()}</div>
-          <div className="text-xs text-brand-700 mt-1">Medicines, batches & accounts created</div>
+          <div className="text-xs text-brand-700 mt-1">Medicines, batches &amp; accounts created</div>
         </div>
       </div>
 
@@ -114,7 +128,7 @@ export default async function ImportHubPage() {
             <table className="w-full text-xs text-left">
               <thead className="bg-slate-50 text-ink-700 font-semibold uppercase tracking-wider border-b border-slate-200">
                 <tr>
-                  <th className="px-5 py-3.5">File Name & Source</th>
+                  <th className="px-5 py-3.5">File Name &amp; Source</th>
                   <th className="px-5 py-3.5">Entity</th>
                   <th className="px-5 py-3.5">Status</th>
                   <th className="px-5 py-3.5">Rows Staged</th>
@@ -204,6 +218,22 @@ export default async function ImportHubPage() {
           </div>
         )}
       </div>
+    </div>
+  ) : null;
+
+  return (
+    <div className="page space-y-6">
+      <PageHeader
+        title="Data Import & Migration Hub"
+        description="Quickly drop opening stock CSVs or run the full staged migration wizard for Marg ERP, GoFrugal, customers, and suppliers."
+      />
+
+      <ImportHubClient
+        initialTab={initialTab}
+        canQuickImport={canQuickImport}
+        canMigration={canMigration}
+        migrationContent={migrationContent}
+      />
     </div>
   );
 }
