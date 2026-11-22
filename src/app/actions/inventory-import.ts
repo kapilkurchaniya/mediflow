@@ -18,6 +18,10 @@ export type ImportRow = {
   mrp: number; // in paise
   purchaseRate: number; // in paise
   saleRate: number; // in paise
+  unitsPerPack?: number;
+  packSize?: string;
+  packUnit?: string;
+  looseUnit?: string;
 };
 
 export async function processInventoryImport(rows: ImportRow[]) {
@@ -113,6 +117,14 @@ export async function processInventoryImport(rows: ImportRow[]) {
               mrp: cleanMrp,
               purchasePrice: cleanPurchaseRate,
               salePrice: cleanSaleRate,
+              ...(row.unitsPerPack && row.unitsPerPack > 1
+                ? {
+                    unitsPerPack: Math.round(row.unitsPerPack),
+                    packUnit: row.packUnit || "strip",
+                    looseUnit: row.looseUnit || "tablet",
+                  }
+                : {}),
+              ...(row.packSize ? { packSize: row.packSize.trim() } : {}),
             })
             .returning({ id: schema.medicines.id });
           medicineId = newMed.id;

@@ -2,10 +2,12 @@
 
 import { db, schema } from "@/server/db";
 import { eq, and, desc, ilike, or, sql } from "drizzle-orm";
-import { requirePermission, checkPermission } from "@/server/rbac";
+import { requirePermission, checkPermission, can } from "@/server/rbac";
 import { writeAudit } from "@/server/audit";
+import { recordStockMovement } from "@/server/domain/stock";
 import { DEFAULT_GST_RATE_BP, isValidGstRateBp } from "@/lib/regulatory";
 import { revalidatePath } from "next/cache";
+import { z } from "zod";
 
 // --- Categories ---
 
@@ -253,5 +255,206 @@ export async function createMedicine(formData: FormData) {
       return { error: "A medicine with this barcode already exists." };
     }
     return { error: (err instanceof Error ? err.message : String(err)) || "Failed to create medicine" };
+  }
+}
+
+const updateMedicineSchema = z.object({
+  medicineId: z.string().uuid("Invalid medicine ID"),
+  name: z.string().trim().min(1, "Name is required"),
+  genericName: z.string().optional(),
+  manufacturerId: z.string().optional(),
+  categoryId: z.string().optional(),
+  packSize: z.string().optional(),
+  barcode: z.string().optional(),
+  hsn: z.string().optional(),
+  gstRatePct: z.coerce.number(),
+  mrp: z.coerce.number().min(0, "MRP must be non-negative").default(0),
+  salePrice: z.coerce.number().min(0, "Selling price must be non-negative").optional(),
+  purchasePrice: z.coerce.number().min(0, "Purchase price must be non-negative").optional(),
+  unitsPerPack: z.coerce.number().int().min(1, "Units per pack must be a whole number of at least 1"),
+  packUnit: z.string().trim().min(1).default("strip"),
+  looseUnit: z.string().trim().min(1).default("tablet"),
+  rxRequired: z.boolean().default(false),
+  schedule: z.enum(["none", "G", "H", "H1", "X", "narcotic"]).default("none"),
+  isActive: z.boolean().default(true),
+  convertExistingBatches: z.boolean().default(false),
+});
+
+export async function updateMedicine(formData: FormData) {
+  const auth = await checkPermission("medicine.manage");
+  if (!auth.ok) return { error: auth.error };
+  const ctx = auth.ctx;
+
+  const raw = Object.fromEntries(formData.entries());
+  const parsed = updateMedicineSchema.safeParse({
+    ...raw,
+    rxRequired: formData.get("rxRequired") === "on" || formData.get("rxRequired") === "true",
+    isActive: formData.get("isActive") === "on" || formData.get("isActive") === "true",
+    convertExistingBatches:
+      formData.get("convertExistingBatches") === "on" ||
+      formData.get("convertExistingBatches") === "true",
+  });
+
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0].message };
+  }
+
+  const input = parsed.data;
+  const gstRateBp = Math.round(input.gstRatePct * 100);
+  if (!isValidGstRateBp(gstRateBp)) {
+    return { error: "Choose a valid GST rate (0%, 5%, 12%, 18% or 28%)." };
+  }
+
+  if (input.convertExistingBatches && !can(ctx, "inventory.adjust")) {
+    return { error: "You need inventory.adjust permission to convert existing batch stock." };
+  }
+
+  const mrpPaise = Math.round(input.mrp * 100);
+  const salePricePaise =
+    input.salePrice !== undefined && formData.get("salePrice") !== ""
+      ? Math.round(input.salePrice * 100)
+      : mrpPaise;
+  const purchasePricePaise =
+    input.purchasePrice !== undefined && formData.get("purchasePrice") !== ""
+      ? Math.round(input.purchasePrice * 100)
+      : undefined;
+
+  const owns = async (
+    table: typeof schema.categories | typeof schema.manufacturers,
+    id: string,
+  ) => {
+    const [row] = await db
+      .select({ id: table.id })
+      .from(table)
+      .where(and(eq(table.id, id), eq(table.tenantId, ctx.tenantId)));
+    return !!row;
+  };
+  const catId = input.categoryId?.trim() || null;
+  const mfgId = input.manufacturerId?.trim() || null;
+  if (catId && !(await owns(schema.categories, catId))) return { error: "Category not found." };
+  if (mfgId && !(await owns(schema.manufacturers, mfgId))) return { error: "Manufacturer not found." };
+
+  const cleanBarcode = input.barcode?.trim() || null;
+  const cleanPackUnit = input.packUnit.toLowerCase();
+  const cleanLooseUnit = input.looseUnit.toLowerCase();
+
+  try {
+    await db.transaction(async (tx) => {
+      const [existing] = await tx
+        .select()
+        .from(schema.medicines)
+        .where(and(eq(schema.medicines.id, input.medicineId), eq(schema.medicines.tenantId, ctx.tenantId)))
+        .limit(1);
+
+      if (!existing) throw new Error("Medicine not found.");
+
+      await tx
+        .update(schema.medicines)
+        .set({
+          name: input.name,
+          genericName: input.genericName?.trim() || null,
+          manufacturerId: mfgId,
+          categoryId: catId,
+          unit: cleanPackUnit,
+          unitsPerPack: input.unitsPerPack,
+          packUnit: cleanPackUnit,
+          looseUnit: cleanLooseUnit,
+          packSize: input.packSize?.trim() || null,
+          barcode: cleanBarcode,
+          hsn: input.hsn?.trim() || null,
+          gstRateBp,
+          mrp: mrpPaise,
+          salePrice: salePricePaise,
+          ...(purchasePricePaise !== undefined ? { purchasePrice: purchasePricePaise } : {}),
+          rxRequired: input.rxRequired,
+          schedule: input.schedule,
+          isActive: input.isActive,
+          updatedAt: new Date(),
+        })
+        .where(and(eq(schema.medicines.id, input.medicineId), eq(schema.medicines.tenantId, ctx.tenantId)));
+
+      let convertedBatches = 0;
+      if (input.convertExistingBatches && input.unitsPerPack !== existing.unitsPerPack) {
+        const oldUpp = Math.max(1, existing.unitsPerPack);
+        const newUpp = input.unitsPerPack;
+        const storeBatches = await tx
+          .select()
+          .from(schema.batches)
+          .where(
+            and(
+              eq(schema.batches.tenantId, ctx.tenantId),
+              eq(schema.batches.storeId, ctx.storeId),
+              eq(schema.batches.medicineId, input.medicineId),
+            ),
+          );
+
+        for (const b of storeBatches) {
+          const targetQty = Math.round((b.qtyOnHand * newUpp) / oldUpp);
+          const qtyDelta = targetQty - b.qtyOnHand;
+          const adjustedPtr = Math.round((b.purchaseRate * oldUpp) / newUpp);
+
+          if (qtyDelta !== 0) {
+            await recordStockMovement({
+              tx,
+              tenantId: ctx.tenantId,
+              storeId: ctx.storeId,
+              batchId: b.id,
+              medicineId: input.medicineId,
+              type: "adjustment",
+              qtyChange: qtyDelta,
+              unitCost: adjustedPtr > 0 ? adjustedPtr : null,
+              refType: "medicine_pack_conversion",
+              note: `Pack conversion: ${oldUpp} → ${newUpp} ${cleanLooseUnit}s/${cleanPackUnit}`,
+              userId: ctx.userId,
+            });
+          }
+
+          await tx
+            .update(schema.batches)
+            .set({ purchaseRate: adjustedPtr, updatedAt: new Date() })
+            .where(eq(schema.batches.id, b.id));
+          convertedBatches++;
+        }
+      }
+
+      await writeAudit(tx, ctx, {
+        action: "update",
+        entityType: "medicine",
+        entityId: input.medicineId,
+        oldValue: {
+          name: existing.name,
+          unitsPerPack: existing.unitsPerPack,
+          packUnit: existing.packUnit,
+          looseUnit: existing.looseUnit,
+          mrp: existing.mrp,
+          salePrice: existing.salePrice,
+          gstRateBp: existing.gstRateBp,
+          isActive: existing.isActive,
+        },
+        newValue: {
+          name: input.name,
+          unitsPerPack: input.unitsPerPack,
+          packUnit: cleanPackUnit,
+          looseUnit: cleanLooseUnit,
+          mrp: mrpPaise,
+          salePrice: salePricePaise,
+          gstRateBp,
+          isActive: input.isActive,
+          convertedBatches,
+        },
+        reason: "Updated medicine details",
+      });
+    });
+
+    revalidatePath("/dashboard/inventory");
+    revalidatePath("/dashboard/inventory/batches");
+    revalidatePath("/dashboard/sales/pos");
+    revalidatePath("/dashboard");
+    return { success: true };
+  } catch (err: unknown) {
+    if ((err instanceof Error ? err.message : String(err))?.includes("medicines_tenant_barcode_uq")) {
+      return { error: "A medicine with this barcode already exists." };
+    }
+    return { error: (err instanceof Error ? err.message : String(err)) || "Failed to update medicine" };
   }
 }

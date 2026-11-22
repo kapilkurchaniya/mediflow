@@ -1,11 +1,12 @@
-import { getMedicines, getMedicinesCount } from "@/app/actions/inventory";
+import { getMedicines, getMedicinesCount, getCategories, getManufacturers } from "@/app/actions/inventory";
 import { getRacks } from "@/app/actions/racks";
-import { Plus, Pill, Upload } from "lucide-react";
+import { Plus, Pill, Upload, Boxes } from "lucide-react";
 import Link from "next/link";
 import { PageHeader, SearchForm, EmptyState, TableWrapper } from "@/app/components/ui";
 import { formatINR, formatNumber } from "@/lib/format";
 import { requirePagePermission, can } from "@/server/rbac";
 import { BranchSettingsButton } from "./_components/BranchSettingsButton";
+import { EditMedicineButton } from "./_components/EditMedicineButton";
 import { Pagination } from "@/app/components/Pagination";
 
 export const metadata = { title: "Item master" };
@@ -23,10 +24,12 @@ export default async function InventoryPage({
   const PAGE_SIZE = 50;
   const offset = (page - 1) * PAGE_SIZE;
 
-  const [items, totalCount, racks] = await Promise.all([
+  const [items, totalCount, racks, categories, manufacturers] = await Promise.all([
     getMedicines(q, PAGE_SIZE, offset),
     getMedicinesCount(q),
     getRacks(),
+    canManage ? getCategories() : Promise.resolve([]),
+    canManage ? getManufacturers() : Promise.resolve([]),
   ]);
   const rxCount = items.filter((i) => i.medicine.rxRequired).length;
 
@@ -74,7 +77,7 @@ export default async function InventoryPage({
                     <th className="text-right">MRP</th>
                     <th className="text-right">Sale price</th>
                     <th className="text-right">Status</th>
-                    <th className="w-10 text-right">Branch</th>
+                    <th className="w-28 text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -117,13 +120,32 @@ export default async function InventoryPage({
                         </span>
                       </td>
                       <td className="text-right">
-                        {canManage && (
-                          <BranchSettingsButton
-                            medicine={medicine}
-                            branchSettings={branchSettings}
-                            racks={racks}
-                          />
-                        )}
+                        <div className="inline-flex items-center justify-end gap-1">
+                          <Link
+                            href={`/dashboard/inventory/batches?medicineId=${medicine.id}`}
+                            className="p-1.5 rounded text-ink-400 hover:text-brand-600 hover:bg-brand-50 transition-colors"
+                            data-tooltip-title="View & Edit Stock"
+                            data-tooltip={`Inspect and adjust batch stock for ${medicine.name}`}
+                            aria-label={`View stock batches for ${medicine.name}`}
+                          >
+                            <Boxes className="w-4 h-4" />
+                          </Link>
+                          {canManage && (
+                            <EditMedicineButton
+                              medicine={medicine}
+                              categories={categories}
+                              manufacturers={manufacturers}
+                              canAdjustStock={canAdjust}
+                            />
+                          )}
+                          {canManage && (
+                            <BranchSettingsButton
+                              medicine={medicine}
+                              branchSettings={branchSettings}
+                              racks={racks}
+                            />
+                          )}
+                        </div>
                       </td>
                     </tr>
                   ))}
