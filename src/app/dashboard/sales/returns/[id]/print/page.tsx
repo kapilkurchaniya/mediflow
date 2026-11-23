@@ -1,10 +1,9 @@
 import { notFound } from "next/navigation";
-import { format } from "date-fns";
 import { ArrowLeft, Printer, Receipt, FileText } from "lucide-react";
 import Link from "next/link";
 import { requirePagePermission } from "@/server/rbac";
 import { getSaleReturnById } from "@/app/actions/sales";
-import { formatINR } from "@/lib/format";
+import { formatINR, formatISTDate, formatISTDateTime } from "@/lib/format";
 import PrintButton from "@/app/dashboard/sales/[id]/print/PrintButton";
 import { PrintWatermark } from "@/app/components/PrintWatermark";
 
@@ -106,9 +105,9 @@ export default async function PrintCreditNotePage({
           <div className="py-2 border-b border-dashed border-black text-[10px] space-y-0.5">
             <div className="flex justify-between font-bold">
               <span>CN No: {saleReturn.returnNo}</span>
-              <span>{format(returnDate, "dd/MM/yy HH:mm")}</span>
+              <span>{formatISTDateTime(returnDate, "compact")}</span>
             </div>
-            <div>Ref Inv: {sale.invoiceNo} ({format(origSaleDate, "dd/MM/yy")})</div>
+            <div>Ref Inv: {sale.invoiceNo} ({formatISTDate(origSaleDate, "compact")})</div>
             <div>Cust: {customer?.name || "Walk-in"}</div>
             {customer?.phone && <div>Phone: {customer.phone}</div>}
             <div>Refund Method: {saleReturn.refundMethod.toUpperCase()}</div>
@@ -186,9 +185,9 @@ export default async function PrintCreditNotePage({
               <div className="text-[11px] text-ink-500 font-medium">(Under Section 34 of CGST Act / Rule 46)</div>
               <div className="mt-2 bg-amber-50/80 rounded-lg p-2.5 border border-amber-200 text-left text-xs font-mono inline-block">
                 <div><span className="text-ink-500">Credit Note:</span> <strong>{saleReturn.returnNo}</strong></div>
-                <div className="mt-0.5"><span className="text-ink-500">Date:</span> {format(returnDate, "dd MMM yyyy, hh:mm a")}</div>
+                <div className="mt-0.5"><span className="text-ink-500">Date:</span> {formatISTDateTime(returnDate, "short")}</div>
                 <div className="mt-0.5 border-t border-amber-200/80 pt-0.5 text-ink-600">
-                  <span className="text-ink-500">Original Inv:</span> <strong>{sale.invoiceNo}</strong> ({format(origSaleDate, "dd/MM/yyyy")})
+                  <span className="text-ink-500">Original Inv:</span> <strong>{sale.invoiceNo}</strong> ({formatISTDate(origSaleDate, "numeric")})
                 </div>
               </div>
             </div>
