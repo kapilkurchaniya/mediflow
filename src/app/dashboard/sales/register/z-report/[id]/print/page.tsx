@@ -1,11 +1,10 @@
 import { notFound } from "next/navigation";
-import { format } from "date-fns";
 import { ArrowLeft, Printer, Receipt, FileText, CheckCircle2, AlertTriangle } from "lucide-react";
 import Link from "next/link";
 import { requirePagePermission } from "@/server/rbac";
 import { getZReport } from "@/server/domain/cash-sessions";
 import { db } from "@/server/db";
-import { formatINR } from "@/lib/format";
+import { formatINR, formatISTDateTime } from "@/lib/format";
 import PrintButton from "@/app/dashboard/sales/[id]/print/PrintButton";
 import { PrintWatermark } from "@/app/components/PrintWatermark";
 
@@ -125,14 +124,14 @@ export default async function PrintZReportPage({
             </div>
             <div className="flex justify-between">
               <span>Opened At:</span>
-              <span>{format(new Date(shift.openedAt), "dd-MMM-yyyy hh:mm a")}</span>
+              <span>{formatISTDateTime(shift.openedAt, "short")}</span>
             </div>
             <div className="flex justify-between">
               <span>Closed At:</span>
               <span>
                 {shift.closedAt
-                  ? format(new Date(shift.closedAt), "dd-MMM-yyyy hh:mm a")
-                  : format(new Date(generatedAt), "dd-MMM-yyyy hh:mm a")}
+                  ? formatISTDateTime(shift.closedAt, "short")
+                  : formatISTDateTime(generatedAt, "short")}
               </span>
             </div>
             <div className="flex justify-between">
@@ -307,13 +306,13 @@ export default async function PrintZReportPage({
             <div>
               <span className="text-ink-400 block uppercase tracking-wider text-[10px]">Opened By / At</span>
               <span className="font-semibold text-ink-900 block">{shift.openedByName}</span>
-              <span className="font-mono text-ink-600 text-[11px]">{format(new Date(shift.openedAt), "dd/MM/yyyy HH:mm")}</span>
+              <span className="font-mono text-ink-600 text-[11px]">{formatISTDateTime(shift.openedAt, "numeric")}</span>
             </div>
             <div>
               <span className="text-ink-400 block uppercase tracking-wider text-[10px]">Closed By / At</span>
               <span className="font-semibold text-ink-900 block">{shift.closedByName ?? shift.openedByName}</span>
               <span className="font-mono text-ink-600 text-[11px]">
-                {shift.closedAt ? format(new Date(shift.closedAt), "dd/MM/yyyy HH:mm") : "—"}
+                {shift.closedAt ? formatISTDateTime(shift.closedAt, "numeric") : "—"}
               </span>
             </div>
             <div>

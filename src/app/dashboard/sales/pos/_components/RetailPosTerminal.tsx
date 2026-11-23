@@ -206,7 +206,7 @@ export function RetailPosTerminal() {
           const bill = await getPosDB().pendingSales.get(res.saleId);
           if (bill) setOfflineReceiptBill(bill);
         } else {
-          router.push(`/dashboard/sales/${res.saleId}/print?format=thermal`);
+          router.push(`/dashboard/sales/${res.saleId}/print`);
         }
       } else {
         setSubmitError(res.error || "Failed to finalize sale");
