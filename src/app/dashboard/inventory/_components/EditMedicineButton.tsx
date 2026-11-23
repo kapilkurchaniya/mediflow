@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Edit2, X, Check, Loader2, AlertCircle, Info } from "lucide-react";
 import { updateMedicine } from "@/app/actions/inventory";
 import { useRouter } from "next/navigation";
+import { RackSelectorField, type RackOption } from "./RackSelectorField";
 
 export interface EditableMedicineData {
   id: string;
@@ -30,6 +31,8 @@ interface EditMedicineButtonProps {
   medicine: EditableMedicineData;
   categories: Array<{ id: string; name: string }>;
   manufacturers: Array<{ id: string; name: string }>;
+  racks?: RackOption[];
+  currentRackId?: string | null;
   canAdjustStock?: boolean;
 }
 
@@ -37,6 +40,8 @@ export function EditMedicineButton({
   medicine,
   categories,
   manufacturers,
+  racks = [],
+  currentRackId = null,
   canAdjustStock = false,
 }: EditMedicineButtonProps) {
   const router = useRouter();
@@ -59,6 +64,7 @@ export function EditMedicineButton({
   const [looseUnit, setLooseUnit] = useState(medicine.looseUnit || "tablet");
   const [packSize, setPackSize] = useState(medicine.packSize || "");
   const [schedule, setSchedule] = useState(medicine.schedule || "none");
+  const [rackId, setRackId] = useState(currentRackId || "");
   const [rxRequired, setRxRequired] = useState(medicine.rxRequired);
   const [isActive, setIsActive] = useState(medicine.isActive);
   const [convertExistingBatches, setConvertExistingBatches] = useState(false);
@@ -82,6 +88,7 @@ export function EditMedicineButton({
     setLooseUnit(medicine.looseUnit || "tablet");
     setPackSize(medicine.packSize || "");
     setSchedule(medicine.schedule || "none");
+    setRackId(currentRackId || "");
     setRxRequired(medicine.rxRequired);
     setIsActive(medicine.isActive);
     setConvertExistingBatches(false);
@@ -111,6 +118,7 @@ export function EditMedicineButton({
     fd.append("looseUnit", looseUnit);
     fd.append("packSize", packSize);
     fd.append("schedule", schedule);
+    fd.append("rackId", rackId);
     if (rxRequired) fd.append("rxRequired", "on");
     if (isActive) fd.append("isActive", "on");
     if (uppChanged && convertExistingBatches) fd.append("convertExistingBatches", "on");
@@ -394,6 +402,24 @@ export function EditMedicineButton({
                         className="input font-mono"
                       />
                     </div>
+                  </div>
+                </div>
+
+                <div className="space-y-3 pt-4 border-t border-ink-150">
+                  <h4 className="text-xs font-semibold uppercase tracking-wider text-ink-400">
+                    Storage Location (Rack &amp; Shelf)
+                  </h4>
+                  <div>
+                    <label className="label" htmlFor={`med-rack-${medicine.id}`}>Rack / Shelf</label>
+                    <RackSelectorField
+                      id={`med-rack-${medicine.id}`}
+                      value={rackId}
+                      onChange={setRackId}
+                      racks={racks}
+                    />
+                    <p className="text-[11px] text-ink-400 mt-1">
+                      Shown on POS search results so billing staff can locate this medicine immediately.
+                    </p>
                   </div>
                 </div>
 

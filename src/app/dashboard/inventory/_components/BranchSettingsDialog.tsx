@@ -7,6 +7,7 @@ import { updateStoreMedicineSettingsAction } from "@/app/actions/store-settings"
 import { actionError } from "@/lib/action-result";
 import { useShell } from "@/app/components/ShellContext";
 import { formatINR } from "@/lib/format";
+import { RackSelectorField } from "./RackSelectorField";
 
 interface BranchSettingsDialogProps {
   medicine: {
@@ -147,19 +148,13 @@ export function BranchSettingsDialog({
           )}
 
           <div className="space-y-1">
-            <label className="text-xs font-medium text-ink-700">Store Rack / Shelf</label>
-            <select
+            <label className="text-xs font-medium text-ink-700" htmlFor={`branch-rack-${medicine.id}`}>Store Rack / Shelf</label>
+            <RackSelectorField
+              id={`branch-rack-${medicine.id}`}
               value={rackId}
-              onChange={(e) => setRackId(e.target.value)}
-              className="input w-full text-xs"
-            >
-              <option value="">— Unassigned (No Rack) —</option>
-              {racks.map((r) => (
-                <option key={r.id} value={r.id}>
-                  {r.code} - {r.name}
-                </option>
-              ))}
-            </select>
+              onChange={setRackId}
+              racks={racks}
+            />
             <p className="text-[11px] text-ink-400">Physical layout assignment specific to this branch.</p>
           </div>
 

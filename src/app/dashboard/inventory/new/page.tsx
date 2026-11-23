@@ -7,6 +7,7 @@ import { AlertCircle, Check, Plus } from "lucide-react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { PageHeader, FormSection, Field } from "@/app/components/ui";
+import { RackSelectorField } from "../_components/RackSelectorField";
 
 function InlineCreate({
   value,
@@ -49,6 +50,7 @@ export default function NewMedicinePage() {
   const [packUnit, setPackUnit] = useState("strip");
   const [unitsPerPack, setUnitsPerPack] = useState("10");
   const [looseUnit, setLooseUnit] = useState("tablet");
+  const [selectedRackId, setSelectedRackId] = useState("");
 
   useEffect(() => {
     // Load categories, manufacturers, and racks on mount
@@ -248,14 +250,14 @@ export default function NewMedicinePage() {
 
           <FormSection title="Storage location" description="Physical shelf or rack where this item is kept in the store.">
             <Field label="Rack / Shelf" htmlFor="rackId" hint="Shown on POS search results so billing staff can locate items instantly." className="sm:col-span-2">
-              <select id="rackId" name="rackId" className="input">
-                <option value="">No rack assigned</option>
-                {racks.map((r) => (
-                  <option key={r.id} value={r.id}>
-                    {r.code} — {r.name}
-                  </option>
-                ))}
-              </select>
+              <RackSelectorField
+                id="rackId"
+                name="rackId"
+                value={selectedRackId}
+                onChange={setSelectedRackId}
+                racks={racks}
+                onRackCreated={(r) => setRacks((prev) => [...prev, r])}
+              />
             </Field>
           </FormSection>
         </div>
