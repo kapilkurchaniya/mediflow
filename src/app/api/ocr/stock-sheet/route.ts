@@ -6,6 +6,7 @@ import { getAuthCtx, can } from "@/server/rbac";
 import { checkAiRateLimit } from "@/server/ai/rate-limiter";
 import { readAndValidateOcrFile, runStructuredOcr } from "@/server/ai/ocr";
 import { DEFAULT_GST_RATE_BP, isValidGstRateBp, type GstRateBp } from "@/lib/regulatory";
+import { parsePackaging, resolveOcrCatalogPackConflict } from "@/lib/packaging";
 
 export const maxDuration = 60;
 
@@ -18,6 +19,11 @@ const StockSheetOcrSchema = z.object({
       hsn: z.string().nullable().optional(),
       batchNo: z.string().nullable().optional(),
       expiryDate: z.string().nullable().optional(),
+      packRaw: z.string().nullable().optional(),
+      dosageForm: z
+        .enum(["tablet", "capsule", "syrup", "cream", "injection", "drops", "sachet", "other"])
+        .nullable()
+        .optional(),
       unitsPerPack: z.number().int().min(1).default(1),
       qtyPacks: z.number().int().min(0).default(0),
       qtyLoose: z.number().int().min(0).default(0),
@@ -67,7 +73,9 @@ For each row return:
 - genericName, manufacturer, hsn (if visible)
 - batchNo (uppercase string, or empty if not visible)
 - expiryDate (YYYY-MM-DD, using last day of month if MM/YY)
-- unitsPerPack (integer >= 1, default 1)
+- packRaw (exact printed pack text e.g. "10'S", "1x15", "100ML", "15GM", or null if omitted)
+- dosageForm ("tablet", "capsule", "syrup", "cream", "injection", "drops", "sachet", or "other")
+- unitsPerPack (integer tablets/capsules per strip e.g. 10 or 15; ALWAYS 1 for syrups, creams, drops, vials, injections)
 - qtyPacks (integer packs/strips/bottles)
 - qtyLoose (integer loose units/tablets if any)
 - ptrRupees, mrpRupees, saleRateRupees (in INR per pack)
@@ -136,6 +144,16 @@ For each row return:
       const ptrPaise = Math.round((it.ptrRupees || 0) * 100) || (mrpPaise > 0 ? Math.round(mrpPaise * 0.8) : 0);
       const saleRatePaise = Math.round((it.saleRateRupees || 0) * 100) || mrpPaise;
 
+      const parsedPack = parsePackaging({
+        packRaw: it.packRaw || (it.unitsPerPack > 1 ? String(it.unitsPerPack) : ""),
+        medicineName: cleanName,
+        dosageForm: it.dosageForm,
+      });
+      const packResolution = resolveOcrCatalogPackConflict(
+        matchedMed?.unitsPerPack ?? null,
+        parsedPack.unitsPerPack
+      );
+
       return {
         rowKey: `ocr-${idx}`,
         medicineName: cleanName,
@@ -153,7 +171,13 @@ For each row return:
           : ("new_medicine" as const),
         batchNo: batchNo || `OCR-${idx + 1}`,
         expiryDate: normalizeExpiry(it.expiryDate),
-        unitsPerPack: matchedMed?.unitsPerPack || Math.max(1, it.unitsPerPack || 1),
+        packRaw: parsedPack.packSize || "",
+        packUnit: parsedPack.packUnit,
+        looseUnit: parsedPack.looseUnit,
+        unitsPerPack: packResolution.effectiveUpp,
+        catalogUnitsPerPack: packResolution.catalogUpp,
+        packMismatch: packResolution.packMismatch,
+        suggestCatalogUpdate: packResolution.suggestCatalogUpdate,
         qtyPacks: Math.max(0, it.qtyPacks || 0),
         qtyLoose: Math.max(0, it.qtyLoose || 0),
         ptrPaise,
