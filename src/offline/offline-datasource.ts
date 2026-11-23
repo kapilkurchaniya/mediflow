@@ -11,6 +11,7 @@ import type { PosDB } from "./db";
 import { searchMedicines, searchCustomers, searchDoctors, getBatchAvailableStock } from "./search";
 import { createOfflineSale } from "./offline-sale";
 import type { PaymentMethod } from "./types";
+import { scheduleRequiresRx } from "@/lib/schedule";
 
 export interface OfflinePosContext {
   tenantId: string;
@@ -33,7 +34,7 @@ export class OfflinePosDataSource implements PosDataSource {
         name: r.medicine.name,
         genericName: r.medicine.genericName,
         gstRateBp: 500,
-        rxRequired: Boolean(r.medicine.schedule),
+        rxRequired: scheduleRequiresRx(r.medicine.schedule),
         schedule: r.medicine.schedule,
         rackCode: null,
         rackName: null,
