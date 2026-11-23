@@ -5,6 +5,11 @@ import { getCurrentSession } from "@/server/auth";
 import { parsePackaging, type LooseUnit, type PackUnit } from "@/lib/packaging";
 import { normalizeDrugSchedule, scheduleRequiresRx, type DrugSchedule } from "@/lib/schedule";
 import { DEFAULT_GST_RATE_BP, isValidGstRateBp } from "@/lib/regulatory";
+import {
+  checkCdscoBannedFdc,
+  lookupIndianDrugReference,
+  type BannedFdcMatch,
+} from "@/lib/indian-drug-catalog";
 
 export interface EnrichMedicineRequest {
   medicineName: string;
@@ -23,51 +28,16 @@ export interface EnrichMedicineResponse {
   packUnit?: PackUnit;
   looseUnit?: LooseUnit;
   description?: string;
+  bannedFdc?: BannedFdcMatch;
   source: string; // which model or search provided it
 }
-
-interface MasterDictEntry {
-  match: string[];
-  manufacturer: string;
-  category: string;
-  genericName: string;
-  schedule: DrugSchedule;
-  hsn: string;
-  gstRateBp: number;
-  mrp: number;
-  unitsPerPack: number;
-  packUnit: PackUnit;
-  looseUnit: LooseUnit;
-}
-
-const PHARMA_MASTER_DICT: MasterDictEntry[] = [
-  { match: ["augmentin"], manufacturer: "GlaxoSmithKline", category: "Antibiotic", genericName: "Amoxycillin 500mg + Clavulanic Acid 125mg", schedule: "H1", hsn: "300410", gstRateBp: 500, mrp: 22350, unitsPerPack: 10, packUnit: "strip", looseUnit: "tablet" },
-  { match: ["pan-d", "pand"], manufacturer: "Alkem Laboratories", category: "Gastrointestinal", genericName: "Pantoprazole 40mg + Domperidone 30mg", schedule: "H", hsn: "30049099", gstRateBp: 500, mrp: 19900, unitsPerPack: 15, packUnit: "strip", looseUnit: "capsule" },
-  { match: ["pantoprazole", "pantocid"], manufacturer: "Sun Pharma", category: "Gastrointestinal", genericName: "Pantoprazole 40mg", schedule: "H", hsn: "30049099", gstRateBp: 500, mrp: 9500, unitsPerPack: 15, packUnit: "strip", looseUnit: "tablet" },
-  { match: ["azithral", "azithromycin"], manufacturer: "Alembic Pharmaceuticals", category: "Antibiotic", genericName: "Azithromycin 500mg", schedule: "H", hsn: "300420", gstRateBp: 500, mrp: 13200, unitsPerPack: 5, packUnit: "strip", looseUnit: "tablet" },
-  { match: ["amoxicillin"], manufacturer: "Cipla", category: "Antibiotic", genericName: "Amoxycillin 500mg", schedule: "H", hsn: "300410", gstRateBp: 500, mrp: 8000, unitsPerPack: 10, packUnit: "strip", looseUnit: "capsule" },
-  { match: ["glycomet-gp", "glycomet gp"], manufacturer: "USV", category: "Antidiabetic", genericName: "Glimepiride + Metformin", schedule: "H", hsn: "30049099", gstRateBp: 500, mrp: 13210, unitsPerPack: 10, packUnit: "strip", looseUnit: "tablet" },
-  { match: ["glycomet", "metformin"], manufacturer: "USV", category: "Antidiabetic", genericName: "Metformin 500mg", schedule: "G", hsn: "30049099", gstRateBp: 500, mrp: 5500, unitsPerPack: 10, packUnit: "strip", looseUnit: "tablet" },
-  { match: ["amlong", "amlodipine"], manufacturer: "Micro Labs", category: "Cardiovascular & BP", genericName: "Amlodipine", schedule: "H", hsn: "30049072", gstRateBp: 500, mrp: 3500, unitsPerPack: 15, packUnit: "strip", looseUnit: "tablet" },
-  { match: ["olmezest"], manufacturer: "Sun Pharma", category: "Cardiovascular & BP", genericName: "Olmesartan Medoxomil", schedule: "H", hsn: "30049079", gstRateBp: 500, mrp: 28120, unitsPerPack: 10, packUnit: "strip", looseUnit: "tablet" },
-  { match: ["onglyza"], manufacturer: "AstraZeneca", category: "Antidiabetic", genericName: "Saxagliptin 5mg", schedule: "H", hsn: "30049099", gstRateBp: 500, mrp: 44560, unitsPerPack: 14, packUnit: "strip", looseUnit: "tablet" },
-  { match: ["starpress"], manufacturer: "Lupin", category: "Cardiovascular & BP", genericName: "Metoprolol Succinate", schedule: "H", hsn: "30049074", gstRateBp: 500, mrp: 9500, unitsPerPack: 15, packUnit: "strip", looseUnit: "tablet" },
-  { match: ["vildaprime"], manufacturer: "Primus", category: "Antidiabetic", genericName: "Vildagliptin 50mg", schedule: "H", hsn: "30049099", gstRateBp: 500, mrp: 13305, unitsPerPack: 15, packUnit: "strip", looseUnit: "tablet" },
-  { match: ["vozuca"], manufacturer: "Dr. Reddy's", category: "Antidiabetic", genericName: "Voglibose 0.3mg", schedule: "H", hsn: "30049099", gstRateBp: 500, mrp: 15660, unitsPerPack: 15, packUnit: "strip", looseUnit: "tablet" },
-  { match: ["atorvastatin", "atorva"], manufacturer: "Sun Pharma", category: "Cardiovascular & BP", genericName: "Atorvastatin 10mg", schedule: "H", hsn: "30049099", gstRateBp: 500, mrp: 10500, unitsPerPack: 10, packUnit: "strip", looseUnit: "tablet" },
-  { match: ["telma", "telmisartan"], manufacturer: "Glenmark Pharmaceuticals", category: "Cardiovascular & BP", genericName: "Telmisartan 40mg", schedule: "H", hsn: "30049099", gstRateBp: 500, mrp: 21000, unitsPerPack: 15, packUnit: "strip", looseUnit: "tablet" },
-  { match: ["allegra", "fexofenadine"], manufacturer: "Sanofi India", category: "Antihistamine & Allergy", genericName: "Fexofenadine 120mg", schedule: "H", hsn: "30049099", gstRateBp: 500, mrp: 24200, unitsPerPack: 10, packUnit: "strip", looseUnit: "tablet" },
-  { match: ["dolo", "paracetamol", "calpol"], manufacturer: "Micro Labs", category: "Analgesic & Antipyretic", genericName: "Paracetamol 650mg", schedule: "none", hsn: "30049099", gstRateBp: 500, mrp: 3500, unitsPerPack: 15, packUnit: "strip", looseUnit: "tablet" },
-];
 
 export async function enrichMedicineDetails(req: EnrichMedicineRequest): Promise<EnrichMedicineResponse | null> {
   const { session } = await getCurrentSession();
   if (!session?.tenantId) throw new Error("Unauthorized");
 
-  const lower = (req.medicineName || "").toLowerCase();
-
-  // Instant Pharmacopeia Master Dictionary lookup
-  const dictHit = PHARMA_MASTER_DICT.find((entry) => entry.match.some((k) => lower.includes(k)));
+  // Instant Offline Indian Pharmacy Reference Catalog lookup (0ms, zero API cost)
+  const dictHit = lookupIndianDrugReference(req.medicineName);
   if (dictHit) {
     return {
       manufacturer: dictHit.manufacturer,
@@ -77,11 +47,12 @@ export async function enrichMedicineDetails(req: EnrichMedicineRequest): Promise
       rxRequired: scheduleRequiresRx(dictHit.schedule),
       hsn: dictHit.hsn,
       gstRateBp: dictHit.gstRateBp,
-      mrp: dictHit.mrp,
+      mrp: dictHit.mrpPaise,
       unitsPerPack: dictHit.unitsPerPack,
       packUnit: dictHit.packUnit,
       looseUnit: dictHit.looseUnit,
-      source: "Pharma Master Dictionary",
+      bannedFdc: checkCdscoBannedFdc(req.medicineName, dictHit.genericName),
+      source: "Indian Drug Reference Catalog",
     };
   }
 
@@ -128,10 +99,12 @@ Return ONLY a valid raw JSON object (no markdown fences) with:
     const rawGstBp = Number.isFinite(Number(data.gstPct)) ? Math.round(Number(data.gstPct) * 100) : DEFAULT_GST_RATE_BP;
     const gstRateBp = isValidGstRateBp(rawGstBp) ? rawGstBp : DEFAULT_GST_RATE_BP;
 
+    const genericName = typeof data.genericName === "string" ? data.genericName.trim() : "";
+
     return {
       manufacturer: data.manufacturer || "Unknown",
       category: data.category || "OTC & Wellness",
-      genericName: typeof data.genericName === "string" ? data.genericName.trim() : "",
+      genericName,
       schedule,
       rxRequired: scheduleRequiresRx(schedule),
       hsn: typeof data.hsn === "string" && data.hsn.trim() ? data.hsn.trim() : "30049099",
@@ -140,6 +113,7 @@ Return ONLY a valid raw JSON object (no markdown fences) with:
       unitsPerPack: sanitized.unitsPerPack,
       packUnit: sanitized.packUnit,
       looseUnit: sanitized.looseUnit,
+      bannedFdc: checkCdscoBannedFdc(req.medicineName, genericName),
       source: aiRes.model,
     };
   } catch (error) {
