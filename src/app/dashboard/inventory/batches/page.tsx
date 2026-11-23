@@ -7,7 +7,7 @@ import { formatINR, formatNumber, daysUntil } from "@/lib/format";
 import { ExpiryDateFilter } from "@/app/components/ExpiryDateFilter";
 import { resolveExpiryDateRange } from "@/lib/date-range";
 import { ExportButton } from "@/app/components/ExportButton";
-import { requirePagePermission } from "@/server/rbac";
+import { requirePagePermission, can } from "@/server/rbac";
 import { BackfillPtrBanner } from "./BackfillPtrBanner";
 import { EditBatchButton } from "./EditBatchModal";
 import { StockOcrButton } from "./_components/StockOcrButton";
@@ -28,16 +28,18 @@ function ExpiryBadge({ date }: { date: string }) {
 export default async function BatchesPage({
   searchParams,
 }: {
-  searchParams: Promise<{ nearExpiry?: string; range?: string; from?: string; to?: string }>;
+  searchParams: Promise<{ nearExpiry?: string; range?: string; from?: string; to?: string; medicineId?: string }>;
 }) {
-  await requirePagePermission("inventory.view");
-  const { nearExpiry, range, from, to } = await searchParams;
+  const ctx = await requirePagePermission("inventory.view");
+  const canAdjust = can(ctx, "inventory.adjust");
+  const { nearExpiry, range, from, to, medicineId } = await searchParams;
   const isNearExpiry = nearExpiry === "true";
   const dateRange = resolveExpiryDateRange({ range, from, to });
   const batches = await getBatches({
     nearExpiryOnly: isNearExpiry,
     from: dateRange.from,
     to: dateRange.to,
+    medicineId: medicineId || null,
   });
 
   const getEffectivePtr = (b: (typeof batches)[0]["batch"], m: (typeof batches)[0]["medicine"]) => {
@@ -136,7 +138,14 @@ export default async function BatchesPage({
               Near expiry
             </Link>
           </div>
-          <span className="text-[12.5px] text-ink-500 num">{formatNumber(batches.length)} rows</span>
+          <span className="text-[12.5px] text-ink-500 num">
+            {medicineId && (
+              <Link href="/dashboard/inventory/batches" className="mr-3 text-brand-700 hover:underline font-sans">
+                Clear medicine filter &times;
+              </Link>
+            )}
+            {formatNumber(batches.length)} rows
+          </span>
         </div>
 
         {batches.length > 0 ? (
@@ -194,21 +203,33 @@ export default async function BatchesPage({
                             batch.qtyOnHand > 0 ? "text-ink-900" : "text-red-600",
                           )}
                         >
-                          {formatNumber(batch.qtyOnHand)}
+                          {medicine.unitsPerPack > 1
+                            ? `${Math.floor(batch.qtyOnHand / medicine.unitsPerPack)} ${medicine.packUnit}s + ${batch.qtyOnHand % medicine.unitsPerPack} ${medicine.looseUnit}s`
+                            : formatNumber(batch.qtyOnHand)}
                         </span>
+                        {medicine.unitsPerPack > 1 && (
+                          <div className="cell-sub font-mono">{formatNumber(batch.qtyOnHand)} {medicine.looseUnit}s</div>
+                        )}
                       </td>
                       <td className="text-right">
-                        <EditBatchButton
-                          batch={{
-                            id: batch.id,
-                            batchNo: batch.batchNo,
-                            expiryDate: batch.expiryDate,
-                            purchaseRate: batch.purchaseRate,
-                            mrp: batch.mrp,
-                            saleRate: batch.saleRate,
-                            medicineName: medicine.name,
-                          }}
-                        />
+                        {canAdjust && (
+                          <EditBatchButton
+                            batch={{
+                              id: batch.id,
+                              batchNo: batch.batchNo,
+                              expiryDate: batch.expiryDate,
+                              purchaseRate: batch.purchaseRate,
+                              mrp: batch.mrp,
+                              saleRate: batch.saleRate,
+                              qtyOnHand: batch.qtyOnHand,
+                              status: batch.status,
+                              medicineName: medicine.name,
+                              unitsPerPack: medicine.unitsPerPack,
+                              packUnit: medicine.packUnit,
+                              looseUnit: medicine.looseUnit,
+                            }}
+                          />
+                        )}
                       </td>
                     </tr>
                   );

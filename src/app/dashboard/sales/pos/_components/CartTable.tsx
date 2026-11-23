@@ -286,9 +286,28 @@ export function CartTable({
                               placeholder="0"
                             />
                             <span className="text-[9.5px] text-ink-400 font-mono mt-0.5">(1 {line.packUnit} = {line.unitsPerPack})</span>
+                            {line.packQty > 0 && (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  onUpdatePackQty(line.batchId, 0);
+                                  if (line.looseQty === 0) onUpdateLooseQty(line.batchId, 1);
+                                }}
+                                data-tooltip={`Switch to loose ${line.looseUnit}s only (sets Pack to 0)`}
+                                className="text-[10px] font-semibold text-brand-700 hover:underline mt-0.5"
+                              >
+                                Loose only
+                              </button>
+                            )}
                           </div>
                         ) : (
-                          <span className="text-ink-300 text-xs">—</span>
+                          <span
+                            className="text-ink-300 text-xs cursor-help"
+                            data-tooltip="1 unit/pack — set Units / Pack > 1 in Item Master (/dashboard/inventory) to sell loose tablets"
+                          >
+                            —
+                          </span>
                         )}
                       </td>
                       <td className="text-right">

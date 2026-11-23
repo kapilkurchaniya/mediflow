@@ -15,6 +15,7 @@ export async function getBatches(
         nearExpiryOnly?: boolean;
         from?: string | null;
         to?: string | null;
+        medicineId?: string | null;
       }
     | boolean
 ) {
@@ -24,6 +25,7 @@ export async function getBatches(
   const nearExpiryOnly = isBool ? opts : Boolean(opts?.nearExpiryOnly);
   const from = !isBool ? opts?.from : null;
   const to = !isBool ? opts?.to : null;
+  const medicineId = !isBool ? opts?.medicineId : null;
 
   const ninetyDaysFromNow = nearExpiryOnly ? format(addDays(new Date(), 90), "yyyy-MM-dd") : undefined;
 
@@ -31,6 +33,10 @@ export async function getBatches(
     eq(schema.batches.tenantId, ctx.tenantId),
     eq(schema.batches.storeId, ctx.storeId),
   ];
+
+  if (medicineId) {
+    conditions.push(eq(schema.batches.medicineId, medicineId));
+  }
 
   if (nearExpiryOnly && ninetyDaysFromNow) {
     conditions.push(lte(schema.batches.expiryDate, ninetyDaysFromNow));
@@ -255,6 +261,12 @@ const updateBatchSchema = z.object({
   purchaseRate: z.coerce.number().min(0, "Purchase rate must be non-negative"),
   mrp: z.coerce.number().min(0, "MRP must be non-negative"),
   saleRate: z.coerce.number().min(0, "Sale rate must be non-negative").optional().default(0),
+  status: z.enum(["active", "hold"]).optional(),
+  stockMode: z.enum(["keep", "set", "adjust"]).optional().default("keep"),
+  targetQty: z.coerce.number().int().min(0, "Stock quantity cannot be negative").optional(),
+  qtyDelta: z.coerce.number().int().optional(),
+  adjustReason: z.enum(["adjustment", "damage", "expired"]).optional().default("adjustment"),
+  adjustNote: z.string().optional(),
 });
 
 export async function updateBatch(formData: FormData) {
@@ -267,7 +279,17 @@ export async function updateBatch(formData: FormData) {
     return { error: parsed.error.issues[0].message };
   }
 
-  const { batchId, batchNo, expiryDate } = parsed.data;
+  const {
+    batchId,
+    batchNo,
+    expiryDate,
+    status,
+    stockMode,
+    targetQty,
+    qtyDelta: rawDelta,
+    adjustReason,
+    adjustNote,
+  } = parsed.data;
   const purchaseRate = Math.round(parsed.data.purchaseRate * 100);
   const mrp = Math.round(parsed.data.mrp * 100);
   const saleRate = parsed.data.saleRate ? Math.round(parsed.data.saleRate * 100) : mrp;
@@ -288,6 +310,8 @@ export async function updateBatch(formData: FormData) {
 
       if (!existing) throw new Error("Batch not found");
 
+      const nextStatus = status ?? existing.status;
+
       await tx
         .update(schema.batches)
         .set({
@@ -296,6 +320,8 @@ export async function updateBatch(formData: FormData) {
           purchaseRate,
           mrp,
           saleRate,
+          status: nextStatus,
+          updatedAt: new Date(),
         })
         .where(eq(schema.batches.id, batchId));
 
@@ -315,6 +341,39 @@ export async function updateBatch(formData: FormData) {
           )
         );
 
+      const computedDelta =
+        stockMode === "set" && targetQty !== undefined
+          ? targetQty - existing.qtyOnHand
+          : stockMode === "adjust" && rawDelta !== undefined
+            ? rawDelta
+            : 0;
+
+      let balanceAfter = existing.qtyOnHand;
+      if (computedDelta !== 0) {
+        balanceAfter = await recordStockMovement({
+          tx,
+          tenantId: ctx.tenantId,
+          storeId: ctx.storeId,
+          batchId,
+          medicineId: existing.medicineId,
+          type: adjustReason,
+          qtyChange: computedDelta,
+          unitCost: purchaseRate > 0 ? purchaseRate : null,
+          note: adjustNote?.trim() || `Batch edit (${stockMode === "set" ? "set exact count" : adjustReason})`,
+          userId: ctx.userId,
+        });
+
+        await tx.insert(schema.stockAdjustments).values({
+          tenantId: ctx.tenantId,
+          storeId: ctx.storeId,
+          batchId,
+          qtyChange: computedDelta,
+          kind: adjustReason,
+          reason: adjustNote?.trim() || `Batch edit (${adjustReason})`,
+          userId: ctx.userId,
+        });
+      }
+
       await writeAudit(tx, ctx, {
         action: "stock_adjust",
         entityType: "batch",
@@ -324,17 +383,31 @@ export async function updateBatch(formData: FormData) {
           expiryDate: existing.expiryDate,
           purchaseRate: existing.purchaseRate,
           mrp: existing.mrp,
+          status: existing.status,
+          qtyOnHand: existing.qtyOnHand,
         },
-        newValue: { batchNo, expiryDate, purchaseRate, mrp, saleRate },
-        reason: "User updated batch details",
+        newValue: {
+          batchNo: batchNo.trim().toUpperCase(),
+          expiryDate,
+          purchaseRate,
+          mrp,
+          saleRate,
+          status: nextStatus,
+          qtyOnHand: balanceAfter,
+        },
+        reason: adjustNote?.trim() || "User updated batch details",
       });
     });
 
     revalidatePath("/dashboard/inventory/batches");
     revalidatePath("/dashboard/inventory", "layout");
+    revalidatePath("/dashboard/sales/pos");
     revalidatePath("/dashboard");
     return { success: true };
   } catch (err: unknown) {
+    if ((err instanceof Error ? err.message : String(err))?.includes("batches_store_med_batch_uq")) {
+      return { error: "A batch with this number already exists for this medicine in this store." };
+    }
     return { error: (err instanceof Error ? err.message : String(err)) || "Failed to update batch" };
   }
 }

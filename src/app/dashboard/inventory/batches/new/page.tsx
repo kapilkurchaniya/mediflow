@@ -13,6 +13,9 @@ interface RawMedicine {
   genericName?: string | null;
   unit?: string | null;
   packSize?: string | null;
+  unitsPerPack?: number;
+  packUnit?: string | null;
+  looseUnit?: string | null;
   purchasePrice?: number | null;
   mrp?: number;
   salePrice?: number | null;
@@ -21,6 +24,8 @@ interface RawMedicine {
 export default function NewBatchPage() {
   const [medicines, setMedicines] = useState<{ id: string; name: string; raw: RawMedicine }[]>([]);
   const [selectedMedicine, setSelectedMedicine] = useState<RawMedicine | null>(null);
+  const [packCount, setPackCount] = useState("");
+  const [looseCount, setLooseCount] = useState("");
 
   useEffect(() => {
     getMedicines().then((data) => {
@@ -87,9 +92,48 @@ export default function NewBatchPage() {
             <Field label="Expiry date" required htmlFor="expiryDate">
               <input id="expiryDate" type="date" name="expiryDate" required className="input num" />
             </Field>
-            <Field label="Quantity (units)" required htmlFor="qty">
-              <input id="qty" type="number" name="qty" required min="1" className="input num" placeholder="100" />
-            </Field>
+            {(selectedMedicine?.unitsPerPack ?? 1) > 1 ? (
+              <>
+                <input
+                  type="hidden"
+                  name="qty"
+                  value={
+                    (parseInt(packCount || "0", 10) || 0) * (selectedMedicine?.unitsPerPack ?? 1) +
+                    (parseInt(looseCount || "0", 10) || 0)
+                  }
+                />
+                <Field
+                  label={`Quantity (${selectedMedicine?.packUnit || "strip"}s + ${selectedMedicine?.looseUnit || "tablet"}s)`}
+                  required
+                  htmlFor="packCount"
+                  hint={`1 ${selectedMedicine?.packUnit || "strip"} = ${selectedMedicine?.unitsPerPack} ${selectedMedicine?.looseUnit || "tablet"}s`}
+                >
+                  <div className="grid grid-cols-2 gap-2">
+                    <input
+                      id="packCount"
+                      type="number"
+                      min="0"
+                      value={packCount}
+                      onChange={(e) => setPackCount(e.target.value)}
+                      className="input num"
+                      placeholder={`${selectedMedicine?.packUnit || "Strips"}`}
+                    />
+                    <input
+                      type="number"
+                      min="0"
+                      value={looseCount}
+                      onChange={(e) => setLooseCount(e.target.value)}
+                      className="input num"
+                      placeholder={`Loose ${selectedMedicine?.looseUnit || "tabs"}`}
+                    />
+                  </div>
+                </Field>
+              </>
+            ) : (
+              <Field label="Quantity (units)" required htmlFor="qty">
+                <input id="qty" type="number" name="qty" required min="1" className="input num" placeholder="100" />
+              </Field>
+            )}
           </FormSection>
 
           <FormSection title="Pricing (per unit)" description="Used for stock valuation and default billing rate.">

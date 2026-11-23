@@ -236,6 +236,17 @@ export function mapAndValidateStockRow(row: Record<string, string>): ParsedStock
   const exp = getVal(["exp", "expiry", "exp date", "exp_date", "expiry date", "exp.date"]).trim();
   const mfg = getVal(["mfg", "manufacturer", "company", "brand", "mfg by"]).trim();
   const cat = getVal(["category", "group", "type", "schedule"]).trim();
+  const rawPack = getVal(["units_per_pack", "units per pack", "unitsperpack", "pack_size", "pack size", "packing", "strip size"]).trim();
+
+  let parsedUpp = 1;
+  if (rawPack) {
+    const xMatch = rawPack.match(/^\d+\s*[xX*]\s*(\d+)/);
+    const numMatch = rawPack.match(/(\d+)/);
+    const candidate = xMatch ? parseInt(xMatch[1], 10) : numMatch ? parseInt(numMatch[1], 10) : 1;
+    if (Number.isFinite(candidate) && candidate > 1 && candidate <= 1000) {
+      parsedUpp = candidate;
+    }
+  }
 
   const rawQty = getVal(["qty", "quantity", "stock", "closing", "cl qty", "balance", "total qty"]);
   const rawMrp = getVal(["mrp", "retail", "sale rate", "salerate", "s.rate", "sale price"]);
@@ -276,6 +287,8 @@ export function mapAndValidateStockRow(row: Record<string, string>): ParsedStock
     warnings,
     mapped: {
       medicineName: name,
+      ...(parsedUpp > 1 ? { unitsPerPack: parsedUpp } : {}),
+      ...(rawPack ? { packSize: rawPack } : {}),
       manufacturer: mfg || undefined,
       category: cat || undefined,
       batchNo: batch,
