@@ -2,6 +2,7 @@ import { and, eq, sql } from "drizzle-orm";
 import { schema, type DbOrTx, type Tx } from "@/server/db";
 import { recordStockMovement } from "@/server/domain/stock";
 import { writeAudit } from "@/server/audit";
+import { parsePackaging } from "@/lib/packaging";
 import { getImportJob } from "./index";
 import {
   NormalizedMedicineRow,
@@ -426,13 +427,16 @@ async function commitBatchRow(
 
   // Auto-create minimal medicine if not matched
   if (!medicineId) {
+    const inferredPack = parsePackaging({ medicineName: batchRow.medicineCodeOrName });
     const [autoMed] = await tx
       .insert(schema.medicines)
       .values({
         tenantId,
         name: batchRow.medicineCodeOrName,
-        packSize: "1s",
-        unitsPerPack: 1,
+        packSize: inferredPack.packSize ?? "1s",
+        unitsPerPack: inferredPack.unitsPerPack,
+        packUnit: inferredPack.packUnit,
+        looseUnit: inferredPack.looseUnit,
         mrp: batchRow.mrpPaise,
         purchasePrice: batchRow.purchaseRatePaise,
         salePrice: batchRow.saleRatePaise ?? batchRow.mrpPaise,
