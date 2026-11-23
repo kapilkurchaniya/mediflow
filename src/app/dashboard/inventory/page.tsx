@@ -198,6 +198,8 @@ export default async function InventoryPage({
                               medicine={medicine}
                               categories={categories}
                               manufacturers={manufacturers}
+                              racks={racks}
+                              currentRackId={branchSettings?.rackId ?? null}
                               canAdjustStock={canAdjust}
                             />
                           )}
