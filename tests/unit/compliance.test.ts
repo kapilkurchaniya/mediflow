@@ -142,4 +142,23 @@ describe("validateDispensingCompliance", () => {
     expect(res.controlledItems).toHaveLength(1);
     expect(res.controlledItems[0]?.rule.statutoryRegister).toBe("narcotics");
   });
+
+  it("rxRequired: requires Doctor Name even when schedule is none", () => {
+    const invalidRes = validateDispensingCompliance({
+      items: [
+        { medicineName: "Azithromycin 500mg", schedule: "none", rxRequired: true, qty: 5 },
+      ],
+      doctorName: "",
+    });
+    expect(invalidRes.valid).toBe(false);
+    expect(invalidRes.errors[0]).toContain("Doctor Name is required");
+
+    const validRes = validateDispensingCompliance({
+      items: [
+        { medicineName: "Azithromycin 500mg", schedule: "none", rxRequired: true, qty: 5 },
+      ],
+      doctorName: "Dr. K. Patel",
+    });
+    expect(validRes.valid).toBe(true);
+  });
 });

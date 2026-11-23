@@ -14,6 +14,7 @@ const optText = z.string().trim().max(500).optional();
 
 /** Doctor / patient / prescription details needed for Schedule H, H1, X and narcotic drugs. */
 export const ComplianceDetailsSchema = z.object({
+  doctorId: z.string().uuid().optional(),
   doctorName: optText,
   doctorRegNo: optText,
   doctorAddress: optText,
