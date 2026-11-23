@@ -23,6 +23,7 @@ import {
 import { PageHeader, EmptyState } from "@/app/components/ui";
 import { createPrescription, getPrescriptions } from "@/app/actions/compliance";
 import { MedicineAutocompleteInput } from "./MedicineAutocompleteInput";
+import { PhysicalScannerButton } from "@/app/components/PhysicalScannerButton";
 
 export interface PrescriptionItem {
   id?: string;
@@ -281,6 +282,13 @@ export function PrescriptionsView({
               {isScanningRx ? <Loader2 className="h-4 w-4 animate-spin" /> : <Camera className="h-4 w-4" />}
               Scan Rx (Image / PDF)
             </button>
+            <PhysicalScannerButton
+              channel="prescriptions"
+              size="sm"
+              label="Scanner"
+              disabled={isScanningRx}
+              onScannedFile={(scanned) => void handleScanRxFile(scanned)}
+            />
             <button
               onClick={() => setIsModalOpen(true)}
               className="btn btn-primary text-xs flex items-center gap-1.5"

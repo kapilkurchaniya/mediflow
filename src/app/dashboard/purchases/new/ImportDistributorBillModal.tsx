@@ -23,6 +23,7 @@ import type { SupplierCheckResult } from "@/server/domain/import/supplier-matche
 import type { PendingSupplierMeta } from "@/lib/pending-supplier";
 import { detectBinaryContentMismatch } from "@/lib/stock-csv-validator";
 import { QuickRegisterSupplierModal } from "@/app/components/QuickRegisterSupplierModal";
+import { PhysicalScannerButton } from "@/app/components/PhysicalScannerButton";
 
 interface ImportDistributorBillModalProps {
   isOpen: boolean;
@@ -318,12 +319,19 @@ export function ImportDistributorBillModal({
               </p>
             </div>
           </div>
-          <button
-            onClick={onClose}
-            className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-          >
-            <X className="w-5 h-5" />
-          </button>
+          <div className="flex items-center gap-2 shrink-0">
+            <PhysicalScannerButton
+              channel="invoices"
+              label="Physical Scanner"
+              onScannedFile={(scanned) => handleFileSelect(scanned)}
+            />
+            <button
+              onClick={onClose}
+              className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
         </div>
 
         {/* Content Body */}

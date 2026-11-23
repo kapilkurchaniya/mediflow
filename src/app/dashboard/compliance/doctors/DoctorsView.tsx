@@ -16,9 +16,12 @@ import {
   Camera,
   Loader2,
   CheckCircle2,
+  QrCode,
 } from "lucide-react";
 import { PageHeader, EmptyState } from "@/app/components/ui";
 import { upsertDoctor } from "@/app/actions/compliance";
+import { parseDoctorQrPayload } from "@/lib/doctor-qr";
+import { PhysicalScannerButton } from "@/app/components/PhysicalScannerButton";
 
 interface DoctorRecord {
   id: string;
@@ -51,7 +54,39 @@ export function DoctorsView({
   const [formError, setFormError] = useState("");
   const [isScanningDoc, setIsScanningDoc] = useState(false);
   const [scanSuccess, setScanSuccess] = useState<string | null>(null);
+  const [qrInput, setQrInput] = useState("");
+  const [showQrPanel, setShowQrPanel] = useState(false);
   const scanDocInputRef = useRef<HTMLInputElement>(null);
+
+  const handleApplyQrPayload = (rawPayload: string) => {
+    const parsed = parseDoctorQrPayload(rawPayload);
+    if (!parsed) {
+      setFormError("Could not recognize ABDM HPR, NMC, or vCard doctor details in that QR payload.");
+      return;
+    }
+    setFormError("");
+    setEditingId(null);
+    if (parsed.name) setName(parsed.name);
+    if (parsed.regNo) setRegNo(parsed.regNo);
+    if (parsed.qualification) setQualification(parsed.qualification);
+    if (parsed.specialization) setSpecialization(parsed.specialization);
+    if (parsed.hospital) setHospital(parsed.hospital);
+    if (parsed.phone) setPhone(parsed.phone);
+    if (parsed.email) setEmail(parsed.email);
+    if (parsed.address) setAddress(parsed.address);
+    const label =
+      parsed.source === "abdm_hpr"
+        ? "ABDM HPR QR"
+        : parsed.source === "nmc_qr"
+        ? "NMC Registry QR"
+        : parsed.source === "vcard"
+        ? "Doctor vCard QR"
+        : "Doctor QR";
+    setScanSuccess(`Auto-filled from ${label}${parsed.hprId ? ` (${parsed.hprId})` : ""}. Verify & save.`);
+    setQrInput("");
+    setShowQrPanel(false);
+    setIsModalOpen(true);
+  };
 
   const handleScanDoctorDocument = async (file: File) => {
     setIsScanningDoc(true);
@@ -227,6 +262,27 @@ export function DoctorsView({
               {isScanningDoc ? <Loader2 className="h-4 w-4 animate-spin" /> : <Camera className="h-4 w-4" />}
               Scan Rx / Letterhead
             </button>
+            <PhysicalScannerButton
+              channel="prescriptions"
+              size="sm"
+              label="Scanner"
+              disabled={isScanningDoc}
+              onScannedFile={(scanned) => void handleScanDoctorDocument(scanned)}
+            />
+            <button
+              type="button"
+              onClick={() => {
+                setShowQrPanel(true);
+                setFormError("");
+                setScanSuccess(null);
+                setIsModalOpen(true);
+              }}
+              className="btn btn-secondary text-xs flex items-center gap-1.5"
+              title="Scan an ABDM HPR / NMC QR code or doctor vCard using a 2D barcode scanner"
+            >
+              <QrCode className="h-4 w-4 text-brand-600" />
+              HPR / NMC QR
+            </button>
             <button
               onClick={openAddModal}
               className="btn btn-primary text-xs flex items-center gap-1.5"
@@ -342,6 +398,47 @@ export function DoctorsView({
             </div>
 
             <form onSubmit={handleSubmit} className="p-5 space-y-4">
+              {showQrPanel && (
+                <div className="rounded-xl border border-brand-200 bg-brand-50/50 p-3 space-y-2 text-xs">
+                  <div className="flex items-center justify-between font-semibold text-brand-900">
+                    <span className="inline-flex items-center gap-1.5">
+                      <QrCode className="h-3.5 w-3.5 text-brand-600" />
+                      Scan ABDM HPR / NMC QR Code (2D Scanner or Paste)
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setShowQrPanel(false)}
+                      className="text-ink-400 hover:text-ink-700"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      autoFocus
+                      value={qrInput}
+                      onChange={(e) => setQrInput(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" && qrInput.trim()) {
+                          e.preventDefault();
+                          handleApplyQrPayload(qrInput);
+                        }
+                      }}
+                      placeholder="Focus here & beep 2D QR scanner (HPR URL, HP-ID, JSON, or vCard)…"
+                      className="input text-xs bg-white flex-1 font-mono"
+                    />
+                    <button
+                      type="button"
+                      disabled={!qrInput.trim()}
+                      onClick={() => handleApplyQrPayload(qrInput)}
+                      className="btn btn-primary btn-xs shrink-0"
+                    >
+                      Parse QR
+                    </button>
+                  </div>
+                </div>
+              )}
               {isScanningDoc && (
                 <div className="rounded-lg bg-brand-50 border border-brand-200 p-3 text-xs text-brand-800 flex items-center gap-2">
                   <Loader2 className="h-4 w-4 animate-spin shrink-0" />

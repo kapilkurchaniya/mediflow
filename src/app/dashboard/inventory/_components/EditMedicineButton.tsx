@@ -11,6 +11,7 @@ import {
 } from "@/app/actions/inventory";
 import { enrichMedicineDetails } from "@/app/actions/ai-enrichment";
 import { scheduleRequiresRx } from "@/lib/schedule";
+import { checkCdscoBannedFdc } from "@/lib/indian-drug-catalog";
 import { useRouter } from "next/navigation";
 import { RackSelectorField, type RackOption } from "./RackSelectorField";
 
@@ -341,6 +342,29 @@ export function EditMedicineButton({
                     <span>{enrichNote}</span>
                   </div>
                 )}
+                {(() => {
+                  const ban = checkCdscoBannedFdc(name, genericName);
+                  if (!ban.isBanned) return null;
+                  return (
+                    <div className="rounded-xl border-2 border-rose-300 bg-rose-50 p-3 text-xs text-rose-900 space-y-1.5">
+                      <div className="flex items-start gap-2 font-bold">
+                        <ShieldAlert className="h-4 w-4 text-rose-600 shrink-0 mt-0.5" />
+                        <span>CDSCO Banned FDC Warning ({ban.notificationRef})</span>
+                      </div>
+                      <p className="text-[11.5px] text-rose-800">{ban.reason}</p>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setBanReason(`${ban.notificationRef}: ${ban.reason}`);
+                          setShowDangerZone(true);
+                        }}
+                        className="btn btn-xs bg-rose-600 text-white hover:bg-rose-700"
+                      >
+                        Open Ban &amp; Quarantine Controls
+                      </button>
+                    </div>
+                  );
+                })()}
 
                 <div className="space-y-3">
                   <h4 className="text-xs font-semibold uppercase tracking-wider text-ink-400">Identification</h4>

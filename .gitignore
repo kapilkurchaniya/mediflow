@@ -58,3 +58,7 @@ __pycache__/
 # ...but keep the documented templates
 !.env.example
 !.env.test.example
+
+# Tauri / Rust build artifacts
+desktop/src-tauri/target/
+desktop/src-tauri/gen/

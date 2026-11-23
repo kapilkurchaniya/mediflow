@@ -14,6 +14,8 @@ import {
 import { commitOcrStockUpdateAction } from "@/app/actions/stock";
 import { parseApiJsonResponse, splitPdfIntoChunks } from "@/lib/pdf-chunker";
 import { SCHEDULE_OPTIONS, scheduleRequiresRx, type DrugSchedule } from "@/lib/schedule";
+import { checkCdscoBannedFdc } from "@/lib/indian-drug-catalog";
+import { PhysicalScannerButton } from "@/app/components/PhysicalScannerButton";
 
 export interface StockOcrRow {
   rowKey: string;
@@ -207,9 +209,16 @@ export function StockOcrModal({
               </p>
             </div>
           </div>
-          <button type="button" onClick={onClose} className="btn btn-ghost btn-icon">
-            <X className="w-5 h-5" />
-          </button>
+          <div className="flex items-center gap-2 shrink-0">
+            <PhysicalScannerButton
+              channel="stock"
+              label="Physical Scanner"
+              onScannedFile={(scanned) => void handleScanFile(scanned)}
+            />
+            <button type="button" onClick={onClose} className="btn btn-ghost btn-icon">
+              <X className="w-5 h-5" />
+            </button>
+          </div>
         </div>
 
         <div className="p-4 sm:p-6 overflow-y-auto flex-1 space-y-4">
@@ -344,6 +353,15 @@ export function StockOcrModal({
                         <tr key={r.rowKey}>
                           <td className="p-2.5 font-medium text-ink-900">
                             <div>{r.matchedMedicineName || r.medicineName}</div>
+                            {(() => {
+                              const ban = checkCdscoBannedFdc(r.medicineName, r.genericName);
+                              if (!ban.isBanned) return null;
+                              return (
+                                <div className="mt-1 inline-flex items-center gap-1 rounded bg-rose-100 border border-rose-300 px-1.5 py-0.5 text-[10px] font-bold text-rose-800">
+                                  CDSCO Banned FDC Alert: {ban.notificationRef}
+                                </div>
+                              );
+                            })()}
                             {r.existingBatchId && (
                               <div className="text-[10.5px] text-ink-500">Current: {r.currentQtyOnHand} units</div>
                             )}
