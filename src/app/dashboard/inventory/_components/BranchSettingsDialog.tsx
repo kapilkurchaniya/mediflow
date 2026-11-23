@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { Settings2, X, Loader2, CheckCircle2 } from "lucide-react";
 import { updateStoreMedicineSettingsAction } from "@/app/actions/store-settings";
@@ -59,7 +60,7 @@ export function BranchSettingsDialog({
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
 
-  if (!isOpen) return null;
+  if (!isOpen || typeof document === "undefined") return null;
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -109,8 +110,13 @@ export function BranchSettingsDialog({
     }
   }
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-ink-900/40 backdrop-blur-sm animate-fade-in">
+  return createPortal(
+    <div
+      className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-ink-900/40 backdrop-blur-sm animate-fade-in text-left"
+      onClick={(e) => {
+        if (e.target === e.currentTarget && !saving) onClose();
+      }}
+    >
       <div className="card w-full max-w-lg p-0 shadow-2xl border border-surface-300 overflow-hidden animate-scale-in">
         <div className="flex items-center justify-between p-4 border-b border-surface-200 bg-surface-50">
           <div className="flex items-center gap-2">
@@ -227,6 +233,7 @@ export function BranchSettingsDialog({
           </div>
         </form>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

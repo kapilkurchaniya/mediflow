@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { createPortal } from "react-dom";
 import { Edit2, X, Check, Loader2, AlertCircle } from "lucide-react";
 import { updateBatch } from "@/app/actions/stock";
 import { useRouter } from "next/navigation";
@@ -125,9 +126,16 @@ export function EditBatchButton({ batch }: { batch: BatchEditData }) {
         <Edit2 className="h-3.5 w-3.5" />
       </button>
 
-      {isOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs animate-in fade-in duration-150 text-left">
-          <div className="card w-full max-w-xl max-h-[92vh] flex flex-col shadow-xl animate-in zoom-in-95 duration-150 overflow-hidden">
+      {isOpen &&
+        typeof document !== "undefined" &&
+        createPortal(
+          <div
+            className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs animate-in fade-in duration-150 text-left"
+            onClick={(e) => {
+              if (e.target === e.currentTarget && !isSubmitting) setIsOpen(false);
+            }}
+          >
+            <div className="card w-full max-w-xl max-h-[92vh] flex flex-col shadow-xl animate-in zoom-in-95 duration-150 overflow-hidden">
             <div className="flex items-center justify-between border-b border-ink-150 px-5 py-4 shrink-0">
               <div>
                 <h3 className="text-base font-semibold text-ink-900">Edit Batch &amp; Stock</h3>
@@ -390,8 +398,9 @@ export function EditBatchButton({ batch }: { batch: BatchEditData }) {
               </div>
             </form>
           </div>
-        </div>
-      )}
+        </div>,
+          document.body
+        )}
     </>
   );
 }
