@@ -170,6 +170,7 @@ export function ImportDistributorBillModal({
         mrpPaise: i.mrpPaise,
         ptrPaise: i.ptrPaise,
         barcode: i.barcode,
+        schedule: i.schedule,
       }));
 
       const res = await quickCreateDistributorMedicinesAction(itemsToCreate);

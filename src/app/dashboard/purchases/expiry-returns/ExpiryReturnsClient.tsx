@@ -25,7 +25,7 @@ export function ExpiryReturnsClient({ candidates }: ExpiryReturnsClientProps) {
   const [selectedSupplier, setSelectedSupplier] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<"all" | "expired" | "near_expiry">("all");
 
-  const today = new Date().toISOString().split("T")[0]!;
+  const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata" }).format(new Date());
 
   const suppliers = Array.from(
     new Map(
@@ -153,7 +153,7 @@ export function ExpiryReturnsClient({ candidates }: ExpiryReturnsClientProps) {
             onChange={(e) => setStatusFilter(e.target.value as "all" | "expired" | "near_expiry")}
             className="input text-xs w-36"
           >
-            <option value="all">All (Next 60 Days)</option>
+            <option value="all">All (Expired &amp; Next 60d)</option>
             <option value="expired">Expired Only</option>
             <option value="near_expiry">Near Expiry Only</option>
           </select>
@@ -214,9 +214,14 @@ export function ExpiryReturnsClient({ candidates }: ExpiryReturnsClientProps) {
                         </span>
                       </td>
                       <td className="px-4 py-3 text-xs">
-                        <span className="font-medium text-foreground flex items-center gap-1">
+                        <span className="font-medium text-foreground flex items-center gap-1 flex-wrap">
                           <Truck className="h-3 w-3 text-muted-foreground shrink-0" />
                           {item.supplierName || "Direct / Local"}
+                          {item.isPendingSupplier && (
+                            <span className="badge bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300 text-[10px]">
+                              Unregistered
+                            </span>
+                          )}
                         </span>
                         {item.purchaseNo && (
                           <span className="text-[11px] text-muted-foreground block num">

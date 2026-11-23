@@ -5,6 +5,7 @@ import { eq, and, desc } from "drizzle-orm";
 import { requirePermission } from "@/server/rbac";
 import { protectedAction } from "@/server/action";
 import { revalidatePath } from "next/cache";
+import { PENDING_SUPPLIER_PLACEHOLDER_NAME } from "@/lib/pending-supplier";
 import {
   createPurchaseReturn,
   CreatePurchaseReturnSchema,
@@ -26,8 +27,10 @@ export const createPurchaseReturnAction = protectedAction("purchase.return")
     });
 
     revalidatePath("/dashboard/purchases/returns");
+    revalidatePath("/dashboard/purchases/expiry-returns");
     revalidatePath("/dashboard/purchases");
     revalidatePath("/dashboard/inventory");
+    revalidatePath("/dashboard/inventory/quarantine");
     revalidatePath(`/dashboard/purchases/${parsedInput.purchaseId}`);
 
     return {
@@ -96,9 +99,19 @@ export async function getPurchaseForReturn(purchaseId: string) {
       )
     );
 
+  const supplierDisplay =
+    res.supplier.name === PENDING_SUPPLIER_PLACEHOLDER_NAME
+      ? {
+          ...res.supplier,
+          name: res.purchase.pendingSupplierMeta?.name
+            ? `${res.purchase.pendingSupplierMeta.name} (Unregistered)`
+            : "Unregistered Supplier",
+        }
+      : res.supplier;
+
   return {
     purchase: res.purchase,
-    supplier: res.supplier,
+    supplier: supplierDisplay,
     items: items.map((i) => ({
       ...i.item,
       medicineName: i.med.name,

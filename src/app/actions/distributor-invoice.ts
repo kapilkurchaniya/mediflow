@@ -92,6 +92,7 @@ export async function quickCreateDistributorMedicinesAction(
     mrpPaise?: number;
     ptrPaise?: number;
     barcode?: string | null;
+    schedule?: string | null;
   }[]
 ): Promise<{ success: boolean; createdMap?: Record<string, string>; error?: string }> {
   try {

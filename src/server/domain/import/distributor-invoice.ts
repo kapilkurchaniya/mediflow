@@ -15,6 +15,7 @@ import { PHARMARACK_INVOICE_MAPPINGS } from "./presets/pharmarack";
 import { RETAILIO_INVOICE_MAPPINGS } from "./presets/retailio";
 import { MARG_MEDICINE_MAPPINGS, MARG_BATCH_MAPPINGS } from "./presets/marg";
 import { isValidGstRateBp, DEFAULT_GST_RATE_BP, type GstRateBp } from "@/lib/regulatory";
+import { normalizeDrugSchedule, scheduleRequiresRx, type DrugSchedule } from "@/lib/schedule";
 import type { PurchaseItemInput } from "@/server/domain/purchases";
 import type { ExtractedSupplierInfo } from "@/server/domain/import/supplier-matcher";
 
@@ -38,6 +39,7 @@ export interface ParsedDistributorInvoiceItem {
   gstRateBp: GstRateBp; // 0, 500, 1200, 1800, 2800
   hsn: string;
   barcode: string | null;
+  schedule?: DrugSchedule;
   effectiveUnitCostPaise: number; // landed cost per pack after free qty & discount
 
   // Medicine catalog matching
@@ -541,6 +543,7 @@ export async function quickCreateDistributorMedicines(
     mrpPaise?: number;
     ptrPaise?: number;
     barcode?: string | null;
+    schedule?: string | null;
   }[]
 ): Promise<Map<string, string>> {
   const createdMap = new Map<string, string>(); // name.toLowerCase() -> medicineId
@@ -571,6 +574,7 @@ export async function quickCreateDistributorMedicines(
     const purchasePrice = item.ptrPaise ?? Math.round(mrp * 0.7);
     const salePrice = Math.round(purchasePrice * 1.25);
 
+    const normalizedSchedule = normalizeDrugSchedule(item.schedule);
     const [newMed] = await db
       .insert(schema.medicines)
       .values({
@@ -585,7 +589,8 @@ export async function quickCreateDistributorMedicines(
         mrp,
         purchasePrice,
         salePrice,
-        schedule: "none",
+        schedule: normalizedSchedule,
+        rxRequired: scheduleRequiresRx(normalizedSchedule),
         barcode: item.barcode || null,
         isActive: true,
       })

@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState, useEffect, useRef, useState, Suspense } from "react";
-import { useSearchParams, redirect } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { createPurchaseInvoice, PurchaseItemInput } from "@/app/actions/purchases";
 import { getSuppliers } from "@/app/actions/suppliers";
@@ -33,7 +33,20 @@ import type { PendingSupplierMeta } from "@/lib/pending-supplier";
 import { QuickRegisterSupplierModal } from "@/app/components/QuickRegisterSupplierModal";
 import { ImportDistributorBillModal } from "./ImportDistributorBillModal";
 
+function getIstTodayStr(): string {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata" }).format(new Date());
+}
+
+function getCurrentIndianFyStartStr(istToday: string): string {
+  const [yStr, mStr] = istToday.split("-");
+  const y = parseInt(yStr, 10);
+  const m = parseInt(mStr, 10);
+  const startYear = m >= 4 ? y : y - 1;
+  return `${startYear}-04-01`;
+}
+
 function NewPurchaseForm() {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const poId = searchParams.get("poId");
 
@@ -50,7 +63,9 @@ function NewPurchaseForm() {
 
   const [supplierId, setSupplierId] = useState("");
   const [supplierInvoiceNo, setSupplierInvoiceNo] = useState("");
-  const [invoiceDate, setInvoiceDate] = useState(new Date().toISOString().split("T")[0]);
+  const [invoiceDate, setInvoiceDate] = useState(() => getIstTodayStr());
+  const [notes, setNotes] = useState("");
+  const [historicalDateNotice, setHistoricalDateNotice] = useState<string | null>(null);
 
   const [items, setItems] = useState<PurchaseItemInput[]>([]);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
@@ -128,11 +143,14 @@ function NewPurchaseForm() {
         supplierInvoiceNo.trim(),
         invoiceDate,
         items,
-        undefined,
+        notes.trim() || undefined,
         linkedPo?.id,
         !supplierId ? pendingSupplierMeta : null
       );
-      if (res.success) redirect("/dashboard/purchases");
+      if (res.success) {
+        router.push("/dashboard/purchases");
+        router.refresh();
+      }
       return res;
     },
     null
@@ -312,14 +330,24 @@ function NewPurchaseForm() {
               <label htmlFor="grn-invoice-date-input" className="label required">Invoice Date</label>
               <input
                 id="grn-invoice-date-input"
-                type="date"
-                value={invoiceDate}
-                onChange={(e) => setInvoiceDate(e.target.value)}
-                className="input"
-                required
-              />
+                  type="date"
+                  value={invoiceDate}
+                  onChange={(e) => {
+                    setInvoiceDate(e.target.value);
+                    setHistoricalDateNotice(null);
+                  }}
+                  className="input"
+                  required
+                />
+              </div>
             </div>
-          </div>
+
+          {historicalDateNotice && (
+            <div className="p-3 rounded-xl border border-blue-200 bg-blue-50 text-blue-900 text-xs flex items-start gap-2">
+              <AlertCircle className="h-4 w-4 text-blue-600 shrink-0 mt-0.5" />
+              <span>{historicalDateNotice}</span>
+            </div>
+          )}
 
           {!supplierId && pendingSupplierMeta && (
             <div className="p-3.5 rounded-xl border border-amber-300 bg-amber-50 text-amber-950 text-xs flex flex-wrap items-center justify-between gap-3">
@@ -549,7 +577,6 @@ function NewPurchaseForm() {
                             }
                             className="input !h-8.5 text-right num text-[12.5px]"
                             placeholder="0.00"
-                            required
                           />
                         </td>
                         <td className="text-right text-[11.5px] leading-snug">
@@ -621,6 +648,13 @@ function NewPurchaseForm() {
               </div>
             </div>
 
+            {state?.error && (
+              <div className="p-2.5 rounded-lg bg-red-50 border border-red-200 text-red-800 text-xs flex items-start gap-2">
+                <AlertCircle className="h-4 w-4 shrink-0 mt-0.5 text-red-600" />
+                <span>{state.error}</span>
+              </div>
+            )}
+
             <button
               type="submit"
               disabled={isPending || items.length === 0}
@@ -648,7 +682,24 @@ function NewPurchaseForm() {
         onPendingSupplier={(meta) => setPendingSupplierMeta(meta)}
         onFillHeader={(hdr) => {
           if (hdr.invoiceNo) setSupplierInvoiceNo(hdr.invoiceNo);
-          if (hdr.invoiceDate) setInvoiceDate(hdr.invoiceDate);
+          if (hdr.invoiceDate) {
+            const todayStr = getIstTodayStr();
+            const fyStartStr = getCurrentIndianFyStartStr(todayStr);
+            if (hdr.invoiceDate < fyStartStr) {
+              setInvoiceDate(todayStr);
+              setNotes((prev) =>
+                prev.includes(hdr.invoiceDate!)
+                  ? prev
+                  : [prev, `Original supplier bill date: ${hdr.invoiceDate}`].filter(Boolean).join(" | ")
+              );
+              setHistoricalDateNotice(
+                `Extracted bill date (${hdr.invoiceDate}) belongs to a closed/historical financial year, so the posting date was kept as ${todayStr} (original bill date saved in notes).`
+              );
+            } else {
+              setInvoiceDate(hdr.invoiceDate);
+              setHistoricalDateNotice(null);
+            }
+          }
         }}
         onSuppliersRefresh={async () => {
           const fresh = await getSuppliers();

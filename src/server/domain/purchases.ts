@@ -340,7 +340,10 @@ export async function createPurchase(
     // Check if batch already exists in this store
     let batchId = "";
     const [existingBatch] = await tx
-      .select({ id: schema.batches.id })
+      .select({
+        id: schema.batches.id,
+        supplierId: schema.batches.supplierId,
+      })
       .from(schema.batches)
       .where(
         and(
@@ -353,7 +356,7 @@ export async function createPurchase(
 
     if (existingBatch) {
       batchId = existingBatch.id;
-      // Update batch purchaseRate to current landed cost
+      // Update batch purchaseRate to current landed cost and backfill supplier if missing
       await tx
         .update(schema.batches)
         .set({
@@ -361,6 +364,7 @@ export async function createPurchase(
           mrp: item.mrp,
           saleRate: item.saleRate,
           expiryDate: item.expiryDate,
+          ...(!existingBatch.supplierId ? { supplierId: supplier.id } : {}),
         })
         .where(eq(schema.batches.id, batchId));
     } else {

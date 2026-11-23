@@ -3,12 +3,29 @@
 import React, { useRef, useState } from "react";
 import { UploadCloud } from "lucide-react";
 import { BatchCsvImportModal } from "./BatchCsvImportModal";
+import { StockOcrModal } from "./StockOcrModal";
+
+function isOcrDocumentFile(file: File): boolean {
+  const lower = file.name.toLowerCase();
+  const type = (file.type || "").toLowerCase();
+  return (
+    lower.endsWith(".pdf") ||
+    lower.endsWith(".jpg") ||
+    lower.endsWith(".jpeg") ||
+    lower.endsWith(".png") ||
+    lower.endsWith(".webp") ||
+    type === "application/pdf" ||
+    type.startsWith("image/")
+  );
+}
 
 export function BatchesDropWrapper({ children }: { children: React.ReactNode }) {
   const dragDepthRef = useRef(0);
   const [isDragging, setIsDragging] = useState(false);
-  const [droppedFile, setDroppedFile] = useState<File | null>(null);
-  const [modalOpen, setModalOpen] = useState(false);
+  const [droppedCsvFile, setDroppedCsvFile] = useState<File | null>(null);
+  const [csvModalOpen, setCsvModalOpen] = useState(false);
+  const [droppedOcrFile, setDroppedOcrFile] = useState<File | null>(null);
+  const [ocrModalOpen, setOcrModalOpen] = useState(false);
 
   const hasFiles = (e: React.DragEvent) => Array.from(e.dataTransfer?.types ?? []).includes("Files");
 
@@ -38,9 +55,13 @@ export function BatchesDropWrapper({ children }: { children: React.ReactNode }) 
         dragDepthRef.current = 0;
         setIsDragging(false);
         const file = e.dataTransfer.files?.[0];
-        if (file) {
-          setDroppedFile(file);
-          setModalOpen(true);
+        if (!file) return;
+        if (isOcrDocumentFile(file)) {
+          setDroppedOcrFile(file);
+          setOcrModalOpen(true);
+        } else {
+          setDroppedCsvFile(file);
+          setCsvModalOpen(true);
         }
       }}
     >
@@ -52,20 +73,29 @@ export function BatchesDropWrapper({ children }: { children: React.ReactNode }) 
             <div className="mx-auto w-14 h-14 rounded-full bg-brand-100 text-brand-700 flex items-center justify-center">
               <UploadCloud className="w-7 h-7" />
             </div>
-            <p className="text-base font-bold text-ink-900">Drop CSV to Import Batches</p>
+            <p className="text-base font-bold text-ink-900">Drop Stock CSV, PDF, or Bill Photo</p>
             <p className="text-xs text-ink-500">
-              Non-CSV files and unrelated spreadsheets are automatically rejected before import.
+              CSVs open inline batch import; PDFs and photos automatically open AI OCR stock scanner (with Schedule H/H1/X detection).
             </p>
           </div>
         </div>
       )}
 
       <BatchCsvImportModal
-        isOpen={modalOpen}
-        initialFile={droppedFile}
+        isOpen={csvModalOpen}
+        initialFile={droppedCsvFile}
         onClose={() => {
-          setModalOpen(false);
-          setDroppedFile(null);
+          setCsvModalOpen(false);
+          setDroppedCsvFile(null);
+        }}
+      />
+
+      <StockOcrModal
+        isOpen={ocrModalOpen}
+        initialFile={droppedOcrFile}
+        onClose={() => {
+          setOcrModalOpen(false);
+          setDroppedOcrFile(null);
         }}
       />
     </div>

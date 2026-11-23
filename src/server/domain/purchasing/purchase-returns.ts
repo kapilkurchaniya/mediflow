@@ -1,5 +1,6 @@
 import { schema, type Tx, type DbOrTx } from "@/server/db";
-import { eq, and, desc, sql, inArray } from "drizzle-orm";
+import { eq, and, desc, sql, inArray, gt, lte } from "drizzle-orm";
+import { PENDING_SUPPLIER_PLACEHOLDER_NAME } from "@/lib/pending-supplier";
 import { DomainError } from "@/server/errors";
 import { writeAudit } from "@/server/audit";
 import { nextDocNumber } from "@/server/domain/sequence";
@@ -463,9 +464,20 @@ export interface ExpiryReturnCandidate {
   medicineName: string;
   supplierId: string | null;
   supplierName: string | null;
+  isPendingSupplier?: boolean;
   purchaseId: string | null;
   purchaseItemId: string | null;
   purchaseNo: string | null;
+}
+
+/**
+ * Computes YYYY-MM-DD in Asia/Kolkata offset by `offsetDays`.
+ */
+function istDateOffsetStr(offsetDays: number): string {
+  const istNow = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata" }).format(new Date());
+  const d = new Date(`${istNow}T00:00:00.000Z`);
+  d.setUTCDate(d.getUTCDate() + offsetDays);
+  return d.toISOString().split("T")[0]!;
 }
 
 /**
@@ -478,7 +490,7 @@ export async function getBatchesForExpiryReturn(
   storeId: string,
   daysAhead = 60
 ): Promise<ExpiryReturnCandidate[]> {
-  const cutoffDate = new Date(Date.now() + daysAhead * 86400000).toISOString().split("T")[0]!;
+  const cutoffDate = istDateOffsetStr(daysAhead);
 
   const rows = await dbOrTx
     .select({
@@ -497,8 +509,8 @@ export async function getBatchesForExpiryReturn(
       and(
         eq(schema.batches.tenantId, tenantId),
         eq(schema.batches.storeId, storeId),
-        sql`${schema.batches.qtyOnHand} > 0`,
-        sql`${schema.batches.expiryDate} <= ${cutoffDate}`
+        gt(schema.batches.qtyOnHand, 0),
+        lte(schema.batches.expiryDate, cutoffDate)
       )
     )
     .orderBy(schema.batches.expiryDate);
@@ -511,6 +523,14 @@ export async function getBatchesForExpiryReturn(
     if (seen.has(r.batch.id)) continue;
     seen.add(r.batch.id);
 
+    const isPlaceholder = r.sup?.name === PENDING_SUPPLIER_PLACEHOLDER_NAME;
+    const pendingName = r.pur?.pendingSupplierMeta?.name?.trim();
+    const resolvedSupplierName = isPlaceholder
+      ? pendingName
+        ? `${pendingName} (Unregistered)`
+        : "Unregistered Supplier"
+      : r.sup?.name ?? (pendingName ? `${pendingName} (Unregistered)` : null);
+
     candidates.push({
       batchId: r.batch.id,
       batchNo: r.batch.batchNo,
@@ -519,8 +539,9 @@ export async function getBatchesForExpiryReturn(
       purchaseRate: r.batch.purchaseRate ?? 0,
       medicineId: r.med.id,
       medicineName: r.med.name,
-      supplierId: r.sup?.id ?? r.pur?.supplierId ?? null,
-      supplierName: r.sup?.name ?? null,
+      supplierId: isPlaceholder ? null : (r.sup?.id ?? r.pur?.supplierId ?? null),
+      supplierName: resolvedSupplierName,
+      isPendingSupplier: isPlaceholder || (!r.sup && Boolean(pendingName)),
       purchaseId: r.pur?.id ?? null,
       purchaseItemId: r.pItem?.id ?? null,
       purchaseNo: r.pur?.purchaseNo ?? null,
