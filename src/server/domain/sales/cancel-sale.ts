@@ -1,5 +1,4 @@
 import { and, eq, gt, inArray } from "drizzle-orm";
-import { format } from "date-fns";
 import { z } from "zod";
 import { schema, type Tx } from "@/server/db";
 import type { AuthCtx } from "@/server/rbac";
@@ -222,7 +221,7 @@ export async function cancelSale(
       .where(eq(schema.journalLines.entryId, originalEntry.id));
 
     const entryNo = await nextDocNumber(tx, ctx.tenantId, ctx.storeId, "journal", "JV");
-    const entryDateStr = format(now, "yyyy-MM-dd");
+    const entryDateStr = getIndianBusinessDate(now);
 
     // Guard: Both the original sale's period and current cancellation period must be open
     await assertAccountingPeriodOpen(tx, { tenantId: ctx.tenantId, entryDate: originalEntry.entryDate, storeId: ctx.storeId });

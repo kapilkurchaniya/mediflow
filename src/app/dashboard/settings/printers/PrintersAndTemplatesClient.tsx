@@ -13,7 +13,7 @@ import {
   Loader2,
   FileCode2,
   Eye,
-  RotateCcw,
+  Plus,
 } from "lucide-react";
 import { PageHeader } from "@/app/components/ui";
 import {
@@ -197,12 +197,30 @@ export function PrintersAndTemplatesClient({
     });
   };
 
+  const hasActiveCustomForFormat = filteredTemplates.some((t) => t.isActive);
+
   const handleFormatSwitch = (fmt: "a4" | "thermal_80mm") => {
     setTemplateFormat(fmt);
+    const activeForFmt = templates.find((t) => t.storeId === selectedStoreId && t.format === fmt && t.isActive);
+    if (activeForFmt) {
+      setEditingId(activeForFmt.id);
+      setTemplateName(activeForFmt.name);
+      setHtmlContent(activeForFmt.htmlContent);
+      setSourceType(activeForFmt.sourceType);
+    } else {
+      setEditingId(null);
+      setSourceType("manual");
+      setTemplateName(fmt === "a4" ? "Custom A4 GST Invoice" : "Custom 80mm Thermal Slip");
+      setHtmlContent(fmt === "a4" ? DEFAULT_A4_HTML : DEFAULT_THERMAL_HTML);
+    }
+  };
+
+  const handleNewTemplate = () => {
     setEditingId(null);
     setSourceType("manual");
-    setTemplateName(fmt === "a4" ? "Custom A4 GST Invoice" : "Custom 80mm Thermal Slip");
-    setHtmlContent(fmt === "a4" ? DEFAULT_A4_HTML : DEFAULT_THERMAL_HTML);
+    setTemplateName(templateFormat === "a4" ? "Custom A4 GST Invoice" : "Custom 80mm Thermal Slip");
+    setHtmlContent(templateFormat === "a4" ? DEFAULT_A4_HTML : DEFAULT_THERMAL_HTML);
+    setNotice(null);
   };
 
   const handleBillPhotoOcr = async (file: File) => {
@@ -446,64 +464,113 @@ export function PrintersAndTemplatesClient({
 
                 <button
                   type="button"
-                  onClick={() => handleSetActive(null)}
-                  disabled={isPending}
-                  className="btn btn-ghost btn-sm text-xs inline-flex items-center gap-1"
+                  onClick={handleNewTemplate}
+                  className="btn btn-secondary btn-sm inline-flex items-center gap-1.5"
                 >
-                  <RotateCcw className="h-3.5 w-3.5" /> Use Built-in Default
+                  <Plus className="h-3.5 w-3.5" /> New Custom Template
                 </button>
               </div>
             </div>
 
-            {filteredTemplates.length > 0 && (
-              <div className="flex flex-wrap gap-2 pt-2 border-t border-ink-100">
+            {/* Active Template Selector: Built-in Default vs Custom Templates */}
+            <div className="pt-3 border-t border-ink-100 space-y-2">
+              <div className="text-[11px] font-semibold uppercase tracking-wider text-ink-500">
+                Active Template for {templateFormat === "a4" ? "A4 GST Invoice" : "80mm / 58mm Thermal Slip"}
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+                {/* Built-in Default Card */}
+                <div
+                  className={`rounded-xl border p-3 text-xs flex items-center justify-between gap-2 ${
+                    !hasActiveCustomForFormat
+                      ? "border-emerald-300 bg-emerald-50/70 text-emerald-950 ring-1 ring-emerald-300"
+                      : "border-ink-200 bg-white text-ink-700"
+                  }`}
+                >
+                  <div className="min-w-0">
+                    <div className="font-semibold flex items-center gap-1.5">
+                      <span>MediFlow Built-in Default</span>
+                      {!hasActiveCustomForFormat && (
+                        <span className="badge badge-success !text-[10px]">Active</span>
+                      )}
+                    </div>
+                    <div className="text-[11px] text-ink-500 mt-0.5">
+                      Standard GST-compliant layout
+                    </div>
+                  </div>
+                  {hasActiveCustomForFormat && (
+                    <button
+                      type="button"
+                      disabled={isPending}
+                      onClick={() => handleSetActive(null)}
+                      className="btn btn-secondary btn-xs shrink-0"
+                    >
+                      Use Default
+                    </button>
+                  )}
+                </div>
+
+                {/* Saved Custom Templates */}
                 {filteredTemplates.map((tpl) => (
                   <div
                     key={tpl.id}
-                    className={`flex items-center gap-2 rounded-lg border px-3 py-1.5 text-xs ${
+                    className={`rounded-xl border p-3 text-xs flex items-center justify-between gap-2 ${
                       tpl.isActive
-                        ? "border-emerald-300 bg-emerald-50 text-emerald-900"
+                        ? "border-emerald-300 bg-emerald-50/70 text-emerald-950 ring-1 ring-emerald-300"
                         : "border-ink-200 bg-white text-ink-700"
                     }`}
                   >
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setEditingId(tpl.id);
-                        setTemplateName(tpl.name);
-                        setHtmlContent(tpl.htmlContent);
-                        setSourceType(tpl.sourceType);
-                      }}
-                      className="font-semibold hover:underline"
-                    >
-                      {tpl.name}
-                    </button>
-                    {tpl.sourceType === "ocr" && (
-                      <span className="badge badge-neutral !text-[10px]">OCR</span>
-                    )}
-                    {tpl.isActive ? (
-                      <span className="badge badge-success !text-[10px]">Active</span>
-                    ) : (
+                    <div className="min-w-0">
                       <button
                         type="button"
-                        onClick={() => handleSetActive(tpl.id)}
-                        className="text-[11px] font-semibold text-brand-600 hover:underline"
+                        onClick={() => {
+                          setEditingId(tpl.id);
+                          setTemplateName(tpl.name);
+                          setHtmlContent(tpl.htmlContent);
+                          setSourceType(tpl.sourceType);
+                        }}
+                        className="font-semibold hover:underline truncate block max-w-full text-left"
+                        title="Click to edit this template"
                       >
-                        Activate
+                        {tpl.name}
                       </button>
-                    )}
-                    <button
-                      type="button"
-                      onClick={() => handleDeleteTemplate(tpl.id)}
-                      className="text-ink-400 hover:text-rose-600"
-                      aria-label="Delete template"
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </button>
+                      <div className="flex items-center gap-1.5 mt-1">
+                        <span className="badge badge-neutral !text-[10px]">
+                          {tpl.sourceType === "ocr" ? "OCR" : "HTML"}
+                        </span>
+                        {tpl.isActive && (
+                          <span className="badge badge-success !text-[10px]">Active</span>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      {!tpl.isActive && (
+                        <button
+                          type="button"
+                          disabled={isPending}
+                          onClick={() => handleSetActive(tpl.id)}
+                          className="btn btn-primary btn-xs"
+                        >
+                          Use This
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (window.confirm(`Delete custom template "${tpl.name}"?`)) {
+                            handleDeleteTemplate(tpl.id);
+                          }
+                        }}
+                        className="p-1 text-ink-400 hover:text-rose-600 rounded"
+                        aria-label="Delete template"
+                        title="Delete template"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
                   </div>
                 ))}
               </div>
-            )}
+            </div>
           </div>
 
           {/* Editor + Live Preview */}
