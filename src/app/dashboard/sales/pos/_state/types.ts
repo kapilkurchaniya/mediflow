@@ -43,6 +43,7 @@ export interface ComplianceState {
   doctorName: string;
   doctorRegNo: string;
   doctorAddress: string;
+  patientName?: string;
   patientAge: number | "";
   patientGender: string;
   patientAddress: string;
