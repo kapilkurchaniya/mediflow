@@ -130,6 +130,7 @@ export type PosItemInput = {
 };
 
 export type ComplianceDetailsInput = {
+  doctorId?: string;
   doctorName?: string;
   doctorRegNo?: string;
   doctorAddress?: string;
@@ -235,6 +236,8 @@ export async function createSaleInvoice(
     revalidatePath("/dashboard/accounting");
     revalidatePath("/dashboard/gst");
     revalidatePath("/dashboard/sales/pos");
+    revalidatePath("/dashboard/compliance/prescriptions");
+    revalidatePath("/dashboard/compliance");
 
     return {
       success: true,

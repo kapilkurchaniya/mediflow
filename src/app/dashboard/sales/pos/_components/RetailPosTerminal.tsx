@@ -44,6 +44,28 @@ export function RetailPosTerminal() {
   const [promiseMedicine, setPromiseMedicine] = useState<{ id: string; name: string } | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
+  const [complianceForceOpen, setComplianceForceOpen] = useState(false);
+
+  const requiresStrictRegAndAddress = useMemo(
+    () =>
+      controlledItems.some(
+        (i) => i.schedule && ["X", "NARCOTIC"].includes(i.schedule.toUpperCase())
+      ),
+    [controlledItems]
+  );
+
+  const validatePosComplianceBeforeCheckout = useCallback((): string | null => {
+    if (controlledItems.length === 0) return null;
+    const missing: string[] = [];
+    if (!state.compliance.doctorName.trim()) missing.push("Doctor Name");
+    if (!state.compliance.prescriptionRef.trim()) missing.push("Prescription Ref / Rx No");
+    if (requiresStrictRegAndAddress) {
+      if (!state.compliance.doctorRegNo.trim()) missing.push("Doctor Reg. No");
+      if (!state.compliance.patientAddress.trim()) missing.push("Patient Address");
+    }
+    if (missing.length === 0) return null;
+    return `Prescription required for ${controlledItems.map((i) => i.medicineName).join(", ")}. Please enter: ${missing.join(", ")} in Doctor & Prescription.`;
+  }, [controlledItems, state.compliance, requiresStrictRegAndAddress]);
 
   const hasStockShortage = useMemo(() => {
     return state.cart.some((line) => {
@@ -128,6 +150,12 @@ export function RetailPosTerminal() {
       setSubmitError("One or more items exceed available stock. Adjust quantities or choose a substitute first.");
       return;
     }
+    const complianceErr = validatePosComplianceBeforeCheckout();
+    if (complianceErr) {
+      setComplianceForceOpen(true);
+      setSubmitError(complianceErr);
+      return;
+    }
     if (requireShift && !activeShift) {
       alert("Please open a cash register shift before completing sales.");
       return;
@@ -152,11 +180,17 @@ export function RetailPosTerminal() {
         paymentMethod: method === "split" ? "cash" : method,
         amountPaid: totals.total,
         complianceDetails: {
-          doctorName: state.compliance.doctorName, doctorRegNo: state.compliance.doctorRegNo,
+          doctorId: state.compliance.doctorId || undefined,
+          doctorName: state.compliance.doctorName,
+          doctorRegNo: state.compliance.doctorRegNo,
           doctorAddress: state.compliance.doctorAddress,
+          patientName: state.compliance.patientName || state.customer?.name || undefined,
+          patientPhone: state.customer?.phone || undefined,
           patientAge: state.compliance.patientAge === "" ? undefined : Number(state.compliance.patientAge),
-          patientGender: state.compliance.patientGender, patientAddress: state.compliance.patientAddress,
-          prescriptionRef: state.compliance.prescriptionRef, prescriptionDate: state.compliance.prescriptionDate,
+          patientGender: state.compliance.patientGender,
+          patientAddress: state.compliance.patientAddress,
+          prescriptionRef: state.compliance.prescriptionRef,
+          prescriptionDate: state.compliance.prescriptionDate,
         },
         medicalRepId: state.compliance.medicalRepId,
         paymentsInput,
@@ -192,7 +226,15 @@ export function RetailPosTerminal() {
     onOpenRegister: () => router.push("/dashboard/sales/register"),
     onHoldBill: () => { if (state.cart.length > 0) setIsParkOpen(true); },
     onListHeldBills: () => setIsHeldListOpen(true),
-    onOpenPaymentModal: () => setIsPaymentOpen(true),
+    onOpenPaymentModal: () => {
+      const complianceErr = validatePosComplianceBeforeCheckout();
+      if (complianceErr) {
+        setComplianceForceOpen(true);
+        setSubmitError(complianceErr);
+        return;
+      }
+      setIsPaymentOpen(true);
+    },
     onOpenPromiseModal: () => setPromiseMedicine({ id: "", name: "" }),
     onCompleteSale: () => handleCompleteSale(isPaymentOpen ? "split" : state.paymentMethod),
     onOpenCalculator: () => toggleCalculator(),
@@ -269,8 +311,39 @@ export function RetailPosTerminal() {
 
       <div className="w-full lg:w-80 flex flex-col space-y-3 shrink-0">
         <CustomerPicker customer={state.customer} dataSource={ds} onSelectCustomer={(c) => dispatch({ type: "SET_CUSTOMER", payload: c })} onCustomerRedeemableLoaded={(pts, val) => dispatch({ type: "SET_CUSTOMER_REDEEMABLE", payload: { redeemablePoints: pts, redeemableValuePaise: val } })} />
-        <CompliancePanel compliance={state.compliance} hasControlledItems={controlledItems.length > 0} dataSource={ds} onChange={(patch) => dispatch({ type: "SET_COMPLIANCE", payload: patch })} />
-        <TotalsBar totals={totals} loyaltyDiscountPaise={loyaltyDiscountPaise} itemCount={state.cart.length} paymentMethod={state.paymentMethod} isSubmitting={isSubmitting} canBill={!requireShift || Boolean(activeShift)} hasStockShortage={hasStockShortage} submitError={submitError} onDismissError={() => setSubmitError("")} onSetPaymentMethod={(m) => dispatch({ type: "SET_PAYMENT_METHOD", payload: m })} onOpenSplitModal={() => setIsPaymentOpen(true)} onCompleteSale={() => handleCompleteSale()} />
+        <CompliancePanel
+          compliance={state.compliance}
+          hasControlledItems={controlledItems.length > 0}
+          requiresStrictRegAndAddress={requiresStrictRegAndAddress}
+          forceOpen={complianceForceOpen}
+          dataSource={ds}
+          onChange={(patch) => {
+            setSubmitError("");
+            dispatch({ type: "SET_COMPLIANCE", payload: patch });
+          }}
+        />
+        <TotalsBar
+          totals={totals}
+          loyaltyDiscountPaise={loyaltyDiscountPaise}
+          itemCount={state.cart.length}
+          paymentMethod={state.paymentMethod}
+          isSubmitting={isSubmitting}
+          canBill={!requireShift || Boolean(activeShift)}
+          hasStockShortage={hasStockShortage}
+          submitError={submitError}
+          onDismissError={() => setSubmitError("")}
+          onSetPaymentMethod={(m) => dispatch({ type: "SET_PAYMENT_METHOD", payload: m })}
+          onOpenSplitModal={() => {
+            const complianceErr = validatePosComplianceBeforeCheckout();
+            if (complianceErr) {
+              setComplianceForceOpen(true);
+              setSubmitError(complianceErr);
+              return;
+            }
+            setIsPaymentOpen(true);
+          }}
+          onCompleteSale={() => handleCompleteSale()}
+        />
       </div>
 
       <MobileTenderBar
