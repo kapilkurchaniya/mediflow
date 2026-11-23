@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useRef, useState, useTransition } from "react";
+import React, { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
   Camera,
@@ -12,6 +12,7 @@ import {
   PackageCheck,
 } from "lucide-react";
 import { commitOcrStockUpdateAction } from "@/app/actions/stock";
+import { SCHEDULE_OPTIONS, scheduleRequiresRx, type DrugSchedule } from "@/lib/schedule";
 
 export interface StockOcrRow {
   rowKey: string;
@@ -19,6 +20,8 @@ export interface StockOcrRow {
   genericName: string;
   manufacturer: string;
   hsn: string;
+  schedule: DrugSchedule;
+  rxRequired: boolean;
   matchedMedicineId: string | null;
   matchedMedicineName: string | null;
   existingBatchId: string | null;
@@ -45,12 +48,15 @@ export interface StockOcrRow {
 export function StockOcrModal({
   isOpen,
   onClose,
+  initialFile,
 }: {
   isOpen: boolean;
   onClose: () => void;
+  initialFile?: File | null;
 }) {
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const handledInitialFileRef = useRef<File | null>(null);
   const [rows, setRows] = useState<StockOcrRow[]>([]);
   const [stockMode, setStockMode] = useState<"add" | "set">("add");
   const [createMissing, setCreateMissing] = useState(true);
@@ -58,8 +64,6 @@ export function StockOcrModal({
   const [error, setError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
-
-  if (!isOpen) return null;
 
   const handleScanFile = async (file: File) => {
     setIsScanning(true);
@@ -76,6 +80,8 @@ export function StockOcrModal({
       } else {
         const scanned: StockOcrRow[] = (data.rows || []).map((r: StockOcrRow) => ({
           ...r,
+          schedule: r.schedule || "none",
+          rxRequired: r.rxRequired ?? scheduleRequiresRx(r.schedule),
           updateCatalogPackSize: Boolean(r.suggestCatalogUpdate),
         }));
         setRows(scanned);
@@ -89,6 +95,18 @@ export function StockOcrModal({
       setIsScanning(false);
     }
   };
+
+  useEffect(() => {
+    if (isOpen && initialFile && handledInitialFileRef.current !== initialFile) {
+      handledInitialFileRef.current = initialFile;
+      void handleScanFile(initialFile);
+    }
+    if (!isOpen) {
+      handledInitialFileRef.current = null;
+    }
+  }, [isOpen, initialFile]);
+
+  if (!isOpen) return null;
 
   const updateRow = (idx: number, patch: Partial<StockOcrRow>) => {
     setRows((prev) => prev.map((r, i) => (i === idx ? { ...r, ...patch } : r)));
@@ -112,6 +130,8 @@ export function StockOcrModal({
           genericName: r.genericName || undefined,
           manufacturer: r.manufacturer || undefined,
           hsn: r.hsn || undefined,
+          schedule: r.schedule || "none",
+          rxRequired: r.rxRequired ?? scheduleRequiresRx(r.schedule),
           batchNo: r.batchNo,
           expiryDate: r.expiryDate,
           unitsPerPack: r.unitsPerPack,
@@ -256,6 +276,7 @@ export function StockOcrModal({
                   <thead className="bg-ink-50 border-b border-ink-200 text-ink-600 font-semibold">
                     <tr>
                       <th className="p-2.5">Medicine</th>
+                      <th className="p-2.5">Schedule</th>
                       <th className="p-2.5">Status</th>
                       <th className="p-2.5">Batch No</th>
                       <th className="p-2.5">Expiry (YYYY-MM-DD)</th>
@@ -299,6 +320,29 @@ export function StockOcrModal({
                                 <span>Update catalog to {r.unitsPerPack}/pack</span>
                               </label>
                             )}
+                          </td>
+                          <td className="p-2.5">
+                            <select
+                              value={r.schedule || "none"}
+                              onChange={(e) => {
+                                const next = e.target.value as DrugSchedule;
+                                updateRow(idx, {
+                                  schedule: next,
+                                  rxRequired: scheduleRequiresRx(next),
+                                });
+                              }}
+                              className={`input input-sm !py-1 !px-1.5 w-24 text-[11px] font-semibold ${
+                                r.schedule && r.schedule !== "none"
+                                  ? "border-rose-300 bg-rose-50 text-rose-800"
+                                  : ""
+                              }`}
+                            >
+                              {SCHEDULE_OPTIONS.map((opt) => (
+                                <option key={opt.value} value={opt.value}>
+                                  {opt.value === "none" ? "OTC" : opt.label}
+                                </option>
+                              ))}
+                            </select>
                           </td>
                           <td className="p-2.5">
                             <span

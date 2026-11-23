@@ -86,10 +86,14 @@ export async function getPurchaseById(purchaseId: string) {
 
 function revalidatePurchasePaths() {
   revalidatePath("/dashboard/purchases");
+  revalidatePath("/dashboard/purchases/expiry-returns");
+  revalidatePath("/dashboard/purchases/returns");
+  revalidatePath("/dashboard/purchases/returns/new");
   revalidatePath("/dashboard/suppliers");
   revalidatePath("/dashboard/accounting");
   revalidatePath("/dashboard/gst");
   revalidatePath("/dashboard/inventory/batches");
+  revalidatePath("/dashboard/inventory/quarantine");
 }
 
 /**

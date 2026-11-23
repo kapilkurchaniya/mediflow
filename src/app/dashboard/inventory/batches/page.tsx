@@ -63,7 +63,7 @@ export default async function BatchesPage({
       <div className="page space-y-6">
         <PageHeader
           title="Batches & stock"
-          description="Batch-level stock on hand, expiry exposure and purchase-cost valuation. Drag & drop a CSV anywhere to import."
+          description="Batch-level stock on hand, expiry exposure and valuation. Drag & drop a CSV, PDF, or bill photo anywhere to import."
           actions={
             <>
               <ExportButton
@@ -176,7 +176,12 @@ export default async function BatchesPage({
                         </div>
                       </td>
                       <td>
-                        <span className="font-mono text-[12.5px] text-ink-800">{batch.batchNo}</span>
+                        <div className="flex items-center gap-1.5">
+                          <span className="font-mono text-[12.5px] text-ink-800">{batch.batchNo}</span>
+                          {batch.status === "hold" && (
+                            <span className="badge badge-danger !text-[10px] !px-1.5">Hold</span>
+                          )}
+                        </div>
                       </td>
                       <td>
                         <ExpiryBadge date={batch.expiryDate} />

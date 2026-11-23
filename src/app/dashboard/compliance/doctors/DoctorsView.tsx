@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useTransition } from "react";
+import React, { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
   Stethoscope,
@@ -13,6 +13,9 @@ import {
   X,
   AlertCircle,
   Award,
+  Camera,
+  Loader2,
+  CheckCircle2,
 } from "lucide-react";
 import { PageHeader, EmptyState } from "@/app/components/ui";
 import { upsertDoctor } from "@/app/actions/compliance";
@@ -46,6 +49,58 @@ export function DoctorsView({
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
   const [formError, setFormError] = useState("");
+  const [isScanningDoc, setIsScanningDoc] = useState(false);
+  const [scanSuccess, setScanSuccess] = useState<string | null>(null);
+  const scanDocInputRef = useRef<HTMLInputElement>(null);
+
+  const handleScanDoctorDocument = async (file: File) => {
+    setIsScanningDoc(true);
+    setFormError("");
+    setScanSuccess(null);
+    setEditingId(null);
+    setIsModalOpen(true);
+
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const res = await fetch("/api/ocr/prescription", { method: "POST", body: fd });
+      const data = await res.json();
+      if (!res.ok) {
+        setFormError(data.error || "Failed to scan doctor prescription or letterhead.");
+        return;
+      }
+
+      const ex = data.extracted || {};
+      if (data.matchedDoctor) {
+        setEditingId(data.matchedDoctor.id);
+        setName(data.matchedDoctor.name || ex.doctorName || "");
+        setRegNo(data.matchedDoctor.regNo || ex.doctorRegNo || "");
+        setQualification(data.matchedDoctor.qualification || ex.doctorQualification || "");
+        setSpecialization(data.matchedDoctor.specialization || ex.doctorSpecialization || "");
+        setHospital(data.matchedDoctor.hospital || ex.doctorHospital || "");
+        setPhone(data.matchedDoctor.phone || ex.doctorPhone || "");
+        setAddress(data.matchedDoctor.address || ex.doctorAddress || "");
+        setScanSuccess(`Matched existing doctor "${data.matchedDoctor.name}" from "${file.name}". Review & save any updates.`);
+      } else {
+        setName(ex.doctorName || "");
+        setRegNo(ex.doctorRegNo || "");
+        setQualification(ex.doctorQualification || "MBBS");
+        setSpecialization(ex.doctorSpecialization || "");
+        setHospital(ex.doctorHospital || "");
+        setPhone(ex.doctorPhone || "");
+        setAddress(ex.doctorAddress || "");
+        setScanSuccess(
+          ex.doctorName
+            ? `Extracted "${ex.doctorName}" from "${file.name}". Verify Medical Council Reg No and click Save Doctor.`
+            : `Scanned "${file.name}" — please review and complete any missing doctor fields.`
+        );
+      }
+    } catch (err: unknown) {
+      setFormError(err instanceof Error ? err.message : "OCR scan failed");
+    } finally {
+      setIsScanningDoc(false);
+    }
+  };
 
   // Edit / Add Form state
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -151,13 +206,35 @@ export function DoctorsView({
         description="Statutory Medical Council registration directory for prescription validation, Schedule H1 audit trails, and referral records."
         backHref="/dashboard/compliance"
         actions={
-          <button
-            onClick={openAddModal}
-            className="btn btn-primary text-xs flex items-center gap-1.5"
-          >
-            <Plus className="h-4 w-4" />
-            Add Doctor
-          </button>
+          <div className="flex items-center gap-2">
+            <input
+              ref={scanDocInputRef}
+              type="file"
+              accept=".pdf,.jpg,.jpeg,.png,.webp,application/pdf,image/*"
+              className="hidden"
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f) void handleScanDoctorDocument(f);
+                e.target.value = "";
+              }}
+            />
+            <button
+              type="button"
+              onClick={() => scanDocInputRef.current?.click()}
+              disabled={isScanningDoc}
+              className="btn btn-secondary text-xs flex items-center gap-1.5 border-brand-300 text-brand-700 hover:bg-brand-50"
+            >
+              {isScanningDoc ? <Loader2 className="h-4 w-4 animate-spin" /> : <Camera className="h-4 w-4" />}
+              Scan Rx / Letterhead
+            </button>
+            <button
+              onClick={openAddModal}
+              className="btn btn-primary text-xs flex items-center gap-1.5"
+            >
+              <Plus className="h-4 w-4" />
+              Add Doctor
+            </button>
+          </div>
         }
       />
 
@@ -265,6 +342,18 @@ export function DoctorsView({
             </div>
 
             <form onSubmit={handleSubmit} className="p-5 space-y-4">
+              {isScanningDoc && (
+                <div className="rounded-lg bg-brand-50 border border-brand-200 p-3 text-xs text-brand-800 flex items-center gap-2">
+                  <Loader2 className="h-4 w-4 animate-spin shrink-0" />
+                  <span>Reading doctor letterhead / prescription with AI OCR…</span>
+                </div>
+              )}
+              {scanSuccess && !isScanningDoc && (
+                <div className="rounded-lg bg-emerald-50 border border-emerald-200 p-3 text-xs text-emerald-800 flex items-start gap-2">
+                  <CheckCircle2 className="h-4 w-4 shrink-0 mt-0.5 text-emerald-600" />
+                  <span>{scanSuccess}</span>
+                </div>
+              )}
               {formError && (
                 <div className="rounded-lg bg-rose-50 border border-rose-200 p-3 text-xs text-rose-700 flex items-center gap-2">
                   <AlertCircle className="h-4 w-4 shrink-0" />

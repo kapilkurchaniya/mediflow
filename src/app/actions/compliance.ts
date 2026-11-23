@@ -230,7 +230,12 @@ export async function createPrescription(data: {
   doctorId?: string | null;
   doctorName: string;
   doctorRegNo?: string | null;
+  doctorQualification?: string | null;
+  doctorSpecialization?: string | null;
+  doctorHospital?: string | null;
+  doctorPhone?: string | null;
   doctorAddress?: string | null;
+  autoEnrollDoctor?: boolean;
   rxNumber?: string | null;
   prescriptionDate: string;
   diagnosis?: string | null;
@@ -263,6 +268,63 @@ export async function createPrescription(data: {
 
   try {
     const insertedRx = await db.transaction(async (tx) => {
+      let resolvedDoctorId = data.doctorId || null;
+      const cleanDoctorName = data.doctorName.trim();
+      const cleanDoctorRegNo = data.doctorRegNo?.trim() || null;
+
+      if (!resolvedDoctorId && data.autoEnrollDoctor && cleanDoctorName) {
+        const [existingByReg] = cleanDoctorRegNo
+          ? await tx
+              .select({ id: schema.doctors.id })
+              .from(schema.doctors)
+              .where(
+                and(
+                  eq(schema.doctors.tenantId, ctx.tenantId),
+                  sql`lower(${schema.doctors.regNo}) = lower(${cleanDoctorRegNo})`
+                )
+              )
+              .limit(1)
+          : [];
+
+        if (existingByReg) {
+          resolvedDoctorId = existingByReg.id;
+        } else {
+          const [existingByName] = await tx
+            .select({ id: schema.doctors.id })
+            .from(schema.doctors)
+            .where(
+              and(
+                eq(schema.doctors.tenantId, ctx.tenantId),
+                sql`lower(${schema.doctors.name}) = lower(${cleanDoctorName})`
+              )
+            )
+            .limit(1);
+
+          if (existingByName) {
+            resolvedDoctorId = existingByName.id;
+          } else {
+            const regNoToSave =
+              cleanDoctorRegNo ||
+              `PENDING-${Date.now().toString(36).toUpperCase().slice(-6)}`;
+            const [createdDoc] = await tx
+              .insert(schema.doctors)
+              .values({
+                tenantId: ctx.tenantId,
+                name: cleanDoctorName,
+                regNo: regNoToSave,
+                qualification: data.doctorQualification?.trim() || null,
+                specialization: data.doctorSpecialization?.trim() || null,
+                hospital: data.doctorHospital?.trim() || null,
+                phone: data.doctorPhone?.trim() || null,
+                address: data.doctorAddress?.trim() || null,
+                isActive: true,
+              })
+              .returning({ id: schema.doctors.id });
+            resolvedDoctorId = createdDoc.id;
+          }
+        }
+      }
+
       const [inserted] = await tx
         .insert(schema.prescriptions)
         .values({
@@ -274,9 +336,9 @@ export async function createPrescription(data: {
           patientGender: data.patientGender ?? null,
           patientPhone: data.patientPhone?.trim() || null,
           patientAddress: data.patientAddress?.trim() || null,
-          doctorId: data.doctorId || null,
-          doctorName: data.doctorName.trim(),
-          doctorRegNo: data.doctorRegNo?.trim() || null,
+          doctorId: resolvedDoctorId,
+          doctorName: cleanDoctorName,
+          doctorRegNo: cleanDoctorRegNo,
           doctorAddress: data.doctorAddress?.trim() || null,
           rxNumber: data.rxNumber?.trim() || null,
           prescriptionDate: data.prescriptionDate,
@@ -314,6 +376,7 @@ export async function createPrescription(data: {
 
     revalidatePath("/dashboard/compliance");
     revalidatePath("/dashboard/compliance/prescriptions");
+    revalidatePath("/dashboard/compliance/doctors");
     return { success: true, prescriptionId: insertedRx.id, prescription: insertedRx };
   } catch (err: unknown) {
     return { error: err instanceof Error ? err.message : String(err) };

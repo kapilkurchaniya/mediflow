@@ -6,6 +6,7 @@ import { getAuthCtx, can } from "@/server/rbac";
 import { checkAiRateLimit } from "@/server/ai/rate-limiter";
 import { readAndValidateOcrFile, runStructuredOcr } from "@/server/ai/ocr";
 import { evaluateGrnSupplierMatch } from "@/server/domain/import/supplier-matcher";
+import { normalizeExpiryDate } from "@/server/domain/import/normalize";
 import type {
   ParseDistributorInvoiceResult,
   ParsedDistributorInvoiceItem,
@@ -13,6 +14,7 @@ import type {
 import type { PurchaseItemInput } from "@/server/domain/purchases";
 import { DEFAULT_GST_RATE_BP, isValidGstRateBp, type GstRateBp } from "@/lib/regulatory";
 import { parsePackaging, resolveOcrCatalogPackConflict } from "@/lib/packaging";
+import { normalizeDrugSchedule } from "@/lib/schedule";
 
 export const maxDuration = 60;
 
@@ -43,22 +45,14 @@ const GrnOcrSchema = z.object({
       gstPct: z.number().min(0).max(28).default(12),
       hsn: z.string().nullable().optional(),
       barcode: z.string().nullable().optional(),
+      schedule: z.string().nullable().optional(),
     })
   ),
 });
 
 function normalizeExpiry(raw?: string | null): string {
-  const s = (raw || "").trim();
-  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
-  const my = s.match(/^(\d{1,2})[-/](\d{2,4})$/);
-  if (my) {
-    const m = Math.min(12, Math.max(1, parseInt(my[1], 10)));
-    let y = parseInt(my[2], 10);
-    if (y < 100) y += 2000;
-    const lastDay = new Date(y, m, 0).getDate();
-    return `${y}-${String(m).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
-  }
-  return "";
+  const res = normalizeExpiryDate(raw);
+  return res.success && res.date ? res.date : "";
 }
 
 function normalizeInvoiceDate(raw?: string | null): string {
@@ -105,7 +99,7 @@ Rules:
 - supplierAddress: supplier street/city address if visible.
 - invoiceNo: supplier invoice / bill number if visible.
 - invoiceDate: format as YYYY-MM-DD if visible.
-- For each line item: extract medicine name, batch number (uppercase), expiryDate (YYYY-MM-DD, using last day of month if MM/YY), pack (e.g. "10'S", "1x15", "100ML"), dosageForm ("tablet", "capsule", "syrup", "cream", "injection", "drops", "sachet", or "other"), unitsPerPack (integer tablets/capsules per strip e.g. 10 or 15; ALWAYS 1 for syrups, creams, drops, vials, injections), billedQty (packs), freeQty, rateRupees (PTR per pack in INR), mrpRupees (MRP per pack in INR), discountPct, gstPct (0, 5, 12, 18, or 28), hsn, and barcode if printed.`;
+- For each line item: extract medicine name, batch number (uppercase), expiryDate (YYYY-MM-DD, using last day of month if MM/YY or exact date if DD MMM YY), pack (e.g. "10'S", "1x15", "100ML"), dosageForm ("tablet", "capsule", "syrup", "cream", "injection", "drops", "sachet", or "other"), unitsPerPack (integer tablets/capsules per strip e.g. 10 or 15; ALWAYS 1 for syrups, creams, drops, vials, injections), billedQty (packs), freeQty, rateRupees (PTR per pack in INR), mrpRupees (MRP per pack in INR), discountPct, gstPct (0, 5, 12, 18, or 28), hsn, schedule (Indian drug schedule from SCH column e.g. "H", "H1", "X", "G", "G & H", or null if omitted), and barcode if printed.`;
 
     const extracted = await runStructuredOcr({
       bytes,
@@ -225,6 +219,7 @@ Rules:
         gstRateBp,
         hsn: it.hsn || "",
         barcode: it.barcode || null,
+        schedule: normalizeDrugSchedule(it.schedule),
         effectiveUnitCostPaise,
         matchedMedicineId: matched?.id ?? null,
         matchType: byBarcode ? "exact_barcode" : byExactName || byPrefix ? "exact_name" : "unmatched",

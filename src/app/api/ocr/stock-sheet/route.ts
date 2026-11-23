@@ -7,6 +7,8 @@ import { checkAiRateLimit } from "@/server/ai/rate-limiter";
 import { readAndValidateOcrFile, runStructuredOcr } from "@/server/ai/ocr";
 import { DEFAULT_GST_RATE_BP, isValidGstRateBp, type GstRateBp } from "@/lib/regulatory";
 import { parsePackaging, resolveOcrCatalogPackConflict } from "@/lib/packaging";
+import { normalizeExpiryDate } from "@/server/domain/import/normalize";
+import { normalizeDrugSchedule, scheduleRequiresRx } from "@/lib/schedule";
 
 export const maxDuration = 60;
 
@@ -17,6 +19,7 @@ const StockSheetOcrSchema = z.object({
       genericName: z.string().nullable().optional(),
       manufacturer: z.string().nullable().optional(),
       hsn: z.string().nullable().optional(),
+      schedule: z.string().nullable().optional(),
       batchNo: z.string().nullable().optional(),
       expiryDate: z.string().nullable().optional(),
       packRaw: z.string().nullable().optional(),
@@ -36,17 +39,8 @@ const StockSheetOcrSchema = z.object({
 });
 
 function normalizeExpiry(raw?: string | null): string {
-  const s = (raw || "").trim();
-  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
-  const my = s.match(/^(\d{1,2})[-/](\d{2,4})$/);
-  if (my) {
-    const m = Math.min(12, Math.max(1, parseInt(my[1], 10)));
-    let y = parseInt(my[2], 10);
-    if (y < 100) y += 2000;
-    const lastDay = new Date(y, m, 0).getDate();
-    return `${y}-${String(m).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
-  }
-  return "";
+  const res = normalizeExpiryDate(raw);
+  return res.success && res.date ? res.date : "";
 }
 
 export async function POST(req: Request) {
@@ -71,8 +65,9 @@ export async function POST(req: Request) {
 For each row return:
 - medicineName (string)
 - genericName, manufacturer, hsn (if visible)
+- schedule (Indian drug schedule from SCH / Schedule column if visible, e.g. "H", "H1", "X", "G", "G & H", "narcotic", or null if not printed)
 - batchNo (uppercase string, or empty if not visible)
-- expiryDate (YYYY-MM-DD, using last day of month if MM/YY)
+- expiryDate (YYYY-MM-DD, using last day of month if MM/YY, or exact date if DD MMM YY)
 - packRaw (exact printed pack text e.g. "10'S", "1x15", "100ML", "15GM", or null if omitted)
 - dosageForm ("tablet", "capsule", "syrup", "cream", "injection", "drops", "sachet", or "other")
 - unitsPerPack (integer tablets/capsules per strip e.g. 10 or 15; ALWAYS 1 for syrups, creams, drops, vials, injections)
@@ -96,6 +91,8 @@ For each row return:
           unitsPerPack: schema.medicines.unitsPerPack,
           gstRateBp: schema.medicines.gstRateBp,
           mrp: schema.medicines.mrp,
+          schedule: schema.medicines.schedule,
+          rxRequired: schema.medicines.rxRequired,
         })
         .from(schema.medicines)
         .where(and(eq(schema.medicines.tenantId, ctx.tenantId), eq(schema.medicines.isActive, true))),
@@ -154,12 +151,19 @@ For each row return:
         parsedPack.unitsPerPack
       );
 
+      const ocrSchedule = normalizeDrugSchedule(it.schedule);
+      const catalogSchedule = normalizeDrugSchedule(matchedMed?.schedule);
+      const effectiveSchedule = ocrSchedule !== "none" ? ocrSchedule : catalogSchedule;
+      const effectiveRxRequired = scheduleRequiresRx(effectiveSchedule) || Boolean(matchedMed?.rxRequired);
+
       return {
         rowKey: `ocr-${idx}`,
         medicineName: cleanName,
         genericName: it.genericName?.trim() || "",
         manufacturer: it.manufacturer?.trim() || "",
         hsn: it.hsn?.trim() || "",
+        schedule: effectiveSchedule,
+        rxRequired: effectiveRxRequired,
         matchedMedicineId: matchedMed?.id ?? null,
         matchedMedicineName: matchedMed?.name ?? null,
         existingBatchId: existingBatch?.id ?? null,
