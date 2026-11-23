@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useTransition } from "react";
+import React, { useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -9,14 +9,16 @@ import {
   Search,
   Stethoscope,
   User,
-  Calendar,
-  CheckCircle,
-  Clock,
   Trash2,
   ScanLine,
   X,
   AlertCircle,
   ExternalLink,
+  Camera,
+  Upload,
+  Loader2,
+  CheckCircle2,
+  UserPlus,
 } from "lucide-react";
 import { PageHeader, EmptyState } from "@/app/components/ui";
 import { createPrescription, getPrescriptions } from "@/app/actions/compliance";
@@ -64,6 +66,15 @@ export function PrescriptionsView({
   const [selectedDoctorId, setSelectedDoctorId] = useState("");
   const [doctorName, setDoctorName] = useState("");
   const [doctorRegNo, setDoctorRegNo] = useState("");
+  const [doctorQualification, setDoctorQualification] = useState("");
+  const [doctorSpecialization, setDoctorSpecialization] = useState("");
+  const [doctorHospital, setDoctorHospital] = useState("");
+  const [doctorPhone, setDoctorPhone] = useState("");
+  const [doctorAddress, setDoctorAddress] = useState("");
+  const [autoEnrollDoctor, setAutoEnrollDoctor] = useState(true);
+  const [isScanningRx, setIsScanningRx] = useState(false);
+  const [scanBanner, setScanBanner] = useState<string | null>(null);
+  const scanInputRef = useRef<HTMLInputElement>(null);
   const [rxNumber, setRxNumber] = useState("");
   const [prescriptionDate, setPrescriptionDate] = useState(
     new Date().toISOString().slice(0, 10)
@@ -80,6 +91,69 @@ export function PrescriptionsView({
     if (doc) {
       setDoctorName(doc.name);
       setDoctorRegNo(doc.regNo);
+      setAutoEnrollDoctor(false);
+    }
+  };
+
+  const handleScanRxFile = async (file: File) => {
+    setIsScanningRx(true);
+    setFormError("");
+    setScanBanner(null);
+    setIsModalOpen(true);
+
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const res = await fetch("/api/ocr/prescription", { method: "POST", body: fd });
+      const data = await res.json();
+      if (!res.ok) {
+        setFormError(data.error || "Failed to scan prescription.");
+        return;
+      }
+
+      const ex = data.extracted || {};
+      if (ex.patientName) setPatientName(ex.patientName);
+      if (ex.patientAge !== null && ex.patientAge !== undefined) setPatientAge(ex.patientAge);
+      if (ex.patientGender) setPatientGender(ex.patientGender);
+      if (ex.patientPhone) setPatientPhone(ex.patientPhone);
+      if (ex.patientAddress) setPatientAddress(ex.patientAddress);
+      if (ex.rxNumber) setRxNumber(ex.rxNumber);
+      if (ex.prescriptionDate) setPrescriptionDate(ex.prescriptionDate);
+      if (ex.diagnosis) setDiagnosis(ex.diagnosis);
+      if (ex.notes) setNotes(ex.notes);
+
+      if (data.matchedDoctor) {
+        setSelectedDoctorId(data.matchedDoctor.id);
+        setDoctorName(data.matchedDoctor.name);
+        setDoctorRegNo(data.matchedDoctor.regNo || ex.doctorRegNo || "");
+        setAutoEnrollDoctor(false);
+        setScanBanner(
+          `Scanned "${file.name}" — matched existing doctor ${data.matchedDoctor.name} and extracted ${ex.items?.length || 0} medicines.`
+        );
+      } else {
+        setSelectedDoctorId("");
+        if (ex.doctorName) setDoctorName(ex.doctorName);
+        if (ex.doctorRegNo) setDoctorRegNo(ex.doctorRegNo);
+        setDoctorQualification(ex.doctorQualification || "");
+        setDoctorSpecialization(ex.doctorSpecialization || "");
+        setDoctorHospital(ex.doctorHospital || "");
+        setDoctorPhone(ex.doctorPhone || "");
+        setDoctorAddress(ex.doctorAddress || "");
+        setAutoEnrollDoctor(Boolean(ex.doctorName));
+        setScanBanner(
+          `Scanned "${file.name}" — extracted ${ex.items?.length || 0} medicines${
+            ex.doctorName ? ` & new doctor "${ex.doctorName}" (will auto-enroll in Doctor Master on save)` : ""
+          }. Please verify before saving.`
+        );
+      }
+
+      if (Array.isArray(ex.items) && ex.items.length > 0) {
+        setRxItems(ex.items);
+      }
+    } catch (err: unknown) {
+      setFormError(err instanceof Error ? err.message : "Failed to scan prescription");
+    } finally {
+      setIsScanningRx(false);
     }
   };
 
@@ -136,6 +210,12 @@ export function PrescriptionsView({
         doctorId: selectedDoctorId || null,
         doctorName,
         doctorRegNo,
+        doctorQualification: doctorQualification || null,
+        doctorSpecialization: doctorSpecialization || null,
+        doctorHospital: doctorHospital || null,
+        doctorPhone: doctorPhone || null,
+        doctorAddress: doctorAddress || null,
+        autoEnrollDoctor: !selectedDoctorId && autoEnrollDoctor,
         rxNumber,
         prescriptionDate,
         diagnosis,
@@ -180,13 +260,35 @@ export function PrescriptionsView({
         description="Digital prescription vault with prescriber verification, automatic refill tracking, and statutory compliance linking."
         backHref="/dashboard/compliance"
         actions={
-          <button
-            onClick={() => setIsModalOpen(true)}
-            className="btn btn-primary text-xs flex items-center gap-1.5"
-          >
-            <Plus className="h-4 w-4" />
-            New Prescription
-          </button>
+          <div className="flex items-center gap-2">
+            <input
+              ref={scanInputRef}
+              type="file"
+              accept=".pdf,.jpg,.jpeg,.png,.webp,application/pdf,image/*"
+              className="hidden"
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f) void handleScanRxFile(f);
+                e.target.value = "";
+              }}
+            />
+            <button
+              type="button"
+              onClick={() => scanInputRef.current?.click()}
+              disabled={isScanningRx}
+              className="btn btn-secondary text-xs flex items-center gap-1.5 border-brand-300 text-brand-700 hover:bg-brand-50"
+            >
+              {isScanningRx ? <Loader2 className="h-4 w-4 animate-spin" /> : <Camera className="h-4 w-4" />}
+              Scan Rx (Image / PDF)
+            </button>
+            <button
+              onClick={() => setIsModalOpen(true)}
+              className="btn btn-primary text-xs flex items-center gap-1.5"
+            >
+              <Plus className="h-4 w-4" />
+              New Prescription
+            </button>
+          </div>
         }
       />
 
@@ -315,6 +417,42 @@ export function PrescriptionsView({
             </div>
 
             <form onSubmit={handleSavePrescription} className="overflow-y-auto p-5 space-y-4 flex-1">
+              {/* Scan / Drop Rx Strip */}
+              <div
+                onClick={() => !isScanningRx && scanInputRef.current?.click()}
+                onDragOver={(e) => e.preventDefault()}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  const f = e.dataTransfer.files?.[0];
+                  if (f && !isScanningRx) void handleScanRxFile(f);
+                }}
+                className="rounded-xl border-2 border-dashed border-brand-200 bg-brand-50/40 hover:border-brand-400 hover:bg-brand-50/70 p-3 flex items-center justify-between gap-3 cursor-pointer transition-colors"
+              >
+                <div className="flex items-center gap-2.5 text-xs">
+                  <div className="w-8 h-8 rounded-lg bg-white border border-brand-200 flex items-center justify-center text-brand-600 shrink-0">
+                    {isScanningRx ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+                  </div>
+                  <div>
+                    <div className="font-semibold text-ink-900">
+                      {isScanningRx
+                        ? "Scanning prescription with AI OCR…"
+                        : "Scan or drop Prescription (Photo, PDF, or Scanner file)"}
+                    </div>
+                    <div className="text-[11px] text-ink-500">
+                      Auto-fills patient, doctor (+ Medical Council Reg No), diagnosis &amp; prescribed medicines
+                    </div>
+                  </div>
+                </div>
+                <span className="btn btn-secondary btn-xs shrink-0">Upload / Scan</span>
+              </div>
+
+              {scanBanner && (
+                <div className="rounded-lg bg-emerald-50 border border-emerald-200 p-3 text-xs text-emerald-800 flex items-start gap-2">
+                  <CheckCircle2 className="h-4 w-4 shrink-0 mt-0.5 text-emerald-600" />
+                  <span>{scanBanner}</span>
+                </div>
+              )}
+
               {formError && (
                 <div className="rounded-lg bg-rose-50 border border-rose-200 p-3 text-xs text-rose-700 flex items-center gap-2">
                   <AlertCircle className="h-4 w-4 shrink-0" />
@@ -437,6 +575,20 @@ export function PrescriptionsView({
                     />
                   </div>
                 </div>
+                {!selectedDoctorId && doctorName.trim() && (
+                  <label className="flex items-center gap-2 text-xs text-brand-800 bg-brand-50/60 border border-brand-200 rounded-lg px-3 py-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={autoEnrollDoctor}
+                      onChange={(e) => setAutoEnrollDoctor(e.target.checked)}
+                    />
+                    <UserPlus className="h-3.5 w-3.5 text-brand-600 shrink-0" />
+                    <span>
+                      Auto-enroll <strong>{doctorName}</strong>
+                      {doctorHospital ? ` (${doctorHospital})` : ""} into Doctor Master
+                    </span>
+                  </label>
+                )}
               </div>
 
               {/* Prescribed Items Section */}

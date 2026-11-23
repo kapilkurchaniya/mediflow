@@ -6,6 +6,7 @@ import { writeAudit } from "@/server/audit";
 import { revalidatePath } from "next/cache";
 import { and, desc, eq, gte, inArray, lte, sql } from "drizzle-orm";
 import { format } from "date-fns";
+import { PENDING_SUPPLIER_PLACEHOLDER_NAME } from "@/lib/pending-supplier";
 import {
   quarantineBatch,
   getQuarantinedBatches,
@@ -73,6 +74,10 @@ export async function getNearExpiryBatchesForQuarantineAction(options?: {
 
   return batches.map((b) => ({
     ...b,
+    supplierName:
+      b.supplierName === PENDING_SUPPLIER_PLACEHOLDER_NAME
+        ? "Unregistered Supplier"
+        : b.supplierName,
     isExpired: b.expiryDate <= todayStr,
     purchaseRatePaise: b.purchaseRate || 0,
     mrpPaise: b.mrp || 0,

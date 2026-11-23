@@ -5,6 +5,7 @@ import {
   getManufacturers,
   getStoreStockTotalsByMedicine,
   type MedicinePackFilter,
+  type MedicineStatusFilter,
 } from "@/app/actions/inventory";
 import { getRacks } from "@/app/actions/racks";
 import { Plus, Pill, Upload, Boxes } from "lucide-react";
@@ -22,23 +23,26 @@ export const metadata = { title: "Item master" };
 export default async function InventoryPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; page?: string; pack?: string }>;
+  searchParams: Promise<{ q?: string; page?: string; pack?: string; status?: string }>;
 }) {
   const ctx = await requirePagePermission("medicine.view");
   const canManage = can(ctx, "medicine.manage");
   const canAdjust = can(ctx, "inventory.adjust");
-  const { q, page: pageStr, pack } = await searchParams;
+  const { q, page: pageStr, pack, status } = await searchParams;
   const packFilter: MedicinePackFilter = pack === "single" ? "single" : "all";
+  const statusFilter: MedicineStatusFilter =
+    status === "archived" ? "archived" : status === "all" ? "all" : "active";
   const page = Math.max(1, parseInt(pageStr || "1", 10));
   const PAGE_SIZE = 50;
   const offset = (page - 1) * PAGE_SIZE;
 
-  const [items, totalCount, allItemsCount, singleUnitCount, racks, categories, manufacturers] =
+  const [items, totalCount, activeItemsCount, archivedItemsCount, singleUnitCount, racks, categories, manufacturers] =
     await Promise.all([
-      getMedicines(q, PAGE_SIZE, offset, packFilter),
-      getMedicinesCount(q, packFilter),
-      getMedicinesCount(q, "all"),
-      getMedicinesCount(q, "single"),
+      getMedicines(q, PAGE_SIZE, offset, packFilter, statusFilter),
+      getMedicinesCount(q, packFilter, statusFilter),
+      getMedicinesCount(q, "all", "active"),
+      getMedicinesCount(q, "all", "archived"),
+      getMedicinesCount(q, "single", "active"),
       getRacks(),
       canManage ? getCategories() : Promise.resolve([]),
       canManage ? getManufacturers() : Promise.resolve([]),
@@ -90,16 +94,17 @@ export default async function InventoryPage({
       <div className="card overflow-hidden">
         <SearchForm defaultValue={q || ""} placeholder="Search by name, composition or barcode">
           {packFilter === "single" && <input type="hidden" name="pack" value="single" />}
+          {statusFilter !== "active" && <input type="hidden" name="status" value={statusFilter} />}
           <div className="flex flex-wrap items-center gap-2">
             <Link
               href={`/dashboard/inventory${q ? `?q=${encodeURIComponent(q)}` : ""}`}
               className={`px-2.5 py-1 rounded-lg text-xs font-medium border transition-colors ${
-                packFilter === "all"
+                packFilter === "all" && statusFilter === "active"
                   ? "bg-brand-50 text-brand-700 border-brand-200"
                   : "bg-white text-ink-600 border-ink-200 hover:bg-ink-50"
               }`}
             >
-              All ({formatNumber(allItemsCount)})
+              Active ({formatNumber(activeItemsCount)})
             </Link>
             <Link
               href={`/dashboard/inventory?pack=single${q ? `&q=${encodeURIComponent(q)}` : ""}`}
@@ -111,6 +116,18 @@ export default async function InventoryPage({
             >
               Single-unit / Unconfigured Pack ({formatNumber(singleUnitCount)})
             </Link>
+            {archivedItemsCount > 0 && (
+              <Link
+                href={`/dashboard/inventory?status=archived${q ? `&q=${encodeURIComponent(q)}` : ""}`}
+                className={`px-2.5 py-1 rounded-lg text-xs font-medium border transition-colors ${
+                  statusFilter === "archived"
+                    ? "bg-rose-50 text-rose-800 border-rose-300"
+                    : "bg-white text-ink-600 border-ink-200 hover:bg-ink-50"
+                }`}
+              >
+                Banned / Archived ({formatNumber(archivedItemsCount)})
+              </Link>
+            )}
             <span className="text-[12.5px] text-ink-500 num ml-1">
               {formatNumber(rxCount)} Rx on page
             </span>
@@ -138,8 +155,13 @@ export default async function InventoryPage({
                   {items.map(({ medicine, manufacturer, category, rack, branchSettings }) => (
                     <tr key={medicine.id}>
                       <td className="max-w-[320px]">
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-1.5">
                           <span className="cell-primary truncate">{medicine.name}</span>
+                          {medicine.schedule && medicine.schedule !== "none" && (
+                            <span className="badge badge-warning !h-[18px] !px-1.5 !text-[10px] font-mono">
+                              Sch {medicine.schedule === "narcotic" ? "NDPS" : medicine.schedule}
+                            </span>
+                          )}
                           {medicine.rxRequired && <span className="badge badge-danger !h-[18px] !px-1.5 !text-[10.5px]">Rx</span>}
                         </div>
                         <div className="cell-sub truncate" title={medicine.genericName || ""}>
@@ -222,7 +244,11 @@ export default async function InventoryPage({
               pageSize={PAGE_SIZE}
               totalCount={totalCount}
               basePath="/dashboard/inventory"
-              queryParams={{ q, ...(packFilter === "single" ? { pack: "single" } : {}) }}
+              queryParams={{
+                q,
+                ...(packFilter === "single" ? { pack: "single" } : {}),
+                ...(statusFilter !== "active" ? { status: statusFilter } : {}),
+              }}
               itemLabel="medicines"
             />
           </>

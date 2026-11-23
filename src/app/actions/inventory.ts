@@ -11,8 +11,45 @@ import { z } from "zod";
 
 // --- Categories ---
 
+const DEFAULT_PHARMACY_CATEGORIES = [
+  "Analgesic & Antipyretic",
+  "Antibiotic",
+  "Antidiabetic",
+  "Antihistamine & Allergy",
+  "Ayurvedic & Herbal",
+  "Cardiovascular & BP",
+  "Dermatology & Topical",
+  "Gastrointestinal",
+  "Neurology & CNS",
+  "Ophthalmic & ENT",
+  "OTC & Wellness",
+  "Pediatrics",
+  "Respiratory & Asthma",
+  "Surgical & Medical Devices",
+  "Vitamins & Supplements",
+] as const;
+
 export async function getCategories() {
   const ctx = await requirePermission("medicine.view");
+
+  const existing = await db
+    .select()
+    .from(schema.categories)
+    .where(eq(schema.categories.tenantId, ctx.tenantId))
+    .orderBy(schema.categories.name);
+
+  if (existing.length > 0) return existing;
+
+  // Auto-seed standard Indian pharmacy therapeutic categories on first access
+  await db
+    .insert(schema.categories)
+    .values(
+      DEFAULT_PHARMACY_CATEGORIES.map((name) => ({
+        tenantId: ctx.tenantId,
+        name,
+      }))
+    )
+    .onConflictDoNothing();
 
   return db
     .select()
@@ -26,14 +63,32 @@ export async function createCategory(name: string) {
   if (!auth.ok) return { error: auth.error };
   const ctx = auth.ctx;
 
+  const trimmed = name?.trim();
+  if (!trimmed) return { error: "Category name is required" };
+
   try {
+    const [existing] = await db
+      .select()
+      .from(schema.categories)
+      .where(
+        and(
+          eq(schema.categories.tenantId, ctx.tenantId),
+          sql`lower(${schema.categories.name}) = lower(${trimmed})`
+        )
+      )
+      .limit(1);
+    if (existing) {
+      return { success: true, category: existing };
+    }
+
     const [category] = await db
       .insert(schema.categories)
       .values({
         tenantId: ctx.tenantId,
-        name,
+        name: trimmed,
       })
       .returning();
+    revalidatePath("/dashboard/inventory");
     return { success: true, category };
   } catch (err: unknown) {
     return { error: (err instanceof Error ? err.message : String(err)) || "Failed to create category" };
@@ -57,14 +112,32 @@ export async function createManufacturer(name: string) {
   if (!auth.ok) return { error: auth.error };
   const ctx = auth.ctx;
 
+  const trimmed = name?.trim();
+  if (!trimmed) return { error: "Manufacturer name is required" };
+
   try {
+    const [existing] = await db
+      .select()
+      .from(schema.manufacturers)
+      .where(
+        and(
+          eq(schema.manufacturers.tenantId, ctx.tenantId),
+          sql`lower(${schema.manufacturers.name}) = lower(${trimmed})`
+        )
+      )
+      .limit(1);
+    if (existing) {
+      return { success: true, manufacturer: existing };
+    }
+
     const [manufacturer] = await db
       .insert(schema.manufacturers)
       .values({
         tenantId: ctx.tenantId,
-        name,
+        name: trimmed,
       })
       .returning();
+    revalidatePath("/dashboard/inventory");
     return { success: true, manufacturer };
   } catch (err: unknown) {
     return { error: (err instanceof Error ? err.message : String(err)) || "Failed to create manufacturer" };
@@ -74,13 +147,21 @@ export async function createManufacturer(name: string) {
 // --- Medicines ---
 
 export type MedicinePackFilter = "all" | "single";
+export type MedicineStatusFilter = "all" | "active" | "archived";
 
 function buildMedicineSearchConditions(
   tenantId: string,
   searchQuery?: string,
-  packFilter: MedicinePackFilter = "all"
+  packFilter: MedicinePackFilter = "all",
+  statusFilter: MedicineStatusFilter = "all"
 ) {
   const conditions = [eq(schema.medicines.tenantId, tenantId)];
+
+  if (statusFilter === "active") {
+    conditions.push(eq(schema.medicines.isActive, true));
+  } else if (statusFilter === "archived") {
+    conditions.push(eq(schema.medicines.isActive, false));
+  }
 
   if (packFilter === "single") {
     conditions.push(eq(schema.medicines.unitsPerPack, 1));
@@ -102,10 +183,11 @@ function buildMedicineSearchConditions(
 
 export async function getMedicinesCount(
   searchQuery?: string,
-  packFilter: MedicinePackFilter = "all"
+  packFilter: MedicinePackFilter = "all",
+  statusFilter: MedicineStatusFilter = "all"
 ): Promise<number> {
   const ctx = await requirePermission("medicine.view");
-  const conditions = buildMedicineSearchConditions(ctx.tenantId, searchQuery, packFilter);
+  const conditions = buildMedicineSearchConditions(ctx.tenantId, searchQuery, packFilter, statusFilter);
 
   const [row] = await db
     .select({ count: sql<number>`count(*)::int` })
@@ -119,10 +201,11 @@ export async function getMedicines(
   searchQuery?: string,
   limit = 50,
   offset = 0,
-  packFilter: MedicinePackFilter = "all"
+  packFilter: MedicinePackFilter = "all",
+  statusFilter: MedicineStatusFilter = "all"
 ) {
   const ctx = await requirePermission("medicine.view");
-  const conditions = buildMedicineSearchConditions(ctx.tenantId, searchQuery, packFilter);
+  const conditions = buildMedicineSearchConditions(ctx.tenantId, searchQuery, packFilter, statusFilter);
 
   return db
     .select({
@@ -667,5 +750,207 @@ export async function bulkUpdateMedicinePackaging(payload: z.input<typeof BulkPa
     return {
       error: (err instanceof Error ? err.message : String(err)) || "Failed to bulk update pack sizes",
     };
+  }
+}
+
+/**
+ * Bans / discontinues a medicine (immediately removing it from POS and optionally
+ * quarantining & zeroing all active branch stock), or permanently deletes the medicine
+ * if it has never been referenced in sales, purchases, prescriptions, or registers.
+ */
+export async function discontinueOrDeleteMedicine(params: {
+  medicineId: string;
+  mode: "ban" | "delete";
+  reason?: string;
+  zeroOutStock?: boolean;
+}): Promise<{ success?: boolean; deleted?: boolean; message?: string; error?: string }> {
+  const auth = await checkPermission("medicine.manage");
+  if (!auth.ok) return { error: auth.error };
+  const ctx = auth.ctx;
+
+  const shouldZeroStock = params.mode === "ban" && (params.zeroOutStock ?? true);
+  if (shouldZeroStock && !can(ctx, "inventory.adjust")) {
+    return { error: "You need inventory.adjust permission to zero out / recall batch stock." };
+  }
+
+  const cleanReason =
+    params.reason?.trim() ||
+    (params.mode === "ban"
+      ? "Medicine banned / discontinued by pharmacy"
+      : "Deleted unused medicine from catalog");
+
+  try {
+    const result = await db.transaction(async (tx) => {
+      const [med] = await tx
+        .select()
+        .from(schema.medicines)
+        .where(
+          and(
+            eq(schema.medicines.id, params.medicineId),
+            eq(schema.medicines.tenantId, ctx.tenantId)
+          )
+        )
+        .limit(1);
+
+      if (!med) {
+        throw new Error("Medicine not found.");
+      }
+
+      if (params.mode === "delete") {
+        const [saleRef] = await tx
+          .select({ id: schema.saleItems.id })
+          .from(schema.saleItems)
+          .where(eq(schema.saleItems.medicineId, med.id))
+          .limit(1);
+        const [purchaseRef] = await tx
+          .select({ id: schema.purchaseItems.id })
+          .from(schema.purchaseItems)
+          .where(eq(schema.purchaseItems.medicineId, med.id))
+          .limit(1);
+        const [poRef] = await tx
+          .select({ id: schema.purchaseOrderItems.id })
+          .from(schema.purchaseOrderItems)
+          .where(eq(schema.purchaseOrderItems.medicineId, med.id))
+          .limit(1);
+        const [rxRef] = await tx
+          .select({ id: schema.prescriptionItems.id })
+          .from(schema.prescriptionItems)
+          .where(eq(schema.prescriptionItems.medicineId, med.id))
+          .limit(1);
+        const [compRef] = await tx
+          .select({ id: schema.dispensingLogs.id })
+          .from(schema.dispensingLogs)
+          .where(eq(schema.dispensingLogs.medicineId, med.id))
+          .limit(1);
+        const [quarantineRef] = await tx
+          .select({ id: schema.quarantineBatches.id })
+          .from(schema.quarantineBatches)
+          .where(eq(schema.quarantineBatches.medicineId, med.id))
+          .limit(1);
+        const [transferRef] = await tx
+          .select({ id: schema.stockTransferItems.id })
+          .from(schema.stockTransferItems)
+          .where(eq(schema.stockTransferItems.medicineId, med.id))
+          .limit(1);
+
+        if (!saleRef && !purchaseRef && !poRef && !rxRef && !compRef && !quarantineRef && !transferRef) {
+          await tx
+            .delete(schema.stockMovements)
+            .where(
+              and(
+                eq(schema.stockMovements.medicineId, med.id),
+                eq(schema.stockMovements.tenantId, ctx.tenantId)
+              )
+            );
+          await tx
+            .delete(schema.batches)
+            .where(
+              and(
+                eq(schema.batches.medicineId, med.id),
+                eq(schema.batches.tenantId, ctx.tenantId)
+              )
+            );
+          await tx
+            .delete(schema.medicines)
+            .where(eq(schema.medicines.id, med.id));
+
+          await writeAudit(tx, ctx, {
+            action: "delete",
+            entityType: "medicine",
+            entityId: med.id,
+            oldValue: { name: med.name, schedule: med.schedule },
+            reason: cleanReason,
+          });
+
+          return {
+            deleted: true,
+            message: `"${med.name}" and its unused batches were permanently deleted.`,
+          };
+        }
+      }
+
+      // Ban / Discontinue path (preserves historical invoices, GST & Form 35 registers)
+      await tx
+        .update(schema.medicines)
+        .set({ isActive: false, updatedAt: new Date() })
+        .where(eq(schema.medicines.id, med.id));
+
+      let recalledUnits = 0;
+      let heldBatches = 0;
+
+      const storeBatches = await tx
+        .select()
+        .from(schema.batches)
+        .where(
+          and(
+            eq(schema.batches.tenantId, ctx.tenantId),
+            eq(schema.batches.storeId, ctx.storeId),
+            eq(schema.batches.medicineId, med.id)
+          )
+        )
+        .for("update");
+
+      for (const b of storeBatches) {
+        if (shouldZeroStock && b.qtyOnHand > 0) {
+          recalledUnits += b.qtyOnHand;
+          await recordStockMovement({
+            tx,
+            tenantId: ctx.tenantId,
+            storeId: ctx.storeId,
+            batchId: b.id,
+            medicineId: med.id,
+            type: "damage",
+            qtyChange: -b.qtyOnHand,
+            unitCost: b.purchaseRate > 0 ? b.purchaseRate : null,
+            refType: "ban_recall",
+            note: cleanReason,
+            userId: ctx.userId,
+          });
+          await tx.insert(schema.quarantineBatches).values({
+            tenantId: ctx.tenantId,
+            storeId: ctx.storeId,
+            batchId: b.id,
+            medicineId: med.id,
+            supplierId: b.supplierId,
+            qty: b.qtyOnHand,
+            reason: "recalled",
+            status: "quarantined",
+            notes: cleanReason,
+            quarantinedBy: ctx.userId,
+          });
+        }
+        await tx
+          .update(schema.batches)
+          .set({ status: "hold", updatedAt: new Date() })
+          .where(eq(schema.batches.id, b.id));
+        heldBatches++;
+      }
+
+      await writeAudit(tx, ctx, {
+        action: "update",
+        entityType: "medicine",
+        entityId: med.id,
+        oldValue: { isActive: med.isActive },
+        newValue: { isActive: false, heldBatches, recalledUnits, mode: params.mode },
+        reason: cleanReason,
+      });
+
+      const msg =
+        params.mode === "delete"
+          ? `"${med.name}" has statutory billing/ledger history so it was archived & blocked from POS instead of hard-deleted.`
+          : `"${med.name}" has been banned/archived from POS${recalledUnits > 0 ? ` and ${recalledUnits} units were moved to Recall Quarantine` : ""}.`;
+
+      return { deleted: false, message: msg };
+    });
+
+    revalidatePath("/dashboard/inventory");
+    revalidatePath("/dashboard/inventory/batches");
+    revalidatePath("/dashboard/inventory/quarantine");
+    revalidatePath("/dashboard/purchases/expiry-returns");
+    revalidatePath("/dashboard/sales/pos");
+    revalidatePath("/dashboard");
+    return { success: true, ...result };
+  } catch (err: unknown) {
+    return { error: err instanceof Error ? err.message : "Failed to discontinue/remove medicine" };
   }
 }

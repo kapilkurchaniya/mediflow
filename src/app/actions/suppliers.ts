@@ -150,6 +150,9 @@ export async function createSupplier(formData: FormData) {
 
     revalidatePath("/dashboard/suppliers");
     revalidatePath("/dashboard/purchases");
+    revalidatePath("/dashboard/purchases/expiry-returns");
+    revalidatePath("/dashboard/purchases/returns");
+    revalidatePath("/dashboard/inventory/quarantine");
     if (linkPurchaseId.trim()) {
       revalidatePath(`/dashboard/purchases/${linkPurchaseId.trim()}`);
     }
@@ -222,6 +225,9 @@ export async function quickCreateSupplierAction(input: {
 
     revalidatePath("/dashboard/suppliers");
     revalidatePath("/dashboard/purchases");
+    revalidatePath("/dashboard/purchases/expiry-returns");
+    revalidatePath("/dashboard/purchases/returns");
+    revalidatePath("/dashboard/inventory/quarantine");
     if (input.linkPurchaseId?.trim()) {
       revalidatePath(`/dashboard/purchases/${input.linkPurchaseId.trim()}`);
     }

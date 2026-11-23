@@ -2,6 +2,8 @@ import { describe, it, expect, beforeAll } from "vitest";
 import { and, eq } from "drizzle-orm";
 import { db, schema } from "@/server/db";
 import { createPurchase, resolvePendingPurchaseSupplier } from "@/server/domain/purchases";
+import { getBatchesForExpiryReturn } from "@/server/domain/purchasing/purchase-returns";
+import { normalizeExpiryDate } from "@/server/domain/import/normalize";
 import { parseDistributorInvoice } from "@/server/domain/import/distributor-invoice";
 import { PENDING_SUPPLIER_PLACEHOLDER_NAME } from "@/lib/pending-supplier";
 import { makeTenant, makeStore, makeUser, makeMedicine } from "../setup/factories";
@@ -126,5 +128,98 @@ describe("GRN Pending Supplier Flow & CSV Header Extraction", () => {
       );
     expect(updatedGst?.partyName).toBe("J.B MEDICAL STORES");
     expect(updatedGst?.partyGstin).toBe("27ABCDE1234F1Z5");
+  });
+
+  it("exposes expired and near-expiry GRN batches in Expiry Returns and normalizes diverse expiry formats", async () => {
+    expect(normalizeExpiryDate("10/25")).toEqual({ success: true, date: "2025-10-31" });
+    expect(normalizeExpiryDate("2025-10")).toEqual({ success: true, date: "2025-10-31" });
+    expect(normalizeExpiryDate("Oct-25")).toEqual({ success: true, date: "2025-10-31" });
+
+    const medExpired = await makeMedicine(db, tenantId, { name: "Starpress T 50 XL Tab.", gstRateBp: 1200 });
+    const medNear = await makeMedicine(db, tenantId, { name: "Pantocid DCR Cap.", gstRateBp: 1200 });
+
+    const todayIst = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata" }).format(new Date());
+    const dNear = new Date(`${todayIst}T00:00:00.000Z`);
+    dNear.setUTCDate(dNear.getUTCDate() + 20);
+    const nearExpiryStr = dNear.toISOString().split("T")[0]!;
+
+    const posted = await db.transaction(async (tx) => {
+      return createPurchase(
+        tx,
+        { tenantId, storeId, userId },
+        {
+          supplierId: "",
+          supplierInvoiceNo: "C-4754",
+          invoiceDate: todayIst,
+          pendingSupplierMeta: {
+            name: "J.B MEDICAL STORES",
+            phone: "8000682056",
+            drugLicenseNo: "20-136251",
+            address: "1-2, S K Complex, Khanpur, Ahmedabad -1.",
+          },
+          items: [
+            {
+              medicineId: medExpired.id,
+              batchNo: "U200239",
+              expiryDate: "2025-10-31",
+              qty: 4,
+              freeQty: 0,
+              rate: 38700,
+              mrp: 0,
+              saleRate: 38700,
+              gstRateBp: 1200,
+            },
+            {
+              medicineId: medNear.id,
+              batchNo: "230710540",
+              expiryDate: nearExpiryStr,
+              qty: 5,
+              freeQty: 0,
+              rate: 22900,
+              mrp: 0,
+              saleRate: 22900,
+              gstRateBp: 1200,
+            },
+          ],
+        }
+      );
+    });
+
+    const candidatesPending = await getBatchesForExpiryReturn(db, tenantId, storeId, 60);
+    const expCand = candidatesPending.find((c) => c.batchNo === "U200239");
+    const nearCand = candidatesPending.find((c) => c.batchNo === "230710540");
+
+    expect(expCand).toBeDefined();
+    expect(expCand?.expiryDate).toBe("2025-10-31");
+    expect(expCand?.qtyOnHand).toBe(4);
+    expect(expCand?.supplierName).toBe("J.B MEDICAL STORES (Unregistered)");
+    expect(expCand?.isPendingSupplier).toBe(true);
+    expect(expCand?.supplierId).toBeNull();
+    expect(nearCand).toBeDefined();
+    expect(nearCand?.qtyOnHand).toBe(5);
+
+    const [sup] = await db
+      .insert(schema.suppliers)
+      .values({
+        tenantId,
+        name: "J.B MEDICAL STORES",
+        phone: "8000682056",
+        stateCode: "24",
+        isActive: true,
+      })
+      .returning();
+
+    await db.transaction(async (tx) => {
+      await resolvePendingPurchaseSupplier(tx, { tenantId }, {
+        purchaseId: posted.purchase.id,
+        supplierId: sup.id,
+      });
+    });
+
+    const candidatesLinked = await getBatchesForExpiryReturn(db, tenantId, storeId, 60);
+    const linkedExp = candidatesLinked.find((c) => c.batchNo === "U200239");
+    expect(linkedExp?.supplierId).toBe(sup.id);
+    expect(linkedExp?.supplierName).toBe("J.B MEDICAL STORES");
+    expect(linkedExp?.isPendingSupplier).toBe(false);
   });
 });

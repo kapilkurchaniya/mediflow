@@ -2,8 +2,15 @@
 
 import { useState } from "react";
 import { createPortal } from "react-dom";
-import { Edit2, X, Check, Loader2, AlertCircle, Info } from "lucide-react";
-import { updateMedicine } from "@/app/actions/inventory";
+import { Edit2, X, Check, Loader2, AlertCircle, Info, Sparkles, Plus, ShieldAlert, Trash2 } from "lucide-react";
+import {
+  updateMedicine,
+  createCategory,
+  createManufacturer,
+  discontinueOrDeleteMedicine,
+} from "@/app/actions/inventory";
+import { enrichMedicineDetails } from "@/app/actions/ai-enrichment";
+import { scheduleRequiresRx } from "@/lib/schedule";
 import { useRouter } from "next/navigation";
 import { RackSelectorField, type RackOption } from "./RackSelectorField";
 
@@ -49,6 +56,17 @@ export function EditMedicineButton({
   const [isOpen, setIsOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [localCategories, setLocalCategories] = useState(categories);
+  const [localManufacturers, setLocalManufacturers] = useState(manufacturers);
+  const [showNewCat, setShowNewCat] = useState(false);
+  const [newCatName, setNewCatName] = useState("");
+  const [isCreatingCat, setIsCreatingCat] = useState(false);
+  const [isEnriching, setIsEnriching] = useState(false);
+  const [enrichNote, setEnrichNote] = useState<string | null>(null);
+  const [showDangerZone, setShowDangerZone] = useState(false);
+  const [banReason, setBanReason] = useState("Government ban / regulatory recall");
+  const [banZeroStock, setBanZeroStock] = useState(true);
+  const [isDiscontinuing, setIsDiscontinuing] = useState(false);
 
   const [name, setName] = useState(medicine.name);
   const [genericName, setGenericName] = useState(medicine.genericName || "");
@@ -93,8 +111,126 @@ export function EditMedicineButton({
     setRxRequired(medicine.rxRequired);
     setIsActive(medicine.isActive);
     setConvertExistingBatches(false);
+    setLocalCategories(categories);
+    setLocalManufacturers(manufacturers);
+    setShowNewCat(false);
+    setNewCatName("");
+    setEnrichNote(null);
+    setShowDangerZone(false);
     setError(null);
     setIsOpen(true);
+  };
+
+  const handleAddInlineCategory = async () => {
+    const trimmed = newCatName.trim();
+    if (!trimmed) return;
+    setIsCreatingCat(true);
+    setError(null);
+    const res = await createCategory(trimmed);
+    setIsCreatingCat(false);
+    if (res.error || !res.category) {
+      setError(res.error || "Failed to add category");
+      return;
+    }
+    const created = res.category;
+    setLocalCategories((prev) =>
+      prev.some((c) => c.id === created.id) ? prev : [...prev, created].sort((a, b) => a.name.localeCompare(b.name))
+    );
+    setCategoryId(created.id);
+    setNewCatName("");
+    setShowNewCat(false);
+  };
+
+  const handleAutoFillAi = async () => {
+    if (!name.trim()) return;
+    setIsEnriching(true);
+    setError(null);
+    setEnrichNote(null);
+    try {
+      const data = await enrichMedicineDetails({ medicineName: name.trim() });
+      if (!data) {
+        setError("Could not enrich medicine details.");
+        return;
+      }
+      if (data.genericName) setGenericName(data.genericName);
+      if (data.hsn) setHsn(data.hsn);
+      if (data.gstRateBp !== undefined) setGstRatePct(String(data.gstRateBp / 100));
+      if (data.mrp > 0 && (parseFloat(mrp) || 0) === 0) {
+        setMrp((data.mrp / 100).toFixed(2));
+        setSalePrice((data.mrp / 100).toFixed(2));
+      }
+      if (data.unitsPerPack && data.unitsPerPack > 1 && parsedUpp === 1) {
+        setUnitsPerPack(String(data.unitsPerPack));
+        if (data.packUnit) setPackUnit(data.packUnit);
+        if (data.looseUnit) setLooseUnit(data.looseUnit);
+      }
+      if (data.schedule && data.schedule !== "none") {
+        setSchedule(data.schedule);
+        setRxRequired(data.rxRequired ?? scheduleRequiresRx(data.schedule));
+      }
+
+      if (data.category && data.category !== "General") {
+        const existingCat = localCategories.find(
+          (c) => c.name.toLowerCase() === data.category.toLowerCase()
+        );
+        if (existingCat) {
+          setCategoryId(existingCat.id);
+        } else {
+          const catRes = await createCategory(data.category);
+          if (catRes.category) {
+            const c = catRes.category;
+            setLocalCategories((prev) => [...prev, c].sort((a, b) => a.name.localeCompare(b.name)));
+            setCategoryId(c.id);
+          }
+        }
+      }
+
+      if (data.manufacturer && data.manufacturer !== "Unknown") {
+        const existingMfg = localManufacturers.find(
+          (m) => m.name.toLowerCase() === data.manufacturer.toLowerCase()
+        );
+        if (existingMfg) {
+          setManufacturerId(existingMfg.id);
+        } else {
+          const mfgRes = await createManufacturer(data.manufacturer);
+          if (mfgRes.manufacturer) {
+            const m = mfgRes.manufacturer;
+            setLocalManufacturers((prev) => [...prev, m].sort((a, b) => a.name.localeCompare(b.name)));
+            setManufacturerId(m.id);
+          }
+        }
+      }
+
+      setEnrichNote(`Auto-filled from ${data.source}. Review fields & click Save Medicine.`);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "AI enrichment failed");
+    } finally {
+      setIsEnriching(false);
+    }
+  };
+
+  const handleDiscontinue = async (mode: "ban" | "delete") => {
+    setIsDiscontinuing(true);
+    setError(null);
+    try {
+      const res = await discontinueOrDeleteMedicine({
+        medicineId: medicine.id,
+        mode,
+        reason: banReason,
+        zeroOutStock: mode === "ban" ? banZeroStock : false,
+      });
+      if (res.error) {
+        setError(res.error);
+        setIsDiscontinuing(false);
+      } else {
+        setIsDiscontinuing(false);
+        setIsOpen(false);
+        router.refresh();
+      }
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to remove/ban medicine");
+      setIsDiscontinuing(false);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -164,19 +300,31 @@ export function EditMedicineButton({
             }}
           >
             <div className="bg-white w-full max-w-xl h-full flex flex-col shadow-2xl border-l border-ink-200 text-left">
-            <div className="flex items-center justify-between border-b border-ink-150 px-5 py-4 shrink-0">
-              <div>
+              <div className="flex items-center justify-between gap-2 border-b border-ink-150 px-5 py-4 shrink-0">
+                <div className="min-w-0">
                 <h3 className="text-base font-bold text-ink-900">Edit Medicine</h3>
-                <p className="text-xs text-ink-500 mt-0.5 truncate max-w-md">{medicine.name}</p>
+                <p className="text-xs text-ink-500 mt-0.5 truncate max-w-xs">{medicine.name}</p>
               </div>
-              <button
-                type="button"
-                onClick={() => setIsOpen(false)}
-                className="rounded-md p-1.5 text-ink-400 hover:bg-ink-100 hover:text-ink-700"
-                aria-label="Close"
-              >
-                <X className="h-4 w-4" />
-              </button>
+              <div className="flex items-center gap-2 shrink-0">
+                <button
+                  type="button"
+                  disabled={isEnriching || isSubmitting}
+                  onClick={() => void handleAutoFillAi()}
+                  className="btn btn-secondary btn-xs border-brand-300 text-brand-700 hover:bg-brand-50 inline-flex items-center gap-1"
+                  title="Auto-fill salt composition, therapeutic category, schedule, HSN, and pack size"
+                >
+                  {isEnriching ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+                  {isEnriching ? "Looking up…" : "Auto-Fill Details"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsOpen(false)}
+                  className="rounded-md p-1.5 text-ink-400 hover:bg-ink-100 hover:text-ink-700"
+                  aria-label="Close"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
             </div>
 
             <form onSubmit={handleSubmit} className="flex-1 flex flex-col min-h-0">
@@ -185,6 +333,12 @@ export function EditMedicineButton({
                   <div className="alert-error text-xs">
                     <AlertCircle className="h-4 w-4 shrink-0" />
                     <span>{error}</span>
+                  </div>
+                )}
+                {enrichNote && (
+                  <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-2.5 text-xs text-emerald-900 flex items-center gap-2">
+                    <Sparkles className="h-4 w-4 text-emerald-600 shrink-0" />
+                    <span>{enrichNote}</span>
                   </div>
                 )}
 
@@ -212,7 +366,23 @@ export function EditMedicineButton({
                   </div>
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label className="label" htmlFor={`med-cat-${medicine.id}`}>Category</label>
+                      <div className="flex items-center justify-between">
+                        <label
+                          className="label"
+                          htmlFor={`med-cat-${medicine.id}`}
+                          data-tooltip-title="Therapeutic Category"
+                          data-tooltip="Groups medicines by therapeutic class (e.g. Cardiovascular & BP, Antidiabetic, Antibiotic) for sales reports, shelf organization, and faster catalog filtering."
+                        >
+                          Category (Therapeutic Class)
+                        </label>
+                        <button
+                          type="button"
+                          onClick={() => setShowNewCat((v) => !v)}
+                          className="text-[11px] font-semibold text-brand-700 hover:underline inline-flex items-center gap-0.5 mb-1"
+                        >
+                          <Plus className="h-3 w-3" /> New
+                        </button>
+                      </div>
                       <select
                         id={`med-cat-${medicine.id}`}
                         value={categoryId}
@@ -220,10 +390,29 @@ export function EditMedicineButton({
                         className="input"
                       >
                         <option value="">Uncategorised</option>
-                        {categories.map((c) => (
+                        {localCategories.map((c) => (
                           <option key={c.id} value={c.id}>{c.name}</option>
                         ))}
                       </select>
+                      {showNewCat && (
+                        <div className="mt-1.5 flex gap-1.5">
+                          <input
+                            type="text"
+                            value={newCatName}
+                            onChange={(e) => setNewCatName(e.target.value)}
+                            placeholder="e.g. Cardiac, Diabetes"
+                            className="input !h-8 text-xs flex-1"
+                          />
+                          <button
+                            type="button"
+                            disabled={isCreatingCat || !newCatName.trim()}
+                            onClick={() => void handleAddInlineCategory()}
+                            className="btn btn-primary btn-xs shrink-0"
+                          >
+                            {isCreatingCat ? "…" : "Add"}
+                          </button>
+                        </div>
+                      )}
                     </div>
                     <div>
                       <label className="label" htmlFor={`med-mfg-${medicine.id}`}>Manufacturer</label>
@@ -234,7 +423,7 @@ export function EditMedicineButton({
                         className="input"
                       >
                         <option value="">Unspecified</option>
-                        {manufacturers.map((m) => (
+                        {localManufacturers.map((m) => (
                           <option key={m.id} value={m.id}>{m.name}</option>
                         ))}
                       </select>
@@ -439,7 +628,11 @@ export function EditMedicineButton({
                       <select
                         id={`med-sched-${medicine.id}`}
                         value={schedule}
-                        onChange={(e) => setSchedule(e.target.value)}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setSchedule(val);
+                          if (scheduleRequiresRx(val)) setRxRequired(true);
+                        }}
                         className="input"
                       >
                         <option value="none">None (OTC)</option>
@@ -469,6 +662,76 @@ export function EditMedicineButton({
                       </label>
                     </div>
                   </div>
+                </div>
+
+                {/* Danger Zone: Ban / Discontinue or Delete */}
+                <div className="rounded-xl border border-rose-200 bg-rose-50/60 p-4 space-y-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2 text-rose-900">
+                      <ShieldAlert className="h-4 w-4 text-rose-600 shrink-0" />
+                      <div>
+                        <div className="text-xs font-bold">Ban / Discontinue or Remove Medicine</div>
+                        <div className="text-[11px] text-rose-700">
+                          For government-banned (FDC) or recalled drugs: immediately blocks POS sales &amp; isolates stock.
+                        </div>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setShowDangerZone((v) => !v)}
+                      className="btn btn-xs border border-rose-300 bg-white text-rose-700 hover:bg-rose-100 shrink-0"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                      {showDangerZone ? "Hide" : "Ban / Remove"}
+                    </button>
+                  </div>
+
+                  {showDangerZone && (
+                    <div className="space-y-2.5 pt-2 border-t border-rose-200 text-xs">
+                      <div>
+                        <label className="label text-rose-900" htmlFor={`ban-reason-${medicine.id}`}>
+                          Reason (saved to audit &amp; recall ledger)
+                        </label>
+                        <input
+                          id={`ban-reason-${medicine.id}`}
+                          type="text"
+                          value={banReason}
+                          onChange={(e) => setBanReason(e.target.value)}
+                          className="input text-xs bg-white"
+                          placeholder="e.g. CDSCO ban notification / discontinued SKU"
+                        />
+                      </div>
+                      {canAdjustStock && (
+                        <label className="flex items-center gap-2 cursor-pointer text-rose-900 font-medium">
+                          <input
+                            type="checkbox"
+                            checked={banZeroStock}
+                            onChange={(e) => setBanZeroStock(e.target.checked)}
+                          />
+                          <span>Also remove all branch batch stock &amp; move to Recall Quarantine</span>
+                        </label>
+                      )}
+                      <div className="flex flex-wrap gap-2">
+                        <button
+                          type="button"
+                          disabled={isDiscontinuing || isSubmitting}
+                          onClick={() => void handleDiscontinue("ban")}
+                          className="btn btn-xs bg-rose-600 text-white hover:bg-rose-700"
+                        >
+                          {isDiscontinuing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ShieldAlert className="h-3.5 w-3.5" />}
+                          Ban &amp; Block from POS
+                        </button>
+                        <button
+                          type="button"
+                          disabled={isDiscontinuing || isSubmitting}
+                          onClick={() => void handleDiscontinue("delete")}
+                          className="btn btn-xs border border-ink-300 bg-white text-ink-700 hover:bg-ink-100"
+                        >
+                          Delete Permanently (if unused)
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
 

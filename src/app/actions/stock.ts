@@ -1,13 +1,14 @@
 "use server";
 
 import { db, schema } from "@/server/db";
-import { eq, and, desc, sql, lte } from "drizzle-orm";
+import { eq, and, desc, or, sql, lte } from "drizzle-orm";
 import { recordStockMovement } from "@/server/domain/stock";
 import { writeAudit } from "@/server/audit";
 import { requirePermission, checkPermission } from "@/server/rbac";
 import { revalidatePath } from "next/cache";
 import { addDays, format } from "date-fns";
 import { protectedAction } from "@/server/action";
+import { normalizeDrugSchedule, scheduleRequiresRx } from "@/lib/schedule";
 
 export async function getBatches(
   opts?:
@@ -470,6 +471,8 @@ const OcrStockItemSchema = z.object({
   genericName: z.string().optional(),
   manufacturer: z.string().optional(),
   hsn: z.string().optional(),
+  schedule: z.string().optional(),
+  rxRequired: z.boolean().optional(),
   batchNo: z.string().trim().min(1),
   expiryDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   unitsPerPack: z.number().int().min(1).default(1),
@@ -496,11 +499,14 @@ export const commitOcrStockUpdateAction = protectedAction("inventory.adjust")
       let processed = 0;
 
       for (const item of parsedInput.items) {
+        const itemSchedule = normalizeDrugSchedule(item.schedule);
+        const itemRxRequired = item.rxRequired ?? scheduleRequiresRx(itemSchedule);
         let medicineId = item.medicineId;
+        let existingSchedule: string | null = null;
 
         if (!medicineId) {
           const [existingMed] = await tx
-            .select({ id: schema.medicines.id })
+            .select({ id: schema.medicines.id, schedule: schema.medicines.schedule })
             .from(schema.medicines)
             .where(
               and(
@@ -512,6 +518,7 @@ export const commitOcrStockUpdateAction = protectedAction("inventory.adjust")
 
           if (existingMed) {
             medicineId = existingMed.id;
+            existingSchedule = existingMed.schedule;
           } else if (parsedInput.createMissingMedicines) {
             let manufacturerId: string | null = null;
             const mfgName = item.manufacturer?.trim();
@@ -545,6 +552,8 @@ export const commitOcrStockUpdateAction = protectedAction("inventory.adjust")
                 genericName: item.genericName?.trim() || null,
                 manufacturerId,
                 hsn: item.hsn?.trim() || null,
+                schedule: itemSchedule,
+                rxRequired: itemRxRequired,
                 unitsPerPack: item.unitsPerPack,
                 ...(item.packUnit ? { packUnit: item.packUnit } : {}),
                 ...(item.looseUnit ? { looseUnit: item.looseUnit } : {}),
@@ -565,6 +574,40 @@ export const commitOcrStockUpdateAction = protectedAction("inventory.adjust")
               `Medicine "${item.medicineName}" is not in your catalog. Enable "Create missing medicines in catalog" or remove the row.`,
             );
           }
+        } else {
+          const [matchedRow] = await tx
+            .select({ schedule: schema.medicines.schedule })
+            .from(schema.medicines)
+            .where(
+              and(
+                eq(schema.medicines.id, medicineId),
+                eq(schema.medicines.tenantId, ctx.tenantId),
+              ),
+            )
+            .limit(1);
+          existingSchedule = matchedRow?.schedule ?? null;
+        }
+
+        // Upgrade catalog schedule automatically when the bill specifies a drug schedule
+        // (e.g. Schedule H / H1 / X / G) and catalog was previously "none".
+        if (
+          medicineId &&
+          itemSchedule !== "none" &&
+          (!existingSchedule || existingSchedule === "none")
+        ) {
+          await tx
+            .update(schema.medicines)
+            .set({
+              schedule: itemSchedule,
+              rxRequired: scheduleRequiresRx(itemSchedule) || itemRxRequired,
+              updatedAt: new Date(),
+            })
+            .where(
+              and(
+                eq(schema.medicines.id, medicineId),
+                eq(schema.medicines.tenantId, ctx.tenantId),
+              ),
+            );
         }
 
         if (medicineId && item.updateCatalogPackSize && item.unitsPerPack > 1) {
@@ -672,7 +715,169 @@ export const commitOcrStockUpdateAction = protectedAction("inventory.adjust")
 
     revalidatePath("/dashboard/inventory/batches");
     revalidatePath("/dashboard/inventory", "layout");
+    revalidatePath("/dashboard/purchases/expiry-returns");
+    revalidatePath("/dashboard/inventory/quarantine");
     revalidatePath("/dashboard/sales/pos");
     revalidatePath("/dashboard");
     return { updatedCount };
   });
+
+export async function removeOrRecallBatchStock(params: {
+  batchId: string;
+  mode: "recall" | "writeoff" | "delete";
+  reason?: string;
+}): Promise<{ success?: boolean; deleted?: boolean; message?: string; error?: string }> {
+  const auth = await checkPermission("inventory.adjust");
+  if (!auth.ok) return { error: auth.error };
+  const ctx = auth.ctx;
+
+  const cleanReason =
+    params.reason?.trim() ||
+    (params.mode === "recall"
+      ? "Medicine banned / regulatory recall"
+      : params.mode === "delete"
+      ? "Removed unused batch"
+      : "Stock written off");
+
+  try {
+    const result = await db.transaction(async (tx) => {
+      const [batch] = await tx
+        .select()
+        .from(schema.batches)
+        .where(
+          and(
+            eq(schema.batches.id, params.batchId),
+            eq(schema.batches.tenantId, ctx.tenantId),
+            eq(schema.batches.storeId, ctx.storeId)
+          )
+        )
+        .for("update");
+
+      if (!batch) {
+        throw new Error("Batch not found in this branch.");
+      }
+
+      if (params.mode === "delete") {
+        const [saleRef] = await tx
+          .select({ id: schema.saleItems.id })
+          .from(schema.saleItems)
+          .where(eq(schema.saleItems.batchId, batch.id))
+          .limit(1);
+        const [purchaseRef] = await tx
+          .select({ id: schema.purchaseItems.id })
+          .from(schema.purchaseItems)
+          .where(eq(schema.purchaseItems.batchId, batch.id))
+          .limit(1);
+        const [quarantineRef] = await tx
+          .select({ id: schema.quarantineBatches.id })
+          .from(schema.quarantineBatches)
+          .where(eq(schema.quarantineBatches.batchId, batch.id))
+          .limit(1);
+        const [transferRef] = await tx
+          .select({ id: schema.stockTransferItems.id })
+          .from(schema.stockTransferItems)
+          .where(
+            or(
+              eq(schema.stockTransferItems.fromBatchId, batch.id),
+              eq(schema.stockTransferItems.toBatchId, batch.id)
+            )
+          )
+          .limit(1);
+        const [dispensingRef] = await tx
+          .select({ id: schema.dispensingLogs.id })
+          .from(schema.dispensingLogs)
+          .where(eq(schema.dispensingLogs.batchId, batch.id))
+          .limit(1);
+
+        if (!saleRef && !purchaseRef && !quarantineRef && !transferRef && !dispensingRef) {
+          await tx
+            .delete(schema.stockMovements)
+            .where(
+              and(
+                eq(schema.stockMovements.batchId, batch.id),
+                eq(schema.stockMovements.tenantId, ctx.tenantId)
+              )
+            );
+          await tx
+            .delete(schema.batches)
+            .where(eq(schema.batches.id, batch.id));
+
+          await writeAudit(tx, ctx, {
+            action: "delete",
+            entityType: "batch",
+            entityId: batch.id,
+            oldValue: { batchNo: batch.batchNo, qtyOnHand: batch.qtyOnHand },
+            reason: cleanReason,
+          });
+          return { deleted: true, message: `Batch ${batch.batchNo} permanently removed.` };
+        }
+      }
+
+      // Statutory recall / write-off path (preserves immutable audit & GST history)
+      const prevQty = batch.qtyOnHand;
+      if (prevQty > 0) {
+        await recordStockMovement({
+          tx,
+          tenantId: ctx.tenantId,
+          storeId: ctx.storeId,
+          batchId: batch.id,
+          medicineId: batch.medicineId,
+          type: "damage",
+          qtyChange: -prevQty,
+          unitCost: batch.purchaseRate > 0 ? batch.purchaseRate : null,
+          refType: params.mode === "recall" ? "ban_recall" : "writeoff",
+          note: cleanReason,
+          userId: ctx.userId,
+        });
+
+        if (params.mode === "recall") {
+          await tx.insert(schema.quarantineBatches).values({
+            tenantId: ctx.tenantId,
+            storeId: ctx.storeId,
+            batchId: batch.id,
+            medicineId: batch.medicineId,
+            supplierId: batch.supplierId,
+            qty: prevQty,
+            reason: "recalled",
+            status: "quarantined",
+            notes: cleanReason,
+            quarantinedBy: ctx.userId,
+          });
+        }
+      }
+
+      await tx
+        .update(schema.batches)
+        .set({ status: "hold", updatedAt: new Date() })
+        .where(eq(schema.batches.id, batch.id));
+
+      await writeAudit(tx, ctx, {
+        action: "stock_adjust",
+        entityType: "batch",
+        entityId: batch.id,
+        oldValue: { batchNo: batch.batchNo, qtyOnHand: prevQty, status: batch.status },
+        newValue: { batchNo: batch.batchNo, qtyOnHand: 0, status: "hold", mode: params.mode },
+        reason: cleanReason,
+      });
+
+      const msg =
+        params.mode === "delete"
+          ? `Batch ${batch.batchNo} has transaction history so it cannot be hard-deleted; stock was zeroed and placed on Hold (blocked from POS).`
+          : params.mode === "recall"
+          ? `Batch ${batch.batchNo} (${prevQty} units) recalled, blocked from POS, and moved to Quarantine for vendor claim.`
+          : `Batch ${batch.batchNo} stock (${prevQty} units) written off and placed on Hold.`;
+
+      return { deleted: false, message: msg };
+    });
+
+    revalidatePath("/dashboard/inventory/batches");
+    revalidatePath("/dashboard/inventory", "layout");
+    revalidatePath("/dashboard/inventory/quarantine");
+    revalidatePath("/dashboard/purchases/expiry-returns");
+    revalidatePath("/dashboard/sales/pos");
+    revalidatePath("/dashboard");
+    return { success: true, ...result };
+  } catch (err: unknown) {
+    return { error: err instanceof Error ? err.message : "Failed to remove batch stock" };
+  }
+}

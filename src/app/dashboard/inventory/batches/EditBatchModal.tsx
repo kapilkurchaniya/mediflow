@@ -2,8 +2,8 @@
 
 import { useState } from "react";
 import { createPortal } from "react-dom";
-import { Edit2, X, Check, Loader2, AlertCircle } from "lucide-react";
-import { updateBatch } from "@/app/actions/stock";
+import { Edit2, X, Check, Loader2, AlertCircle, ShieldAlert, Trash2 } from "lucide-react";
+import { updateBatch, removeOrRecallBatchStock } from "@/app/actions/stock";
 import { useRouter } from "next/navigation";
 
 export interface BatchEditData {
@@ -46,6 +46,32 @@ export function EditBatchButton({ batch }: { batch: BatchEditData }) {
   const [adjustDelta, setAdjustDelta] = useState("");
   const [adjustReason, setAdjustReason] = useState<"adjustment" | "damage" | "expired">("adjustment");
   const [adjustNote, setAdjustNote] = useState("");
+  const [showRemovePanel, setShowRemovePanel] = useState(false);
+  const [removeReason, setRemoveReason] = useState("Government ban / regulatory recall");
+  const [isRemoving, setIsRemoving] = useState(false);
+
+  const handleRemoveStock = async (mode: "recall" | "writeoff" | "delete") => {
+    setIsRemoving(true);
+    setError(null);
+    try {
+      const res = await removeOrRecallBatchStock({
+        batchId: batch.id,
+        mode,
+        reason: removeReason,
+      });
+      if (res.error) {
+        setError(res.error);
+        setIsRemoving(false);
+      } else {
+        setIsRemoving(false);
+        setIsOpen(false);
+        router.refresh();
+      }
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to remove batch stock");
+      setIsRemoving(false);
+    }
+  };
 
   const handleOpen = () => {
     setBatchNo(batch.batchNo);
@@ -372,6 +398,74 @@ export function EditBatchButton({ batch }: { batch: BatchEditData }) {
                           className="input"
                           placeholder="Reason for audit log"
                         />
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Danger Zone: Recall / Remove Banned Stock */}
+                <div className="rounded-xl border border-rose-200 bg-rose-50/60 p-4 space-y-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2 text-rose-900">
+                      <ShieldAlert className="h-4 w-4 text-rose-600 shrink-0" />
+                      <div>
+                        <div className="text-xs font-bold">Ban / Recall or Remove Batch Stock</div>
+                        <div className="text-[11px] text-rose-700">
+                          Immediately block this batch from POS billing and clear active stock with a statutory audit trail.
+                        </div>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setShowRemovePanel((v) => !v)}
+                      className="btn btn-sm border border-rose-300 bg-white text-rose-700 hover:bg-rose-100 shrink-0"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                      {showRemovePanel ? "Hide" : "Remove Stock"}
+                    </button>
+                  </div>
+
+                  {showRemovePanel && (
+                    <div className="space-y-2.5 pt-2 border-t border-rose-200">
+                      <div>
+                        <label className="label text-rose-900" htmlFor="remove-batch-reason">
+                          Reason (recorded in audit &amp; stock ledger)
+                        </label>
+                        <input
+                          id="remove-batch-reason"
+                          type="text"
+                          value={removeReason}
+                          onChange={(e) => setRemoveReason(e.target.value)}
+                          className="input text-xs bg-white"
+                          placeholder="e.g. CDSCO FDC ban / batch recall / data entry mistake"
+                        />
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        <button
+                          type="button"
+                          disabled={isRemoving || isSubmitting}
+                          onClick={() => void handleRemoveStock("recall")}
+                          className="btn btn-sm bg-rose-600 text-white hover:bg-rose-700 text-xs"
+                        >
+                          {isRemoving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ShieldAlert className="h-3.5 w-3.5" />}
+                          Recall &amp; Quarantine All ({batch.qtyOnHand})
+                        </button>
+                        <button
+                          type="button"
+                          disabled={isRemoving || isSubmitting}
+                          onClick={() => void handleRemoveStock("writeoff")}
+                          className="btn btn-sm border border-rose-300 bg-white text-rose-800 hover:bg-rose-100 text-xs"
+                        >
+                          Write-Off Stock to 0 &amp; Hold
+                        </button>
+                        <button
+                          type="button"
+                          disabled={isRemoving || isSubmitting}
+                          onClick={() => void handleRemoveStock("delete")}
+                          className="btn btn-sm border border-ink-300 bg-white text-ink-700 hover:bg-ink-100 text-xs"
+                        >
+                          Delete Unused Batch
+                        </button>
                       </div>
                     </div>
                   )}

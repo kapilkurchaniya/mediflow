@@ -11,11 +11,13 @@ import {
   parsePackAndLooseQty,
   type QtyMode,
 } from "@/lib/packaging";
+import { normalizeDrugSchedule, scheduleRequiresRx } from "@/lib/schedule";
 
 export type ImportRow = {
   medicineName: string;
   manufacturer?: string;
   category?: string;
+  schedule?: string;
   batchNo: string;
   expiryDate: string; // YYYY-MM-DD
   mfgDate?: string; // YYYY-MM-DD
@@ -72,10 +74,12 @@ export async function processInventoryImport(
         // 1. Resolve or Create Medicine
         let medicineId: string;
         let effectiveUpp = rowUpp;
+        const rowSchedule = normalizeDrugSchedule(row.schedule);
         const [existingMed] = await tx
           .select({
             id: schema.medicines.id,
             unitsPerPack: schema.medicines.unitsPerPack,
+            schedule: schema.medicines.schedule,
           })
           .from(schema.medicines)
           .where(
@@ -88,6 +92,17 @@ export async function processInventoryImport(
         if (existingMed) {
           medicineId = existingMed.id;
           effectiveUpp = rowUpp > 1 ? rowUpp : Math.max(1, existingMed.unitsPerPack ?? 1);
+
+          if (rowSchedule !== "none" && (!existingMed.schedule || existingMed.schedule === "none")) {
+            await tx
+              .update(schema.medicines)
+              .set({
+                schedule: rowSchedule,
+                rxRequired: scheduleRequiresRx(rowSchedule),
+                updatedAt: new Date(),
+              })
+              .where(eq(schema.medicines.id, existingMed.id));
+          }
 
           if (updateExistingPackSizes && existingMed.unitsPerPack === 1 && rowUpp > 1) {
             await tx
@@ -198,6 +213,8 @@ export async function processInventoryImport(
               mrp: cleanMrp,
               purchasePrice: cleanPurchaseRate,
               salePrice: cleanSaleRate,
+              schedule: rowSchedule,
+              rxRequired: scheduleRequiresRx(rowSchedule),
               ...(row.unitsPerPack && row.unitsPerPack > 1
                 ? {
                     unitsPerPack: Math.round(row.unitsPerPack),

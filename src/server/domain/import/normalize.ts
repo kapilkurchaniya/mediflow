@@ -1,11 +1,28 @@
 import { isValidGstin, extractStateCodeFromGstin } from "@/server/domain/gst";
 import { GST_RATES_BP, DEFAULT_GST_RATE_BP } from "@/lib/regulatory";
 
+const MONTH_NAME_MAP: Record<string, number> = {
+  jan: 1, january: 1,
+  feb: 2, february: 2,
+  mar: 3, march: 3,
+  apr: 4, april: 4,
+  may: 5,
+  jun: 6, june: 6,
+  jul: 7, july: 7,
+  aug: 8, august: 8,
+  sep: 9, sept: 9, september: 9,
+  oct: 10, october: 10,
+  nov: 11, november: 11,
+  dec: 12, december: 12,
+};
+
 /**
  * Normalizes pharma expiry dates into standard ISO YYYY-MM-DD.
  * Supports:
  * - "MM/YY" or "MM-YY" (e.g. "11/26" -> "2026-11-30")
  * - "MM/YYYY" or "MM-YYYY" (e.g. "08/2027" -> "2027-08-31")
+ * - "YYYY-MM" or "YYYY/MM" (e.g. "2025-10" -> "2025-10-31")
+ * - "MMM-YY" or "MMM YY" / "MMM-YYYY" (e.g. "Oct-25" -> "2025-10-31")
  * - "DD/MM/YYYY" or "DD-MM-YYYY" (e.g. "15/08/2027" -> "2027-08-15")
  * - "YYYY-MM-DD"
  */
@@ -58,7 +75,55 @@ export function normalizeExpiryDate(raw: string | null | undefined): {
     };
   }
 
-  // 3. Month & Year format: MM/YY or MM-YY or MM/YYYY or MM-YYYY
+  // 3. Day + Month name + Year format: "30 Sep 28", "30-Sep-2028", "31 Dec 2028"
+  const dmmmMatch = s.match(/^(\d{1,2})[-/\s]+([a-zA-Z]{3,9})[-/\s,]+(\d{2}|\d{4})$/);
+  if (dmmmMatch) {
+    const day = parseInt(dmmmMatch[1], 10);
+    const month = MONTH_NAME_MAP[dmmmMatch[2].toLowerCase()];
+    if (month && day >= 1 && day <= 31) {
+      let year = parseInt(dmmmMatch[3], 10);
+      if (year < 100) year += 2000;
+      const d = new Date(Date.UTC(year, month - 1, day));
+      if (d.getUTCFullYear() === year && d.getUTCMonth() === month - 1 && d.getUTCDate() === day) {
+        return {
+          success: true,
+          date: `${year.toString().padStart(4, "0")}-${month.toString().padStart(2, "0")}-${day.toString().padStart(2, "0")}`,
+        };
+      }
+    }
+  }
+
+  // 4. Year & Month format: YYYY-MM or YYYY/MM
+  const ymMatch = s.match(/^(\d{4})[-/](\d{1,2})$/);
+  if (ymMatch) {
+    const year = parseInt(ymMatch[1], 10);
+    const month = parseInt(ymMatch[2], 10);
+    if (month < 1 || month > 12) {
+      return { success: false, error: `Invalid month: ${ymMatch[2]}` };
+    }
+    const lastDay = new Date(Date.UTC(year, month, 0)).getUTCDate();
+    return {
+      success: true,
+      date: `${year.toString().padStart(4, "0")}-${month.toString().padStart(2, "0")}-${lastDay.toString().padStart(2, "0")}`,
+    };
+  }
+
+  // 4. Month name & Year format: MMM-YY, MMM YY, MMM-YYYY, MMM/YY
+  const mmmMatch = s.match(/^([a-zA-Z]{3,9})[-/\s,]+(\d{2}|\d{4})$/);
+  if (mmmMatch) {
+    const month = MONTH_NAME_MAP[mmmMatch[1].toLowerCase()];
+    if (month) {
+      let year = parseInt(mmmMatch[2], 10);
+      if (year < 100) year += 2000;
+      const lastDay = new Date(Date.UTC(year, month, 0)).getUTCDate();
+      return {
+        success: true,
+        date: `${year.toString().padStart(4, "0")}-${month.toString().padStart(2, "0")}-${lastDay.toString().padStart(2, "0")}`,
+      };
+    }
+  }
+
+  // 5. Month & Year format: MM/YY or MM-YY or MM/YYYY or MM-YYYY
   const myMatch = s.match(/^(\d{1,2})[-/](\d{2}|\d{4})$/);
   if (myMatch) {
     const month = parseInt(myMatch[1], 10);
