@@ -1,10 +1,9 @@
 import { getSaleById } from "@/app/actions/sales";
 import { notFound } from "next/navigation";
-import { format } from "date-fns";
 import { Printer, Receipt, User, Stethoscope, AlertOctagon, RotateCcw, FileText, ChevronRight, MessageSquare } from "lucide-react";
 import Link from "next/link";
 import { PageHeader } from "@/app/components/ui";
-import { formatINR, formatItemQuantity } from "@/lib/format";
+import { formatINR, formatItemQuantity, formatISTDate, formatISTDateTime } from "@/lib/format";
 import { can, requirePagePermission } from "@/server/rbac";
 import { getIndianBusinessDate } from "@/server/domain/sales/cancel-sale";
 import { buildWhatsAppDirectUrl, buildInvoiceWhatsAppMessage } from "@/lib/whatsapp";
@@ -45,7 +44,7 @@ export default async function SaleDetailPage({
           storeName: store?.name || "MediFlow Pharmacy",
           invoiceNo: sale.invoiceNo,
           totalINR: formatINR(sale.totalAmount || 0),
-          dateStr: format(saleDate, "dd MMM yyyy"),
+          dateStr: formatISTDate(saleDate),
           itemCount: items.length,
         }),
       )
@@ -55,7 +54,7 @@ export default async function SaleDetailPage({
     <div className="page space-y-6">
       <PageHeader
         title={`Invoice ${sale.invoiceNo ?? "Draft"}`}
-        description={`Raised on ${format(saleDate, "d MMMM yyyy, hh:mm a")}`}
+        description={`Raised on ${formatISTDateTime(saleDate, "long")}`}
         backHref="/dashboard/sales"
         actions={
           <div className="flex items-center gap-2">
@@ -115,7 +114,7 @@ export default async function SaleDetailPage({
               Cancelled on{" "}
               <strong>
                 {sale.cancelledAt
-                  ? format(new Date(sale.cancelledAt), "d MMMM yyyy, hh:mm a")
+                  ? formatISTDateTime(sale.cancelledAt, "long")
                   : "Same day"}
               </strong>
               {sale.cancelReason ? (
@@ -339,7 +338,7 @@ export default async function SaleDetailPage({
                     </span>
                   </div>
                   <div className="text-[12px] text-ink-500">
-                    Issued on {format(new Date(ret.createdAt!), "d MMM yyyy, hh:mm a")} &bull; Reason:{" "}
+                    Issued on {formatISTDateTime(ret.createdAt!, "short")} &bull; Reason:{" "}
                     <span className="italic text-ink-700 font-medium">&ldquo;{ret.reason}&rdquo;</span>
                   </div>
                 </div>

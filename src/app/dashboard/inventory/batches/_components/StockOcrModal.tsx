@@ -12,6 +12,7 @@ import {
   PackageCheck,
 } from "lucide-react";
 import { commitOcrStockUpdateAction } from "@/app/actions/stock";
+import { parseApiJsonResponse, splitPdfIntoChunks } from "@/lib/pdf-chunker";
 import { SCHEDULE_OPTIONS, scheduleRequiresRx, type DrugSchedule } from "@/lib/schedule";
 
 export interface StockOcrRow {
@@ -61,38 +62,69 @@ export function StockOcrModal({
   const [stockMode, setStockMode] = useState<"add" | "set">("add");
   const [createMissing, setCreateMissing] = useState(true);
   const [isScanning, setIsScanning] = useState(false);
+  const [scanProgress, setScanProgress] = useState<{
+    current: number;
+    total: number;
+    startPage: number;
+    endPage: number;
+    totalPages: number;
+  } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
   const handleScanFile = async (file: File) => {
     setIsScanning(true);
+    setScanProgress(null);
     setError(null);
     setSuccessMsg(null);
     try {
-      const fd = new FormData();
-      fd.append("file", file);
-      const res = await fetch("/api/ocr/stock-sheet", { method: "POST", body: fd });
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data.error || "Failed to scan stock sheet.");
-        setRows([]);
-      } else {
-        const scanned: StockOcrRow[] = (data.rows || []).map((r: StockOcrRow) => ({
+      const chunks = await splitPdfIntoChunks(file, 3);
+      const accumulatedRows: StockOcrRow[] = [];
+
+      for (let i = 0; i < chunks.length; i++) {
+        const chunk = chunks[i];
+        setScanProgress({
+          current: i + 1,
+          total: chunks.length,
+          startPage: chunk.startPage,
+          endPage: chunk.endPage,
+          totalPages: chunk.totalPages,
+        });
+
+        const fd = new FormData();
+        fd.append("file", chunk.file);
+        const res = await fetch("/api/ocr/stock-sheet", { method: "POST", body: fd });
+        const parsed = await parseApiJsonResponse<{ rows?: StockOcrRow[]; error?: string }>(res);
+
+        if (!parsed.ok || !parsed.data) {
+          const pageHint =
+            chunk.totalPages > 1 ? ` (pages ${chunk.startPage}–${chunk.endPage})` : "";
+          setError(`${parsed.errorMessage || "Failed to scan stock sheet."}${pageHint}`);
+          setRows(accumulatedRows);
+          return;
+        }
+
+        const chunkRows: StockOcrRow[] = (parsed.data.rows || []).map((r) => ({
           ...r,
+          rowKey: `ocr-${accumulatedRows.length}-${Math.random().toString(36).slice(2, 7)}`,
           schedule: r.schedule || "none",
           rxRequired: r.rxRequired ?? scheduleRequiresRx(r.schedule),
           updateCatalogPackSize: Boolean(r.suggestCatalogUpdate),
         }));
-        setRows(scanned);
-        if (scanned.length === 0) {
-          setError("No medicine stock rows could be extracted from this file.");
-        }
+        accumulatedRows.push(...chunkRows);
+      }
+
+      const reindexed = accumulatedRows.map((r, idx) => ({ ...r, rowKey: `ocr-${idx}` }));
+      setRows(reindexed);
+      if (reindexed.length === 0) {
+        setError("No medicine stock rows could be extracted from this file.");
       }
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "OCR request failed.");
     } finally {
       setIsScanning(false);
+      setScanProgress(null);
     }
   };
 
@@ -231,8 +263,20 @@ export function StockOcrModal({
             <div className="py-16 text-center space-y-3">
               <Loader2 className="w-8 h-8 mx-auto text-brand-600 animate-spin" />
               <p className="text-sm font-medium text-ink-800">
-                Reading medicine batches, expiries &amp; quantities with Gemini OCR…
+                {scanProgress && scanProgress.totalPages > 1
+                  ? `Scanning pages ${scanProgress.startPage}–${scanProgress.endPage} of ${scanProgress.totalPages} (batch ${scanProgress.current}/${scanProgress.total})…`
+                  : "Reading medicine batches, expiries & quantities with Gemini OCR…"}
               </p>
+              {scanProgress && scanProgress.total > 1 && (
+                <div className="max-w-xs mx-auto">
+                  <div className="h-2 w-full rounded-full bg-ink-100 overflow-hidden">
+                    <div
+                      className="h-full bg-brand-600 transition-all duration-300"
+                      style={{ width: `${Math.round((scanProgress.current / scanProgress.total) * 100)}%` }}
+                    />
+                  </div>
+                </div>
+              )}
             </div>
           )}
 

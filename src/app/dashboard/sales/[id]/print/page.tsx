@@ -3,11 +3,10 @@ import { db, schema } from "@/server/db";
 import { renderBillingTemplate, type BillingTemplateContext } from "@/server/domain/sales/template-engine";
 import { getSaleById } from "@/app/actions/sales";
 import { notFound } from "next/navigation";
-import { format } from "date-fns";
 import { ArrowLeft, Printer, Receipt, AlertCircle, MessageSquare } from "lucide-react";
 import Link from "next/link";
 import PrintButton from "./PrintButton";
-import { formatINR, formatItemQuantity, formatItemQuantityCompact } from "@/lib/format";
+import { formatINR, formatISTDate, formatISTDateTime, formatItemQuantity, formatItemQuantityCompact } from "@/lib/format";
 import { requirePagePermission } from "@/server/rbac";
 import { buildWhatsAppDirectUrl, buildInvoiceWhatsAppMessage } from "@/lib/whatsapp";
 import { QrCode } from "@/app/components/QrCode";
@@ -18,11 +17,11 @@ export default async function PrintInvoicePage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ format?: string }>;
+  searchParams: Promise<{ format?: string; template?: string }>;
 }) {
   await requirePagePermission("sale.view");
   const resolvedParams = await params;
-  const { format: printFormatParam } = await searchParams;
+  const { format: printFormatParam, template: templateOverride } = await searchParams;
 
   const data = await getSaleById(resolvedParams.id);
   if (!data) return notFound();
@@ -34,20 +33,24 @@ export default async function PrintInvoicePage({
     : storeDefaultFormat === "thermal_80mm" || storeDefaultFormat === "thermal_58mm";
   const targetTemplateFormat = isThermal ? "thermal_80mm" : "a4";
 
-  const [customTemplate] = store
-    ? await db
-        .select({ htmlContent: schema.billingTemplates.htmlContent })
-        .from(schema.billingTemplates)
-        .where(
-          and(
-            eq(schema.billingTemplates.tenantId, sale.tenantId),
-            eq(schema.billingTemplates.storeId, store.id),
-            eq(schema.billingTemplates.format, targetTemplateFormat),
-            eq(schema.billingTemplates.isActive, true),
-          ),
-        )
-        .limit(1)
-    : [undefined];
+  const [customTemplate] =
+    store && templateOverride !== "default"
+      ? await db
+          .select({
+            name: schema.billingTemplates.name,
+            htmlContent: schema.billingTemplates.htmlContent,
+          })
+          .from(schema.billingTemplates)
+          .where(
+            and(
+              eq(schema.billingTemplates.tenantId, sale.tenantId),
+              eq(schema.billingTemplates.storeId, store.id),
+              eq(schema.billingTemplates.format, targetTemplateFormat),
+              eq(schema.billingTemplates.isActive, true),
+            ),
+          )
+          .limit(1)
+      : [undefined];
 
   const isSimulated = !gstDoc?.einvoiceProvider || gstDoc.einvoiceProvider === "SIMULATOR";
 
@@ -74,12 +77,14 @@ export default async function PrintInvoicePage({
       },
       sale: {
         invoiceNo: sale.invoiceNo || "DRAFT",
-        invoiceDate: format(new Date(sale.completedAt ?? sale.createdAt!), "dd MMM yyyy, hh:mm a"),
+        invoiceDate: formatISTDateTime(sale.completedAt ?? sale.createdAt!, "short"),
         customerName: customer?.name || sale.customerName || "Walk-in",
         customerPhone: customer?.phone || sale.customerPhone || "",
         doctorName: sale.doctorName || "",
         paymentSummary,
         isCancelled: sale.status === "cancelled",
+        cancelledAt: sale.cancelledAt ? formatISTDateTime(sale.cancelledAt, "short") : "",
+        cancelReason: sale.cancelReason || "",
       },
       totals: {
         subtotal: formatINR(sale.taxableAmount || 0),
@@ -129,7 +134,7 @@ export default async function PrintInvoicePage({
           storeName: store?.name || tenant?.name || "MediFlow Pharmacy",
           invoiceNo: sale.invoiceNo,
           totalINR: formatINR(sale.totalAmount || 0),
-          dateStr: format(new Date(sale.completedAt ?? sale.createdAt!), "dd MMM yyyy"),
+          dateStr: formatISTDate(sale.completedAt ?? sale.createdAt!),
           itemCount: items.length,
         }),
       )
@@ -185,6 +190,21 @@ export default async function PrintInvoicePage({
         </div>
 
         <div className="flex items-center gap-2">
+          <Link
+            href="/dashboard/settings/printers"
+            className="text-xs px-2.5 py-1 rounded-md bg-white border border-ink-200 text-ink-600 hover:text-brand-700 hover:border-brand-300 transition-colors"
+            title="Switch between Built-in Default and Custom Templates in Settings"
+          >
+            Template: <strong>{customTemplate ? customTemplate.name : "Built-in Default"}</strong>
+          </Link>
+          {customTemplate && (
+            <Link
+              href={`/dashboard/sales/${sale.id}/print?format=${isThermal ? "thermal" : "gst"}&template=default`}
+              className="text-xs text-ink-500 hover:text-ink-800 underline"
+            >
+              View Default
+            </Link>
+          )}
           {whatsappUrl && (
             <a
               href={whatsappUrl}
@@ -208,8 +228,16 @@ export default async function PrintInvoicePage({
               ? "max-w-[80mm] mx-auto bg-white p-3 shadow-xl border border-ink-200 print:shadow-none print:border-none print:p-0 print:m-0 thermal-slip"
               : "max-w-3xl mx-auto bg-white p-6 shadow-xl border border-ink-200 print:shadow-none print:border-none print:p-0 print:m-0"
           }
-          dangerouslySetInnerHTML={{ __html: customRenderedHtml }}
-        />
+        >
+          {sale.status === "cancelled" && (
+            <div className="mb-3 border border-rose-400 bg-rose-50 px-3 py-1.5 text-center text-xs font-bold text-rose-900">
+              CANCELLED INVOICE
+              {sale.cancelledAt ? ` · ${formatISTDateTime(sale.cancelledAt, "short")}` : ""}
+              {sale.cancelReason ? ` · ${sale.cancelReason}` : ""}
+            </div>
+          )}
+          <div dangerouslySetInnerHTML={{ __html: customRenderedHtml }} />
+        </div>
       ) : isThermal ? (
         /* ──────────────── 80mm Thermal POS Slip Format ──────────────── */
         <div
@@ -229,7 +257,7 @@ export default async function PrintInvoicePage({
           <div className="py-2 border-b border-dashed border-black text-[10px] space-y-0.5">
             <div className="flex justify-between">
               <span>Inv: {sale.invoiceNo}</span>
-              <span>{format(new Date(sale.completedAt ?? sale.createdAt!), "dd/MM/yy HH:mm")}</span>
+              <span>{formatISTDateTime(sale.completedAt ?? sale.createdAt!, "compact")}</span>
             </div>
             <div>Cust: {customer?.name || "Walk-in"}</div>
             {customer?.phone && <div>Phone: {customer.phone}</div>}
@@ -356,7 +384,7 @@ export default async function PrintInvoicePage({
               <h2 className="text-xl font-bold text-ink-900 tracking-tight">TAX INVOICE</h2>
               <div className="mt-2 bg-ink-50 rounded-lg p-2.5 border border-ink-150 text-left text-xs font-mono inline-block">
                 <div><span className="text-ink-500">Invoice:</span> <strong>{sale.invoiceNo}</strong></div>
-                <div className="mt-0.5"><span className="text-ink-500">Date:</span> {format(new Date(sale.completedAt ?? sale.createdAt!), "dd MMM yyyy, hh:mm a")}</div>
+                <div className="mt-0.5"><span className="text-ink-500">Date:</span> {formatISTDateTime(sale.completedAt ?? sale.createdAt!, "short")}</div>
               </div>
             </div>
           </div>
@@ -412,7 +440,7 @@ export default async function PrintInvoicePage({
                 {gstDoc.ackNo && (
                   <p className="text-[11px] text-ink-600">
                     Ack No: <span className="font-mono font-semibold text-ink-900">{gstDoc.ackNo}</span> | Date:{" "}
-                    {gstDoc.ackDate ? format(new Date(gstDoc.ackDate), "dd/MM/yyyy HH:mm") : "N/A"}
+                    {gstDoc.ackDate ? formatISTDateTime(gstDoc.ackDate, "numeric") : "N/A"}
                   </p>
                 )}
               </div>

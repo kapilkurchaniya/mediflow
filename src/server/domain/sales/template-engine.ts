@@ -32,6 +32,8 @@ export interface BillingTemplateContext {
     doctorName: string;
     paymentSummary: string;
     isCancelled: boolean;
+    cancelledAt: string;
+    cancelReason: string;
   };
   totals: {
     subtotal: string;
@@ -67,6 +69,8 @@ export const BILLING_TEMPLATE_PLACEHOLDERS = [
   "{{sale.customerPhone}}",
   "{{sale.doctorName}}",
   "{{sale.paymentSummary}}",
+  "{{sale.cancelledAt}}",
+  "{{sale.cancelReason}}",
   "{{totals.subtotal}}",
   "{{totals.discount}}",
   "{{totals.cgst}}",
@@ -192,6 +196,8 @@ export function getSampleBillingContext(): BillingTemplateContext {
       doctorName: "Dr. Ananya Rao",
       paymentSummary: "UPI: ₹280.00",
       isCancelled: false,
+      cancelledAt: "",
+      cancelReason: "",
     },
     totals: {
       subtotal: "₹265.00",

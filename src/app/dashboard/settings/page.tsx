@@ -1,10 +1,11 @@
 import { PageHeader } from "@/app/components/ui";
 import { getStoreSettings } from "@/app/actions/settings";
+import { getBillingTemplatesAction } from "@/app/actions/billing-templates";
 import { SettingsForm } from "./SettingsForm";
+import { BillingTemplateQuickCard } from "./BillingTemplateQuickCard";
 import {
   Receipt,
   ShieldCheck,
-  Printer,
   CheckCircle2,
   User,
   Sliders,
@@ -18,9 +19,15 @@ import { TooltipSettingsCard } from "./TooltipSettingsCard";
 export const metadata = { title: "Settings" };
 
 export default async function SettingsPage() {
-  await requirePagePermission("settings.manage");
-  const [{ user: authUser }, data] = await Promise.all([requireAuth(), getStoreSettings()]);
+  const ctx = await requirePagePermission("settings.manage");
+  const [{ user: authUser }, data, templateRows] = await Promise.all([
+    requireAuth(),
+    getStoreSettings(),
+    getBillingTemplatesAction(ctx.storeId),
+  ]);
   const { store, user, tenant } = data;
+  const storeSettings = "settings" in store ? store.settings : undefined;
+  const initialPrintFormat = storeSettings?.printFormat ?? "thermal_80mm";
 
   return (
     <div className="page space-y-6">
@@ -36,53 +43,17 @@ export default async function SettingsPage() {
           <SettingsForm store={store} />
 
           {/* Billing & Printing Preferences */}
-          <div className="card p-5 space-y-4">
-            <div className="flex items-center gap-2.5 pb-3 border-b border-ink-150">
-              <Printer className="h-5 w-5 text-sky-600" />
-              <div>
-                <h2 className="text-[15px] font-semibold text-ink-900">
-                  Billing & Thermal Printing
-                </h2>
-                <p className="text-[12px] text-ink-500">
-                  Default format options for sales counter receipts.
-                </p>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-[13px]">
-              <div className="p-3.5 rounded-lg border border-brand-200 bg-brand-50/30 flex items-start gap-3">
-                <Receipt className="h-4 w-4 text-brand-600 shrink-0 mt-0.5" />
-                <div>
-                  <p className="font-medium text-ink-900">Thermal 80mm Roll (Default)</p>
-                  <p className="text-[12px] text-ink-500 mt-0.5">
-                    Fast ESC/POS counter receipt with medicine, batch, expiry, MRP & savings.
-                  </p>
-                </div>
-              </div>
-
-              <div className="p-3.5 rounded-lg border border-ink-150 bg-white flex items-start gap-3">
-                <ShieldCheck className="h-4 w-4 text-ink-500 shrink-0 mt-0.5" />
-                <div>
-                  <p className="font-medium text-ink-900">A4 GST Tax Invoice</p>
-                  <p className="text-[12px] text-ink-500 mt-0.5">
-                    Full GST breakdown with HSN summary, CGST/SGST ledger, and doctor details.
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <div className="pt-2 flex flex-wrap items-center justify-between gap-2 text-[12.5px] text-ink-500">
-              <p>
-                💡 Thermal 80mm is automatically optimized for standard receipt printers (TVS, Epson, NGX).
-              </p>
-              <Link
-                href="/dashboard/settings/printers"
-                className="text-brand-600 hover:text-brand-700 font-medium shrink-0 inline-flex items-center gap-1"
-              >
-                Configure & Test Print <Printer className="w-3.5 h-3.5" />
-              </Link>
-            </div>
-          </div>
+          <BillingTemplateQuickCard
+            storeId={ctx.storeId}
+            initialPrintFormat={initialPrintFormat}
+            initialTemplates={templateRows.map((t) => ({
+              id: t.id,
+              format: t.format,
+              name: t.name,
+              isActive: t.isActive,
+              sourceType: t.sourceType,
+            }))}
+          />
 
           {/* Interface & Guided Feature Tooltips Preference */}
           <TooltipSettingsCard />

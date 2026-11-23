@@ -20,9 +20,23 @@ describe("Year-End Database Roles & Security Boundary Tests (A5.6)", () => {
 
   afterAll(async () => {
     try {
-      await t.db.execute(sql`DROP ROLE IF EXISTS test_unprivileged_actor;`);
-    } catch {}
-    await t?.cleanup();
+      if (t) {
+        await t.db.execute(sql`
+          DO $$ BEGIN
+            IF EXISTS (SELECT FROM pg_roles WHERE rolname = 'test_unprivileged_actor') THEN
+              REVOKE ALL PRIVILEGES ON ALL TABLES IN SCHEMA public FROM test_unprivileged_actor;
+              REVOKE ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public FROM test_unprivileged_actor;
+              REVOKE ALL PRIVILEGES ON ALL FUNCTIONS IN SCHEMA public FROM test_unprivileged_actor;
+              REVOKE ALL PRIVILEGES ON SCHEMA public FROM test_unprivileged_actor;
+              DROP OWNED BY test_unprivileged_actor;
+            END IF;
+          END $$;
+        `);
+        await t.db.execute(sql`DROP ROLE IF EXISTS test_unprivileged_actor;`);
+      }
+    } finally {
+      await t?.cleanup();
+    }
   });
 
   it("1. mediflow_year_end_owner has restricted non-login, no-inherit attributes", async () => {

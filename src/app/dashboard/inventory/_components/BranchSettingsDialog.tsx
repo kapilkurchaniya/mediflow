@@ -1,12 +1,14 @@
 "use client";
 
 import { useState } from "react";
+import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { Settings2, X, Loader2, CheckCircle2 } from "lucide-react";
 import { updateStoreMedicineSettingsAction } from "@/app/actions/store-settings";
 import { actionError } from "@/lib/action-result";
 import { useShell } from "@/app/components/ShellContext";
 import { formatINR } from "@/lib/format";
+import { RackSelectorField } from "./RackSelectorField";
 
 interface BranchSettingsDialogProps {
   medicine: {
@@ -58,7 +60,7 @@ export function BranchSettingsDialog({
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
 
-  if (!isOpen) return null;
+  if (!isOpen || typeof document === "undefined") return null;
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -108,8 +110,13 @@ export function BranchSettingsDialog({
     }
   }
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-ink-900/40 backdrop-blur-sm animate-fade-in">
+  return createPortal(
+    <div
+      className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-ink-900/40 backdrop-blur-sm animate-fade-in text-left"
+      onClick={(e) => {
+        if (e.target === e.currentTarget && !saving) onClose();
+      }}
+    >
       <div className="card w-full max-w-lg p-0 shadow-2xl border border-surface-300 overflow-hidden animate-scale-in">
         <div className="flex items-center justify-between p-4 border-b border-surface-200 bg-surface-50">
           <div className="flex items-center gap-2">
@@ -147,19 +154,13 @@ export function BranchSettingsDialog({
           )}
 
           <div className="space-y-1">
-            <label className="text-xs font-medium text-ink-700">Store Rack / Shelf</label>
-            <select
+            <label className="text-xs font-medium text-ink-700" htmlFor={`branch-rack-${medicine.id}`}>Store Rack / Shelf</label>
+            <RackSelectorField
+              id={`branch-rack-${medicine.id}`}
               value={rackId}
-              onChange={(e) => setRackId(e.target.value)}
-              className="input w-full text-xs"
-            >
-              <option value="">— Unassigned (No Rack) —</option>
-              {racks.map((r) => (
-                <option key={r.id} value={r.id}>
-                  {r.code} - {r.name}
-                </option>
-              ))}
-            </select>
+              onChange={setRackId}
+              racks={racks}
+            />
             <p className="text-[11px] text-ink-400">Physical layout assignment specific to this branch.</p>
           </div>
 
@@ -232,6 +233,7 @@ export function BranchSettingsDialog({
           </div>
         </form>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

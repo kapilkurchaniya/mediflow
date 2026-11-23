@@ -173,12 +173,11 @@ export function validateDispensingCompliance(
     return { valid: true, errors, warnings, controlledItems };
   }
 
-  // If any controlled drug is present, doctor name is legally mandatory
-  const hasScheduleHOrHigher = controlledItems.some((ci) => ci.rule.isControlled);
-  if (hasScheduleHOrHigher) {
+  // If any controlled or Rx-required drug is present, doctor name is mandatory
+  if (controlledItems.length > 0) {
     if (!input.doctorName || input.doctorName.trim().length === 0) {
       errors.push(
-        `Doctor Name is required because the bill contains controlled drug(s): ${controlledItems.map((c) => c.medicineName).join(", ")}`
+        `Doctor Name is required because the bill contains prescription/controlled drug(s): ${controlledItems.map((c) => c.medicineName).join(", ")}`
       );
     }
   }

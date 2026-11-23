@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { createPortal } from "react-dom";
 import { Edit2, X, Check, Loader2, AlertCircle, Info, Sparkles, Plus, ShieldAlert, Trash2 } from "lucide-react";
 import {
   updateMedicine,
@@ -11,6 +12,7 @@ import {
 import { enrichMedicineDetails } from "@/app/actions/ai-enrichment";
 import { scheduleRequiresRx } from "@/lib/schedule";
 import { useRouter } from "next/navigation";
+import { RackSelectorField, type RackOption } from "./RackSelectorField";
 
 export interface EditableMedicineData {
   id: string;
@@ -37,6 +39,8 @@ interface EditMedicineButtonProps {
   medicine: EditableMedicineData;
   categories: Array<{ id: string; name: string }>;
   manufacturers: Array<{ id: string; name: string }>;
+  racks?: RackOption[];
+  currentRackId?: string | null;
   canAdjustStock?: boolean;
 }
 
@@ -44,6 +48,8 @@ export function EditMedicineButton({
   medicine,
   categories,
   manufacturers,
+  racks = [],
+  currentRackId = null,
   canAdjustStock = false,
 }: EditMedicineButtonProps) {
   const router = useRouter();
@@ -77,6 +83,7 @@ export function EditMedicineButton({
   const [looseUnit, setLooseUnit] = useState(medicine.looseUnit || "tablet");
   const [packSize, setPackSize] = useState(medicine.packSize || "");
   const [schedule, setSchedule] = useState(medicine.schedule || "none");
+  const [rackId, setRackId] = useState(currentRackId || "");
   const [rxRequired, setRxRequired] = useState(medicine.rxRequired);
   const [isActive, setIsActive] = useState(medicine.isActive);
   const [convertExistingBatches, setConvertExistingBatches] = useState(false);
@@ -100,6 +107,7 @@ export function EditMedicineButton({
     setLooseUnit(medicine.looseUnit || "tablet");
     setPackSize(medicine.packSize || "");
     setSchedule(medicine.schedule || "none");
+    setRackId(currentRackId || "");
     setRxRequired(medicine.rxRequired);
     setIsActive(medicine.isActive);
     setConvertExistingBatches(false);
@@ -247,6 +255,7 @@ export function EditMedicineButton({
     fd.append("looseUnit", looseUnit);
     fd.append("packSize", packSize);
     fd.append("schedule", schedule);
+    fd.append("rackId", rackId);
     if (rxRequired) fd.append("rxRequired", "on");
     if (isActive) fd.append("isActive", "on");
     if (uppChanged && convertExistingBatches) fd.append("convertExistingBatches", "on");
@@ -281,11 +290,18 @@ export function EditMedicineButton({
         <Edit2 className="w-4 h-4" />
       </button>
 
-      {isOpen && (
-        <div className="fixed inset-0 z-50 flex justify-end bg-black/50 backdrop-blur-xs animate-in fade-in duration-150">
-          <div className="bg-white w-full max-w-xl h-full flex flex-col shadow-2xl border-l border-ink-200 text-left">
-            <div className="flex items-center justify-between gap-2 border-b border-ink-150 px-5 py-4 shrink-0">
-              <div className="min-w-0">
+      {isOpen &&
+        typeof document !== "undefined" &&
+        createPortal(
+          <div
+            className="fixed inset-0 z-[60] flex justify-end bg-black/50 backdrop-blur-xs animate-in fade-in duration-150"
+            onClick={(e) => {
+              if (e.target === e.currentTarget && !isSubmitting) setIsOpen(false);
+            }}
+          >
+            <div className="bg-white w-full max-w-xl h-full flex flex-col shadow-2xl border-l border-ink-200 text-left">
+              <div className="flex items-center justify-between gap-2 border-b border-ink-150 px-5 py-4 shrink-0">
+                <div className="min-w-0">
                 <h3 className="text-base font-bold text-ink-900">Edit Medicine</h3>
                 <p className="text-xs text-ink-500 mt-0.5 truncate max-w-xs">{medicine.name}</p>
               </div>
@@ -587,6 +603,24 @@ export function EditMedicineButton({
                 </div>
 
                 <div className="space-y-3 pt-4 border-t border-ink-150">
+                  <h4 className="text-xs font-semibold uppercase tracking-wider text-ink-400">
+                    Storage Location (Rack &amp; Shelf)
+                  </h4>
+                  <div>
+                    <label className="label" htmlFor={`med-rack-${medicine.id}`}>Rack / Shelf</label>
+                    <RackSelectorField
+                      id={`med-rack-${medicine.id}`}
+                      value={rackId}
+                      onChange={setRackId}
+                      racks={racks}
+                    />
+                    <p className="text-[11px] text-ink-400 mt-1">
+                      Shown on POS search results so billing staff can locate this medicine immediately.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="space-y-3 pt-4 border-t border-ink-150">
                   <h4 className="text-xs font-semibold uppercase tracking-wider text-ink-400">Compliance &amp; Status</h4>
                   <div className="grid grid-cols-2 gap-3 items-center">
                     <div>
@@ -717,8 +751,9 @@ export function EditMedicineButton({
               </div>
             </form>
           </div>
-        </div>
-      )}
+        </div>,
+          document.body
+        )}
     </>
   );
 }

@@ -15,10 +15,10 @@ export function ScheduleBadge({ schedule }: { schedule: string }) {
   if (norm === "H1") {
     return (
       <span
-        className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10.5px] font-bold font-mono bg-rose-100 text-rose-800 border border-rose-300 shadow-xs"
+        className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10.5px] font-bold font-mono bg-rose-100 text-rose-800 border border-rose-300 shadow-xs whitespace-nowrap shrink-0"
         title="Schedule H1: Separate register entry & doctor details required"
       >
-        <span className="w-1.5 h-1.5 rounded-full bg-rose-600 animate-pulse" />
+        <span className="w-1.5 h-1.5 rounded-full bg-rose-600 animate-pulse shrink-0" />
         Rx · Sched H1
       </span>
     );
@@ -26,10 +26,10 @@ export function ScheduleBadge({ schedule }: { schedule: string }) {
   if (norm === "X") {
     return (
       <span
-        className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10.5px] font-bold font-mono bg-purple-100 text-purple-800 border border-purple-300 shadow-xs"
+        className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10.5px] font-bold font-mono bg-purple-100 text-purple-800 border border-purple-300 shadow-xs whitespace-nowrap shrink-0"
         title="Schedule X: NDPS Controlled Substance. Duplicate prescription required."
       >
-        <span className="w-1.5 h-1.5 rounded-full bg-purple-600" />
+        <span className="w-1.5 h-1.5 rounded-full bg-purple-600 shrink-0" />
         NDPS · Sched X
       </span>
     );
@@ -37,16 +37,16 @@ export function ScheduleBadge({ schedule }: { schedule: string }) {
   if (norm === "H") {
     return (
       <span
-        className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10.5px] font-semibold font-mono bg-amber-100 text-amber-800 border border-amber-300"
+        className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10.5px] font-semibold font-mono bg-amber-100 text-amber-800 border border-amber-300 whitespace-nowrap shrink-0"
         title="Schedule H: Prescription required"
       >
-        <span className="w-1.5 h-1.5 rounded-full bg-amber-600" />
+        <span className="w-1.5 h-1.5 rounded-full bg-amber-600 shrink-0" />
         Rx · Sched H
       </span>
     );
   }
   return (
-    <span className="badge badge-neutral !text-[10px] font-mono">
+    <span className="badge badge-neutral !text-[10px] font-mono whitespace-nowrap shrink-0">
       Sched {schedule}
     </span>
   );
@@ -144,12 +144,12 @@ export function CartTable({
           </div>
         ) : (
           <div className="flex-1 overflow-x-auto overflow-y-auto min-w-0">
-            <table className="data-table min-w-[680px] w-full">
+            <table className="data-table min-w-[780px] w-full">
               <thead className="sticky top-0 bg-ink-50 z-10">
                 <tr>
                   <th className="w-8">#</th>
-                  <th>Medicine</th>
-                  <th>Batch / Expiry</th>
+                  <th className="min-w-[180px]">Medicine</th>
+                  <th className="min-w-[140px]">Batch / Expiry</th>
                   <th className="text-center w-28">Packs ({cart[0]?.packUnit || "Strip"})</th>
                   <th className="text-center w-28">Loose ({cart[0]?.looseUnit || "Tab"})</th>
                   <th className="text-right w-20">Rate</th>
@@ -200,7 +200,7 @@ export function CartTable({
                         <div className="flex items-center gap-1.5 flex-wrap">
                           <span className="font-semibold text-ink-900 text-sm">{line.medicineName}</span>
                           {line.schedule && <ScheduleBadge schedule={line.schedule} />}
-                          {line.schemeText && <span className="badge badge-brand !text-[10px] flex items-center gap-0.5 font-mono"><Tag className="w-2.5 h-2.5 inline" /> {line.schemeText}</span>}
+                          {line.schemeText && <span className="badge badge-brand !text-[10px] flex items-center gap-0.5 font-mono whitespace-nowrap shrink-0"><Tag className="w-2.5 h-2.5 inline shrink-0" /> {line.schemeText}</span>}
                         </div>
                         <div className="text-[11.5px] text-ink-500 font-mono flex items-center gap-2">
                           <span>{line.genericName || "—"}</span>
@@ -261,7 +261,7 @@ export function CartTable({
                             <span className="font-mono text-xs font-semibold text-ink-800">{line.batchNo}</span>
                           )}
                         </div>
-                        <div className="text-[11px] text-ink-500 font-mono">Exp: {line.expiryDate} · Stk: {line.qtyOnHand}</div>
+                        <div className="text-[11px] text-ink-500 font-mono whitespace-nowrap">Exp: {line.expiryDate} · Stk: {line.qtyOnHand}</div>
                       </td>
                       <td className="text-center">
                         <input

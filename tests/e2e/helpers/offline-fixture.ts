@@ -10,7 +10,7 @@ import type { ReserveNumbersResponse } from "../../../src/server/domain/sync/typ
 
 const testDbUrl =
   process.env.DATABASE_URL ||
-  "postgres://mediflow:mediflow@localhost:5433/mediflow_test";
+  "postgres://mediflow@localhost:5432/mediflow_test";
 
 export const testPool = new Pool({ connectionString: testDbUrl });
 export const testDb = drizzle(testPool, { schema });

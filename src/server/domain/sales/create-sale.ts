@@ -9,6 +9,7 @@ import { nextDocNumber } from "@/server/domain/sequence";
 import { postSaleJournalEntry } from "@/server/domain/accounting";
 import {
   applyPrescriptionDispensing,
+  getScheduleRule,
   isScheduledDrug,
   recordDispensingLog,
   validateDispensingCompliance,
@@ -511,6 +512,87 @@ export async function createSale(
       });
     } catch (e) {
       throw new DomainError("PRESCRIPTION", e instanceof Error ? e.message : "Could not apply the prescription.");
+    }
+  } else {
+    // ── 9b. Auto-record Rx / scheduled sale into Prescription Repository ─────────────────────────
+    const rxLines = allocatedLines.filter(
+      (p) => p.medicine.rxRequired || getScheduleRule(p.medicine.schedule).isControlled,
+    );
+    if (rxLines.length > 0 && doctorName) {
+      let resolvedDoctorId: string | null = null;
+      if (c?.doctorId) {
+        const [docRow] = await tx
+          .select({ id: schema.doctors.id })
+          .from(schema.doctors)
+          .where(and(eq(schema.doctors.id, c.doctorId), eq(schema.doctors.tenantId, ctx.tenantId)))
+          .limit(1);
+        if (docRow) resolvedDoctorId = docRow.id;
+      } else if (c?.doctorRegNo?.trim()) {
+        const reg = c.doctorRegNo.trim();
+        const [existingDoc] = await tx
+          .select({ id: schema.doctors.id })
+          .from(schema.doctors)
+          .where(
+            and(
+              eq(schema.doctors.tenantId, ctx.tenantId),
+              sql`lower(${schema.doctors.regNo}) = lower(${reg})`,
+            ),
+          )
+          .limit(1);
+        if (existingDoc) {
+          resolvedDoctorId = existingDoc.id;
+        } else {
+          const [createdDoc] = await tx
+            .insert(schema.doctors)
+            .values({
+              tenantId: ctx.tenantId,
+              name: doctorName,
+              regNo: reg,
+              address: c.doctorAddress?.trim() || null,
+            })
+            .onConflictDoNothing()
+            .returning({ id: schema.doctors.id });
+          if (createdDoc) resolvedDoctorId = createdDoc.id;
+        }
+      }
+
+      const [autoRx] = await tx
+        .insert(schema.prescriptions)
+        .values({
+          tenantId: ctx.tenantId,
+          storeId: ctx.storeId,
+          customerId: input.customerId ?? null,
+          patientName: patientName || "Walk-in Patient",
+          patientAge: c?.patientAge ?? null,
+          patientGender: c?.patientGender || null,
+          patientPhone: c?.patientPhone || customer?.phone || null,
+          patientAddress: c?.patientAddress?.trim() || null,
+          doctorId: resolvedDoctorId,
+          doctorName,
+          doctorRegNo: c?.doctorRegNo?.trim() || null,
+          doctorAddress: c?.doctorAddress?.trim() || null,
+          rxNumber: c?.prescriptionRef?.trim() || invoiceNo,
+          prescriptionDate: c?.prescriptionDate || todayStr,
+          notes: `Auto-recorded from POS bill ${invoiceNo}`,
+          status: "fully_dispensed",
+        })
+        .returning({ id: schema.prescriptions.id });
+
+      await tx.insert(schema.prescriptionItems).values(
+        rxLines.map((p) => ({
+          tenantId: ctx.tenantId,
+          prescriptionId: autoRx.id,
+          medicineId: p.medicine.id,
+          medicineName: p.medicine.name,
+          quantityPrescribed: p.baseQty,
+          quantityDispensed: p.baseQty,
+        })),
+      );
+
+      await tx
+        .update(schema.sales)
+        .set({ prescriptionId: autoRx.id })
+        .where(eq(schema.sales.id, sale.id));
     }
   }
 

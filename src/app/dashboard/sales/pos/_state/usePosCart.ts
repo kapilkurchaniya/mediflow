@@ -8,7 +8,7 @@ import { saveDraftCart, loadDraftCart, clearDraftCart, buildCartStorageKey, type
 
 export const initialComplianceState: ComplianceState = {
   doctorId: "", doctorName: "", doctorRegNo: "", doctorAddress: "",
-  patientAge: "", patientGender: "male", patientAddress: "",
+  patientName: "", patientAge: "", patientGender: "male", patientAddress: "",
   prescriptionRef: "", prescriptionDate: new Date().toISOString().slice(0, 10),
   medicalRepId: "",
 };
@@ -123,7 +123,15 @@ export function posCartReducer(state: PosState, action: PosAction): PosState {
       return { ...state, cart: [] };
 
     case "SET_CUSTOMER":
-      return { ...state, customer: action.payload, redeemPoints: 0 };
+      return {
+        ...state,
+        customer: action.payload,
+        redeemPoints: 0,
+        compliance: {
+          ...state.compliance,
+          patientName: action.payload?.name || "",
+        },
+      };
 
     case "SET_CUSTOMER_REDEEMABLE":
       if (!state.customer) return state;
@@ -246,7 +254,12 @@ export function usePosCart(identity?: CartIdentity) {
   const rxWarning = useMemo(() => state.cart.some((i) => Boolean(i.rxRequired)), [state.cart]);
 
   const controlledItems = useMemo(
-    () => state.cart.filter((i) => i.schedule && ["H", "H1", "X", "NARCOTIC"].includes(i.schedule.toUpperCase())),
+    () =>
+      state.cart.filter(
+        (i) =>
+          Boolean(i.rxRequired) ||
+          (i.schedule && ["H", "H1", "X", "NARCOTIC"].includes(i.schedule.toUpperCase()))
+      ),
     [state.cart]
   );
 

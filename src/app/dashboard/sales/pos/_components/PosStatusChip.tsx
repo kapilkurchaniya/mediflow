@@ -35,7 +35,7 @@ export function PosStatusChip({
       <button
         type="button"
         onClick={onOpenDrawer}
-        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-brand-50 text-brand-800 border border-brand-300 hover:bg-brand-100 transition-colors shadow-2xs"
+        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-brand-50 text-brand-800 border border-brand-300 hover:bg-brand-100 transition-colors shadow-2xs whitespace-nowrap shrink-0"
         title="Syncing pending sales with central server. Click to view pending bills."
         aria-label="Syncing pending bills"
       >
@@ -55,7 +55,7 @@ export function PosStatusChip({
       <button
         type="button"
         onClick={onOpenDrawer}
-        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-900 border border-amber-300 hover:bg-amber-100 transition-colors shadow-2xs"
+        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-900 border border-amber-300 hover:bg-amber-100 transition-colors shadow-2xs whitespace-nowrap shrink-0"
         title="Counter is operating offline. Click to view pending bills."
         aria-label={pendingCount > 0 ? `Offline mode active, ${pendingCount} pending` : "Offline mode active"}
       >
@@ -76,7 +76,7 @@ export function PosStatusChip({
     <button
       type="button"
       onClick={onOpenDrawer}
-      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-900 border border-emerald-300 hover:bg-emerald-100 transition-colors shadow-2xs"
+      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-900 border border-emerald-300 hover:bg-emerald-100 transition-colors shadow-2xs whitespace-nowrap shrink-0"
       title={`Counter is online. Last synced ${formatRelativeSync(lastSyncAt)}. Click to view pending bills.`}
       aria-label={`Online, last synced ${formatRelativeSync(lastSyncAt)}${pendingCount > 0 ? `, ${pendingCount} pending` : ""}`}
     >

@@ -112,7 +112,9 @@ export const saveBillingTemplateAction = protectedAction("settings.manage")
       newValue: { name: saved.name, format: saved.format, isActive: saved.isActive },
     });
 
+    revalidatePath("/dashboard/settings");
     revalidatePath("/dashboard/settings/printers");
+    revalidatePath("/dashboard/sales");
     return saved;
   });
 
@@ -157,7 +159,9 @@ export const setActiveBillingTemplateAction = protectedAction("settings.manage")
       }
     });
 
+    revalidatePath("/dashboard/settings");
     revalidatePath("/dashboard/settings/printers");
+    revalidatePath("/dashboard/sales");
     return { ok: true };
   });
 
@@ -184,7 +188,9 @@ export const deleteBillingTemplateAction = protectedAction("settings.manage")
         ),
       );
 
+    revalidatePath("/dashboard/settings");
     revalidatePath("/dashboard/settings/printers");
+    revalidatePath("/dashboard/sales");
     return { deleted: true };
   });
 
@@ -219,7 +225,9 @@ export const saveStorePrintFormatAction = protectedAction("settings.manage")
       .set({ settings: updatedSettings })
       .where(and(eq(schema.stores.id, targetStoreId), eq(schema.stores.tenantId, ctx.tenantId)));
 
+    revalidatePath("/dashboard/settings");
     revalidatePath("/dashboard/settings/printers");
+    revalidatePath("/dashboard/sales");
     return { printFormat: parsedInput.printFormat };
   });
 

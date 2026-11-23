@@ -359,6 +359,7 @@ const updateMedicineSchema = z.object({
   genericName: z.string().optional(),
   manufacturerId: z.string().optional(),
   categoryId: z.string().optional(),
+  rackId: z.string().optional(),
   packSize: z.string().optional(),
   barcode: z.string().optional(),
   hsn: z.string().optional(),
@@ -426,8 +427,23 @@ export async function updateMedicine(formData: FormData) {
   };
   const catId = input.categoryId?.trim() || null;
   const mfgId = input.manufacturerId?.trim() || null;
+  const rackId = input.rackId?.trim() || null;
   if (catId && !(await owns(schema.categories, catId))) return { error: "Category not found." };
   if (mfgId && !(await owns(schema.manufacturers, mfgId))) return { error: "Manufacturer not found." };
+  if (rackId) {
+    const [rackRow] = await db
+      .select({ id: schema.racks.id })
+      .from(schema.racks)
+      .where(
+        and(
+          eq(schema.racks.id, rackId),
+          eq(schema.racks.tenantId, ctx.tenantId),
+          eq(schema.racks.storeId, ctx.storeId),
+        ),
+      )
+      .limit(1);
+    if (!rackRow) return { error: "Selected rack was not found in this store." };
+  }
 
   const cleanBarcode = input.barcode?.trim() || null;
   const cleanPackUnit = input.packUnit.toLowerCase();
@@ -510,6 +526,21 @@ export async function updateMedicine(formData: FormData) {
             .where(eq(schema.batches.id, b.id));
           convertedBatches++;
         }
+      }
+
+      if (formData.has("rackId")) {
+        await tx
+          .insert(schema.storeMedicineSettings)
+          .values({
+            tenantId: ctx.tenantId,
+            storeId: ctx.storeId,
+            medicineId: input.medicineId,
+            rackId,
+          })
+          .onConflictDoUpdate({
+            target: [schema.storeMedicineSettings.storeId, schema.storeMedicineSettings.medicineId],
+            set: { rackId, updatedAt: new Date() },
+          });
       }
 
       await writeAudit(tx, ctx, {

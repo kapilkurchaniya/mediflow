@@ -1,10 +1,9 @@
 import Link from "next/link";
-import { format } from "date-fns";
 import { RotateCcw, FileText, ArrowUpRight, Search, Printer, Calendar } from "lucide-react";
 import { PageHeader } from "@/app/components/ui";
 import { requirePagePermission } from "@/server/rbac";
 import { getSaleReturnsList } from "@/app/actions/sales";
-import { formatINR } from "@/lib/format";
+import { formatINR, formatISTDateTime } from "@/lib/format";
 
 export const metadata = { title: "Sale Returns & Credit Notes" };
 
@@ -147,7 +146,7 @@ export default async function SaleReturnsListPage({
                     <td>
                       <span className="text-[12.5px] text-ink-800">
                         {saleReturn.createdAt
-                          ? format(new Date(saleReturn.createdAt), "d MMM yyyy, hh:mm a")
+                          ? formatISTDateTime(saleReturn.createdAt, "short")
                           : "—"}
                       </span>
                       {user && <div className="cell-sub text-[11px]">By {user.name}</div>}

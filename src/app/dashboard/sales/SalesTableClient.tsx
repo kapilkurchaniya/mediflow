@@ -3,10 +3,9 @@
 import React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { format } from "date-fns";
 import { Eye, Printer } from "lucide-react";
 import { Avatar, TableWrapper } from "@/app/components/ui";
-import { formatINR, formatNumber } from "@/lib/format";
+import { formatINR, formatISTDate, formatISTTime, formatNumber } from "@/lib/format";
 
 export interface SalesTableRow {
   sale: {
@@ -77,8 +76,8 @@ export function SalesTableClient({ rows }: { rows: SalesTableRow[] }) {
                   </Link>
                 </td>
                 <td className="text-ink-600 num whitespace-nowrap">
-                  {format(new Date(sale.completedAt ?? sale.createdAt), "d MMM yyyy")}
-                  <div className="cell-sub">{format(new Date(sale.completedAt ?? sale.createdAt), "hh:mm a")}</div>
+                  {formatISTDate(sale.completedAt ?? sale.createdAt)}
+                  <div className="cell-sub">{formatISTTime(sale.completedAt ?? sale.createdAt)}</div>
                 </td>
                 <td>
                   <div className="flex items-center gap-2.5">

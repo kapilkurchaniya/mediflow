@@ -99,3 +99,106 @@ export function formatItemQuantityCompact(item: QuantityBreakdown): string {
   }
   return `${lQty} ${lUnit}`;
 }
+
+const IST_TZ = "Asia/Kolkata";
+
+function toValidDate(value: Date | string | number): Date {
+  return value instanceof Date ? value : new Date(value);
+}
+
+function normalizeMeridiem(str: string): string {
+  return str.replace(/\b(am|pm)\b/gi, (m) => m.toUpperCase());
+}
+
+/** Formats a date/time deterministically in Indian Standard Time (Asia/Kolkata). */
+export function formatISTDateTime(
+  value: Date | string | number,
+  style: "long" | "short" | "compact" | "numeric" = "short"
+): string {
+  const d = toValidDate(value);
+  if (Number.isNaN(d.getTime())) return "—";
+
+  if (style === "compact") {
+    const parts = new Intl.DateTimeFormat("en-GB", {
+      timeZone: IST_TZ,
+      day: "2-digit",
+      month: "2-digit",
+      year: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    }).format(d);
+    return parts.replace(",", "");
+  }
+
+  if (style === "numeric") {
+    const parts = new Intl.DateTimeFormat("en-GB", {
+      timeZone: IST_TZ,
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    }).format(d);
+    return parts.replace(",", "");
+  }
+
+  const dateFormatted = new Intl.DateTimeFormat("en-IN", {
+    timeZone: IST_TZ,
+    day: style === "long" ? "numeric" : "2-digit",
+    month: style === "long" ? "long" : "short",
+    year: "numeric",
+  }).format(d);
+
+  return `${dateFormatted}, ${formatISTTime(d)}`;
+}
+
+/** Formats a calendar date deterministically in Indian Standard Time (Asia/Kolkata). */
+export function formatISTDate(
+  value: Date | string | number,
+  style: "medium" | "numeric" | "compact" = "medium"
+): string {
+  const d = toValidDate(value);
+  if (Number.isNaN(d.getTime())) return "—";
+
+  if (style === "numeric") {
+    return new Intl.DateTimeFormat("en-GB", {
+      timeZone: IST_TZ,
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+    }).format(d);
+  }
+
+  if (style === "compact") {
+    return new Intl.DateTimeFormat("en-GB", {
+      timeZone: IST_TZ,
+      day: "2-digit",
+      month: "2-digit",
+      year: "2-digit",
+    }).format(d);
+  }
+
+  return new Intl.DateTimeFormat("en-IN", {
+    timeZone: IST_TZ,
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  }).format(d);
+}
+
+/** Formats a time of day deterministically in Indian Standard Time (Asia/Kolkata). */
+export function formatISTTime(value: Date | string | number): string {
+  const d = toValidDate(value);
+  if (Number.isNaN(d.getTime())) return "—";
+
+  const formatted = new Intl.DateTimeFormat("en-IN", {
+    timeZone: IST_TZ,
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: true,
+  }).format(d);
+
+  return normalizeMeridiem(formatted);
+}

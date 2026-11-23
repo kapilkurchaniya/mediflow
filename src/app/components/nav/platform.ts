@@ -1,4 +1,4 @@
-import { Monitor, ScrollText, ShieldCheck, Store, UserCog } from "lucide-react";
+import { Monitor, Printer, ScrollText, ShieldCheck, Store, UserCog } from "lucide-react";
 import type { NavItem } from "./types";
 
 /** Platform pages (Lane A): audit log, and later users / stores. */
@@ -46,6 +46,15 @@ export const platformNav: NavItem[] = [
     label: "Billing Terminals",
     icon: Monitor,
     description: "Manage counter workstations & offline device tokens",
+    permission: "settings.manage",
+  },
+  {
+    group: "directory",
+    order: 64,
+    href: "/dashboard/settings/printers",
+    label: "Billing Templates & Printers",
+    icon: Printer,
+    description: "Create custom HTML / OCR invoice templates and choose default vs custom",
     permission: "settings.manage",
   },
 ];
