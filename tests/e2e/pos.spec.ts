@@ -6,7 +6,7 @@ import * as schema from "../../src/server/db/schema";
 
 const testDbUrl =
   process.env.DATABASE_URL ||
-  "postgres://mediflow:mediflow@localhost:5433/mediflow_test";
+  "postgres://mediflow@localhost:5432/mediflow_test";
 const pool = new Pool({ connectionString: testDbUrl });
 const db = drizzle(pool, { schema });
 
