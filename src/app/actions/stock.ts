@@ -473,6 +473,9 @@ const OcrStockItemSchema = z.object({
   batchNo: z.string().trim().min(1),
   expiryDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   unitsPerPack: z.number().int().min(1).default(1),
+  packUnit: z.string().optional(),
+  looseUnit: z.string().optional(),
+  updateCatalogPackSize: z.boolean().default(false),
   baseQty: z.number().int().min(0),
   ptrPaise: z.number().int().min(0).default(0),
   mrpPaise: z.number().int().min(0).default(0),
@@ -543,6 +546,8 @@ export const commitOcrStockUpdateAction = protectedAction("inventory.adjust")
                 manufacturerId,
                 hsn: item.hsn?.trim() || null,
                 unitsPerPack: item.unitsPerPack,
+                ...(item.packUnit ? { packUnit: item.packUnit } : {}),
+                ...(item.looseUnit ? { looseUnit: item.looseUnit } : {}),
                 gstRateBp: item.gstRateBp,
                 mrp: item.mrpPaise > 0 ? item.mrpPaise : 0,
                 purchasePrice: item.ptrPaise > 0 ? item.ptrPaise : 0,
@@ -560,6 +565,23 @@ export const commitOcrStockUpdateAction = protectedAction("inventory.adjust")
               `Medicine "${item.medicineName}" is not in your catalog. Enable "Create missing medicines in catalog" or remove the row.`,
             );
           }
+        }
+
+        if (medicineId && item.updateCatalogPackSize && item.unitsPerPack > 1) {
+          await tx
+            .update(schema.medicines)
+            .set({
+              unitsPerPack: item.unitsPerPack,
+              ...(item.packUnit ? { packUnit: item.packUnit } : {}),
+              ...(item.looseUnit ? { looseUnit: item.looseUnit } : {}),
+              updatedAt: new Date(),
+            })
+            .where(
+              and(
+                eq(schema.medicines.id, medicineId),
+                eq(schema.medicines.tenantId, ctx.tenantId),
+              ),
+            );
         }
 
         const cleanBatchNo = item.batchNo.trim().toUpperCase();
@@ -581,6 +603,10 @@ export const commitOcrStockUpdateAction = protectedAction("inventory.adjust")
 
         const resolvedSaleRate =
           item.saleRatePaise > 0 ? item.saleRatePaise : item.mrpPaise;
+        const basePurchaseRate =
+          item.ptrPaise > 0
+            ? Math.round(item.ptrPaise / Math.max(1, item.unitsPerPack))
+            : 0;
 
         let batchId: string;
         let currentQty = 0;
@@ -597,7 +623,7 @@ export const commitOcrStockUpdateAction = protectedAction("inventory.adjust")
               medicineId,
               batchNo: cleanBatchNo,
               expiryDate: item.expiryDate,
-              purchaseRate: item.ptrPaise > 0 ? item.ptrPaise : 0,
+              purchaseRate: basePurchaseRate,
               mrp: item.mrpPaise > 0 ? item.mrpPaise : 0,
               saleRate: resolvedSaleRate > 0 ? resolvedSaleRate : 0,
               qtyOnHand: 0,
@@ -618,7 +644,7 @@ export const commitOcrStockUpdateAction = protectedAction("inventory.adjust")
             medicineId,
             type: existingBatch ? "adjustment" : "opening",
             qtyChange: qtyDelta,
-            unitCost: item.ptrPaise > 0 ? item.ptrPaise : null,
+            unitCost: basePurchaseRate > 0 ? basePurchaseRate : null,
             refType: "ocr_stock_update",
             note:
               parsedInput.mode === "add"
@@ -646,7 +672,7 @@ export const commitOcrStockUpdateAction = protectedAction("inventory.adjust")
 
     revalidatePath("/dashboard/inventory/batches");
     revalidatePath("/dashboard/inventory", "layout");
-    revalidatePath("/dashboard/pos");
+    revalidatePath("/dashboard/sales/pos");
     revalidatePath("/dashboard");
     return { updatedCount };
   });

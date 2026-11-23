@@ -1,11 +1,13 @@
 import Papa from "papaparse";
 import type { ImportRow } from "@/app/actions/inventory-import";
+import { parsePackaging } from "@/lib/packaging";
 
 export type ParsedStockRow = {
   raw: Record<string, string>;
   mapped: Partial<ImportRow>;
   errors: string[];
   warnings: string[];
+  isSolidDoseCandidate?: boolean;
 };
 
 const CSV_EXTENSIONS = [".csv", ".tsv", ".txt"];
@@ -236,19 +238,18 @@ export function mapAndValidateStockRow(row: Record<string, string>): ParsedStock
   const exp = getVal(["exp", "expiry", "exp date", "exp_date", "expiry date", "exp.date"]).trim();
   const mfg = getVal(["mfg", "manufacturer", "company", "brand", "mfg by"]).trim();
   const cat = getVal(["category", "group", "type", "schedule"]).trim();
-  const rawPack = getVal(["units_per_pack", "units per pack", "unitsperpack", "pack_size", "pack size", "packing", "strip size"]).trim();
-
-  let parsedUpp = 1;
-  if (rawPack) {
-    const xMatch = rawPack.match(/^\d+\s*[xX*]\s*(\d+)/);
-    const numMatch = rawPack.match(/(\d+)/);
-    const candidate = xMatch ? parseInt(xMatch[1], 10) : numMatch ? parseInt(numMatch[1], 10) : 1;
-    if (Number.isFinite(candidate) && candidate > 1 && candidate <= 1000) {
-      parsedUpp = candidate;
-    }
+  const rawPack = getVal([
+    "units_per_pack", "units per pack", "unitsperpack",
+    "pack_size", "pack size", "packing", "strip size", "u/p", "conv", "pack",
+  ]).trim();
+  const packaging = parsePackaging({ packRaw: rawPack, medicineName: name });
+  const parsedUpp = packaging.unitsPerPack;
+  if (packaging.warning) {
+    warnings.push(packaging.warning);
   }
 
-  const rawQty = getVal(["qty", "quantity", "stock", "closing", "cl qty", "balance", "total qty"]);
+  const rawQty = getVal(["qty", "quantity", "stock", "closing", "cl qty", "balance", "total qty", "strips", "packs"]);
+  const rawLoose = getVal(["loose", "loose_qty", "loose qty", "loose_units", "loose units", "tablets"]);
   const rawMrp = getVal(["mrp", "retail", "sale rate", "salerate", "s.rate", "sale price"]);
   const rawPRate = getVal([
     "ptr", "p.t.r", "purchase rate", "purchase_rate", "purchase price",
@@ -258,7 +259,9 @@ export function mapAndValidateStockRow(row: Record<string, string>): ParsedStock
     "landing", "basic rate", "rate",
   ]);
 
+  const rawQtyText = String(rawQty ?? "").trim().replace(/,/g, "");
   const qty = parseQtyFromText(rawQty);
+  const looseQty = parseQtyFromText(rawLoose);
   const mrp = parsePaiseFromText(rawMrp);
   let pRate = parsePaiseFromText(rawPRate);
   if (pRate === 0 && mrp > 0) {
@@ -278,22 +281,27 @@ export function mapAndValidateStockRow(row: Record<string, string>): ParsedStock
     if (!formattedExp) errors.push(`Invalid Expiry Format: ${exp}`);
   }
 
-  if (qty === 0) warnings.push("Quantity is 0");
+  if (qty === 0 && looseQty === 0) warnings.push("Quantity is 0");
   if (mrp === 0) warnings.push("MRP is 0");
 
   return {
     raw: row,
     errors,
     warnings,
+    isSolidDoseCandidate: packaging.isSolidDoseCandidate,
     mapped: {
       medicineName: name,
-      ...(parsedUpp > 1 ? { unitsPerPack: parsedUpp } : {}),
-      ...(rawPack ? { packSize: rawPack } : {}),
+      unitsPerPack: parsedUpp,
+      packUnit: packaging.packUnit,
+      looseUnit: packaging.looseUnit,
+      ...(packaging.packSize ? { packSize: packaging.packSize } : {}),
       manufacturer: mfg || undefined,
       category: cat || undefined,
       batchNo: batch,
       expiryDate: formattedExp,
       qty,
+      ...(rawQtyText ? { rawQtyText } : {}),
+      ...(looseQty > 0 ? { looseQty } : {}),
       mrp,
       purchaseRate: pRate,
       saleRate,

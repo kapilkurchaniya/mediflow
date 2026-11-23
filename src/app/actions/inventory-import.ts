@@ -6,6 +6,11 @@ import { requirePermission } from "@/server/rbac";
 import { recordStockMovement } from "@/server/domain/stock";
 import { writeAudit } from "@/server/audit";
 import { revalidatePath } from "next/cache";
+import {
+  computeBaseUnitCost,
+  parsePackAndLooseQty,
+  type QtyMode,
+} from "@/lib/packaging";
 
 export type ImportRow = {
   medicineName: string;
@@ -15,19 +20,34 @@ export type ImportRow = {
   expiryDate: string; // YYYY-MM-DD
   mfgDate?: string; // YYYY-MM-DD
   qty: number;
-  mrp: number; // in paise
-  purchaseRate: number; // in paise
-  saleRate: number; // in paise
+  rawQtyText?: string;
+  looseQty?: number;
+  mrp: number; // in paise (per pack)
+  purchaseRate: number; // in paise (per pack on input; converted to per-base-unit on batch)
+  saleRate: number; // in paise (per pack)
   unitsPerPack?: number;
   packSize?: string;
   packUnit?: string;
   looseUnit?: string;
 };
 
-export async function processInventoryImport(rows: ImportRow[]) {
+export interface ProcessInventoryImportOptions {
+  qtyMode?: QtyMode;
+  updateExistingPackSizes?: boolean;
+  convertExistingBatches?: boolean;
+}
+
+export async function processInventoryImport(
+  rows: ImportRow[],
+  options: ProcessInventoryImportOptions = {}
+) {
   const ctx = await requirePermission("inventory.adjust");
 
   if (!rows || rows.length === 0) return { error: "No data to import" };
+
+  const qtyMode: QtyMode = options.qtyMode ?? "packs";
+  const updateExistingPackSizes = options.updateExistingPackSizes ?? true;
+  const convertExistingBatches = options.convertExistingBatches ?? false;
 
   try {
     const importCount = await db.transaction(async (tx) => {
@@ -44,12 +64,19 @@ export async function processInventoryImport(rows: ImportRow[]) {
         }
         const cleanSaleRate =
           Number.isFinite(row.saleRate) && row.saleRate > 0 ? Math.round(row.saleRate) : cleanMrp;
-        const cleanQty = Number.isFinite(row.qty) && row.qty >= 0 ? Math.round(row.qty) : 0;
+        const rowUpp =
+          row.unitsPerPack && Number.isFinite(row.unitsPerPack) && row.unitsPerPack > 1
+            ? Math.round(row.unitsPerPack)
+            : 1;
 
         // 1. Resolve or Create Medicine
         let medicineId: string;
+        let effectiveUpp = rowUpp;
         const [existingMed] = await tx
-          .select({ id: schema.medicines.id })
+          .select({
+            id: schema.medicines.id,
+            unitsPerPack: schema.medicines.unitsPerPack,
+          })
           .from(schema.medicines)
           .where(
             and(
@@ -60,6 +87,60 @@ export async function processInventoryImport(rows: ImportRow[]) {
 
         if (existingMed) {
           medicineId = existingMed.id;
+          effectiveUpp = rowUpp > 1 ? rowUpp : Math.max(1, existingMed.unitsPerPack ?? 1);
+
+          if (updateExistingPackSizes && existingMed.unitsPerPack === 1 && rowUpp > 1) {
+            await tx
+              .update(schema.medicines)
+              .set({
+                unitsPerPack: rowUpp,
+                packUnit: row.packUnit || "strip",
+                looseUnit: row.looseUnit || "tablet",
+                ...(row.packSize ? { packSize: row.packSize.trim() } : { packSize: `${rowUpp}'s` }),
+                updatedAt: new Date(),
+              })
+              .where(eq(schema.medicines.id, existingMed.id));
+
+            if (convertExistingBatches) {
+              const priorBatches = await tx
+                .select({
+                  id: schema.batches.id,
+                  qtyOnHand: schema.batches.qtyOnHand,
+                  purchaseRate: schema.batches.purchaseRate,
+                })
+                .from(schema.batches)
+                .where(
+                  and(
+                    eq(schema.batches.tenantId, ctx.tenantId),
+                    eq(schema.batches.storeId, ctx.storeId),
+                    eq(schema.batches.medicineId, existingMed.id)
+                  )
+                );
+
+              for (const pb of priorBatches) {
+                if (pb.qtyOnHand > 0) {
+                  const delta = pb.qtyOnHand * (rowUpp - 1);
+                  const scaledRate = computeBaseUnitCost(pb.purchaseRate, rowUpp);
+                  await recordStockMovement({
+                    tx,
+                    tenantId: ctx.tenantId,
+                    storeId: ctx.storeId,
+                    medicineId: existingMed.id,
+                    batchId: pb.id,
+                    type: "adjustment",
+                    qtyChange: delta,
+                    unitCost: scaledRate,
+                    note: `Converted pack size 1 → ${rowUpp} during CSV import`,
+                    userId: ctx.userId,
+                  });
+                  await tx
+                    .update(schema.batches)
+                    .set({ purchaseRate: scaledRate })
+                    .where(eq(schema.batches.id, pb.id));
+                }
+              }
+            }
+          }
         } else {
           let manufacturerId: string | null = null;
           if (row.manufacturer && row.manufacturer !== "Unknown" && row.manufacturer.trim().length > 0) {
@@ -130,6 +211,14 @@ export async function processInventoryImport(rows: ImportRow[]) {
           medicineId = newMed.id;
         }
 
+        const baseQty = parsePackAndLooseQty(
+          row.rawQtyText ?? row.qty,
+          row.looseQty,
+          effectiveUpp,
+          qtyMode
+        ).baseQty;
+        const basePurchaseRate = computeBaseUnitCost(cleanPurchaseRate, effectiveUpp);
+
         // 2. Resolve or Create Batch (uppercase normalized)
         const cleanBatchNo = (row.batchNo || "DEFAULT").trim().toUpperCase();
         const [existingBatch] = await tx
@@ -157,7 +246,7 @@ export async function processInventoryImport(rows: ImportRow[]) {
               expiryDate: row.expiryDate,
               mfgDate: row.mfgDate || null,
               mrp: cleanMrp,
-              purchaseRate: cleanPurchaseRate,
+              purchaseRate: basePurchaseRate,
               saleRate: cleanSaleRate,
               qtyOnHand: 0,
             })
@@ -165,7 +254,7 @@ export async function processInventoryImport(rows: ImportRow[]) {
           batchId = newBatch.id;
         }
 
-        if (cleanQty > 0) {
+        if (baseQty > 0) {
           await recordStockMovement({
             tx,
             tenantId: ctx.tenantId,
@@ -173,8 +262,8 @@ export async function processInventoryImport(rows: ImportRow[]) {
             medicineId,
             batchId,
             type: "opening",
-            qtyChange: cleanQty,
-            unitCost: cleanPurchaseRate,
+            qtyChange: baseQty,
+            unitCost: basePurchaseRate,
             note: existingBatch ? "Quick CSV Import (added)" : "Quick CSV Import (opening)",
             userId: ctx.userId,
           });
@@ -195,6 +284,7 @@ export async function processInventoryImport(rows: ImportRow[]) {
     revalidatePath("/dashboard/inventory");
     revalidatePath("/dashboard/inventory/batches");
     revalidatePath("/dashboard/inventory", "layout");
+    revalidatePath("/dashboard/sales/pos");
     revalidatePath("/dashboard");
     return { success: true, count: importCount };
   } catch (error: unknown) {

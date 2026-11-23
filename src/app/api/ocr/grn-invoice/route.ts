@@ -12,6 +12,7 @@ import type {
 } from "@/server/domain/import/distributor-invoice";
 import type { PurchaseItemInput } from "@/server/domain/purchases";
 import { DEFAULT_GST_RATE_BP, isValidGstRateBp, type GstRateBp } from "@/lib/regulatory";
+import { parsePackaging, resolveOcrCatalogPackConflict } from "@/lib/packaging";
 
 export const maxDuration = 60;
 
@@ -29,6 +30,10 @@ const GrnOcrSchema = z.object({
       batchNo: z.string().nullable().optional(),
       expiryDate: z.string().nullable().optional(),
       pack: z.string().nullable().optional(),
+      dosageForm: z
+        .enum(["tablet", "capsule", "syrup", "cream", "injection", "drops", "sachet", "other"])
+        .nullable()
+        .optional(),
       unitsPerPack: z.number().int().min(1).default(1),
       billedQty: z.number().int().min(0).default(1),
       freeQty: z.number().int().min(0).default(0),
@@ -100,7 +105,7 @@ Rules:
 - supplierAddress: supplier street/city address if visible.
 - invoiceNo: supplier invoice / bill number if visible.
 - invoiceDate: format as YYYY-MM-DD if visible.
-- For each line item: extract medicine name, batch number (uppercase), expiryDate (YYYY-MM-DD, using last day of month if MM/YY), pack (e.g. "10T"), unitsPerPack (integer), billedQty (packs), freeQty, rateRupees (PTR per pack in INR), mrpRupees (MRP per pack in INR), discountPct, gstPct (0, 5, 12, 18, or 28), hsn, and barcode if printed.`;
+- For each line item: extract medicine name, batch number (uppercase), expiryDate (YYYY-MM-DD, using last day of month if MM/YY), pack (e.g. "10'S", "1x15", "100ML"), dosageForm ("tablet", "capsule", "syrup", "cream", "injection", "drops", "sachet", or "other"), unitsPerPack (integer tablets/capsules per strip e.g. 10 or 15; ALWAYS 1 for syrups, creams, drops, vials, injections), billedQty (packs), freeQty, rateRupees (PTR per pack in INR), mrpRupees (MRP per pack in INR), discountPct, gstPct (0, 5, 12, 18, or 28), hsn, and barcode if printed.`;
 
     const extracted = await runStructuredOcr({
       bytes,
@@ -182,7 +187,16 @@ Rules:
       const mrpPaise = Math.round((it.mrpRupees || 0) * 100);
       const discountPct = Math.max(0, Math.min(100, it.discountPct || 0));
       const discountBp = Math.round(discountPct * 100);
-      const unitsPerPack = matched?.unitsPerPack || it.unitsPerPack || 1;
+      const parsedPack = parsePackaging({
+        packRaw: it.pack || (it.unitsPerPack > 1 ? String(it.unitsPerPack) : ""),
+        medicineName: cleanName,
+        dosageForm: it.dosageForm,
+      });
+      const packResolution = resolveOcrCatalogPackConflict(
+        matched?.unitsPerPack ?? null,
+        parsedPack.unitsPerPack
+      );
+      const unitsPerPack = packResolution.effectiveUpp;
       const totalPacks = billedQty + freeQty;
       const netLine = Math.round(billedQty * ptrPaise * (1 - discountPct / 100));
       const effectiveUnitCostPaise = totalPacks > 0 ? Math.round(netLine / totalPacks) : ptrPaise;

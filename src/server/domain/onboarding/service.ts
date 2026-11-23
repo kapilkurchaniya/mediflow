@@ -2,6 +2,7 @@ import { eq, sql, and } from "drizzle-orm";
 import type { DbOrTx } from "@/server/db";
 import { schema } from "@/server/db";
 import { GST_STATE_CODES } from "@/lib/regulatory";
+import { computeBaseUnitCost } from "@/lib/packaging";
 import {
   type BusinessDetailsInput,
   type StoreProfileInput,
@@ -239,10 +240,11 @@ export async function bootstrapStarterCatalogue(
       })
       .returning({ id: schema.medicines.id });
 
-    // Seed an initial demo batch (10 packs) with 18 months expiry
+    // Seed an initial demo batch (10 packs in canonical base units) with 18 months expiry
     const expiry = new Date();
     expiry.setMonth(expiry.getMonth() + 18);
     const expiryStr = expiry.toISOString().split("T")[0];
+    const upp = Math.max(1, item.packSize || 1);
 
     await db.insert(schema.batches).values({
       tenantId,
@@ -251,9 +253,9 @@ export async function bootstrapStarterCatalogue(
       batchNo: `DEMO-${Math.floor(1000 + Math.random() * 9000)}`,
       expiryDate: expiryStr,
       mrp: item.mrpPaise,
-      purchaseRate: item.purchasePricePaise,
+      purchaseRate: computeBaseUnitCost(item.purchasePricePaise, upp),
       saleRate: item.mrpPaise,
-      qtyOnHand: 10,
+      qtyOnHand: 10 * upp,
     });
 
     count++;

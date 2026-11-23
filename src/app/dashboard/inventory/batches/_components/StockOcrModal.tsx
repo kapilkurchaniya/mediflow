@@ -26,7 +26,14 @@ export interface StockOcrRow {
   status: "update_batch" | "new_batch" | "new_medicine";
   batchNo: string;
   expiryDate: string;
+  packRaw?: string;
+  packUnit?: string;
+  looseUnit?: string;
   unitsPerPack: number;
+  catalogUnitsPerPack?: number | null;
+  packMismatch?: boolean;
+  suggestCatalogUpdate?: boolean;
+  updateCatalogPackSize?: boolean;
   qtyPacks: number;
   qtyLoose: number;
   ptrPaise: number;
@@ -67,8 +74,12 @@ export function StockOcrModal({
         setError(data.error || "Failed to scan stock sheet.");
         setRows([]);
       } else {
-        setRows(data.rows || []);
-        if (!data.rows || data.rows.length === 0) {
+        const scanned: StockOcrRow[] = (data.rows || []).map((r: StockOcrRow) => ({
+          ...r,
+          updateCatalogPackSize: Boolean(r.suggestCatalogUpdate),
+        }));
+        setRows(scanned);
+        if (scanned.length === 0) {
           setError("No medicine stock rows could be extracted from this file.");
         }
       }
@@ -104,6 +115,9 @@ export function StockOcrModal({
           batchNo: r.batchNo,
           expiryDate: r.expiryDate,
           unitsPerPack: r.unitsPerPack,
+          packUnit: r.packUnit || undefined,
+          looseUnit: r.looseUnit || undefined,
+          updateCatalogPackSize: Boolean(r.updateCatalogPackSize),
           baseQty: r.qtyPacks * r.unitsPerPack + r.qtyLoose,
           ptrPaise: r.ptrPaise,
           mrpPaise: r.mrpPaise,
@@ -245,77 +259,128 @@ export function StockOcrModal({
                       <th className="p-2.5">Status</th>
                       <th className="p-2.5">Batch No</th>
                       <th className="p-2.5">Expiry (YYYY-MM-DD)</th>
+                      <th className="p-2.5 text-center">Units/Pack</th>
                       <th className="p-2.5 text-right">Packs</th>
                       <th className="p-2.5 text-right">Loose</th>
+                      <th className="p-2.5 text-right">Total Base</th>
                       <th className="p-2.5 text-right">MRP (₹)</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-ink-100">
-                    {rows.map((r, idx) => (
-                      <tr key={r.rowKey}>
-                        <td className="p-2.5 font-medium text-ink-900">
-                          {r.matchedMedicineName || r.medicineName}
-                          {r.existingBatchId && (
-                            <div className="text-[10.5px] text-ink-500">Current: {r.currentQtyOnHand} units</div>
-                          )}
-                        </td>
-                        <td className="p-2.5">
-                          <span
-                            className={`badge !text-[10px] ${
-                              r.status === "update_batch"
-                                ? "badge-brand"
+                    {rows.map((r, idx) => {
+                      const totalBase = r.qtyPacks * Math.max(1, r.unitsPerPack) + r.qtyLoose;
+                      const showCatalogSyncCheckbox =
+                        Boolean(r.matchedMedicineId) &&
+                        r.catalogUnitsPerPack !== null &&
+                        r.catalogUnitsPerPack !== undefined &&
+                        r.unitsPerPack !== r.catalogUnitsPerPack;
+
+                      return (
+                        <tr key={r.rowKey}>
+                          <td className="p-2.5 font-medium text-ink-900">
+                            <div>{r.matchedMedicineName || r.medicineName}</div>
+                            {r.existingBatchId && (
+                              <div className="text-[10.5px] text-ink-500">Current: {r.currentQtyOnHand} units</div>
+                            )}
+                            {r.packMismatch && r.catalogUnitsPerPack && (
+                              <div className="text-[10.5px] text-amber-700 mt-0.5">
+                                Catalog: {r.catalogUnitsPerPack}/pack → Doc: {r.unitsPerPack}/pack
+                              </div>
+                            )}
+                            {showCatalogSyncCheckbox && (
+                              <label className="mt-1 inline-flex items-center gap-1 text-[10.5px] text-brand-700 cursor-pointer">
+                                <input
+                                  type="checkbox"
+                                  checked={Boolean(r.updateCatalogPackSize)}
+                                  onChange={(e) =>
+                                    updateRow(idx, { updateCatalogPackSize: e.target.checked })
+                                  }
+                                />
+                                <span>Update catalog to {r.unitsPerPack}/pack</span>
+                              </label>
+                            )}
+                          </td>
+                          <td className="p-2.5">
+                            <span
+                              className={`badge !text-[10px] ${
+                                r.status === "update_batch"
+                                  ? "badge-brand"
+                                  : r.status === "new_batch"
+                                  ? "badge-success"
+                                  : "badge-warning"
+                              }`}
+                            >
+                              {r.status === "update_batch"
+                                ? "Update Batch"
                                 : r.status === "new_batch"
-                                ? "badge-success"
-                                : "badge-warning"
-                            }`}
-                          >
-                            {r.status === "update_batch"
-                              ? "Update Batch"
-                              : r.status === "new_batch"
-                              ? "New Batch"
-                              : "New Medicine"}
-                          </span>
-                        </td>
-                        <td className="p-2.5">
-                          <input
-                            type="text"
-                            value={r.batchNo}
-                            onChange={(e) => updateRow(idx, { batchNo: e.target.value.toUpperCase() })}
-                            className="input input-sm !py-1 !px-2 w-28 font-mono"
-                          />
-                        </td>
-                        <td className="p-2.5">
-                          <input
-                            type="text"
-                            value={r.expiryDate}
-                            onChange={(e) => updateRow(idx, { expiryDate: e.target.value })}
-                            placeholder="2027-12-31"
-                            className="input input-sm !py-1 !px-2 w-28 font-mono"
-                          />
-                        </td>
-                        <td className="p-2.5 text-right">
-                          <input
-                            type="number"
-                            min={0}
-                            value={r.qtyPacks}
-                            onChange={(e) => updateRow(idx, { qtyPacks: Math.max(0, parseInt(e.target.value, 10) || 0) })}
-                            className="input input-sm !py-1 !px-2 w-16 text-right font-mono"
-                          />
-                        </td>
-                        <td className="p-2.5 text-right">
-                          <input
-                            type="number"
-                            min={0}
-                            value={r.qtyLoose}
-                            onChange={(e) => updateRow(idx, { qtyLoose: Math.max(0, parseInt(e.target.value, 10) || 0) })}
-                            className="input input-sm !py-1 !px-2 w-16 text-right font-mono"
-                          />
-                        </td>
-                        <td className="p-2.5 text-right font-mono">
-                          ₹{(r.mrpPaise / 100).toFixed(2)}
-                        </td>
-                      </tr>
-                    ))}
+                                ? "New Batch"
+                                : "New Medicine"}
+                            </span>
+                          </td>
+                          <td className="p-2.5">
+                            <input
+                              type="text"
+                              value={r.batchNo}
+                              onChange={(e) => updateRow(idx, { batchNo: e.target.value.toUpperCase() })}
+                              className="input input-sm !py-1 !px-2 w-28 font-mono"
+                            />
+                          </td>
+                          <td className="p-2.5">
+                            <input
+                              type="text"
+                              value={r.expiryDate}
+                              onChange={(e) => updateRow(idx, { expiryDate: e.target.value })}
+                              placeholder="2027-12-31"
+                              className="input input-sm !py-1 !px-2 w-28 font-mono"
+                            />
+                          </td>
+                          <td className="p-2.5 text-center">
+                            <input
+                              type="number"
+                              min={1}
+                              max={1000}
+                              value={r.unitsPerPack}
+                              onChange={(e) =>
+                                updateRow(idx, {
+                                  unitsPerPack: Math.max(1, parseInt(e.target.value, 10) || 1),
+                                })
+                              }
+                              className={`input input-sm !py-1 !px-2 w-16 text-center font-mono ${
+                                r.packMismatch ? "border-amber-400 bg-amber-50" : ""
+                              }`}
+                            />
+                          </td>
+                          <td className="p-2.5 text-right">
+                            <input
+                              type="number"
+                              min={0}
+                              value={r.qtyPacks}
+                              onChange={(e) =>
+                                updateRow(idx, { qtyPacks: Math.max(0, parseInt(e.target.value, 10) || 0) })
+                              }
+                              className="input input-sm !py-1 !px-2 w-16 text-right font-mono"
+                            />
+                          </td>
+                          <td className="p-2.5 text-right">
+                            <input
+                              type="number"
+                              min={0}
+                              value={r.qtyLoose}
+                              onChange={(e) =>
+                                updateRow(idx, { qtyLoose: Math.max(0, parseInt(e.target.value, 10) || 0) })
+                              }
+                              className="input input-sm !py-1 !px-2 w-16 text-right font-mono"
+                            />
+                          </td>
+                          <td className="p-2.5 text-right font-mono font-semibold text-brand-700">
+                            {totalBase} {r.looseUnit || "unit"}s
+                          </td>
+                          <td className="p-2.5 text-right font-mono">
+                            ₹{(r.mrpPaise / 100).toFixed(2)}
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>

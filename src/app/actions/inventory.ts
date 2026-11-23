@@ -1,7 +1,7 @@
 "use server";
 
 import { db, schema } from "@/server/db";
-import { eq, and, desc, ilike, or, sql } from "drizzle-orm";
+import { eq, and, desc, ilike, or, sql, inArray } from "drizzle-orm";
 import { requirePermission, checkPermission, can } from "@/server/rbac";
 import { writeAudit } from "@/server/audit";
 import { recordStockMovement } from "@/server/domain/stock";
@@ -73,9 +73,18 @@ export async function createManufacturer(name: string) {
 
 // --- Medicines ---
 
-export async function getMedicinesCount(searchQuery?: string): Promise<number> {
-  const ctx = await requirePermission("medicine.view");
-  const conditions = [eq(schema.medicines.tenantId, ctx.tenantId)];
+export type MedicinePackFilter = "all" | "single";
+
+function buildMedicineSearchConditions(
+  tenantId: string,
+  searchQuery?: string,
+  packFilter: MedicinePackFilter = "all"
+) {
+  const conditions = [eq(schema.medicines.tenantId, tenantId)];
+
+  if (packFilter === "single") {
+    conditions.push(eq(schema.medicines.unitsPerPack, 1));
+  }
 
   if (searchQuery?.trim()) {
     const q = `%${searchQuery.trim().toLowerCase()}%`;
@@ -87,6 +96,16 @@ export async function getMedicinesCount(searchQuery?: string): Promise<number> {
       )!
     );
   }
+
+  return conditions;
+}
+
+export async function getMedicinesCount(
+  searchQuery?: string,
+  packFilter: MedicinePackFilter = "all"
+): Promise<number> {
+  const ctx = await requirePermission("medicine.view");
+  const conditions = buildMedicineSearchConditions(ctx.tenantId, searchQuery, packFilter);
 
   const [row] = await db
     .select({ count: sql<number>`count(*)::int` })
@@ -96,21 +115,14 @@ export async function getMedicinesCount(searchQuery?: string): Promise<number> {
   return row?.count ?? 0;
 }
 
-export async function getMedicines(searchQuery?: string, limit = 50, offset = 0) {
+export async function getMedicines(
+  searchQuery?: string,
+  limit = 50,
+  offset = 0,
+  packFilter: MedicinePackFilter = "all"
+) {
   const ctx = await requirePermission("medicine.view");
-
-  const conditions = [eq(schema.medicines.tenantId, ctx.tenantId)];
-
-  if (searchQuery?.trim()) {
-    const q = `%${searchQuery.trim().toLowerCase()}%`;
-    conditions.push(
-      or(
-        ilike(schema.medicines.name, q),
-        ilike(schema.medicines.genericName, q),
-        ilike(schema.medicines.barcode, q)
-      )!
-    );
-  }
+  const conditions = buildMedicineSearchConditions(ctx.tenantId, searchQuery, packFilter);
 
   return db
     .select({
@@ -456,5 +468,173 @@ export async function updateMedicine(formData: FormData) {
       return { error: "A medicine with this barcode already exists." };
     }
     return { error: (err instanceof Error ? err.message : String(err)) || "Failed to update medicine" };
+  }
+}
+
+export async function getStoreStockTotalsByMedicine(
+  medicineIds: string[]
+): Promise<Record<string, number>> {
+  const ctx = await requirePermission("medicine.view");
+  if (medicineIds.length === 0) return {};
+
+  const rows = await db
+    .select({
+      medicineId: schema.batches.medicineId,
+      totalQty: sql<number>`COALESCE(SUM(${schema.batches.qtyOnHand}), 0)::int`,
+    })
+    .from(schema.batches)
+    .where(
+      and(
+        eq(schema.batches.tenantId, ctx.tenantId),
+        eq(schema.batches.storeId, ctx.storeId),
+        inArray(schema.batches.medicineId, medicineIds)
+      )
+    )
+    .groupBy(schema.batches.medicineId);
+
+  const map: Record<string, number> = {};
+  for (const r of rows) {
+    map[r.medicineId] = r.totalQty;
+  }
+  return map;
+}
+
+const BulkPackUpdateSchema = z.object({
+  convertExistingBatches: z.boolean().default(false),
+  items: z
+    .array(
+      z.object({
+        medicineId: z.string().uuid(),
+        unitsPerPack: z.number().int().min(1).max(1000),
+        packUnit: z.string().trim().min(1),
+        looseUnit: z.string().trim().min(1),
+        packSize: z.string().trim().optional(),
+      })
+    )
+    .min(1, "Select at least one medicine to update."),
+});
+
+export async function bulkUpdateMedicinePackaging(payload: z.input<typeof BulkPackUpdateSchema>) {
+  const auth = await checkPermission("medicine.manage");
+  if (!auth.ok) return { error: auth.error };
+  const ctx = auth.ctx;
+
+  const parsed = BulkPackUpdateSchema.safeParse(payload);
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message || "Invalid bulk pack update data." };
+  }
+
+  const { items, convertExistingBatches } = parsed.data;
+  if (convertExistingBatches && !can(ctx, "inventory.adjust")) {
+    return { error: "Forbidden: inventory.adjust permission required to convert batch stock." };
+  }
+
+  try {
+    const result = await db.transaction(async (tx) => {
+      let updatedMedicines = 0;
+      let convertedBatches = 0;
+
+      for (const item of items) {
+        const [existing] = await tx
+          .select({
+            id: schema.medicines.id,
+            unitsPerPack: schema.medicines.unitsPerPack,
+            packUnit: schema.medicines.packUnit,
+            looseUnit: schema.medicines.looseUnit,
+          })
+          .from(schema.medicines)
+          .where(
+            and(
+              eq(schema.medicines.id, item.medicineId),
+              eq(schema.medicines.tenantId, ctx.tenantId)
+            )
+          )
+          .limit(1);
+
+        if (!existing) continue;
+
+        const oldUpp = Math.max(1, existing.unitsPerPack);
+        const newUpp = item.unitsPerPack;
+        const cleanPackSize = item.packSize?.trim() || `${newUpp}'s`;
+
+        await tx
+          .update(schema.medicines)
+          .set({
+            unitsPerPack: newUpp,
+            packUnit: item.packUnit,
+            looseUnit: item.looseUnit,
+            packSize: cleanPackSize,
+            updatedAt: new Date(),
+          })
+          .where(eq(schema.medicines.id, existing.id));
+
+        updatedMedicines++;
+
+        if (convertExistingBatches && newUpp !== oldUpp) {
+          const storeBatches = await tx
+            .select()
+            .from(schema.batches)
+            .where(
+              and(
+                eq(schema.batches.tenantId, ctx.tenantId),
+                eq(schema.batches.storeId, ctx.storeId),
+                eq(schema.batches.medicineId, existing.id)
+              )
+            );
+
+          for (const b of storeBatches) {
+            const targetQty = Math.round((b.qtyOnHand * newUpp) / oldUpp);
+            const qtyDelta = targetQty - b.qtyOnHand;
+            const adjustedPtr = Math.round((b.purchaseRate * oldUpp) / newUpp);
+
+            if (qtyDelta !== 0) {
+              await recordStockMovement({
+                tx,
+                tenantId: ctx.tenantId,
+                storeId: ctx.storeId,
+                batchId: b.id,
+                medicineId: existing.id,
+                type: "adjustment",
+                qtyChange: qtyDelta,
+                unitCost: adjustedPtr > 0 ? adjustedPtr : null,
+                refType: "medicine_pack_conversion",
+                note: `Bulk pack conversion: ${oldUpp} → ${newUpp} ${item.looseUnit}s/${item.packUnit}`,
+                userId: ctx.userId,
+              });
+            }
+
+            await tx
+              .update(schema.batches)
+              .set({ purchaseRate: adjustedPtr, updatedAt: new Date() })
+              .where(eq(schema.batches.id, b.id));
+            convertedBatches++;
+          }
+        }
+      }
+
+      await writeAudit(tx, ctx, {
+        action: "update",
+        entityType: "medicine",
+        newValue: {
+          source: "bulk_pack_updater",
+          updatedMedicines,
+          convertedBatches,
+          convertExistingBatches,
+        },
+        reason: "Bulk updated medicine pack sizes",
+      });
+
+      return { updatedMedicines, convertedBatches };
+    });
+
+    revalidatePath("/dashboard/inventory");
+    revalidatePath("/dashboard/inventory/batches");
+    revalidatePath("/dashboard/sales/pos");
+    revalidatePath("/dashboard");
+    return { success: true, ...result };
+  } catch (err: unknown) {
+    return {
+      error: (err instanceof Error ? err.message : String(err)) || "Failed to bulk update pack sizes",
+    };
   }
 }

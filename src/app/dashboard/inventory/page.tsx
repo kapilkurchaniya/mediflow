@@ -1,4 +1,11 @@
-import { getMedicines, getMedicinesCount, getCategories, getManufacturers } from "@/app/actions/inventory";
+import {
+  getMedicines,
+  getMedicinesCount,
+  getCategories,
+  getManufacturers,
+  getStoreStockTotalsByMedicine,
+  type MedicinePackFilter,
+} from "@/app/actions/inventory";
 import { getRacks } from "@/app/actions/racks";
 import { Plus, Pill, Upload, Boxes } from "lucide-react";
 import Link from "next/link";
@@ -7,6 +14,7 @@ import { formatINR, formatNumber } from "@/lib/format";
 import { requirePagePermission, can } from "@/server/rbac";
 import { BranchSettingsButton } from "./_components/BranchSettingsButton";
 import { EditMedicineButton } from "./_components/EditMedicineButton";
+import { BulkPackUpdaterModal } from "./_components/BulkPackUpdaterModal";
 import { Pagination } from "@/app/components/Pagination";
 
 export const metadata = { title: "Item master" };
@@ -14,24 +22,44 @@ export const metadata = { title: "Item master" };
 export default async function InventoryPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; page?: string }>;
+  searchParams: Promise<{ q?: string; page?: string; pack?: string }>;
 }) {
   const ctx = await requirePagePermission("medicine.view");
   const canManage = can(ctx, "medicine.manage");
   const canAdjust = can(ctx, "inventory.adjust");
-  const { q, page: pageStr } = await searchParams;
+  const { q, page: pageStr, pack } = await searchParams;
+  const packFilter: MedicinePackFilter = pack === "single" ? "single" : "all";
   const page = Math.max(1, parseInt(pageStr || "1", 10));
   const PAGE_SIZE = 50;
   const offset = (page - 1) * PAGE_SIZE;
 
-  const [items, totalCount, racks, categories, manufacturers] = await Promise.all([
-    getMedicines(q, PAGE_SIZE, offset),
-    getMedicinesCount(q),
-    getRacks(),
-    canManage ? getCategories() : Promise.resolve([]),
-    canManage ? getManufacturers() : Promise.resolve([]),
-  ]);
+  const [items, totalCount, allItemsCount, singleUnitCount, racks, categories, manufacturers] =
+    await Promise.all([
+      getMedicines(q, PAGE_SIZE, offset, packFilter),
+      getMedicinesCount(q, packFilter),
+      getMedicinesCount(q, "all"),
+      getMedicinesCount(q, "single"),
+      getRacks(),
+      canManage ? getCategories() : Promise.resolve([]),
+      canManage ? getManufacturers() : Promise.resolve([]),
+    ]);
+
+  const stockTotals =
+    canManage && items.length > 0
+      ? await getStoreStockTotalsByMedicine(items.map((i) => i.medicine.id))
+      : {};
   const rxCount = items.filter((i) => i.medicine.rxRequired).length;
+
+  const bulkItems = items.map((i) => ({
+    id: i.medicine.id,
+    name: i.medicine.name,
+    genericName: i.medicine.genericName,
+    unitsPerPack: i.medicine.unitsPerPack,
+    packUnit: i.medicine.packUnit,
+    looseUnit: i.medicine.looseUnit,
+    packSize: i.medicine.packSize,
+    stockUnits: stockTotals[i.medicine.id] ?? 0,
+  }));
 
   return (
     <div className="page space-y-6">
@@ -41,6 +69,9 @@ export default async function InventoryPage({
         actions={
           (canAdjust || canManage) ? (
             <>
+              {canManage && items.length > 0 && (
+                <BulkPackUpdaterModal items={bulkItems} canAdjustStock={canAdjust} />
+              )}
               {canAdjust && (
                 <Link href="/dashboard/import?tab=quick" className="btn btn-secondary">
                   <Upload /> Import
@@ -58,9 +89,32 @@ export default async function InventoryPage({
 
       <div className="card overflow-hidden">
         <SearchForm defaultValue={q || ""} placeholder="Search by name, composition or barcode">
-          <span className="text-[12.5px] text-ink-500 num">
-            {formatNumber(totalCount)} items · {formatNumber(rxCount)} on this page
-          </span>
+          {packFilter === "single" && <input type="hidden" name="pack" value="single" />}
+          <div className="flex flex-wrap items-center gap-2">
+            <Link
+              href={`/dashboard/inventory${q ? `?q=${encodeURIComponent(q)}` : ""}`}
+              className={`px-2.5 py-1 rounded-lg text-xs font-medium border transition-colors ${
+                packFilter === "all"
+                  ? "bg-brand-50 text-brand-700 border-brand-200"
+                  : "bg-white text-ink-600 border-ink-200 hover:bg-ink-50"
+              }`}
+            >
+              All ({formatNumber(allItemsCount)})
+            </Link>
+            <Link
+              href={`/dashboard/inventory?pack=single${q ? `&q=${encodeURIComponent(q)}` : ""}`}
+              className={`px-2.5 py-1 rounded-lg text-xs font-medium border transition-colors ${
+                packFilter === "single"
+                  ? "bg-amber-50 text-amber-800 border-amber-300"
+                  : "bg-white text-ink-600 border-ink-200 hover:bg-ink-50"
+              }`}
+            >
+              Single-unit / Unconfigured Pack ({formatNumber(singleUnitCount)})
+            </Link>
+            <span className="text-[12.5px] text-ink-500 num ml-1">
+              {formatNumber(rxCount)} Rx on page
+            </span>
+          </div>
         </SearchForm>
 
         {items.length > 0 ? (
@@ -102,7 +156,16 @@ export default async function InventoryPage({
                         )}
                       </td>
                       <td className="font-mono text-ink-600 text-xs">
-                        {medicine.packSize || `${medicine.unitsPerPack} / pack`}
+                        {medicine.unitsPerPack === 1 ? (
+                          <span
+                            className="inline-flex items-center gap-1 text-amber-700 bg-amber-50 border border-amber-200 rounded px-1.5 py-0.5"
+                            data-tooltip="Units / Pack is 1 — click Edit or Bulk Set Pack Sizes to enable loose tablet selling"
+                          >
+                            1 / {medicine.packUnit}
+                          </span>
+                        ) : (
+                          medicine.packSize || `${medicine.unitsPerPack} ${medicine.looseUnit}s / ${medicine.packUnit}`
+                        )}
                       </td>
                       <td>
                         <span className="font-mono text-xs">{medicine.hsn || "—"}</span>
@@ -157,7 +220,7 @@ export default async function InventoryPage({
               pageSize={PAGE_SIZE}
               totalCount={totalCount}
               basePath="/dashboard/inventory"
-              queryParams={{ q }}
+              queryParams={{ q, ...(packFilter === "single" ? { pack: "single" } : {}) }}
               itemLabel="medicines"
             />
           </>
