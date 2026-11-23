@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { createPortal } from "react-dom";
 import { Edit2, X, Check, Loader2, AlertCircle, Info } from "lucide-react";
 import { updateMedicine } from "@/app/actions/inventory";
 import { useRouter } from "next/navigation";
@@ -153,9 +154,16 @@ export function EditMedicineButton({
         <Edit2 className="w-4 h-4" />
       </button>
 
-      {isOpen && (
-        <div className="fixed inset-0 z-50 flex justify-end bg-black/50 backdrop-blur-xs animate-in fade-in duration-150">
-          <div className="bg-white w-full max-w-xl h-full flex flex-col shadow-2xl border-l border-ink-200 text-left">
+      {isOpen &&
+        typeof document !== "undefined" &&
+        createPortal(
+          <div
+            className="fixed inset-0 z-[60] flex justify-end bg-black/50 backdrop-blur-xs animate-in fade-in duration-150"
+            onClick={(e) => {
+              if (e.target === e.currentTarget && !isSubmitting) setIsOpen(false);
+            }}
+          >
+            <div className="bg-white w-full max-w-xl h-full flex flex-col shadow-2xl border-l border-ink-200 text-left">
             <div className="flex items-center justify-between border-b border-ink-150 px-5 py-4 shrink-0">
               <div>
                 <h3 className="text-base font-bold text-ink-900">Edit Medicine</h3>
@@ -480,8 +488,9 @@ export function EditMedicineButton({
               </div>
             </form>
           </div>
-        </div>
-      )}
+        </div>,
+          document.body
+        )}
     </>
   );
 }
