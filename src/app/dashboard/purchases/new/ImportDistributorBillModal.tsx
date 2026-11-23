@@ -251,6 +251,30 @@ export function ImportDistributorBillModal({
       }
     : null;
 
+  const handleUnitsPerPackChange = (idx: number, nextUppRaw: number) => {
+    if (!parseResult) return;
+    const nextUpp = Math.max(1, Math.min(1000, Math.round(nextUppRaw || 1)));
+    const updatedItems = parseResult.items.map((it, i) =>
+      i === idx ? { ...it, unitsPerPack: nextUpp } : it
+    );
+    const updatedPurchaseItems = parseResult.purchaseItems.map((pi) => {
+      const target = updatedItems[idx];
+      if (
+        target?.matchedMedicineId &&
+        pi.medicineId === target.matchedMedicineId &&
+        pi.batchNo === target.batchNo
+      ) {
+        return { ...pi, unitsPerPack: nextUpp };
+      }
+      return pi;
+    });
+    setParseResult({
+      ...parseResult,
+      items: updatedItems,
+      purchaseItems: updatedPurchaseItems,
+    });
+  };
+
   const finalizeImport = (pendingMeta: PendingSupplierMeta | null) => {
     if (!parseResult || parseResult.purchaseItems.length === 0) return;
     if (ocrHeader && onFillHeader) {
@@ -589,6 +613,7 @@ export function ImportDistributorBillModal({
                         <th className="py-2.5 px-3">Product Name</th>
                         <th className="py-2.5 px-3">Catalog Match</th>
                         <th className="py-2.5 px-3">Batch & Exp</th>
+                        <th className="py-2.5 px-3 text-center">Units/Pack</th>
                         <th className="py-2.5 px-3 text-right">Billed + Free</th>
                         <th className="py-2.5 px-3 text-right">PTR (₹)</th>
                         <th className="py-2.5 px-3 text-right">Disc %</th>
@@ -633,6 +658,18 @@ export function ImportDistributorBillModal({
                           <td className="py-2 px-3 font-mono">
                             <div>{item.batchNo}</div>
                             <div className="text-[11px] text-muted-foreground">{item.expiryDate}</div>
+                          </td>
+                          <td className="py-2 px-3 text-center">
+                            <input
+                              type="number"
+                              min={1}
+                              max={1000}
+                              value={item.unitsPerPack}
+                              onChange={(e) =>
+                                handleUnitsPerPackChange(idx, parseInt(e.target.value, 10) || 1)
+                              }
+                              className="input input-sm !h-7 !py-0.5 !px-1.5 w-14 text-center font-mono text-xs"
+                            />
                           </td>
                           <td className="py-2 px-3 text-right font-mono">
                             <span className="font-semibold text-foreground">{item.billedQty}</span>
