@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { usePathname } from "next/navigation";
-import { Mic, Square, X, Send, AlertCircle, RotateCcw, Loader2, ArrowLeft } from "lucide-react";
+import { Mic, Square, X, Send, AlertCircle, RotateCcw, Loader2, ArrowLeft, GripVertical } from "lucide-react";
 import clsx from "clsx";
 import { useChat } from "@ai-sdk/react";
 import { isToolUIPart, getToolName, type UIMessage } from "ai";
@@ -70,6 +70,97 @@ export function AIAssistant() {
   const scrollRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<ISpeechRecognition | null>(null);
   const dispatchedToolIdsRef = useRef<Set<string>>(new Set());
+  const triggerBtnRef = useRef<HTMLButtonElement>(null);
+  const dragStateRef = useRef<{
+    pointerId: number;
+    startX: number;
+    startY: number;
+    origLeft: number;
+    origTop: number;
+    moved: boolean;
+  } | null>(null);
+  const suppressNextClickRef = useRef(false);
+  const [btnPos, setBtnPos] = useState<{ left: number; top: number } | null>(() => {
+    if (typeof window === "undefined") return null;
+    try {
+      const raw = localStorage.getItem("mediflow_ai_trigger_pos");
+      if (!raw) return null;
+      const parsed = JSON.parse(raw) as { left?: unknown; top?: unknown };
+      if (typeof parsed.left === "number" && typeof parsed.top === "number") {
+        return { left: parsed.left, top: parsed.top };
+      }
+    } catch {
+      // ignore invalid saved position
+    }
+    return null;
+  });
+
+  const clampBtnPos = useCallback((left: number, top: number) => {
+    const pad = 8;
+    const width = triggerBtnRef.current?.offsetWidth || 180;
+    const height = triggerBtnRef.current?.offsetHeight || 40;
+    const maxLeft = Math.max(pad, window.innerWidth - width - pad);
+    const maxTop = Math.max(pad, window.innerHeight - height - pad);
+    return {
+      left: Math.min(Math.max(pad, left), maxLeft),
+      top: Math.min(Math.max(pad, top), maxTop),
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!btnPos) return;
+    const onResize = () => {
+      setBtnPos((prev) => (prev ? clampBtnPos(prev.left, prev.top) : prev));
+    };
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, [btnPos, clampBtnPos]);
+
+  const handleTriggerPointerDown = (e: React.PointerEvent<HTMLButtonElement>) => {
+    if (e.button !== 0 || isOpen) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    dragStateRef.current = {
+      pointerId: e.pointerId,
+      startX: e.clientX,
+      startY: e.clientY,
+      origLeft: rect.left,
+      origTop: rect.top,
+      moved: false,
+    };
+    e.currentTarget.setPointerCapture(e.pointerId);
+  };
+
+  const handleTriggerPointerMove = (e: React.PointerEvent<HTMLButtonElement>) => {
+    const d = dragStateRef.current;
+    if (!d || d.pointerId !== e.pointerId) return;
+    const dx = e.clientX - d.startX;
+    const dy = e.clientY - d.startY;
+    if (!d.moved && Math.hypot(dx, dy) < 5) return;
+    d.moved = true;
+    const next = clampBtnPos(d.origLeft + dx, d.origTop + dy);
+    setBtnPos(next);
+  };
+
+  const handleTriggerPointerUp = (e: React.PointerEvent<HTMLButtonElement>) => {
+    const d = dragStateRef.current;
+    if (!d || d.pointerId !== e.pointerId) return;
+    if (e.currentTarget.hasPointerCapture(e.pointerId)) {
+      e.currentTarget.releasePointerCapture(e.pointerId);
+    }
+    if (d.moved) {
+      suppressNextClickRef.current = true;
+      const dx = e.clientX - d.startX;
+      const dy = e.clientY - d.startY;
+      const finalPos = clampBtnPos(d.origLeft + dx, d.origTop + dy);
+      setBtnPos(finalPos);
+      try {
+        localStorage.setItem("mediflow_ai_trigger_pos", JSON.stringify(finalPos));
+      } catch {
+        // ignore storage quota errors
+      }
+    }
+    dragStateRef.current = null;
+  };
 
   const { messages, setMessages, sendMessage, status, error, stop, regenerate, clearError } = useChat({});
   const isLoading = status === "submitted" || status === "streaming";
@@ -162,20 +253,36 @@ export function AIAssistant() {
 
   return (
     <>
-      {/* Floating Trigger Button */}
+      {/* Floating Trigger Button (draggable) */}
       <button
-        onClick={() => setIsOpen((o) => !o)}
+        ref={triggerBtnRef}
+        type="button"
+        onPointerDown={handleTriggerPointerDown}
+        onPointerMove={handleTriggerPointerMove}
+        onPointerUp={handleTriggerPointerUp}
+        onPointerCancel={handleTriggerPointerUp}
+        onClick={() => {
+          if (suppressNextClickRef.current) {
+            suppressNextClickRef.current = false;
+            return;
+          }
+          setIsOpen((o) => !o);
+        }}
+        style={btnPos ? { left: `${btnPos.left}px`, top: `${btnPos.top}px` } : undefined}
         aria-expanded={isOpen}
-        aria-label="Open assistant"
+        aria-label="Open assistant (drag to move)"
+        title="Click to open Ask MediFlow, or drag to move"
         className={clsx(
-          "fixed z-40 flex h-10 items-center gap-2 rounded-full bg-ink-900 pl-3 pr-3.5 text-[13px] font-medium text-white print:hidden",
-          isPosTerminal
-            ? "bottom-20 right-4 lg:bottom-4 lg:left-4 lg:right-auto"
-            : "bottom-4 right-4 sm:bottom-5 sm:right-5",
-          "shadow-[0_8px_24px_-6px_rgb(0_0_0_/_0.35)] ring-1 ring-white/10 transition-all duration-200 hover:bg-ink-800",
+          "fixed z-40 flex h-10 items-center gap-2 rounded-full bg-ink-900 pl-2 pr-3.5 text-[13px] font-medium text-white print:hidden select-none touch-none cursor-grab active:cursor-grabbing",
+          !btnPos &&
+            (isPosTerminal
+              ? "bottom-20 right-4 lg:bottom-4 lg:left-4 lg:right-auto"
+              : "bottom-4 right-4 sm:bottom-5 sm:right-5"),
+          "shadow-[0_8px_24px_-6px_rgb(0_0_0_/_0.35)] ring-1 ring-white/10 transition-colors duration-200 hover:bg-ink-800",
           isOpen && "pointer-events-none translate-y-2 opacity-0"
         )}
       >
+        <GripVertical className="h-3.5 w-3.5 text-white/40 shrink-0" />
         <span className="relative flex h-2 w-2">
           <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-brand-400 opacity-60" />
           <span className="relative inline-flex h-2 w-2 rounded-full bg-brand-400" />
