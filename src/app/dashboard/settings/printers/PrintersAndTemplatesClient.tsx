@@ -118,7 +118,8 @@ const DEFAULT_THERMAL_HTML = `<style>
     <span>GSTIN: {{store.gstin}} | DL: {{store.drugLicenseNo}}</span>
   </div>
   <div class="line"></div>
-  <div>Inv: {{sale.invoiceNo}} &nbsp; {{sale.invoiceDate}}</div>
+  <div>Inv: <strong>{{sale.invoiceNo}}</strong></div>
+  <div>Date: {{sale.invoiceDate}}</div>
   <div>Cust: {{sale.customerName}}</div>
   <div class="line"></div>
   <table>
@@ -171,6 +172,24 @@ export function PrintersAndTemplatesClient({
 
   const ocrInputRef = useRef<HTMLInputElement>(null);
   const htmlUploadRef = useRef<HTMLInputElement>(null);
+  const editorTextareaRef = useRef<HTMLTextAreaElement>(null);
+
+  const insertPlaceholderAtCursor = (ph: string) => {
+    const el = editorTextareaRef.current;
+    if (!el) {
+      setHtmlContent((prev) => `${prev}\n${ph}`);
+      return;
+    }
+    const start = el.selectionStart ?? htmlContent.length;
+    const end = el.selectionEnd ?? htmlContent.length;
+    const next = htmlContent.slice(0, start) + ph + htmlContent.slice(end);
+    setHtmlContent(next);
+    requestAnimationFrame(() => {
+      el.focus();
+      const pos = start + ph.length;
+      el.setSelectionRange(pos, pos);
+    });
+  };
 
   const filteredTemplates = useMemo(
     () => templates.filter((t) => t.storeId === selectedStoreId && t.format === templateFormat),
@@ -331,11 +350,20 @@ export function PrintersAndTemplatesClient({
 
   return (
     <div className="page space-y-6">
+      <style
+        dangerouslySetInnerHTML={{
+          __html:
+            templateFormat === "thermal_80mm"
+              ? `@media print { @page { size: 80mm auto; margin: 2mm 3mm; } #invoice-printable { max-height: none !important; overflow: visible !important; padding: 0 !important; } }`
+              : `@media print { @page { size: A4 portrait; margin: 8mm; } #invoice-printable { max-height: none !important; overflow: visible !important; padding: 0 !important; } }`,
+        }}
+      />
       <div className="print:hidden space-y-4">
         <PageHeader
           eyebrow="Hardware & Receipt Design"
           title="Billing Templates & Printer Settings"
           description="Create custom HTML billing templates (manually or by scanning a physical bill photo via OCR) and configure branch printer defaults."
+          backHref="/dashboard/settings"
         />
 
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-ink-150 pb-3">
@@ -578,13 +606,19 @@ export function PrintersAndTemplatesClient({
             {/* HTML Editor */}
             <div className="card p-4 space-y-3 print:hidden">
               <div className="flex items-center justify-between gap-2">
-                <h3 className="text-sm font-semibold text-ink-900 flex items-center gap-1.5">
-                  <Code2 className="h-4 w-4 text-brand-600" /> HTML Template Editor
+                <h3 className="text-sm font-semibold text-ink-900 flex items-center gap-1.5 min-w-0">
+                  <Code2 className="h-4 w-4 text-brand-600 shrink-0" />
+                  <span>HTML Template Editor</span>
+                  {editingId && (
+                    <span className="badge badge-info !text-[10px] truncate max-w-[160px]">
+                      Editing
+                    </span>
+                  )}
                 </h3>
                 <button
                   type="button"
                   onClick={() => window.print()}
-                  className="btn btn-secondary btn-xs inline-flex items-center gap-1"
+                  className="btn btn-secondary btn-xs inline-flex items-center gap-1 shrink-0"
                 >
                   <Printer className="h-3 w-3" /> Test Print
                 </button>
@@ -606,6 +640,7 @@ export function PrintersAndTemplatesClient({
                   HTML &amp; Scoped CSS
                 </label>
                 <textarea
+                  ref={editorTextareaRef}
                   rows={16}
                   value={htmlContent}
                   onChange={(e) => setHtmlContent(e.target.value)}
@@ -616,14 +651,14 @@ export function PrintersAndTemplatesClient({
 
               <div className="space-y-1.5">
                 <div className="text-[11px] font-semibold text-ink-500">
-                  Available Placeholders (click to append):
+                  Available Placeholders (click to insert at cursor):
                 </div>
                 <div className="flex flex-wrap gap-1 max-h-24 overflow-y-auto">
                   {BILLING_TEMPLATE_PLACEHOLDERS.slice(0, -1).map((ph) => (
                     <button
                       key={ph}
                       type="button"
-                      onClick={() => setHtmlContent((prev) => `${prev}\n${ph}`)}
+                      onClick={() => insertPlaceholderAtCursor(ph)}
                       className="rounded bg-ink-100 hover:bg-brand-50 px-1.5 py-0.5 font-mono text-[10px] text-ink-700"
                     >
                       {ph}
