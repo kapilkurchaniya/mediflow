@@ -267,6 +267,13 @@
       "when": 1795166386727,
       "tag": "0037_add_billing_templates",
       "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "7",
+      "when": 1795255245934,
+      "tag": "0038_pending_supplier_meta",
+      "breakpoints": true
     }
   ]
 }

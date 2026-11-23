@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, Suspense } from "react";
 import { createSupplier } from "@/app/actions/suppliers";
 import { AlertCircle, Check } from "lucide-react";
 import Link from "next/link";
@@ -16,10 +16,16 @@ function getSafeReturnTo(raw: string | null): string {
   return trimmed;
 }
 
-export default function NewSupplierPage() {
+function NewSupplierForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const returnTo = getSafeReturnTo(searchParams.get("returnTo"));
+  const prefillName = searchParams.get("name") || "";
+  const prefillPhone = searchParams.get("phone") || "";
+  const prefillGstin = searchParams.get("gstin") || "";
+  const prefillDrugLicense = searchParams.get("drugLicenseNo") || "";
+  const prefillAddress = searchParams.get("address") || "";
+  const linkPurchaseId = searchParams.get("linkPurchaseId") || "";
 
   const [state, formAction, isPending] = useActionState(async (_prevState: { error?: string; success?: boolean } | null, formData: FormData) => {
     const res = await createSupplier(formData);
@@ -39,6 +45,7 @@ export default function NewSupplierPage() {
       <PageHeader backHref={returnTo} title="New supplier" description="Add a distributor or stockist you purchase from." />
 
       <form action={formAction} className="card">
+        {linkPurchaseId && <input type="hidden" name="linkPurchaseId" value={linkPurchaseId} />}
         <div className="card-body !p-6 lg:!p-8">
           {state?.error && (
             <div className="alert-error mb-6">
@@ -49,25 +56,25 @@ export default function NewSupplierPage() {
 
           <FormSection title="Basic information" description="Trade name and primary contact.">
             <Field label="Supplier / agency name" required className="sm:col-span-2" htmlFor="name">
-              <input id="name" name="name" required className="input" placeholder="M/s Pharma Distributors" autoFocus />
+              <input id="name" name="name" defaultValue={prefillName} required className="input" placeholder="M/s Pharma Distributors" autoFocus />
             </Field>
             <Field label="Contact person" htmlFor="contactPerson">
               <input id="contactPerson" name="contactPerson" className="input" placeholder="Mr. Suresh" />
             </Field>
             <Field label="Phone" htmlFor="phone">
-              <input id="phone" type="tel" name="phone" className="input num" placeholder="98765 43210" />
+              <input id="phone" type="tel" name="phone" defaultValue={prefillPhone} className="input num" placeholder="98765 43210" />
             </Field>
           </FormSection>
 
           <FormSection title="Statutory" description="Needed for GST input credit and Drug Controller compliance.">
             <Field label="GSTIN" htmlFor="gstin">
-              <input id="gstin" name="gstin" className="input font-mono uppercase" placeholder="22AAAAA0000A1Z5" />
+              <input id="gstin" name="gstin" defaultValue={prefillGstin} className="input font-mono uppercase" placeholder="22AAAAA0000A1Z5" />
             </Field>
             <Field label="Drug licence no." htmlFor="drugLicenseNo">
-              <input id="drugLicenseNo" name="drugLicenseNo" className="input font-mono uppercase" placeholder="MH-MZ-123456" />
+              <input id="drugLicenseNo" name="drugLicenseNo" defaultValue={prefillDrugLicense} className="input font-mono uppercase" placeholder="MH-MZ-123456" />
             </Field>
             <Field label="Address" className="sm:col-span-2" htmlFor="address">
-              <textarea id="address" name="address" rows={2} className="input" placeholder="Shop no., wholesale market, city" />
+              <textarea id="address" name="address" rows={2} defaultValue={prefillAddress} className="input" placeholder="Shop no., wholesale market, city" />
             </Field>
           </FormSection>
 
@@ -85,7 +92,7 @@ export default function NewSupplierPage() {
         </div>
 
         <div className="flex items-center justify-end gap-2 rounded-b-xl border-t border-ink-150 bg-ink-50/60 px-6 py-3.5">
-          <Link href="/dashboard/suppliers" className="btn btn-ghost">
+          <Link href={returnTo} className="btn btn-ghost">
             Cancel
           </Link>
           <button type="submit" disabled={isPending} className="btn btn-primary">
@@ -94,5 +101,13 @@ export default function NewSupplierPage() {
         </div>
       </form>
     </div>
+  );
+}
+
+export default function NewSupplierPage() {
+  return (
+    <Suspense fallback={<div className="page p-8 text-center text-xs text-ink-500">Loading supplier form...</div>}>
+      <NewSupplierForm />
+    </Suspense>
   );
 }

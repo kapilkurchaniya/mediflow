@@ -1,9 +1,14 @@
 import { cache } from "react";
 import { cookies } from "next/headers";
 import { db, schema, type DbOrTx } from "./db";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
+import {
+  getPreloadedMembershipRows,
+  setPreloadedMembershipRows,
+  type PreloadedMembershipRow,
+} from "./auth-preload";
 
 const SESSION_COOKIE_NAME = "mediflow_session";
 const SESSION_MAX_AGE_DAYS = 30;
@@ -52,25 +57,44 @@ export async function validateSessionToken(token: string) {
   const sessionId = hashSessionToken(token);
 
   try {
-    const result = await db
+    const rows = await db
       .select({
         session: schema.sessions,
         user: schema.users,
+        membership: schema.memberships,
+        permission: schema.rolePermissions.permission,
       })
       .from(schema.sessions)
       .innerJoin(schema.users, eq(schema.sessions.userId, schema.users.id))
-      .where(eq(schema.sessions.id, sessionId))
-      .limit(1);
+      .leftJoin(
+        schema.memberships,
+        and(
+          eq(schema.memberships.tenantId, schema.sessions.tenantId),
+          eq(schema.memberships.userId, schema.sessions.userId),
+        ),
+      )
+      .leftJoin(schema.rolePermissions, eq(schema.rolePermissions.roleId, schema.memberships.roleId))
+      .where(eq(schema.sessions.id, sessionId));
 
-    if (result.length === 0) {
+    if (rows.length === 0) {
       return { session: null, user: null };
     }
 
-    const { session, user } = result[0];
+    const { session, user } = rows[0];
 
     if (Date.now() >= session.expiresAt.getTime()) {
       await db.delete(schema.sessions).where(eq(schema.sessions.id, session.id));
       return { session: null, user: null };
+    }
+
+    if (session.tenantId) {
+      const membershipRows: PreloadedMembershipRow[] = [];
+      for (const r of rows) {
+        if (r.membership) {
+          membershipRows.push({ membership: r.membership, permission: r.permission });
+        }
+      }
+      setPreloadedMembershipRows(session, membershipRows);
     }
 
     // Extend session if less than 15 days left (non-blocking via next/server after)
@@ -144,12 +168,17 @@ export async function requireAuth() {
     redirect("/login");
     throw new Error("Unauthorized");
   }
+  const wrappedSession = {
+    ...session,
+    tenantId: session.tenantId,
+    storeId: session.storeId,
+  };
+  const preloaded = getPreloadedMembershipRows(session);
+  if (preloaded) {
+    setPreloadedMembershipRows(wrappedSession, preloaded);
+  }
   return {
-    session: {
-      ...session,
-      tenantId: session.tenantId,
-      storeId: session.storeId,
-    },
+    session: wrappedSession,
     user,
   };
 }

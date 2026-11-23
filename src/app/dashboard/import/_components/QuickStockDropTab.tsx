@@ -1,259 +1,42 @@
 "use client";
 
 import { useState } from "react";
-import Papa from "papaparse";
 import { AlertCircle, CheckCircle2, Package, ArrowRight, Loader2 } from "lucide-react";
 import { processInventoryImport, ImportRow } from "@/app/actions/inventory-import";
 import { enrichMedicineDetails } from "@/app/actions/ai-enrichment";
 import { useRouter } from "next/navigation";
 import { CsvDropzone } from "./CsvDropzone";
 import { StockOcrButton } from "@/app/dashboard/inventory/batches/_components/StockOcrButton";
-
-type ParsedRow = {
-  raw: Record<string, string>;
-  mapped: Partial<ImportRow>;
-  errors: string[];
-  warnings: string[];
-};
-
-function parsePaiseFromText(raw: unknown): number {
-  if (raw === null || raw === undefined) return 0;
-  if (typeof raw === "number") {
-    return Number.isFinite(raw) && raw >= 0 ? Math.round(raw * 100) : 0;
-  }
-  const str = String(raw).trim();
-  if (!str) return 0;
-  const cleaned = str
-    .replace(/[₹$€£\s]/g, "")
-    .replace(/Rs\.?/gi, "")
-    .replace(/\/-\s*$/, "")
-    .replace(/,/g, "");
-  const num = parseFloat(cleaned);
-  return Number.isFinite(num) && num >= 0 ? Math.round(num * 100) : 0;
-}
-
-function parseQtyFromText(raw: unknown): number {
-  if (raw === null || raw === undefined) return 0;
-  if (typeof raw === "number") {
-    return Number.isFinite(raw) && raw >= 0 ? Math.round(raw) : 0;
-  }
-  const str = String(raw).trim().replace(/,/g, "");
-  const num = parseInt(str, 10);
-  return Number.isFinite(num) && num >= 0 ? num : 0;
-}
-
-function parseDate(dateStr: string): string {
-  try {
-    if (!dateStr) return "";
-    let s = dateStr.trim();
-    s = s.replace(/^(exp(iry)?\.?|d\.?o\.?e\.?|val(idity)?\.?)\s*[:.-]?\s*/i, "").trim();
-
-    const MONTH_MAP: Record<string, number> = {
-      jan: 1, feb: 2, mar: 3, apr: 4, may: 5, jun: 6,
-      jul: 7, aug: 8, sep: 9, oct: 10, nov: 11, dec: 12,
-    };
-
-    const monthNameMatch = s.match(/(?:(\d{1,2})[-/.\s]+)?([a-zA-Z]{3,9})[-/.\s]+(\d{2,4})/);
-    if (monthNameMatch) {
-      const dStr = monthNameMatch[1];
-      const mStr = monthNameMatch[2].slice(0, 3).toLowerCase();
-      let y = parseInt(monthNameMatch[3], 10);
-      if (y < 100) y += 2000;
-      const m = MONTH_MAP[mStr];
-      if (m) {
-        let d = dStr ? parseInt(dStr, 10) : new Date(y, m, 0).getDate();
-        if (d > 31) d = new Date(y, m, 0).getDate();
-        return `${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
-      }
-    }
-
-    const dmy = s.match(/^(\d{1,2})[-/.](\d{1,2})[-/.](\d{4})$/);
-    if (dmy) {
-      const d = parseInt(dmy[1], 10);
-      const m = parseInt(dmy[2], 10);
-      const y = parseInt(dmy[3], 10);
-      if (m >= 1 && m <= 12 && d >= 1 && d <= 31) {
-        return `${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
-      }
-    }
-
-    const dmyShort = s.match(/^(\d{1,2})[-/.](\d{1,2})[-/.](\d{2})$/);
-    if (dmyShort) {
-      const d = parseInt(dmyShort[1], 10);
-      const m = parseInt(dmyShort[2], 10);
-      const y = parseInt(dmyShort[3], 10) + 2000;
-      if (m >= 1 && m <= 12 && d >= 1 && d <= 31) {
-        return `${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
-      }
-    }
-
-    const iso = s.match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})$/);
-    if (iso) {
-      const y = parseInt(iso[1], 10);
-      const m = parseInt(iso[2], 10);
-      const d = parseInt(iso[3], 10);
-      if (m >= 1 && m <= 12 && d >= 1 && d <= 31) {
-        return `${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
-      }
-    }
-
-    const ym = s.match(/^(\d{4})[-/.](\d{1,2})$/);
-    if (ym) {
-      const y = parseInt(ym[1], 10);
-      const m = parseInt(ym[2], 10);
-      if (m >= 1 && m <= 12) {
-        const lastDay = new Date(y, m, 0).getDate();
-        return `${y}-${String(m).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
-      }
-    }
-
-    const my = s.match(/^(\d{1,2})[-/.](\d{2}|\d{4})$/);
-    if (my) {
-      let month = parseInt(my[1], 10);
-      let year = parseInt(my[2], 10);
-      if (month > 12 && year <= 12) {
-        const tmp = month;
-        month = year;
-        year = tmp;
-      }
-      if (year < 100) year += 2000;
-      if (month >= 1 && month <= 12) {
-        const lastDay = new Date(year, month, 0).getDate();
-        return `${year}-${String(month).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
-      }
-    }
-
-    const d = new Date(s);
-    if (!isNaN(d.getTime())) return d.toISOString().split("T")[0];
-  } catch {
-    // ignore parse failure
-  }
-  return "";
-}
-
-function mapAndValidateRow(row: Record<string, string>): ParsedRow {
-  const errors: string[] = [];
-  const warnings: string[] = [];
-
-  const getVal = (keys: string[]) => {
-    const rowKeys = Object.keys(row);
-    for (const k of rowKeys) {
-      const cleanK = k.trim().toLowerCase();
-      if (keys.some((key) => cleanK === key)) return row[k] ?? "";
-    }
-    for (const k of rowKeys) {
-      const cleanK = k.trim().toLowerCase();
-      if (keys.some((key) => cleanK.includes(key))) return row[k] ?? "";
-    }
-    return "";
-  };
-
-  const name = getVal(["medicine", "item", "product", "drug", "name", "desc", "item name", "item_name"]).trim();
-  const batch = getVal(["batch", "lot", "b.no", "batchno", "batch_no", "batch no"]).trim();
-  const exp = getVal(["exp", "expiry", "exp date", "exp_date", "expiry date", "exp.date"]).trim();
-  const mfg = getVal(["mfg", "manufacturer", "company", "brand", "mfg by"]).trim();
-  const cat = getVal(["category", "group", "type", "schedule"]).trim();
-  const rawPack = getVal(["units_per_pack", "units per pack", "unitsperpack", "pack_size", "pack size", "packing", "strip size"]).trim();
-
-  let parsedUpp = 1;
-  if (rawPack) {
-    const xMatch = rawPack.match(/^\d+\s*[xX*]\s*(\d+)/);
-    const numMatch = rawPack.match(/(\d+)/);
-    const candidate = xMatch ? parseInt(xMatch[1], 10) : numMatch ? parseInt(numMatch[1], 10) : 1;
-    if (Number.isFinite(candidate) && candidate > 1 && candidate <= 1000) {
-      parsedUpp = candidate;
-    }
-  }
-
-  const rawQty = getVal(["qty", "quantity", "stock", "closing", "cl qty", "balance", "total qty"]);
-  const rawMrp = getVal(["mrp", "retail", "sale rate", "salerate", "s.rate", "sale price"]);
-  const rawPRate = getVal([
-    "ptr", "p.t.r", "purchase rate", "purchase_rate", "purchase price",
-    "purchaseprice", "purchaserate", "pur rate", "pur.rate", "pur_rate",
-    "p.rate", "prate", "p_rate", "cost price", "cost_price", "cost",
-    "unit cost", "buy rate", "buy price", "buying price", "landing cost",
-    "landing", "basic rate", "rate",
-  ]);
-
-  const qty = parseQtyFromText(rawQty);
-  const mrp = parsePaiseFromText(rawMrp);
-  let pRate = parsePaiseFromText(rawPRate);
-  if (pRate === 0 && mrp > 0) {
-    pRate = Math.round(mrp * 0.8);
-    warnings.push("PTR estimated at 80% MRP");
-  }
-  const saleRate = mrp > 0 ? mrp : pRate > 0 ? Math.round(pRate * 1.25) : 0;
-
-  if (!name) errors.push("Missing Medicine Name");
-  if (!batch) errors.push("Missing Batch Number");
-
-  let formattedExp = "";
-  if (!exp) {
-    errors.push("Missing Expiry Date");
-  } else {
-    formattedExp = parseDate(exp);
-    if (!formattedExp) errors.push(`Invalid Expiry Format: ${exp}`);
-  }
-
-  if (qty === 0) warnings.push("Quantity is 0");
-  if (mrp === 0) warnings.push("MRP is 0");
-
-  return {
-    raw: row,
-    errors,
-    warnings,
-    mapped: {
-      medicineName: name,
-      ...(parsedUpp > 1 ? { unitsPerPack: parsedUpp } : {}),
-      ...(rawPack ? { packSize: rawPack } : {}),
-      manufacturer: mfg || undefined,
-      category: cat || undefined,
-      batchNo: batch,
-      expiryDate: formattedExp,
-      qty,
-      mrp,
-      purchaseRate: pRate,
-      saleRate,
-    },
-  };
-}
+import { validateAndParseStockCsvFile, type ParsedStockRow } from "@/lib/stock-csv-validator";
 
 export function QuickStockDropTab() {
   const router = useRouter();
   const [isParsing, setIsParsing] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
-  const [parsedData, setParsedData] = useState<ParsedRow[]>([]);
+  const [parsedData, setParsedData] = useState<ParsedStockRow[]>([]);
   const [fileName, setFileName] = useState<string | null>(null);
   const [globalError, setGlobalError] = useState("");
   const [isEnriching, setIsEnriching] = useState(false);
   const [enrichStats, setEnrichStats] = useState({ enriched: 0, total: 0 });
 
-  const processFile = (file: File) => {
+  const processFile = async (file: File) => {
     setIsParsing(true);
     setGlobalError("");
     setFileName(file.name);
-
-    Papa.parse(file, {
-      header: true,
-      skipEmptyLines: "greedy",
-      complete: (results) => {
-        const rawRows = (results.data as Record<string, string>[]).filter((r) =>
-          Object.values(r).some((v) => v !== null && v !== undefined && String(v).trim().length > 0)
-        );
-        if (rawRows.length === 0) {
-          setGlobalError("The CSV file has no valid data rows.");
-          setParsedData([]);
-          setIsParsing(false);
-          return;
-        }
-        setParsedData(rawRows.map(mapAndValidateRow));
-        setIsParsing(false);
-      },
-      error: (error) => {
-        setGlobalError(error instanceof Error ? error.message : String(error));
-        setIsParsing(false);
-      },
-    });
+    try {
+      const { rows, error } = await validateAndParseStockCsvFile(file);
+      if (error) {
+        setGlobalError(error);
+        setParsedData([]);
+      } else {
+        setParsedData(rows);
+      }
+    } catch (err) {
+      setGlobalError(err instanceof Error ? err.message : String(err));
+      setParsedData([]);
+    } finally {
+      setIsParsing(false);
+    }
   };
 
   const handleImport = async () => {
@@ -501,4 +284,3 @@ export function QuickStockDropTab() {
     </div>
   );
 }
-

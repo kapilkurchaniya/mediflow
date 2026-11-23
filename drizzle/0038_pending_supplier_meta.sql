@@ -1,0 +1,1 @@
+ALTER TABLE "purchases" ADD COLUMN "pending_supplier_meta" jsonb;

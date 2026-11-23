@@ -2,16 +2,16 @@
 
 import { z } from "zod";
 import { db, schema } from "@/server/db";
-import { eq, and, desc, gte, lte } from "drizzle-orm";
+import { eq, and, desc, gte, lte, isNotNull } from "drizzle-orm";
 import { requirePermission } from "@/server/rbac";
 import { protectedAction } from "@/server/action";
 import { revalidatePath } from "next/cache";
 import { isUniqueViolation } from "@/server/db/errors";
 import { DomainError } from "@/server/errors";
+import type { PendingSupplierMeta } from "@/lib/pending-supplier";
 import {
   createPurchase,
   CreatePurchaseSchema,
-  PurchaseItemInputSchema,
   type CreatePurchaseInput,
   type PurchaseItemInput,
 } from "@/server/domain/purchases";
@@ -86,6 +86,7 @@ export async function getPurchaseById(purchaseId: string) {
 
 function revalidatePurchasePaths() {
   revalidatePath("/dashboard/purchases");
+  revalidatePath("/dashboard/suppliers");
   revalidatePath("/dashboard/accounting");
   revalidatePath("/dashboard/gst");
   revalidatePath("/dashboard/inventory/batches");
@@ -120,7 +121,8 @@ export async function createPurchaseInvoice(
   invoiceDate?: string,
   items?: PurchaseItemInput[],
   notes?: string,
-  purchaseOrderId?: string
+  purchaseOrderId?: string,
+  pendingSupplierMeta?: PendingSupplierMeta | null
 ): Promise<{ success?: boolean; purchaseId?: string; error?: string }> {
   const ctx = await requirePermission("purchase.create");
 
@@ -136,6 +138,7 @@ export async function createPurchaseInvoice(
         items,
         notes,
         purchaseOrderId,
+        pendingSupplierMeta,
       });
     }
   } catch (validationErr) {
@@ -161,4 +164,30 @@ export async function createPurchaseInvoice(
     }
     return { error: (err instanceof Error ? err.message : String(err)) || "Failed to create purchase invoice" };
   }
+}
+
+export async function getPendingSupplierPurchases(storeOnly = false) {
+  const ctx = await requirePermission("purchase.view");
+
+  const conditions = [
+    eq(schema.purchases.tenantId, ctx.tenantId),
+    eq(schema.purchases.status, "posted"),
+    isNotNull(schema.purchases.pendingSupplierMeta),
+  ];
+  if (storeOnly) {
+    conditions.push(eq(schema.purchases.storeId, ctx.storeId));
+  }
+
+  return db
+    .select({
+      id: schema.purchases.id,
+      purchaseNo: schema.purchases.purchaseNo,
+      supplierInvoiceNo: schema.purchases.supplierInvoiceNo,
+      invoiceDate: schema.purchases.invoiceDate,
+      totalAmount: schema.purchases.totalAmount,
+      pendingSupplierMeta: schema.purchases.pendingSupplierMeta,
+    })
+    .from(schema.purchases)
+    .where(and(...conditions))
+    .orderBy(desc(schema.purchases.createdAt));
 }

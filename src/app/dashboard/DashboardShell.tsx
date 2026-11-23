@@ -49,7 +49,16 @@ function DashboardShellContent({
   permissions,
 }: DashboardShellProps) {
   const pathname = usePathname();
-  const { mobileOpen, setMobileOpen, calculatorOpen, setCalculatorOpen } = useShell();
+  const {
+    mobileOpen,
+    setMobileOpen,
+    calculatorOpen,
+    setCalculatorOpen,
+    currentStore,
+    allowedStores,
+    storeSwitcherOpen,
+    setStoreSwitcherOpen,
+  } = useShell();
 
   const isPrintMode = pathname?.endsWith("/print") || pathname?.includes("/print");
   const isPosTerminal = pathname === "/dashboard/sales/pos";
@@ -149,6 +158,18 @@ function DashboardShellContent({
         isOpen={calculatorOpen}
         onClose={() => setCalculatorOpen(false)}
       />
+
+      {/* Global Store / Warehouse Switcher Dialog (Sidebar, POS header, Ctrl+Shift+S) */}
+      {storeSwitcherOpen && (
+        <StoreSwitcherDialog
+          currentStore={currentStore}
+          allowedStores={allowedStores}
+          onClose={() => setStoreSwitcherOpen(false)}
+        />
+      )}
+
+      {/* Global Feature Tooltips Layer (controlled via Settings -> Feature Tooltips) */}
+      <GlobalTooltipLayer />
     </div>
   );
 }
