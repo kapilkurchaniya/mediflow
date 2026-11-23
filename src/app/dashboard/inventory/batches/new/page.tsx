@@ -1,4 +1,4 @@
-"use client";
+ "use client";
 
 import { useActionState, useEffect, useState } from "react";
 import { addOpeningStock } from "@/app/actions/stock";
