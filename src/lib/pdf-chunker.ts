@@ -1,5 +1,3 @@
-import { PDFDocument } from "pdf-lib";
-
 export interface PdfChunk {
   file: File;
   startPage: number;
@@ -19,7 +17,10 @@ export async function splitPdfIntoChunks(file: File, pagesPerChunk = 3): Promise
     return [{ file, startPage: 1, endPage: 1, totalPages: 1 }];
   }
 
-  const arrayBuffer = await file.arrayBuffer();
+  const [{ PDFDocument }, arrayBuffer] = await Promise.all([
+    import("pdf-lib"),
+    file.arrayBuffer(),
+  ]);
   const srcDoc = await PDFDocument.load(arrayBuffer, { ignoreEncryption: true });
   const totalPages = srcDoc.getPageCount();
 

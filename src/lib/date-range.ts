@@ -150,3 +150,10 @@ export function resolveAIPeriod(period: string): DateRange {
   // Default to today
   return { from: today, to: today };
 }
+
+/** Returns UTC Date bounds [start, end) for an IST calendar date (YYYY-MM-DD). */
+export function getIstDayBounds(istDateStr: string): { start: Date; end: Date } {
+  const start = new Date(`${istDateStr}T00:00:00+05:30`);
+  const end = new Date(start.getTime() + 24 * 60 * 60 * 1000);
+  return { start, end };
+}
