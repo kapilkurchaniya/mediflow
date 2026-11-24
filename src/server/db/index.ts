@@ -27,7 +27,7 @@ declare global {
  * times out on AAAA or search-domain lookups whenever pg.Pool opens or refreshes a connection.
  */
 function installFastDnsLookup() {
-  if (globalThis.__mediflowDnsInstalled || env.NODE_ENV === "test") return;
+  if (globalThis.__mediflowDnsInstalled || env.NODE_ENV === "test" || Boolean(process.env.VERCEL)) return;
   globalThis.__mediflowDnsInstalled = true;
 
   try {
