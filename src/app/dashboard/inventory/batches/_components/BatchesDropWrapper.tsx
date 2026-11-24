@@ -1,9 +1,17 @@
 "use client";
 
 import React, { useRef, useState } from "react";
+import dynamic from "next/dynamic";
 import { UploadCloud } from "lucide-react";
-import { BatchCsvImportModal } from "./BatchCsvImportModal";
-import { StockOcrModal } from "./StockOcrModal";
+
+const BatchCsvImportModal = dynamic(
+  () => import("./BatchCsvImportModal").then((m) => m.BatchCsvImportModal),
+  { ssr: false }
+);
+const StockOcrModal = dynamic(
+  () => import("./StockOcrModal").then((m) => m.StockOcrModal),
+  { ssr: false }
+);
 
 function isOcrDocumentFile(file: File): boolean {
   const lower = file.name.toLowerCase();
@@ -81,23 +89,27 @@ export function BatchesDropWrapper({ children }: { children: React.ReactNode }) 
         </div>
       )}
 
-      <BatchCsvImportModal
-        isOpen={csvModalOpen}
-        initialFile={droppedCsvFile}
-        onClose={() => {
-          setCsvModalOpen(false);
-          setDroppedCsvFile(null);
-        }}
-      />
+      {csvModalOpen && (
+        <BatchCsvImportModal
+          isOpen={csvModalOpen}
+          initialFile={droppedCsvFile}
+          onClose={() => {
+            setCsvModalOpen(false);
+            setDroppedCsvFile(null);
+          }}
+        />
+      )}
 
-      <StockOcrModal
-        isOpen={ocrModalOpen}
-        initialFile={droppedOcrFile}
-        onClose={() => {
-          setOcrModalOpen(false);
-          setDroppedOcrFile(null);
-        }}
-      />
+      {ocrModalOpen && (
+        <StockOcrModal
+          isOpen={ocrModalOpen}
+          initialFile={droppedOcrFile}
+          onClose={() => {
+            setOcrModalOpen(false);
+            setDroppedOcrFile(null);
+          }}
+        />
+      )}
     </div>
   );
 }

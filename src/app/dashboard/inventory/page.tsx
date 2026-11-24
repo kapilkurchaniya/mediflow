@@ -1,6 +1,6 @@
 import {
   getMedicines,
-  getMedicinesCount,
+  getMedicinesCounts,
   getCategories,
   getManufacturers,
   getStoreStockTotalsByMedicine,
@@ -36,17 +36,21 @@ export default async function InventoryPage({
   const PAGE_SIZE = 50;
   const offset = (page - 1) * PAGE_SIZE;
 
-  const [items, totalCount, activeItemsCount, archivedItemsCount, singleUnitCount, racks, categories, manufacturers] =
+  const [items, counts, racks, categories, manufacturers] =
     await Promise.all([
       getMedicines(q, PAGE_SIZE, offset, packFilter, statusFilter),
-      getMedicinesCount(q, packFilter, statusFilter),
-      getMedicinesCount(q, "all", "active"),
-      getMedicinesCount(q, "all", "archived"),
-      getMedicinesCount(q, "single", "active"),
+      getMedicinesCounts(q, packFilter, statusFilter),
       getRacks(),
       canManage ? getCategories() : Promise.resolve([]),
       canManage ? getManufacturers() : Promise.resolve([]),
     ]);
+
+  const {
+    filteredCount: totalCount,
+    activeCount: activeItemsCount,
+    archivedCount: archivedItemsCount,
+    singleUnitActiveCount: singleUnitCount,
+  } = counts;
 
   const stockTotals =
     canManage && items.length > 0
