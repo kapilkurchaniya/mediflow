@@ -17,7 +17,7 @@ function isValidSecret(provided: string | null, expected?: string): boolean {
   return timingSafeEqual(provBuf, expBuf);
 }
 
-export async function GET(req?: NextRequest) {
+export async function GET(req: NextRequest) {
   const secretHeader = req?.headers?.get ? req.headers.get("x-health-secret") : null;
   const configuredSecret = env.HEALTH_SECRET || env.CRON_SECRET;
   const probeType = req?.nextUrl?.searchParams?.get("probe");
