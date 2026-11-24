@@ -1,8 +1,13 @@
 "use client";
 
 import { useState } from "react";
+import dynamic from "next/dynamic";
 import { Camera } from "lucide-react";
-import { StockOcrModal } from "./StockOcrModal";
+
+const StockOcrModal = dynamic(
+  () => import("./StockOcrModal").then((m) => m.StockOcrModal),
+  { ssr: false }
+);
 
 export function StockOcrButton({
   variant = "secondary",
@@ -24,7 +29,7 @@ export function StockOcrButton({
         <Camera className="w-4 h-4" />
         {label}
       </button>
-      <StockOcrModal isOpen={open} onClose={() => setOpen(false)} />
+      {open && <StockOcrModal isOpen={open} onClose={() => setOpen(false)} />}
     </>
   );
 }

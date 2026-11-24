@@ -17,6 +17,8 @@ export async function getBatches(
         from?: string | null;
         to?: string | null;
         medicineId?: string | null;
+        limit?: number;
+        offset?: number;
       }
     | boolean
 ) {
@@ -27,6 +29,8 @@ export async function getBatches(
   const from = !isBool ? opts?.from : null;
   const to = !isBool ? opts?.to : null;
   const medicineId = !isBool ? opts?.medicineId : null;
+  const limit = !isBool ? opts?.limit : undefined;
+  const offset = !isBool ? opts?.offset ?? 0 : 0;
 
   const ninetyDaysFromNow = nearExpiryOnly ? format(addDays(new Date(), 90), "yyyy-MM-dd") : undefined;
 
@@ -50,17 +54,79 @@ export async function getBatches(
     }
   }
 
-  const query = db
+  const baseQuery = db
     .select({
       batch: schema.batches,
       medicine: schema.medicines,
     })
     .from(schema.batches)
     .innerJoin(schema.medicines, eq(schema.batches.medicineId, schema.medicines.id))
+    .where(and(...conditions))
+    .orderBy(schema.batches.expiryDate);
+
+  if (typeof limit === "number" && limit > 0) {
+    return baseQuery.limit(limit).offset(Math.max(0, offset));
+  }
+  return baseQuery;
+}
+
+export async function getBatchesSummary(opts?: {
+  nearExpiryOnly?: boolean;
+  from?: string | null;
+  to?: string | null;
+  medicineId?: string | null;
+}) {
+  const ctx = await requirePermission("inventory.view");
+
+  const nearExpiryOnly = Boolean(opts?.nearExpiryOnly);
+  const from = opts?.from ?? null;
+  const to = opts?.to ?? null;
+  const medicineId = opts?.medicineId ?? null;
+  const ninetyDaysFromNow = format(addDays(new Date(), 90), "yyyy-MM-dd");
+
+  const conditions = [
+    eq(schema.batches.tenantId, ctx.tenantId),
+    eq(schema.batches.storeId, ctx.storeId),
+  ];
+
+  if (medicineId) {
+    conditions.push(eq(schema.batches.medicineId, medicineId));
+  }
+
+  if (nearExpiryOnly) {
+    conditions.push(lte(schema.batches.expiryDate, ninetyDaysFromNow));
+  } else {
+    if (from) conditions.push(sql`${schema.batches.expiryDate} >= ${from}`);
+    if (to) conditions.push(sql`${schema.batches.expiryDate} <= ${to}`);
+  }
+
+  const effectivePtrSql = sql`CASE
+    WHEN ${schema.batches.purchaseRate} > 0 THEN ${schema.batches.purchaseRate}
+    WHEN ${schema.medicines.purchasePrice} > 0 THEN ${schema.medicines.purchasePrice}
+    WHEN ${schema.batches.mrp} > 0 THEN ROUND(${schema.batches.mrp} * 0.8)
+    WHEN ${schema.medicines.mrp} > 0 THEN ROUND(${schema.medicines.mrp} * 0.8)
+    ELSE 0
+  END`;
+
+  const [row] = await db
+    .select({
+      totalCount: sql<number>`count(*)::int`,
+      totalUnits: sql<number>`coalesce(sum(${schema.batches.qtyOnHand}), 0)::bigint`.mapWith(Number),
+      totalValuation: sql<number>`coalesce(sum(${schema.batches.qtyOnHand} * (${effectivePtrSql})), 0)::bigint`.mapWith(Number),
+      zeroRateCount: sql<number>`count(*) filter (where ${schema.batches.purchaseRate} = 0)::int`,
+      expiringCount: sql<number>`count(*) filter (where ${schema.batches.expiryDate} <= ${ninetyDaysFromNow})::int`,
+    })
+    .from(schema.batches)
+    .innerJoin(schema.medicines, eq(schema.batches.medicineId, schema.medicines.id))
     .where(and(...conditions));
 
-  const results = await query.orderBy(schema.batches.expiryDate);
-  return results;
+  return {
+    totalCount: row?.totalCount ?? 0,
+    totalUnits: row?.totalUnits ?? 0,
+    totalValuation: row?.totalValuation ?? 0,
+    zeroRateCount: row?.zeroRateCount ?? 0,
+    expiringCount: row?.expiringCount ?? 0,
+  };
 }
 
 import { z } from "zod";

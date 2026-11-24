@@ -197,6 +197,45 @@ export async function getMedicinesCount(
   return row?.count ?? 0;
 }
 
+export async function getMedicinesCounts(
+  searchQuery?: string,
+  packFilter: MedicinePackFilter = "all",
+  statusFilter: MedicineStatusFilter = "all"
+): Promise<{
+  filteredCount: number;
+  activeCount: number;
+  archivedCount: number;
+  singleUnitActiveCount: number;
+}> {
+  const ctx = await requirePermission("medicine.view");
+  const baseConditions = buildMedicineSearchConditions(ctx.tenantId, searchQuery, "all", "all");
+
+  const statusCond =
+    statusFilter === "active"
+      ? sql`${schema.medicines.isActive} = true`
+      : statusFilter === "archived"
+      ? sql`${schema.medicines.isActive} = false`
+      : sql`true`;
+  const packCond = packFilter === "single" ? sql`${schema.medicines.unitsPerPack} = 1` : sql`true`;
+
+  const [row] = await db
+    .select({
+      filteredCount: sql<number>`count(*) filter (where ${statusCond} and ${packCond})::int`,
+      activeCount: sql<number>`count(*) filter (where ${schema.medicines.isActive} = true)::int`,
+      archivedCount: sql<number>`count(*) filter (where ${schema.medicines.isActive} = false)::int`,
+      singleUnitActiveCount: sql<number>`count(*) filter (where ${schema.medicines.isActive} = true and ${schema.medicines.unitsPerPack} = 1)::int`,
+    })
+    .from(schema.medicines)
+    .where(and(...baseConditions));
+
+  return {
+    filteredCount: row?.filteredCount ?? 0,
+    activeCount: row?.activeCount ?? 0,
+    archivedCount: row?.archivedCount ?? 0,
+    singleUnitActiveCount: row?.singleUnitActiveCount ?? 0,
+  };
+}
+
 export async function getMedicines(
   searchQuery?: string,
   limit = 50,

@@ -1,8 +1,13 @@
 "use client";
 
 import { useState } from "react";
+import dynamic from "next/dynamic";
 import { Upload } from "lucide-react";
-import { BatchCsvImportModal } from "./BatchCsvImportModal";
+
+const BatchCsvImportModal = dynamic(
+  () => import("./BatchCsvImportModal").then((m) => m.BatchCsvImportModal),
+  { ssr: false }
+);
 
 export function BatchCsvImportButton({
   variant = "secondary",
@@ -26,7 +31,7 @@ export function BatchCsvImportButton({
         <Upload className="w-4 h-4" />
         {label}
       </button>
-      <BatchCsvImportModal isOpen={open} onClose={() => setOpen(false)} />
+      {open && <BatchCsvImportModal isOpen={open} onClose={() => setOpen(false)} />}
     </>
   );
 }

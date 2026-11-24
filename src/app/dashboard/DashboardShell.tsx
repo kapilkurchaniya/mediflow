@@ -154,10 +154,12 @@ function DashboardShellContent({
       <ShortcutsModal />
 
       {/* Floating Counter Calculator (F12 / Alt+F12) */}
-      <CounterCalculator
-        isOpen={calculatorOpen}
-        onClose={() => setCalculatorOpen(false)}
-      />
+      {calculatorOpen && (
+        <CounterCalculator
+          isOpen={calculatorOpen}
+          onClose={() => setCalculatorOpen(false)}
+        />
+      )}
 
       {/* Global Store / Warehouse Switcher Dialog (Sidebar, POS header, Ctrl+Shift+S) */}
       {storeSwitcherOpen && (
