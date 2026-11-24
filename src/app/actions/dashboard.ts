@@ -3,16 +3,18 @@
 import { db, schema } from "@/server/db";
 import { eq, and, desc, sql, gte, lt } from "drizzle-orm";
 import { requirePermission } from "@/server/rbac";
+import { getIndianBusinessDate } from "@/server/domain/sales/cancel-sale";
+import { getIstDayBounds } from "@/lib/date-range";
 
 export async function getDashboardStats(dateRange?: { from?: string | null; to?: string | null }) {
   const ctx = await requirePermission("dashboard.view");
 
-  const todayStr = new Date().toISOString().split("T")[0];
+  const todayIst = getIndianBusinessDate(new Date());
   const ninetyDaysFromNow = new Date();
   ninetyDaysFromNow.setDate(ninetyDaysFromNow.getDate() + 90);
-  const expiryThresholdStr = ninetyDaysFromNow.toISOString().split("T")[0];
+  const expiryThresholdStr = getIndianBusinessDate(ninetyDaysFromNow);
 
-  // 1. Sales - Filtered by date range if provided, or defaults to today
+  // 1. Sales - Sargable IST timestamp bounds so Postgres uses (tenant_id, store_id, status, created_at) index
   const salesConditions = [
     eq(schema.sales.tenantId, ctx.tenantId),
     eq(schema.sales.storeId, ctx.storeId),
@@ -20,13 +22,15 @@ export async function getDashboardStats(dateRange?: { from?: string | null; to?:
   ];
 
   if (dateRange?.from) {
-    salesConditions.push(sql`${schema.sales.createdAt} >= ${dateRange.from}::date`);
+    salesConditions.push(gte(schema.sales.createdAt, getIstDayBounds(dateRange.from).start));
   }
   if (dateRange?.to) {
-    salesConditions.push(sql`${schema.sales.createdAt} < (${dateRange.to}::date + interval '1 day')`);
+    salesConditions.push(lt(schema.sales.createdAt, getIstDayBounds(dateRange.to).end));
   }
   if (!dateRange?.from && !dateRange?.to) {
-    salesConditions.push(sql`DATE(${schema.sales.createdAt}) = ${todayStr}::date`);
+    const { start, end } = getIstDayBounds(todayIst);
+    salesConditions.push(gte(schema.sales.createdAt, start));
+    salesConditions.push(lt(schema.sales.createdAt, end));
   }
 
   const recentSalesConditions = [
@@ -34,10 +38,10 @@ export async function getDashboardStats(dateRange?: { from?: string | null; to?:
     eq(schema.sales.storeId, ctx.storeId),
   ];
   if (dateRange?.from) {
-    recentSalesConditions.push(sql`${schema.sales.createdAt} >= ${dateRange.from}::date`);
+    recentSalesConditions.push(gte(schema.sales.createdAt, getIstDayBounds(dateRange.from).start));
   }
   if (dateRange?.to) {
-    recentSalesConditions.push(sql`${schema.sales.createdAt} < (${dateRange.to}::date + interval '1 day')`);
+    recentSalesConditions.push(lt(schema.sales.createdAt, getIstDayBounds(dateRange.to).end));
   }
 
   const [[salesResult], [expiringResult], lowStockResult, recentSales] = await Promise.all([
