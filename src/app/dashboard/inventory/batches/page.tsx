@@ -1,8 +1,9 @@
-import { getBatches } from "@/app/actions/stock";
+import { getBatches, getBatchesSummary } from "@/app/actions/stock";
 import { Plus, Boxes, IndianRupee, Layers, CalendarClock } from "lucide-react";
 import Link from "next/link";
 import clsx from "clsx";
 import { PageHeader, StatCard, EmptyState, TableWrapper } from "@/app/components/ui";
+import { Pagination } from "@/app/components/Pagination";
 import { formatINR, formatNumber, daysUntil } from "@/lib/format";
 import { ExpiryDateFilter } from "@/app/components/ExpiryDateFilter";
 import { resolveExpiryDateRange } from "@/lib/date-range";
@@ -28,19 +29,33 @@ function ExpiryBadge({ date }: { date: string }) {
 export default async function BatchesPage({
   searchParams,
 }: {
-  searchParams: Promise<{ nearExpiry?: string; range?: string; from?: string; to?: string; medicineId?: string }>;
+  searchParams: Promise<{ nearExpiry?: string; range?: string; from?: string; to?: string; medicineId?: string; page?: string }>;
 }) {
   const ctx = await requirePagePermission("inventory.view");
   const canAdjust = can(ctx, "inventory.adjust");
-  const { nearExpiry, range, from, to, medicineId } = await searchParams;
+  const { nearExpiry, range, from, to, medicineId, page: pageStr } = await searchParams;
   const isNearExpiry = nearExpiry === "true";
   const dateRange = resolveExpiryDateRange({ range, from, to });
-  const batches = await getBatches({
-    nearExpiryOnly: isNearExpiry,
-    from: dateRange.from,
-    to: dateRange.to,
-    medicineId: medicineId || null,
-  });
+  const page = Math.max(1, parseInt(pageStr || "1", 10));
+  const PAGE_SIZE = 50;
+  const offset = (page - 1) * PAGE_SIZE;
+
+  const [batches, summary] = await Promise.all([
+    getBatches({
+      nearExpiryOnly: isNearExpiry,
+      from: dateRange.from,
+      to: dateRange.to,
+      medicineId: medicineId || null,
+      limit: PAGE_SIZE,
+      offset,
+    }),
+    getBatchesSummary({
+      nearExpiryOnly: isNearExpiry,
+      from: dateRange.from,
+      to: dateRange.to,
+      medicineId: medicineId || null,
+    }),
+  ]);
 
   const getEffectivePtr = (b: (typeof batches)[0]["batch"], m: (typeof batches)[0]["medicine"]) => {
     if (b.purchaseRate > 0) return b.purchaseRate;
@@ -50,13 +65,7 @@ export default async function BatchesPage({
     return 0;
   };
 
-  const zeroRateCount = batches.filter((r) => r.batch.purchaseRate === 0).length;
-  const totalValuation = batches.reduce(
-    (acc, row) => acc + row.batch.qtyOnHand * getEffectivePtr(row.batch, row.medicine),
-    0
-  );
-  const totalUnits = batches.reduce((acc, row) => acc + row.batch.qtyOnHand, 0);
-  const expiringCount = batches.filter((b) => daysUntil(b.batch.expiryDate) <= 90).length;
+  const { totalCount, totalUnits, totalValuation, zeroRateCount, expiringCount } = summary;
 
   return (
     <BatchesDropWrapper>
@@ -83,7 +92,7 @@ export default async function BatchesPage({
       <section className="grid grid-cols-1 gap-4 md:grid-cols-3">
         <StatCard
           label="Active batches"
-          value={formatNumber(batches.length)}
+          value={formatNumber(totalCount)}
           icon={Layers}
           footnote={`${formatNumber(totalUnits)} units on hand`}
         />
@@ -144,7 +153,7 @@ export default async function BatchesPage({
                 Clear medicine filter &times;
               </Link>
             )}
-            {formatNumber(batches.length)} rows
+            {formatNumber(totalCount)} rows
           </span>
         </div>
 
@@ -264,6 +273,22 @@ export default async function BatchesPage({
           />
         )}
       </div>
+      {totalCount > PAGE_SIZE && (
+        <Pagination
+          currentPage={page}
+          pageSize={PAGE_SIZE}
+          totalCount={totalCount}
+          basePath="/dashboard/inventory/batches"
+          queryParams={{
+            ...(isNearExpiry ? { nearExpiry: "true" } : {}),
+            ...(range ? { range } : {}),
+            ...(from ? { from } : {}),
+            ...(to ? { to } : {}),
+            ...(medicineId ? { medicineId } : {}),
+          }}
+          itemLabel="batches"
+        />
+      )}
     </div>
     </BatchesDropWrapper>
   );
