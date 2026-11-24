@@ -33,7 +33,8 @@ describe("Health Check API (/api/health)", () => {
     // Even if database is failing, process liveness remains healthy so orchestrators don't restart process
     vi.spyOn(db, "execute").mockRejectedValueOnce(new Error("Database down"));
 
-    const res = await GET();
+    const req = new NextRequest("http://localhost:3000/api/health");
+    const res = await GET(req);
     const data = await res.json();
 
     expect(res.status).toBe(200);
