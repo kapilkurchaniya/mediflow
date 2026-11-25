@@ -12,12 +12,16 @@ function QuickRegisterSupplierModalContent({
   linkPurchaseId,
   onRegistered,
   submitLabel,
+  title,
+  subtitle,
 }: {
   onClose: () => void;
   initialMeta: PendingSupplierMeta;
   linkPurchaseId?: string | null;
   onRegistered?: (supplier: { id: string; name: string }) => Promise<void> | void;
   submitLabel?: string;
+  title?: string;
+  subtitle?: string;
 }) {
   const router = useRouter();
   const [name, setName] = useState(initialMeta.name || "");
@@ -74,9 +78,11 @@ function QuickRegisterSupplierModalContent({
               <Truck className="w-4 h-4" />
             </div>
             <div>
-              <h3 className="font-bold text-ink-900 text-sm">Register Supplier from Invoice</h3>
+              <h3 className="font-bold text-ink-900 text-sm">
+                {title || "Register Supplier from Invoice"}
+              </h3>
               <p className="text-[11.5px] text-ink-500">
-                Pre-filled from your scanned bill — verify and save in one click.
+                {subtitle || "Pre-filled from your scanned bill — verify and save in one click."}
               </p>
             </div>
           </div>
@@ -196,6 +202,8 @@ export function QuickRegisterSupplierModal({
   linkPurchaseId,
   onRegistered,
   submitLabel,
+  title,
+  subtitle,
 }: {
   isOpen: boolean;
   onClose: () => void;
@@ -203,6 +211,8 @@ export function QuickRegisterSupplierModal({
   linkPurchaseId?: string | null;
   onRegistered?: (supplier: { id: string; name: string }) => Promise<void> | void;
   submitLabel?: string;
+  title?: string;
+  subtitle?: string;
 }) {
   if (!isOpen) return null;
   const key = `${initialMeta.name}|${initialMeta.gstin || ""}|${linkPurchaseId || ""}`;
@@ -214,6 +224,8 @@ export function QuickRegisterSupplierModal({
       linkPurchaseId={linkPurchaseId}
       onRegistered={onRegistered}
       submitLabel={submitLabel}
+      title={title}
+      subtitle={subtitle}
     />
   );
 }
