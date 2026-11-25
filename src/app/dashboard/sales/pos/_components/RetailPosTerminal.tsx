@@ -309,8 +309,10 @@ export function RetailPosTerminal() {
         />
       </div>
 
-      <div className="w-full lg:w-80 flex flex-col space-y-3 shrink-0">
-        <CustomerPicker customer={state.customer} dataSource={ds} onSelectCustomer={(c) => dispatch({ type: "SET_CUSTOMER", payload: c })} onCustomerRedeemableLoaded={(pts, val) => dispatch({ type: "SET_CUSTOMER_REDEEMABLE", payload: { redeemablePoints: pts, redeemableValuePaise: val } })} />
+      <div className="w-full lg:w-80 flex flex-col space-y-3 shrink-0 lg:h-full lg:min-h-0">
+        <div className="shrink-0">
+          <CustomerPicker customer={state.customer} dataSource={ds} onSelectCustomer={(c) => dispatch({ type: "SET_CUSTOMER", payload: c })} onCustomerRedeemableLoaded={(pts, val) => dispatch({ type: "SET_CUSTOMER_REDEEMABLE", payload: { redeemablePoints: pts, redeemableValuePaise: val } })} />
+        </div>
         <CompliancePanel
           compliance={state.compliance}
           hasControlledItems={controlledItems.length > 0}
@@ -322,28 +324,30 @@ export function RetailPosTerminal() {
             dispatch({ type: "SET_COMPLIANCE", payload: patch });
           }}
         />
-        <TotalsBar
-          totals={totals}
-          loyaltyDiscountPaise={loyaltyDiscountPaise}
-          itemCount={state.cart.length}
-          paymentMethod={state.paymentMethod}
-          isSubmitting={isSubmitting}
-          canBill={!requireShift || Boolean(activeShift)}
-          hasStockShortage={hasStockShortage}
-          submitError={submitError}
-          onDismissError={() => setSubmitError("")}
-          onSetPaymentMethod={(m) => dispatch({ type: "SET_PAYMENT_METHOD", payload: m })}
-          onOpenSplitModal={() => {
-            const complianceErr = validatePosComplianceBeforeCheckout();
-            if (complianceErr) {
-              setComplianceForceOpen(true);
-              setSubmitError(complianceErr);
-              return;
-            }
-            setIsPaymentOpen(true);
-          }}
-          onCompleteSale={() => handleCompleteSale()}
-        />
+        <div className="shrink-0">
+          <TotalsBar
+            totals={totals}
+            loyaltyDiscountPaise={loyaltyDiscountPaise}
+            itemCount={state.cart.length}
+            paymentMethod={state.paymentMethod}
+            isSubmitting={isSubmitting}
+            canBill={!requireShift || Boolean(activeShift)}
+            hasStockShortage={hasStockShortage}
+            submitError={submitError}
+            onDismissError={() => setSubmitError("")}
+            onSetPaymentMethod={(m) => dispatch({ type: "SET_PAYMENT_METHOD", payload: m })}
+            onOpenSplitModal={() => {
+              const complianceErr = validatePosComplianceBeforeCheckout();
+              if (complianceErr) {
+                setComplianceForceOpen(true);
+                setSubmitError(complianceErr);
+                return;
+              }
+              setIsPaymentOpen(true);
+            }}
+            onCompleteSale={() => handleCompleteSale()}
+          />
+        </div>
       </div>
 
       <MobileTenderBar

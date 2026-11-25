@@ -114,11 +114,15 @@ export function CompliancePanel({
   };
 
   return (
-    <div className={`card shadow-xs overflow-hidden ${forceOpen && hasControlledItems ? "ring-2 ring-amber-400" : ""}`}>
+    <div
+      className={`card shadow-xs overflow-hidden flex flex-col ${
+        isOpen ? "min-h-0 max-h-[300px] lg:flex-1 lg:min-h-[170px] lg:max-h-[300px]" : "shrink-0"
+      } ${forceOpen && hasControlledItems ? "ring-2 ring-amber-400" : ""}`}
+    >
       <button
         type="button"
         onClick={() => setIsManuallyToggled(!isOpen)}
-        className="w-full p-3 flex items-center justify-between text-left hover:bg-ink-50 transition-colors"
+        className="w-full p-3 shrink-0 flex items-center justify-between text-left hover:bg-ink-50 transition-colors"
       >
         <div className="flex items-center gap-2">
           <Stethoscope className="w-4 h-4 text-brand-600" />
@@ -130,7 +134,7 @@ export function CompliancePanel({
       </button>
 
       {isOpen && (
-        <div className="p-3 pt-0 border-t border-ink-100 space-y-2.5 text-xs">
+        <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain p-3 pt-0 pr-2.5 border-t border-ink-100 space-y-2.5 text-xs">
           {hasControlledItems && (
             <div className="mt-2 rounded-lg border border-amber-200 bg-amber-50/90 px-2.5 py-2 text-[11px] text-amber-900 flex items-start gap-1.5">
               <AlertTriangle className="w-3.5 h-3.5 text-amber-600 shrink-0 mt-0.5" />
