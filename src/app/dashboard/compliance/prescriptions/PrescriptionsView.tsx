@@ -75,6 +75,7 @@ export function PrescriptionsView({
   const [isScanningRx, setIsScanningRx] = useState(false);
   const [scanBanner, setScanBanner] = useState<string | null>(null);
   const scanInputRef = useRef<HTMLInputElement>(null);
+  const billAfterSaveRef = useRef(false);
   const [rxNumber, setRxNumber] = useState("");
   const [prescriptionDate, setPrescriptionDate] = useState(
     new Date().toISOString().slice(0, 10)
@@ -224,7 +225,13 @@ export function PrescriptionsView({
       });
 
       if (res.success && res.prescription) {
+        const shouldBill = billAfterSaveRef.current;
+        billAfterSaveRef.current = false;
         setIsModalOpen(false);
+        if (shouldBill) {
+          router.push(`/dashboard/sales/pos?rxId=${res.prescription.id}`);
+          return;
+        }
         const newRecord: PrescriptionRecord = {
           rx: res.prescription,
           doctor: null,
@@ -236,6 +243,7 @@ export function PrescriptionsView({
         });
         router.refresh();
       } else {
+        billAfterSaveRef.current = false;
         setFormError(res.error || "Failed to save prescription");
       }
     });
@@ -682,7 +690,7 @@ export function PrescriptionsView({
                 </div>
               </div>
 
-              <div className="pt-4 border-t border-ink-150 flex items-center justify-end gap-2">
+              <div className="pt-4 border-t border-ink-150 flex flex-wrap items-center justify-end gap-2">
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}
@@ -693,9 +701,23 @@ export function PrescriptionsView({
                 <button
                   type="submit"
                   disabled={isPending}
-                  className="btn btn-primary text-xs"
+                  onClick={() => {
+                    billAfterSaveRef.current = false;
+                  }}
+                  className="btn btn-secondary text-xs"
                 >
                   {isPending ? "Saving..." : "Save Prescription"}
+                </button>
+                <button
+                  type="submit"
+                  disabled={isPending}
+                  onClick={() => {
+                    billAfterSaveRef.current = true;
+                  }}
+                  className="btn btn-primary text-xs inline-flex items-center gap-1.5"
+                >
+                  <ScanLine className="h-3.5 w-3.5" />
+                  Save &amp; Bill at Counter
                 </button>
               </div>
             </form>
