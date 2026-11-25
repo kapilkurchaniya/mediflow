@@ -332,6 +332,7 @@ export async function createMedicine(formData: FormData) {
   if (rackId?.trim() && !(await owns(schema.racks, rackId.trim()))) return { error: "Rack not found." };
 
   try {
+    let createdId = "";
     await db.transaction(async (tx) => {
     const [created] = await tx.insert(schema.medicines).values({
       tenantId: ctx.tenantId,
@@ -353,6 +354,7 @@ export async function createMedicine(formData: FormData) {
       schedule: schedule || "none",
       isActive: true,
     }).returning({ id: schema.medicines.id });
+    createdId = created.id;
 
     await writeAudit(tx, ctx, {
       action: "create",
@@ -383,7 +385,7 @@ export async function createMedicine(formData: FormData) {
     });
 
     revalidatePath("/dashboard/inventory");
-    return { success: true };
+    return { success: true, id: createdId };
   } catch (err: unknown) {
     if ((err instanceof Error ? err.message : String(err))?.includes("medicines_tenant_barcode_uq")) {
       return { error: "A medicine with this barcode already exists." };

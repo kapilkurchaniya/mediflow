@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createStockAuditSessionAction } from "@/app/actions/stocktake";
+import { buildDraftKey, useFormDraft } from "@/lib/useFormDraft";
 import {
   ClipboardCheck,
   Eye,
@@ -26,10 +27,33 @@ interface Props {
 
 export function NewAuditSessionClient({ racks }: Props) {
   const router = useRouter();
-  const [scope, setScope] = useState<"full_store" | "racks">("racks");
-  const [selectedRackIds, setSelectedRackIds] = useState<string[]>([]);
-  const [blindCount, setBlindCount] = useState<boolean>(true);
-  const [notes, setNotes] = useState("");
+  const {
+    value: draft,
+    setValue: setDraft,
+    clearDraft,
+  } = useFormDraft(
+    buildDraftKey("new-stocktake"),
+    {
+      scope: "racks" as "full_store" | "racks",
+      selectedRackIds: [] as string[],
+      blindCount: true,
+      notes: "",
+    },
+    {
+      isEmpty: (d) => d.selectedRackIds.length === 0 && !d.notes && d.scope === "racks",
+    }
+  );
+
+  const { scope, selectedRackIds, blindCount, notes } = draft;
+  const setScope = (val: "full_store" | "racks") => setDraft((p) => ({ ...p, scope: val }));
+  const setSelectedRackIds = (updater: string[] | ((prev: string[]) => string[])) =>
+    setDraft((p) => ({
+      ...p,
+      selectedRackIds: typeof updater === "function" ? updater(p.selectedRackIds) : updater,
+    }));
+  const setBlindCount = (val: boolean) => setDraft((p) => ({ ...p, blindCount: val }));
+  const setNotes = (val: string) => setDraft((p) => ({ ...p, notes: val }));
+
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -66,6 +90,7 @@ export function NewAuditSessionClient({ racks }: Props) {
       });
 
       if (res.success && res.sessionId) {
+        clearDraft();
         router.push(`/dashboard/inventory/stocktake/${res.sessionId}`);
       } else {
         setError(res.error || "Failed to initialize audit session");

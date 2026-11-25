@@ -25,6 +25,7 @@ import { PageHeader } from "@/app/components/ui";
 import { formatINR } from "@/lib/format";
 import { computePurchaseTotals } from "@/lib/money";
 import { DEFAULT_GST_RATE_BP, isValidGstRateBp, type GstRateBp } from "@/lib/regulatory";
+import { buildDraftKey, useFormDraft } from "@/lib/useFormDraft";
 import {
   consumePendingPurchaseImportFile,
   isSupportedPurchaseBillFile,
@@ -61,17 +62,52 @@ function NewPurchaseForm() {
   }[]>([]);
   const [linkedPo, setLinkedPo] = useState<{ id: string; poNo: string } | null>(null);
 
-  const [supplierId, setSupplierId] = useState("");
-  const [supplierInvoiceNo, setSupplierInvoiceNo] = useState("");
-  const [invoiceDate, setInvoiceDate] = useState(() => getIstTodayStr());
-  const [notes, setNotes] = useState("");
-  const [historicalDateNotice, setHistoricalDateNotice] = useState<string | null>(null);
+  const defaultInvoiceDate = useState(() => getIstTodayStr())[0];
+  const {
+    value: draft,
+    setValue: setDraft,
+    hasRestoredDraft,
+    clearDraft,
+    dismissRestoredNotice,
+  } = useFormDraft(
+    buildDraftKey("new-grn"),
+    {
+      supplierId: "",
+      supplierInvoiceNo: "",
+      invoiceDate: defaultInvoiceDate,
+      notes: "",
+      items: [] as PurchaseItemInput[],
+    },
+    {
+      isEmpty: (d) =>
+        !d.supplierId && !d.supplierInvoiceNo && !d.notes && d.items.length === 0,
+    }
+  );
 
-  const [items, setItems] = useState<PurchaseItemInput[]>([]);
+  const { supplierId, supplierInvoiceNo, invoiceDate, notes, items } = draft;
+  const setSupplierId = (val: string) =>
+    setDraft((prev) => ({ ...prev, supplierId: val }));
+  const setSupplierInvoiceNo = (val: string) =>
+    setDraft((prev) => ({ ...prev, supplierInvoiceNo: val }));
+  const setInvoiceDate = (val: string) =>
+    setDraft((prev) => ({ ...prev, invoiceDate: val }));
+  const setNotes = (val: string | ((prev: string) => string)) =>
+    setDraft((prev) => ({
+      ...prev,
+      notes: typeof val === "function" ? val(prev.notes) : val,
+    }));
+  const setItems = (updater: PurchaseItemInput[] | ((prev: PurchaseItemInput[]) => PurchaseItemInput[])) =>
+    setDraft((prev) => ({
+      ...prev,
+      items: typeof updater === "function" ? updater(prev.items) : updater,
+    }));
+
+  const [historicalDateNotice, setHistoricalDateNotice] = useState<string | null>(null);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [droppedImportFile, setDroppedImportFile] = useState<File | null>(null);
   const [pendingSupplierMeta, setPendingSupplierMeta] = useState<PendingSupplierMeta | null>(null);
   const [showQuickRegisterSupplier, setShowQuickRegisterSupplier] = useState(false);
+  const [showManualAddSupplier, setShowManualAddSupplier] = useState(false);
   const [isDraggingBill, setIsDraggingBill] = useState(false);
   const [dropError, setDropError] = useState<string | null>(null);
   const dragDepthRef = useRef(0);
@@ -148,6 +184,7 @@ function NewPurchaseForm() {
         !supplierId ? pendingSupplierMeta : null
       );
       if (res.success) {
+        clearDraft();
         router.push("/dashboard/purchases");
         router.refresh();
       }
@@ -278,12 +315,53 @@ function NewPurchaseForm() {
       )}
 
       <form action={formAction} className="space-y-6">
+        {hasRestoredDraft && !poId && (
+          <div className="rounded-lg border border-brand-200 bg-brand-50/70 px-4 py-2.5 text-xs text-brand-900 flex flex-wrap items-center justify-between gap-2">
+            <span>
+              Restored your unsaved GRN draft ({items.length} item{items.length === 1 ? "" : "s"}).
+            </span>
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() =>
+                  clearDraft({
+                    supplierId: "",
+                    supplierInvoiceNo: "",
+                    invoiceDate: defaultInvoiceDate,
+                    notes: "",
+                    items: [],
+                  })
+                }
+                className="font-semibold text-rose-700 hover:underline"
+              >
+                Discard Draft
+              </button>
+              <button
+                type="button"
+                onClick={dismissRestoredNotice}
+                className="text-brand-700 hover:underline"
+              >
+                Dismiss
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Invoice Info Card */}
         <div className="card p-5 space-y-4">
           <h3 className="card-title text-[14px] border-b border-ink-150 pb-2">Supplier & Bill Info</h3>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
-              <label htmlFor="grn-supplier-select" className="label required">Supplier</label>
+              <div className="flex items-center justify-between mb-1">
+                <label htmlFor="grn-supplier-select" className="label required !mb-0">Supplier</label>
+                <button
+                  type="button"
+                  onClick={() => setShowManualAddSupplier(true)}
+                  className="text-[11px] font-semibold text-brand-600 hover:text-brand-800 hover:underline"
+                >
+                  + New Supplier
+                </button>
+              </div>
               <div className="relative">
                 <Truck className="absolute left-3 top-2.5 h-4 w-4 text-ink-400" />
                 <select
@@ -736,6 +814,20 @@ function NewPurchaseForm() {
           }}
         />
       )}
+
+      <QuickRegisterSupplierModal
+        isOpen={showManualAddSupplier}
+        onClose={() => setShowManualAddSupplier(false)}
+        initialMeta={{ name: "", gstin: null, phone: null, drugLicenseNo: null, address: null }}
+        title="Quick Add Supplier"
+        subtitle="Add a distributor without losing your GRN bill items."
+        onRegistered={async (sup) => {
+          const fresh = await getSuppliers();
+          setSuppliers(fresh);
+          setSupplierId(sup.id);
+          setPendingSupplierMeta(null);
+        }}
+      />
 
       {isDraggingBill && (
         <div className="fixed inset-0 z-40 bg-brand-950/35 backdrop-blur-xs flex items-center justify-center p-6 pointer-events-none">

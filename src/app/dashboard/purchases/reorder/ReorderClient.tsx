@@ -17,6 +17,8 @@ import {
 } from "lucide-react";
 import { getReorderSuggestions, createPoFromReorderAction } from "@/app/actions/reorder";
 import type { ReorderSuggestionsReport } from "@/server/domain/purchasing/reorder";
+import { QuickRegisterSupplierModal } from "@/app/components/QuickRegisterSupplierModal";
+import { buildDraftKey, useFormDraft } from "@/lib/useFormDraft";
 
 interface StoreOption {
   id: string;
@@ -45,8 +47,17 @@ export function ReorderClient({
   const [creatingPoSupplierId, setCreatingPoSupplierId] = useState<string | null>(null);
   const [createdPoNotice, setCreatedPoNotice] = useState<{ poNo: string; id: string } | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [packQtyOverrides, setPackQtyOverrides] = useState<Record<string, number>>({});
+  const {
+    value: packQtyOverrides,
+    setValue: setPackQtyOverrides,
+    clearDraft: clearQtyDraft,
+  } = useFormDraft<Record<string, number>>(
+    buildDraftKey("reorder-qty", currentStoreId),
+    {},
+    { isEmpty: (v) => Object.keys(v).length === 0 }
+  );
   const [unassignedSupplierId, setUnassignedSupplierId] = useState<string>("");
+  const [isAddSupplierOpen, setIsAddSupplierOpen] = useState(false);
   const requestSeqRef = useRef(0);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -119,6 +130,7 @@ export function ReorderClient({
 
         if (res?.data) {
           setCreatedPoNotice({ poNo: res.data.poNo, id: res.data.id });
+          clearQtyDraft({});
           const updated = await getReorderSuggestions(selectedStoreId, {
             search: search.trim() || undefined,
             includeNeverStocked,
@@ -393,12 +405,13 @@ export function ReorderClient({
                       </button>
                     </div>
                   ) : (
-                    <Link
-                      href="/dashboard/suppliers/new?returnTo=/dashboard/purchases/reorder"
+                    <button
+                      type="button"
+                      onClick={() => setIsAddSupplierOpen(true)}
                       className="btn btn-secondary btn-sm text-amber-800 border-amber-300 bg-amber-50 hover:bg-amber-100"
                     >
                       + Add Supplier to Create PO
-                    </Link>
+                    </button>
                   ))}
                 </div>
 
@@ -490,6 +503,24 @@ export function ReorderClient({
           })}
         </div>
       )}
+
+      <QuickRegisterSupplierModal
+        isOpen={isAddSupplierOpen}
+        onClose={() => setIsAddSupplierOpen(false)}
+        initialMeta={{ name: "", gstin: null, phone: null, drugLicenseNo: null, address: null }}
+        title="Quick Add Supplier"
+        subtitle="Add a distributor without losing your reorder quantities."
+        onRegistered={(sup) => {
+          setReport((prev) => ({
+            ...prev,
+            activeSuppliers: [
+              { id: sup.id, name: sup.name, phone: null, leadTimeDays: 2 },
+              ...prev.activeSuppliers.filter((s) => s.id !== sup.id),
+            ],
+          }));
+          setUnassignedSupplierId(sup.id);
+        }}
+      />
     </div>
   );
 }

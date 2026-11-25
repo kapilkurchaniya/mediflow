@@ -29,6 +29,8 @@ import {
   calculateCentralPoMatrix,
   type CentralSplitPoResult,
 } from "@/lib/purchasing/central-po";
+import { QuickRegisterSupplierModal } from "@/app/components/QuickRegisterSupplierModal";
+import { buildDraftKey, useFormDraft } from "@/lib/useFormDraft";
 
 interface MatrixRowItem {
   medicineId: string;
@@ -52,19 +54,10 @@ export function CentralPoClient({
   stores,
   initialMedicines,
 }: CentralPoClientProps) {
-  const [supplierId, setSupplierId] = useState<string>(
-    initialSuppliers[0]?.id || ""
-  );
-  const [expectedDate, setExpectedDate] = useState<string>("");
-  const [notes, setNotes] = useState<string>("");
+  const [suppliers, setSuppliers] = useState<CentralPurchasingSupplierOption[]>(initialSuppliers);
+  const [isAddSupplierOpen, setIsAddSupplierOpen] = useState(false);
 
-  // Medicine search & selector
-  const [searchQuery, setSearchQuery] = useState<string>("");
-  const [searchResults, setSearchResults] = useState<CentralPurchasingMedicineItem[]>([]);
-  const [isSearching, setIsSearching] = useState<boolean>(false);
-
-  // Matrix rows state
-  const [rows, setRows] = useState<MatrixRowItem[]>(() => {
+  const defaultRows = useMemo<MatrixRowItem[]>(() => {
     if (initialMedicines.length > 0) {
       return initialMedicines.slice(0, 3).map((m) => {
         const allocs: Record<string, number> = {};
@@ -78,21 +71,62 @@ export function CentralPoClient({
           packUnit: m.packUnit,
           looseUnit: m.looseUnit,
           unitsPerPack: m.unitsPerPack,
-          rateRupees: 100, // default placeholder
+          rateRupees: 100,
           allocations: allocs,
         };
       });
     }
     return [];
-  });
+  }, [initialMedicines, stores]);
+
+  const {
+    value: draft,
+    setValue: setDraft,
+    hasRestoredDraft,
+    clearDraft,
+    dismissRestoredNotice,
+  } = useFormDraft(
+    buildDraftKey("central-po"),
+    {
+      supplierId: initialSuppliers[0]?.id || "",
+      expectedDate: "",
+      notes: "",
+      rows: defaultRows,
+    },
+    {
+      isEmpty: (d) =>
+        !d.notes &&
+        !d.expectedDate &&
+        d.rows.length === defaultRows.length &&
+        d.rows.every((r) => Object.values(r.allocations).every((q) => !q)),
+    }
+  );
+
+  const { supplierId, expectedDate, notes, rows } = draft;
+  const setSupplierId = (val: string) =>
+    setDraft((prev) => ({ ...prev, supplierId: val }));
+  const setExpectedDate = (val: string) =>
+    setDraft((prev) => ({ ...prev, expectedDate: val }));
+  const setNotes = (val: string) =>
+    setDraft((prev) => ({ ...prev, notes: val }));
+  const setRows = (updater: MatrixRowItem[] | ((prev: MatrixRowItem[]) => MatrixRowItem[])) =>
+    setDraft((prev) => ({
+      ...prev,
+      rows: typeof updater === "function" ? updater(prev.rows) : updater,
+    }));
+
+  // Medicine search & selector
+  const [searchQuery, setSearchQuery] = useState<string>("");
+  const [searchResults, setSearchResults] = useState<CentralPurchasingMedicineItem[]>([]);
+  const [isSearching, setIsSearching] = useState<boolean>(false);
 
   const [isPending, startTransition] = useTransition();
   const [createdResult, setCreatedResult] = useState<CentralSplitPoResult | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const selectedSupplier = useMemo(
-    () => initialSuppliers.find((s) => s.id === supplierId),
-    [initialSuppliers, supplierId]
+    () => suppliers.find((s) => s.id === supplierId),
+    [suppliers, supplierId]
   );
 
   // Compute live matrix calculations
@@ -222,16 +256,20 @@ export function CentralPoClient({
         const res = await createCentralSplitPoAction(payload);
         if (res?.data) {
           setCreatedResult(res.data);
-          // Reset matrix allocations after success
-          setRows((prev) =>
-            prev.map((r) => {
-              const resetAllocs: Record<string, number> = {};
-              stores.forEach((s) => {
-                resetAllocs[s.id] = 0;
-              });
-              return { ...r, allocations: resetAllocs };
-            })
-          );
+          // Reset matrix allocations & clear draft after success
+          const resetRows = rows.map((r) => {
+            const resetAllocs: Record<string, number> = {};
+            stores.forEach((s) => {
+              resetAllocs[s.id] = 0;
+            });
+            return { ...r, allocations: resetAllocs };
+          });
+          clearDraft({
+            supplierId,
+            expectedDate: "",
+            notes: "",
+            rows: resetRows,
+          });
         } else if (res?.serverError) {
           setErrorMessage(res.serverError);
         }
@@ -337,6 +375,38 @@ export function CentralPoClient({
         </div>
       )}
 
+      {/* Draft Restored Banner */}
+      {hasRestoredDraft && (
+        <div className="rounded-lg border border-brand-200 bg-brand-50/70 px-4 py-2.5 text-xs text-brand-900 flex flex-wrap items-center justify-between gap-2">
+          <span>
+            Restored your unsaved Central PO draft ({rows.length} medicine{rows.length === 1 ? "" : "s"}).
+          </span>
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() =>
+                clearDraft({
+                  supplierId: suppliers[0]?.id || "",
+                  expectedDate: "",
+                  notes: "",
+                  rows: defaultRows,
+                })
+              }
+              className="font-semibold text-rose-700 hover:underline"
+            >
+              Discard Draft
+            </button>
+            <button
+              type="button"
+              onClick={dismissRestoredNotice}
+              className="text-brand-700 hover:underline"
+            >
+              Dismiss
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Error Notification */}
       {errorMessage && (
         <div className="rounded-lg border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800 flex items-start gap-3">
@@ -361,24 +431,26 @@ export function CentralPoClient({
               <label className="block text-xs font-medium text-slate-700">
                 Select Supplier <span className="text-rose-500">*</span>
               </label>
-              {initialSuppliers.length > 0 && (
-                <Link
-                  href="/dashboard/suppliers/new?returnTo=/dashboard/purchases/orders/central"
+              {suppliers.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setIsAddSupplierOpen(true)}
                   className="text-[11px] font-semibold text-teal-700 hover:underline"
                 >
                   + New Supplier
-                </Link>
+                </button>
               )}
             </div>
-            {initialSuppliers.length === 0 ? (
+            {suppliers.length === 0 ? (
               <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900 space-y-2">
                 <p className="font-medium">No active suppliers added yet.</p>
-                <Link
-                  href="/dashboard/suppliers/new?returnTo=/dashboard/purchases/orders/central"
+                <button
+                  type="button"
+                  onClick={() => setIsAddSupplierOpen(true)}
                   className="btn btn-primary btn-sm inline-flex items-center gap-1.5"
                 >
                   <Plus className="h-3.5 w-3.5" /> Add Supplier
-                </Link>
+                </button>
               </div>
             ) : (
               <select
@@ -386,7 +458,7 @@ export function CentralPoClient({
                 onChange={(e) => setSupplierId(e.target.value)}
                 className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-teal-500 focus:outline-none focus:ring-1 focus:ring-teal-500"
               >
-                {initialSuppliers.map((s) => (
+                {suppliers.map((s) => (
                   <option key={s.id} value={s.id}>
                     {s.name} {s.gstin ? `(${s.gstin})` : ""}
                   </option>
@@ -681,6 +753,21 @@ export function CentralPoClient({
           </div>
         </div>
       </div>
+
+      <QuickRegisterSupplierModal
+        isOpen={isAddSupplierOpen}
+        onClose={() => setIsAddSupplierOpen(false)}
+        initialMeta={{ name: "", gstin: null, phone: null, drugLicenseNo: null, address: null }}
+        title="Quick Add Supplier"
+        subtitle="Add a distributor without losing your Central PO medicine matrix."
+        onRegistered={(sup) => {
+          setSuppliers((prev) => [
+            { id: sup.id, name: sup.name, gstin: null, phone: null, leadTimeDays: 2 },
+            ...prev.filter((s) => s.id !== sup.id),
+          ]);
+          setSupplierId(sup.id);
+        }}
+      />
     </div>
   );
 }

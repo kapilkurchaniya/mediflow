@@ -7,6 +7,8 @@ import { ArrowLeft, Plus, Trash2, Save, Loader2, AlertCircle, ShoppingCart } fro
 import { PageHeader } from "@/app/components/ui";
 import { formatINR } from "@/lib/format";
 import { createPurchaseOrderAction } from "@/app/actions/purchase-orders";
+import { QuickRegisterSupplierModal } from "@/app/components/QuickRegisterSupplierModal";
+import { buildDraftKey, useFormDraft } from "@/lib/useFormDraft";
 
 interface MedicineOption {
   id: string;
@@ -24,7 +26,7 @@ interface OrderLineItem {
 }
 
 export function NewOrderClient({
-  suppliers,
+  suppliers: initialSuppliers,
   medicines,
   canManageSuppliers = false,
   initialSupplierId = "",
@@ -35,15 +37,51 @@ export function NewOrderClient({
   initialSupplierId?: string;
 }) {
   const router = useRouter();
+  const [suppliers, setSuppliers] = useState(initialSuppliers);
+  const [isAddSupplierOpen, setIsAddSupplierOpen] = useState(false);
 
-  const [supplierId, setSupplierId] = useState(
-    initialSupplierId && suppliers.some((s) => s.id === initialSupplierId) ? initialSupplierId : ""
+  const defaultItems: OrderLineItem[] = [{ medicineId: "", qty: 10, freeQty: 0, rateRupees: 0 }];
+  const initialSup =
+    initialSupplierId && initialSuppliers.some((s) => s.id === initialSupplierId)
+      ? initialSupplierId
+      : "";
+
+  const {
+    value: draft,
+    setValue: setDraft,
+    hasRestoredDraft,
+    clearDraft,
+    dismissRestoredNotice,
+  } = useFormDraft(
+    buildDraftKey("new-po"),
+    {
+      supplierId: initialSup,
+      expectedDate: "",
+      notes: "",
+      items: defaultItems,
+    },
+    {
+      isEmpty: (d) =>
+        !d.supplierId &&
+        !d.expectedDate &&
+        !d.notes &&
+        d.items.length === 1 &&
+        !d.items[0].medicineId,
+    }
   );
-  const [expectedDate, setExpectedDate] = useState("");
-  const [notes, setNotes] = useState("");
-  const [items, setItems] = useState<OrderLineItem[]>([
-    { medicineId: "", qty: 10, freeQty: 0, rateRupees: 0 },
-  ]);
+
+  const { supplierId, expectedDate, notes, items } = draft;
+  const setSupplierId = (val: string) =>
+    setDraft((prev) => ({ ...prev, supplierId: val }));
+  const setExpectedDate = (val: string) =>
+    setDraft((prev) => ({ ...prev, expectedDate: val }));
+  const setNotes = (val: string) =>
+    setDraft((prev) => ({ ...prev, notes: val }));
+  const setItems = (updater: OrderLineItem[] | ((prev: OrderLineItem[]) => OrderLineItem[])) =>
+    setDraft((prev) => ({
+      ...prev,
+      items: typeof updater === "function" ? updater(prev.items) : updater,
+    }));
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -115,6 +153,7 @@ export function NewOrderClient({
 
       const res = await createPurchaseOrderAction(payload);
       if (res?.data?.id) {
+        clearDraft();
         router.push(`/dashboard/purchases/orders/${res.data.id}`);
       } else if (res?.serverError) {
         setErrorMsg(res.serverError);
@@ -144,6 +183,37 @@ export function NewOrderClient({
         description="Draft a replenishment order for scheduled delivery from your distributor."
       />
 
+      {hasRestoredDraft && (
+        <div className="rounded-lg border border-brand-200 bg-brand-50/70 px-4 py-2.5 text-xs text-brand-900 flex flex-wrap items-center justify-between gap-2">
+          <span>
+            Restored your unsaved Purchase Order draft ({items.length} line{items.length === 1 ? "" : "s"}).
+          </span>
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() =>
+                clearDraft({
+                  supplierId: "",
+                  expectedDate: "",
+                  notes: "",
+                  items: defaultItems,
+                })
+              }
+              className="font-semibold text-rose-700 hover:underline"
+            >
+              Discard Draft
+            </button>
+            <button
+              type="button"
+              onClick={dismissRestoredNotice}
+              className="text-brand-700 hover:underline"
+            >
+              Dismiss
+            </button>
+          </div>
+        </div>
+      )}
+
       {errorMsg && (
         <div className="p-3 rounded-lg bg-rose-50 border border-rose-200 text-rose-800 text-xs font-semibold flex items-center gap-2">
           <AlertCircle className="w-4 h-4 shrink-0 text-rose-600" />
@@ -164,12 +234,13 @@ export function NewOrderClient({
                   Supplier / Wholesaler <span className="text-rose-500">*</span>
                 </label>
                 {canManageSuppliers && suppliers.length > 0 && (
-                  <Link
-                    href="/dashboard/suppliers/new?returnTo=/dashboard/purchases/orders/new"
+                  <button
+                    type="button"
+                    onClick={() => setIsAddSupplierOpen(true)}
                     className="text-[11px] font-semibold text-brand-600 hover:text-brand-800 hover:underline"
                   >
                     + New Supplier
-                  </Link>
+                  </button>
                 )}
               </div>
               {suppliers.length === 0 ? (
@@ -178,12 +249,13 @@ export function NewOrderClient({
                     No active suppliers found. Add a supplier before raising a Purchase Order.
                   </p>
                   {canManageSuppliers ? (
-                    <Link
-                      href="/dashboard/suppliers/new?returnTo=/dashboard/purchases/orders/new"
+                    <button
+                      type="button"
+                      onClick={() => setIsAddSupplierOpen(true)}
                       className="btn btn-primary btn-sm inline-flex items-center gap-1.5"
                     >
                       <Plus className="h-3.5 w-3.5" /> Add Supplier
-                    </Link>
+                    </button>
                   ) : (
                     <p className="text-[11px] text-amber-700">
                       Ask your store manager or owner to add a supplier first.
@@ -391,6 +463,18 @@ export function NewOrderClient({
           </div>
         </div>
       </form>
+
+      <QuickRegisterSupplierModal
+        isOpen={isAddSupplierOpen}
+        onClose={() => setIsAddSupplierOpen(false)}
+        initialMeta={{ name: "", gstin: null, phone: null, drugLicenseNo: null, address: null }}
+        title="Quick Add Supplier"
+        subtitle="Add a distributor without losing your Purchase Order items."
+        onRegistered={(sup) => {
+          setSuppliers((prev) => [{ id: sup.id, name: sup.name }, ...prev.filter((s) => s.id !== sup.id)]);
+          setSupplierId(sup.id);
+        }}
+      />
     </div>
   );
 }
