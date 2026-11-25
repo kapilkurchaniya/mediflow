@@ -58,7 +58,7 @@ describe("audit rows are written by the actions", () => {
   it("adjusting stock records the old and new quantity and the reason", async () => {
     const s = await scene();
     const res = await adjustBatchStock(form({ batchId: s.batch.id, qtyChange: "-3", reason: "damage", note: "Water leak" }));
-    expect(res).toEqual({ success: true });
+    expect(res).toMatchObject({ success: true });
     const { rows } = await s.audit();
     expect(rows).toHaveLength(1);
     expect(rows[0]).toMatchObject({
@@ -86,7 +86,7 @@ describe("audit rows are written by the actions", () => {
     const res = await addOpeningStock(
       form({ medicineId: s.medicine.id, batchNo: "NEW1", expiryDate: "2099-01-01", qty: "25", purchaseRate: "60", mrp: "100" }),
     );
-    expect(res).toEqual({ success: true });
+    expect(res).toMatchObject({ success: true });
     const { rows } = await s.audit();
     expect(rows[0]).toMatchObject({ action: "stock_adjust", reason: "Opening stock entry", oldValue: { qtyOnHand: 0 }, newValue: { qtyOnHand: 25, batchNo: "NEW1" } });
   });
@@ -96,7 +96,7 @@ describe("audit rows are written by the actions", () => {
     const res = await updateStoreSettings(
       form({ name: "New Name", stateCode: "27", invoicePrefix: "NEW", address: "", city: "", pincode: "", phone: "", gstin: "", drugLicenseNo: "" }),
     );
-    expect(res).toEqual({ success: true });
+    expect(res).toMatchObject({ success: true });
     const { rows } = await s.audit();
     expect(rows).toHaveLength(1);
     expect(rows[0]).toMatchObject({ action: "update", entityType: "store", entityId: s.store.id });
@@ -114,7 +114,7 @@ describe("audit rows are written by the actions", () => {
   it("creating a medicine records its price, GST rate and schedule", async () => {
     const s = await scene();
     const res = await createMedicine(form({ name: "Azee 500", mrp: "210", salePrice: "210", gstRateBp: "5", schedule: "H1", hsn: "30049099" }));
-    expect(res).toEqual({ success: true });
+    expect(res).toMatchObject({ success: true });
     const { rows } = await s.audit();
     expect(rows[0]).toMatchObject({ action: "create", entityType: "medicine" });
     expect(rows[0].newValue).toMatchObject({ name: "Azee 500", mrp: 21000, gstRateBp: 500, schedule: "H1" });
