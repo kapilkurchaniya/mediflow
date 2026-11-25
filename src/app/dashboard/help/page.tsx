@@ -13,12 +13,16 @@ export default function HelpPage() {
   return (
     <div className="space-y-6">
       <div className="rounded-xl border border-primary-150 bg-gradient-to-r from-primary-50/70 to-emerald-50/40 p-5">
-        <h2 className="text-base font-semibold text-ink-900">
-          MediFlow Counter & Back-Office Playbook
-        </h2>
-        <p className="mt-1 text-xs text-ink-600 max-w-2xl leading-relaxed">
-          Step-by-step task guides designed for cashiers, pharmacists, and accountants running retail pharmacy chains.
-          All workflows strictly adhere to the Drugs & Cosmetics Rules 1945 and GST Rules.
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h2 className="text-base font-semibold text-ink-900">
+            MediFlow Counter & Back-Office Playbook
+          </h2>
+          <span className="inline-flex items-center rounded-full bg-white/80 border border-primary-200 px-2.5 py-0.5 text-[11px] font-semibold text-primary-700">
+            {articles.length} SOP Guides
+          </span>
+        </div>
+        <p className="mt-1 text-xs text-ink-600 max-w-3xl leading-relaxed">
+          Step-by-step task guides covering POS counter billing, AI Stock &amp; Bill OCR, custom HTML invoice templates, Ask MediFlow AI (Ctrl+J), purchasing &amp; accounting, WhatsApp reminders, GST &amp; Drugs &amp; Cosmetics compliance, and offline continuity.
         </p>
       </div>
 
