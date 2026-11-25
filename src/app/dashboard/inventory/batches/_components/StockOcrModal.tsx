@@ -81,7 +81,7 @@ export function StockOcrModal({
     setError(null);
     setSuccessMsg(null);
     try {
-      const chunks = await splitPdfIntoChunks(file, 3);
+      const chunks = await splitPdfIntoChunks(file, 1);
       const accumulatedRows: StockOcrRow[] = [];
 
       for (let i = 0; i < chunks.length; i++) {
@@ -94,15 +94,21 @@ export function StockOcrModal({
           totalPages: chunk.totalPages,
         });
 
-        const fd = new FormData();
-        fd.append("file", chunk.file);
-        const res = await fetch("/api/ocr/stock-sheet", { method: "POST", body: fd });
-        const parsed = await parseApiJsonResponse<{ rows?: StockOcrRow[]; error?: string }>(res);
+        let parsed: Awaited<ReturnType<typeof parseApiJsonResponse<{ rows?: StockOcrRow[]; error?: string }>>> | null = null;
+        for (let attempt = 0; attempt < 3; attempt++) {
+          const fd = new FormData();
+          fd.append("file", chunk.file);
+          const res = await fetch("/api/ocr/stock-sheet", { method: "POST", body: fd });
+          parsed = await parseApiJsonResponse<{ rows?: StockOcrRow[]; error?: string }>(res);
+          const transient = !parsed.ok && (parsed.status === 429 || parsed.status >= 502);
+          if (!transient || attempt === 2) break;
+          await new Promise((r) => setTimeout(r, 1500 * (attempt + 1)));
+        }
 
-        if (!parsed.ok || !parsed.data) {
+        if (!parsed || !parsed.ok || !parsed.data) {
           const pageHint =
-            chunk.totalPages > 1 ? ` (pages ${chunk.startPage}–${chunk.endPage})` : "";
-          setError(`${parsed.errorMessage || "Failed to scan stock sheet."}${pageHint}`);
+            chunk.totalPages > 1 ? ` (page ${chunk.startPage} of ${chunk.totalPages})` : "";
+          setError(`${parsed?.errorMessage || "Failed to scan stock sheet."}${pageHint}`);
           setRows(accumulatedRows);
           return;
         }

@@ -96,6 +96,14 @@ export async function runStructuredOcr<TSchema extends z.ZodTypeAny>(params: {
   const { object } = await generateObject({
     model,
     schema: params.schema,
+    maxOutputTokens: 16384,
+    providerOptions: {
+      google: {
+        thinkingConfig: {
+          thinkingBudget: 0,
+        },
+      },
+    },
     messages: [
       {
         role: "user",
@@ -120,6 +128,14 @@ export async function runTextOcr(params: {
 
   const { text } = await generateText({
     model,
+    maxOutputTokens: 16384,
+    providerOptions: {
+      google: {
+        thinkingConfig: {
+          thinkingBudget: 0,
+        },
+      },
+    },
     messages: [
       {
         role: "user",

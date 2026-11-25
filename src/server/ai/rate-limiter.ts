@@ -35,8 +35,11 @@ const rateLimitStore = new Map<string, UserRequestTimestamps>();
 export function checkAiRateLimit(
   tenantId: string,
   userId: string,
-  now: number = Date.now()
+  now: number = Date.now(),
+  policy?: { burstMax?: number; hourlyMax?: number }
 ): RateLimitStatus {
+  const burstMax = policy?.burstMax ?? BURST_MAX_REQUESTS;
+  const hourlyMax = policy?.hourlyMax ?? HOURLY_MAX_REQUESTS;
   const key = `${tenantId}:${userId}`;
   let bucket = rateLimitStore.get(key);
 
@@ -54,7 +57,7 @@ export function checkAiRateLimit(
   const burstCutoff = now - BURST_WINDOW_MS;
   const burstCount = bucket.timestamps.filter((ts) => ts > burstCutoff).length;
 
-  if (burstCount >= BURST_MAX_REQUESTS) {
+  if (burstCount >= burstMax) {
     const oldestInBurst = bucket.timestamps.find((ts) => ts > burstCutoff) || now;
     const retryAfterSeconds = Math.max(1, Math.ceil((oldestInBurst + BURST_WINDOW_MS - now) / 1000));
     return {
@@ -66,21 +69,21 @@ export function checkAiRateLimit(
   }
 
   // 2. Check Hourly Limit
-  if (bucket.timestamps.length >= HOURLY_MAX_REQUESTS) {
+  if (bucket.timestamps.length >= hourlyMax) {
     const oldestInHour = bucket.timestamps[0] || now;
     const retryAfterSeconds = Math.max(1, Math.ceil((oldestInHour + HOURLY_WINDOW_MS - now) / 1000));
     return {
       allowed: false,
       remaining: 0,
       resetInSeconds: retryAfterSeconds,
-      reason: "Hourly AI query limit reached (60 queries/hr). Please try again later.",
+      reason: `Hourly AI query limit reached (${hourlyMax} queries/hr). Please try again later.`,
     };
   }
 
   // Record timestamp
   bucket.timestamps.push(now);
 
-  const remaining = HOURLY_MAX_REQUESTS - bucket.timestamps.length;
+  const remaining = hourlyMax - bucket.timestamps.length;
   const oldest = bucket.timestamps[0] || now;
   const resetInSeconds = Math.max(1, Math.ceil((oldest + HOURLY_WINDOW_MS - now) / 1000));
 

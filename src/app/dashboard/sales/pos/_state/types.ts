@@ -70,7 +70,7 @@ export interface PosState {
 }
 
 export type PosAction =
-  | { type: "ADD_LINE"; payload: { medicine: SearchResultMedicine; batch: SearchResultBatch; allBatches?: SearchResultBatch[]; schemeText?: string } }
+  | { type: "ADD_LINE"; payload: { medicine: SearchResultMedicine; batch: SearchResultBatch; allBatches?: SearchResultBatch[]; schemeText?: string; initialUnits?: number } }
   | { type: "UPDATE_LINE_PACK_QTY"; payload: { batchId: string; packQty: number } }
   | { type: "UPDATE_LINE_LOOSE_QTY"; payload: { batchId: string; looseQty: number } }
   | { type: "UPDATE_LINE_DISCOUNT"; payload: { batchId: string; discountBp: number } }

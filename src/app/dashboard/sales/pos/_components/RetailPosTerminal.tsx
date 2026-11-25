@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback, useMemo } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
+import { getPrescriptionDetails } from "@/app/actions/compliance";
 import { clearPosSearchCache } from "../_data/posData";
 import { usePosDataSource } from "@/offline/usePosDataSource";
 import { PendingBillsDrawer } from "./PendingBillsDrawer";
@@ -24,6 +25,9 @@ import type { CurrentShiftStats } from "@/server/domain/cash-sessions";
 
 export function RetailPosTerminal() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const rxId = searchParams.get("rxId");
+  const loadedRxIdRef = useRef<string | null>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const { toggleCalculator, setShortcutsOpen, calculatorOpen, shortcutsOpen, currentStore, setStoreSwitcherOpen, collapsed, toggleCollapsed, userId, tenantId } = useShell();
   const cartIdentity = useMemo(() => ({ tenantId, storeId: currentStore?.id, userId }), [tenantId, currentStore?.id, userId]);
@@ -45,6 +49,10 @@ export function RetailPosTerminal() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
   const [complianceForceOpen, setComplianceForceOpen] = useState(false);
+  const [rxLoadNotice, setRxLoadNotice] = useState<{
+    type: "info" | "warning";
+    text: string;
+  } | null>(null);
 
   const requiresStrictRegAndAddress = useMemo(
     () =>
@@ -118,6 +126,126 @@ export function RetailPosTerminal() {
     window.addEventListener("mediflow:store-switch", onStoreSwitch);
     return () => window.removeEventListener("mediflow:store-switch", onStoreSwitch);
   }, [dispatch, refreshMeta]);
+
+  useEffect(() => {
+    if (!rxId || !currentStore?.id || loadedRxIdRef.current === rxId) return;
+    loadedRxIdRef.current = rxId;
+    let active = true;
+
+    async function loadPrescriptionToPos(targetRxId: string) {
+      try {
+        const details = await getPrescriptionDetails(targetRxId);
+        if (!active || !details) return;
+
+        const { prescription, doctor, customer, items } = details;
+
+        // 1. Pre-fill Customer & Loyalty
+        if (customer) {
+          dispatch({
+            type: "SET_CUSTOMER",
+            payload: {
+              id: customer.id,
+              name: customer.name,
+              phone: customer.phone,
+              loyaltyPoints: customer.loyaltyPoints,
+              creditLimit: customer.creditLimit,
+            },
+          });
+        } else if (prescription.patientPhone) {
+          const matchedCustomers = await ds.getCustomers(prescription.patientPhone).catch(() => []);
+          const exactCust =
+            matchedCustomers.find((c) => c.phone === prescription.patientPhone) ?? matchedCustomers[0];
+          if (exactCust && active) {
+            dispatch({ type: "SET_CUSTOMER", payload: exactCust });
+          }
+        }
+
+        // 2. Pre-fill Doctor & Patient Compliance
+        dispatch({
+          type: "SET_COMPLIANCE",
+          payload: {
+            doctorId: prescription.doctorId || "",
+            doctorName: prescription.doctorName || doctor?.name || "",
+            doctorRegNo: prescription.doctorRegNo || doctor?.regNo || "",
+            doctorAddress: doctor?.hospital || "",
+            patientName: prescription.patientName || "",
+            patientAge: prescription.patientAge ?? "",
+            patientGender: prescription.patientGender || "male",
+            patientAddress: prescription.patientAddress || "",
+            prescriptionRef: prescription.rxNumber || targetRxId.slice(0, 8),
+            prescriptionDate: prescription.prescriptionDate
+              ? new Date(prescription.prescriptionDate).toISOString().slice(0, 10)
+              : new Date().toISOString().slice(0, 10),
+          },
+        });
+        setComplianceForceOpen(true);
+
+        // 3. Add prescribed medicines to Cart with FEFO batch selection
+        let addedCount = 0;
+        const missingItems: string[] = [];
+
+        for (const item of items) {
+          const results = await ds.searchItems(item.medicineName).catch(() => []);
+          const exactById = item.medicineId
+            ? results.find((r) => r.medicine.id === item.medicineId && r.batches.length > 0)
+            : undefined;
+          const exactByName = results.find(
+            (r) =>
+              r.medicine.name.trim().toLowerCase() === item.medicineName.trim().toLowerCase() &&
+              r.batches.length > 0
+          );
+          const firstWithStock = results.find((r) => r.batches.some((b) => b.qtyOnHand > 0));
+          const fallbackAny = results.find((r) => r.batches.length > 0);
+          const match = exactById || exactByName || firstWithStock || fallbackAny;
+
+          if (match && match.batches.length > 0) {
+            const bestBatch = match.batches.find((b) => b.qtyOnHand > 0) ?? match.batches[0];
+            dispatch({
+              type: "ADD_LINE",
+              payload: {
+                medicine: match.medicine,
+                batch: bestBatch,
+                allBatches: match.batches,
+                initialUnits: Math.max(1, item.quantityPrescribed || 1),
+              },
+            });
+            addedCount++;
+          } else {
+            missingItems.push(item.medicineName);
+          }
+        }
+
+        if (!active) return;
+
+        if (missingItems.length > 0) {
+          setRxLoadNotice({
+            type: "warning",
+            text: `Loaded Rx for ${prescription.patientName} (Dr. ${prescription.doctorName}) — ${addedCount} item(s) added. Not in stock / unmatched: ${missingItems.join(", ")}.`,
+          });
+        } else {
+          setRxLoadNotice({
+            type: "info",
+            text: `Loaded Rx for ${prescription.patientName} (Dr. ${prescription.doctorName}) — ${addedCount} medicine(s) added to bill.`,
+          });
+        }
+
+        router.replace("/dashboard/sales/pos", { scroll: false });
+      } catch (err) {
+        console.error("Failed to load prescription into POS:", err);
+        if (active) {
+          setRxLoadNotice({
+            type: "warning",
+            text: "Could not load prescription details into POS. Please search medicines manually.",
+          });
+        }
+      }
+    }
+
+    void loadPrescriptionToPos(rxId);
+    return () => {
+      active = false;
+    };
+  }, [rxId, currentStore?.id, ds, dispatch, router]);
 
   useEffect(() => {
     const onAiAddToBill = async (ev: Event) => {
@@ -293,6 +421,24 @@ export function RetailPosTerminal() {
             firstRow?.focus();
           }}
         />
+        {rxLoadNotice && (
+          <div
+            className={`rounded-xl border px-3.5 py-2 text-xs flex items-center justify-between gap-2 ${
+              rxLoadNotice.type === "warning"
+                ? "bg-amber-50 border-amber-200 text-amber-900"
+                : "bg-emerald-50 border-emerald-200 text-emerald-900"
+            }`}
+          >
+            <span>{rxLoadNotice.text}</span>
+            <button
+              type="button"
+              onClick={() => setRxLoadNotice(null)}
+              className="text-[11px] font-semibold opacity-75 hover:opacity-100 shrink-0"
+            >
+              Dismiss
+            </button>
+          </div>
+        )}
         <CartTable
           cart={state.cart}
           revalidationAlert={revalidationAlert}

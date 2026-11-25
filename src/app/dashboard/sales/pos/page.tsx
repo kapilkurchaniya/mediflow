@@ -1,5 +1,6 @@
 "use client";
 
+import { Suspense } from "react";
 import { useShell } from "@/app/components/ShellContext";
 import { WarehousePosNotice } from "./WarehousePosNotice";
 import { RetailPosTerminal } from "./_components/RetailPosTerminal";
@@ -15,7 +16,9 @@ export default function POSPage() {
 
   return (
     <>
-      <RetailPosTerminal />
+      <Suspense fallback={null}>
+        <RetailPosTerminal />
+      </Suspense>
       <RegisterSW />
     </>
   );

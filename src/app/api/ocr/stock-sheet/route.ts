@@ -52,7 +52,10 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Forbidden: inventory.adjust permission required." }, { status: 403 });
   }
 
-  const rl = checkAiRateLimit(ctx.tenantId, ctx.userId);
+  const rl = checkAiRateLimit(ctx.tenantId, ctx.userId, Date.now(), {
+    burstMax: 60,
+    hourlyMax: 240,
+  });
   if (!rl.allowed) {
     return NextResponse.json({ error: rl.reason || "Rate limit exceeded." }, { status: 429 });
   }

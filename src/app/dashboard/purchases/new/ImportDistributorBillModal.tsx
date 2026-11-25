@@ -22,6 +22,7 @@ import { formatINR } from "@/lib/format";
 import type { SupplierCheckResult } from "@/server/domain/import/supplier-matcher";
 import type { PendingSupplierMeta } from "@/lib/pending-supplier";
 import { detectBinaryContentMismatch } from "@/lib/stock-csv-validator";
+import { parseApiJsonResponse, splitPdfIntoChunks } from "@/lib/pdf-chunker";
 import { QuickRegisterSupplierModal } from "@/app/components/QuickRegisterSupplierModal";
 import { PhysicalScannerButton } from "@/app/components/PhysicalScannerButton";
 
@@ -71,21 +72,83 @@ export function ImportDistributorBillModal({
     setError(null);
     try {
       if (isOcr) {
-        const fd = new FormData();
-        fd.append("file", fileToProcess);
-        if (selectedSupplierId) fd.append("selectedSupplierId", selectedSupplierId);
-        const res = await fetch("/api/ocr/grn-invoice", { method: "POST", body: fd });
-        const data = await res.json();
-        if (!res.ok) {
-          setError(data.error || "Failed to scan distributor bill.");
-          setParseResult(null);
-        } else {
-          setParseResult(data.parseResult);
-          setSupplierCheck(data.supplierCheck ?? null);
-          setOcrHeader(data.header ?? null);
-          if (data.supplierCheck?.status === "auto_matched" && data.supplierCheck.matchedSupplier && onSelectSupplier) {
-            onSelectSupplier(data.supplierCheck.matchedSupplier.id);
+        const chunks = await splitPdfIntoChunks(fileToProcess, 1);
+        let mergedResult: ParseDistributorInvoiceResult | null = null;
+        let firstSupplierCheck: SupplierCheckResult | null = null;
+        let firstHeader: { invoiceNo?: string; invoiceDate?: string } | null = null;
+
+        for (let i = 0; i < chunks.length; i++) {
+          const chunk = chunks[i];
+          let parsed: Awaited<
+            ReturnType<
+              typeof parseApiJsonResponse<{
+                parseResult?: ParseDistributorInvoiceResult;
+                supplierCheck?: SupplierCheckResult | null;
+                header?: { invoiceNo?: string; invoiceDate?: string } | null;
+                error?: string;
+              }>
+            >
+          > | null = null;
+
+          for (let attempt = 0; attempt < 3; attempt++) {
+            const fd = new FormData();
+            fd.append("file", chunk.file);
+            if (selectedSupplierId) fd.append("selectedSupplierId", selectedSupplierId);
+            const res = await fetch("/api/ocr/grn-invoice", { method: "POST", body: fd });
+            parsed = await parseApiJsonResponse(res);
+            const transient = !parsed.ok && (parsed.status === 429 || parsed.status >= 502);
+            if (!transient || attempt === 2) break;
+            await new Promise((r) => setTimeout(r, 1500 * (attempt + 1)));
           }
+
+          if (!parsed || !parsed.ok || !parsed.data?.parseResult) {
+            const pageHint =
+              chunk.totalPages > 1 ? ` (page ${chunk.startPage} of ${chunk.totalPages})` : "";
+            setError(`${parsed?.errorMessage || "Failed to scan distributor bill."}${pageHint}`);
+            setParseResult(mergedResult);
+            return;
+          }
+
+          const pageResult = parsed.data.parseResult;
+          if (!mergedResult) {
+            mergedResult = { ...pageResult };
+          } else {
+            const prev: ParseDistributorInvoiceResult = mergedResult;
+            const baseRow = prev.items.length;
+            const shiftedItems = pageResult.items.map((it, idx) => ({
+              ...it,
+              rowNo: baseRow + idx + 1,
+            }));
+            mergedResult = {
+              ...prev,
+              items: [...prev.items, ...shiftedItems],
+              purchaseItems: [...prev.purchaseItems, ...pageResult.purchaseItems],
+              totalLines: prev.totalLines + pageResult.totalLines,
+              validLines: prev.validLines + pageResult.validLines,
+              unmatchedMedicinesCount:
+                prev.unmatchedMedicinesCount + pageResult.unmatchedMedicinesCount,
+              totalInvoiceAmountPaise:
+                prev.totalInvoiceAmountPaise + pageResult.totalInvoiceAmountPaise,
+            };
+          }
+
+          if (!firstSupplierCheck && parsed.data.supplierCheck) {
+            firstSupplierCheck = parsed.data.supplierCheck;
+          }
+          if (!firstHeader && parsed.data.header) {
+            firstHeader = parsed.data.header;
+          }
+        }
+
+        setParseResult(mergedResult);
+        setSupplierCheck(firstSupplierCheck);
+        setOcrHeader(firstHeader);
+        if (
+          firstSupplierCheck?.status === "auto_matched" &&
+          firstSupplierCheck.matchedSupplier &&
+          onSelectSupplier
+        ) {
+          onSelectSupplier(firstSupplierCheck.matchedSupplier.id);
         }
       } else {
         const binaryErr = await detectBinaryContentMismatch(fileToProcess);
