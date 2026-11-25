@@ -7,6 +7,7 @@ import { AlertCircle, Check, Info } from "lucide-react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { PageHeader, FormSection, Field } from "@/app/components/ui";
+import { QuickCreateMedicineModal } from "@/app/components/QuickCreateMedicineModal";
 
 interface RawMedicine {
   id?: string;
@@ -23,7 +24,9 @@ interface RawMedicine {
 
 export default function NewBatchPage() {
   const [medicines, setMedicines] = useState<{ id: string; name: string; raw: RawMedicine }[]>([]);
+  const [selectedMedicineId, setSelectedMedicineId] = useState("");
   const [selectedMedicine, setSelectedMedicine] = useState<RawMedicine | null>(null);
+  const [isAddMedOpen, setIsAddMedOpen] = useState(false);
   const [packCount, setPackCount] = useState("");
   const [looseCount, setLooseCount] = useState("");
 
@@ -42,7 +45,9 @@ export default function NewBatchPage() {
   }, null);
 
   const handleMedicineChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const found = medicines.find((m) => m.id === e.target.value);
+    const id = e.target.value;
+    setSelectedMedicineId(id);
+    const found = medicines.find((m) => m.id === id);
     setSelectedMedicine(found ? found.raw : null);
   };
 
@@ -65,7 +70,24 @@ export default function NewBatchPage() {
 
           <FormSection title="Item" description="Choose the item from your item master.">
             <Field label="Item" required className="sm:col-span-2" htmlFor="medicineId">
-              <select id="medicineId" name="medicineId" required onChange={handleMedicineChange} className="input">
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-[11px] text-ink-500">Missing an item? Add it inline without losing batch fields.</span>
+                <button
+                  type="button"
+                  onClick={() => setIsAddMedOpen(true)}
+                  className="text-[11px] font-semibold text-brand-600 hover:text-brand-800 hover:underline"
+                >
+                  + New Medicine
+                </button>
+              </div>
+              <select
+                id="medicineId"
+                name="medicineId"
+                required
+                value={selectedMedicineId}
+                onChange={handleMedicineChange}
+                className="input"
+              >
                 <option value="">Select an item…</option>
                 {medicines.map((m) => (
                   <option key={m.id} value={m.id}>
@@ -205,6 +227,19 @@ export default function NewBatchPage() {
           </button>
         </div>
       </form>
+
+      <QuickCreateMedicineModal
+        isOpen={isAddMedOpen}
+        onClose={() => setIsAddMedOpen(false)}
+        onCreated={async (med) => {
+          const data = await getMedicines();
+          const mapped = data.map((m) => ({ id: m.medicine.id, name: m.medicine.name, raw: m.medicine }));
+          setMedicines(mapped);
+          setSelectedMedicineId(med.id);
+          const found = mapped.find((m) => m.id === med.id);
+          setSelectedMedicine(found ? found.raw : null);
+        }}
+      />
     </div>
   );
 }
