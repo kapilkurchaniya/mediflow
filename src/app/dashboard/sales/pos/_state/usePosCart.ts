@@ -35,7 +35,7 @@ function normalizeQty(line: PosCartLine, rawPack: number, rawLoose: number) {
 export function posCartReducer(state: PosState, action: PosAction): PosState {
   switch (action.type) {
     case "ADD_LINE": {
-      const { medicine, batch, allBatches, schemeText } = action.payload;
+      const { medicine, batch, allBatches, schemeText, initialUnits } = action.payload;
       const unitsPerPack = Math.max(1, medicine.unitsPerPack ?? 1);
       const totalAvailable = allBatches?.reduce((s, b) => s + b.qtyOnHand, 0) ?? batch.qtyOnHand;
       const existingIdx = state.cart.findIndex((i) => i.batchId === batch.id);
@@ -43,14 +43,27 @@ export function posCartReducer(state: PosState, action: PosAction): PosState {
       if (existingIdx >= 0) {
         const nextCart = [...state.cart];
         const existing = nextCart[existingIdx];
-        const nextPack = existing.packQty + 1;
-        nextCart[existingIdx] = { ...existing, packQty: nextPack, qty: nextPack * existing.unitsPerPack + existing.looseQty };
+        if (initialUnits && initialUnits > 0) {
+          const updated = normalizeQty(existing, existing.packQty, existing.looseQty + initialUnits);
+          nextCart[existingIdx] = updated;
+        } else {
+          const nextPack = existing.packQty + 1;
+          nextCart[existingIdx] = { ...existing, packQty: nextPack, qty: nextPack * existing.unitsPerPack + existing.looseQty };
+        }
         return { ...state, cart: nextCart };
       }
 
-      // If available stock is less than 1 full pack (partial strip), add loose units instead of exceeding stock
-      const initialPackQty = totalAvailable > 0 && totalAvailable < unitsPerPack ? 0 : 1;
-      const initialLooseQty = totalAvailable > 0 && totalAvailable < unitsPerPack ? totalAvailable : 0;
+      let initialPackQty: number;
+      let initialLooseQty: number;
+      if (initialUnits && initialUnits > 0) {
+        const targetUnits = totalAvailable > 0 ? Math.min(initialUnits, totalAvailable) : initialUnits;
+        initialPackQty = Math.floor(targetUnits / unitsPerPack);
+        initialLooseQty = targetUnits % unitsPerPack;
+      } else {
+        // If available stock is less than 1 full pack (partial strip), add loose units instead of exceeding stock
+        initialPackQty = totalAvailable > 0 && totalAvailable < unitsPerPack ? 0 : 1;
+        initialLooseQty = totalAvailable > 0 && totalAvailable < unitsPerPack ? totalAvailable : 0;
+      }
       const initialQty = initialPackQty * unitsPerPack + initialLooseQty;
 
       const newLine: PosCartLine = {
