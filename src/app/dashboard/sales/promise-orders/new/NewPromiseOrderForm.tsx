@@ -4,25 +4,51 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { BookmarkCheck, Loader2 } from "lucide-react";
 import { createPromiseOrder } from "@/app/actions/promise-orders";
+import { QuickCreateMedicineModal } from "@/app/components/QuickCreateMedicineModal";
+import { buildDraftKey, useFormDraft } from "@/lib/useFormDraft";
 
 export function NewPromiseOrderForm({
-  medicines,
+  medicines: initialMedicines,
   customers,
 }: {
   medicines: Array<{ id: string; name: string }>;
   customers: Array<{ id: string; name: string; phone: string | null }>;
 }) {
   const router = useRouter();
+  const [medicines, setMedicines] = useState(initialMedicines);
+  const [isAddMedOpen, setIsAddMedOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const [customerId, setCustomerId] = useState("");
-  const [customerName, setCustomerName] = useState("");
-  const [customerPhone, setCustomerPhone] = useState("");
-  const [medicineId, setMedicineId] = useState("");
-  const [qtyRequested, setQtyRequested] = useState(1);
-  const [promisedDate, setPromisedDate] = useState("");
-  const [notes, setNotes] = useState("");
+  const {
+    value: draft,
+    setValue: setDraft,
+    clearDraft,
+  } = useFormDraft(
+    buildDraftKey("new-promise-order"),
+    {
+      customerId: "",
+      customerName: "",
+      customerPhone: "",
+      medicineId: "",
+      qtyRequested: 1,
+      promisedDate: "",
+      notes: "",
+    },
+    {
+      isEmpty: (d) =>
+        !d.customerName && !d.customerPhone && !d.medicineId && !d.notes && !d.promisedDate,
+    }
+  );
+
+  const { customerId, customerName, customerPhone, medicineId, qtyRequested, promisedDate, notes } = draft;
+  const setCustomerId = (val: string) => setDraft((p) => ({ ...p, customerId: val }));
+  const setCustomerName = (val: string) => setDraft((p) => ({ ...p, customerName: val }));
+  const setCustomerPhone = (val: string) => setDraft((p) => ({ ...p, customerPhone: val }));
+  const setMedicineId = (val: string) => setDraft((p) => ({ ...p, medicineId: val }));
+  const setQtyRequested = (val: number) => setDraft((p) => ({ ...p, qtyRequested: val }));
+  const setPromisedDate = (val: string) => setDraft((p) => ({ ...p, promisedDate: val }));
+  const setNotes = (val: string) => setDraft((p) => ({ ...p, notes: val }));
 
   function handleSelectCustomer(id: string) {
     setCustomerId(id);
@@ -54,6 +80,7 @@ export function NewPromiseOrderForm({
       if (res.error) {
         setError(res.error);
       } else {
+        clearDraft();
         router.push("/dashboard/sales/promise-orders");
       }
     } catch (err) {
@@ -64,6 +91,7 @@ export function NewPromiseOrderForm({
   }
 
   return (
+    <>
     <form onSubmit={handleSubmit} className="card max-w-xl p-6 space-y-4">
       {error && (
         <div className="p-3 text-xs bg-red-50 text-red-800 rounded-lg border border-red-200">
@@ -114,7 +142,16 @@ export function NewPromiseOrderForm({
       </div>
 
       <div>
-        <label className="label">Medicine Demanded *</label>
+        <div className="flex items-center justify-between mb-1">
+          <label className="label !mb-0">Medicine Demanded *</label>
+          <button
+            type="button"
+            onClick={() => setIsAddMedOpen(true)}
+            className="text-[11px] font-semibold text-brand-600 hover:text-brand-800 hover:underline"
+          >
+            + New Medicine
+          </button>
+        </div>
         <select
           value={medicineId}
           onChange={(e) => setMedicineId(e.target.value)}
@@ -182,5 +219,15 @@ export function NewPromiseOrderForm({
         </button>
       </div>
     </form>
+
+    <QuickCreateMedicineModal
+      isOpen={isAddMedOpen}
+      onClose={() => setIsAddMedOpen(false)}
+      onCreated={(med) => {
+        setMedicines((prev) => [{ id: med.id, name: med.name }, ...prev.filter((m) => m.id !== med.id)]);
+        setMedicineId(med.id);
+      }}
+    />
+  </>
   );
 }
