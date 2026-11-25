@@ -7,6 +7,7 @@ import { ArrowLeft, ArrowRight, Loader2 } from "lucide-react";
 import { createDraftTransferAction, getTransferBatchesAction } from "@/app/actions/transfers";
 import { SelectedLinesTable, type SelectedLine } from "./_components/SelectedLinesTable";
 import { BatchSearchPicker, type BatchSearchResult } from "./_components/BatchSearchPicker";
+import { buildDraftKey, useFormDraft } from "@/lib/useFormDraft";
 
 interface StoreOption {
   id: string;
@@ -20,12 +21,37 @@ interface NewTransferClientProps {
 
 export function NewTransferClient({ stores, activeStoreId }: NewTransferClientProps) {
   const router = useRouter();
-  const [fromStoreId, setFromStoreId] = useState(activeStoreId || (stores[0]?.id ?? ""));
-  const [toStoreId, setToStoreId] = useState(
-    stores.find((s) => s.id !== (activeStoreId || stores[0]?.id))?.id ?? "",
+  const defaultFrom = activeStoreId || (stores[0]?.id ?? "");
+  const defaultTo = stores.find((s) => s.id !== defaultFrom)?.id ?? "";
+
+  const {
+    value: draft,
+    setValue: setDraft,
+    hasRestoredDraft,
+    clearDraft,
+    dismissRestoredNotice,
+  } = useFormDraft(
+    buildDraftKey("new-transfer", activeStoreId),
+    {
+      fromStoreId: defaultFrom,
+      toStoreId: defaultTo,
+      notes: "",
+      lines: [] as SelectedLine[],
+    },
+    {
+      isEmpty: (d) => !d.notes && d.lines.length === 0,
+    }
   );
-  const [notes, setNotes] = useState("");
-  const [lines, setLines] = useState<SelectedLine[]>([]);
+
+  const { fromStoreId, toStoreId, notes, lines } = draft;
+  const setFromStoreId = (val: string) => setDraft((p) => ({ ...p, fromStoreId: val }));
+  const setToStoreId = (val: string) => setDraft((p) => ({ ...p, toStoreId: val }));
+  const setNotes = (val: string) => setDraft((p) => ({ ...p, notes: val }));
+  const setLines = (updater: SelectedLine[] | ((prev: SelectedLine[]) => SelectedLine[])) =>
+    setDraft((p) => ({
+      ...p,
+      lines: typeof updater === "function" ? updater(p.lines) : updater,
+    }));
 
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<BatchSearchResult[]>([]);
@@ -116,6 +142,7 @@ export function NewTransferClient({ stores, activeStoreId }: NewTransferClientPr
     setIsSaving(false);
 
     if (res.success) {
+      clearDraft();
       router.push(`/dashboard/inventory/transfers/${res.transferId}`);
     } else {
       setErrorMessage(res.error ?? "Failed to create transfer draft.");
@@ -136,6 +163,37 @@ export function NewTransferClient({ stores, activeStoreId }: NewTransferClientPr
           <p className="text-sm text-ink-500">Create a transfer draft and select batches from source inventory.</p>
         </div>
       </div>
+
+      {hasRestoredDraft && (
+        <div className="rounded-xl border border-brand-200 bg-brand-50/70 px-4 py-2.5 text-xs text-brand-900 flex flex-wrap items-center justify-between gap-2">
+          <span>
+            Restored your unsaved Stock Transfer draft ({lines.length} batch{lines.length === 1 ? "" : "es"}).
+          </span>
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() =>
+                clearDraft({
+                  fromStoreId: defaultFrom,
+                  toStoreId: defaultTo,
+                  notes: "",
+                  lines: [],
+                })
+              }
+              className="font-semibold text-rose-700 hover:underline"
+            >
+              Discard Draft
+            </button>
+            <button
+              type="button"
+              onClick={dismissRestoredNotice}
+              className="text-brand-700 hover:underline"
+            >
+              Dismiss
+            </button>
+          </div>
+        </div>
+      )}
 
       {errorMessage && (
         <div className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800">

@@ -18,6 +18,7 @@ import { ExpenseCategoryModal } from "../../_components/ExpenseCategoryModal";
 import { ExpenseVendorFields } from "./ExpenseVendorFields";
 import { formatINR } from "@/lib/format";
 import { getISTTodayString } from "@/lib/date-range";
+import { buildDraftKey, useFormDraft } from "@/lib/useFormDraft";
 
 interface ExpenseFormProps {
   categories: Array<{ id: string; name: string; code: string }>;
@@ -37,17 +38,64 @@ export function ExpenseForm({
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   const [clientOperationId, setClientOperationId] = useState(initialOperationId);
-  const [categoryId, setCategoryId] = useState(categories[0]?.id || "");
-  const [rupees, setRupees] = useState("");
-  const [method, setMethod] = useState<"cash" | "upi" | "card" | "bank">("cash");
-  const [paidFromTill, setPaidFromTill] = useState(hasOpenShift);
-  const [paymentDate, setPaymentDate] = useState(() => getISTTodayString());
-  const [payeeName, setPayeeName] = useState("");
-  const [reference, setReference] = useState("");
-  const [vendorInvoiceNo, setVendorInvoiceNo] = useState("");
-  const [vendorInvoiceDate, setVendorInvoiceDate] = useState("");
-  const [vendorGstin, setVendorGstin] = useState("");
-  const [note, setNote] = useState("");
+  const defaultPaymentDate = useState(() => getISTTodayString())[0];
+  const {
+    value: draft,
+    setValue: setDraft,
+    clearDraft,
+  } = useFormDraft(
+    buildDraftKey("new-expense", storeName),
+    {
+      categoryId: categories[0]?.id || "",
+      rupees: "",
+      method: "cash" as "cash" | "upi" | "card" | "bank",
+      paidFromTill: hasOpenShift,
+      paymentDate: defaultPaymentDate,
+      payeeName: "",
+      reference: "",
+      vendorInvoiceNo: "",
+      vendorInvoiceDate: "",
+      vendorGstin: "",
+      note: "",
+    },
+    {
+      isEmpty: (d) =>
+        !d.rupees &&
+        !d.payeeName &&
+        !d.reference &&
+        !d.vendorInvoiceNo &&
+        !d.vendorGstin &&
+        !d.note,
+    }
+  );
+
+  const {
+    categoryId,
+    rupees,
+    method,
+    paidFromTill,
+    paymentDate,
+    payeeName,
+    reference,
+    vendorInvoiceNo,
+    vendorInvoiceDate,
+    vendorGstin,
+    note,
+  } = draft;
+  const setCategoryId = (val: string) => setDraft((p) => ({ ...p, categoryId: val }));
+  const setRupees = (val: string) => setDraft((p) => ({ ...p, rupees: val }));
+  const setMethod = (val: "cash" | "upi" | "card" | "bank") =>
+    setDraft((p) => ({ ...p, method: val }));
+  const setPaidFromTill = (val: boolean) => setDraft((p) => ({ ...p, paidFromTill: val }));
+  const setPaymentDate = (val: string) => setDraft((p) => ({ ...p, paymentDate: val }));
+  const setPayeeName = (val: string) => setDraft((p) => ({ ...p, payeeName: val }));
+  const setReference = (val: string) => setDraft((p) => ({ ...p, reference: val }));
+  const setVendorInvoiceNo = (val: string) =>
+    setDraft((p) => ({ ...p, vendorInvoiceNo: val }));
+  const setVendorInvoiceDate = (val: string) =>
+    setDraft((p) => ({ ...p, vendorInvoiceDate: val }));
+  const setVendorGstin = (val: string) => setDraft((p) => ({ ...p, vendorGstin: val }));
+  const setNote = (val: string) => setDraft((p) => ({ ...p, note: val }));
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -90,6 +138,7 @@ export function ExpenseForm({
       });
 
       if (res?.data) {
+        clearDraft();
         router.push("/dashboard/accounting/expenses");
         router.refresh();
       } else if (res?.serverError) {
