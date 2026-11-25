@@ -1,4 +1,10 @@
-export type HelpCategory = "billing" | "inventory" | "compliance" | "offline";
+export type HelpCategory =
+  | "billing"
+  | "inventory"
+  | "purchasing"
+  | "compliance"
+  | "ai-tools"
+  | "offline";
 
 export interface HelpStep {
   title: string;
@@ -33,7 +39,8 @@ export const HELP_ARTICLES: HelpArticle[] = [
   {
     slug: "first-bill",
     title: "Fast Counter Billing & First Invoice",
-    summary: "Learn how to search medicines with F2, pick batches with FEFO sorting, record prescriptions, and print 80mm receipts.",
+    summary:
+      "Learn how to search medicines with F3, pick batches with FEFO sorting, fill the scrollable Doctor & Prescription panel, and finalize bills with F10.",
     category: "billing",
     readMinutes: 3,
     badge: "Core Counter Flow",
@@ -43,41 +50,74 @@ export const HELP_ARTICLES: HelpArticle[] = [
     steps: [
       {
         title: "1. Launch the POS Terminal",
-        content: "Press F2 anywhere in MediFlow or click 'POS Billing' from the sidebar to focus the counter terminal.",
+        content:
+          "Press F2 or click 'New bill' in the sidebar to open the POS Counter. Use Ctrl+B to collapse the sidebar for Focus Mode, or Ctrl+Shift+S to switch branches.",
         shortcutKey: "F2",
       },
       {
         title: "2. Search Formulation or Scan Barcode",
-        content: "Type the brand name (e.g., 'Dolo 650') or scan the EAN-13 barcode. Results display live stock, rack location, and nearest expiry date.",
-        shortcutKey: "Alt + S",
-        tip: "MediFlow automatically suggests active generic substitutes if the requested brand is out of stock.",
+        content:
+          "Press F3 (or '/' or Insert) to focus the search bar, then type a brand/generic name or scan an EAN-13 barcode. Use Alt+N to quickly add a new Customer.",
+        shortcutKey: "F3 / Alt+N",
+        tip: "MediFlow automatically suggests active generic substitutes or Promise Orders if the requested brand is out of stock.",
       },
       {
-        title: "3. Confirm Batch & Quantity",
-        content: "Batches are ordered by First-Expiry-First-Out (FEFO). The nearest non-expired batch is auto-selected to minimize shelf waste.",
-        callout: "Drugs expiring within 90 days are flagged with an amber badge for pharmacist awareness.",
+        title: "3. Confirm Batch & Quantity (Packs / Loose)",
+        content:
+          "Batches are ordered by First-Expiry-First-Out (FEFO). Enter Packs (Strips) or Loose (Tablets) — MediFlow calculates per-tablet rates and GST automatically.",
+        callout:
+          "Drugs expiring within 90 days are flagged with an amber badge for pharmacist awareness.",
       },
       {
-        title: "4. Schedule H / H1 Prescription Validation",
-        content: "If the item is Schedule H or H1, enter the Doctor's Registration Number and Patient Name. This automatically populates your statutory Form 65(9)(b) register.",
+        title: "4. Scrollable Doctor & Prescription Validation",
+        content:
+          "When Schedule H, H1, or X items are in the cart, the Doctor & Prescription card opens automatically with a scrollable form for Doctor Name, Reg. No, Patient Name, Age/Gender, Date, and Rx Ref.",
       },
       {
-        title: "5. Split Tender & Instant Checkout",
-        content: "Press F4 or Ctrl + Enter. Accept split payments (e.g. Cash + UPI Dynamic QR), redeem loyalty points, and hit Enter to print the 80mm thermal bill.",
-        shortcutKey: "F4 / Ctrl+Enter",
+        title: "5. Hold, Split Tender & Finalize Bill",
+        content:
+          "Press F6 to Hold a bill, F7 to recall Parked bills, F8 for Split Tender / Credit (Cash + UPI + Card + Loyalty), or F10 to Finalize & Print immediately.",
+        shortcutKey: "F10 / F8",
       },
     ],
     faqs: [
-      { q: "What if the printer is disconnected?", a: "Bills are safely committed to the database. You can reprint anytime from Sales History (Alt + H)." },
-      { q: "Can I hold a cart while the customer grabs another item?", a: "Yes, press F8 to park the bill, serve the next customer, then press Alt + P to recall it." },
+      {
+        q: "What if the printer is disconnected?",
+        a: "Bills are safely committed to the database. You can reprint anytime from Sales & Invoices.",
+      },
+      {
+        q: "Can I hold a cart while the customer grabs another item?",
+        a: "Yes, press F6 (Hold) to park the bill, serve the next customer, then press F7 (Parked) to recall it.",
+      },
     ],
-    relatedSlugs: ["sales-returns", "offline-mode", "narcotics-compliance"],
-    keywords: ["pos", "bill", "invoice", "receipt", "fefo", "thermal", "f2", "cashier", "checkout"],
+    relatedSlugs: [
+      "sales-returns",
+      "cash-register-shifts",
+      "custom-billing-templates",
+      "offline-mode",
+    ],
+    keywords: [
+      "pos",
+      "bill",
+      "invoice",
+      "receipt",
+      "fefo",
+      "thermal",
+      "f2",
+      "f3",
+      "f6",
+      "f7",
+      "f8",
+      "f10",
+      "cashier",
+      "checkout",
+    ],
   },
   {
     slug: "sales-returns",
     title: "Sales Returns & GST Credit Notes",
-    summary: "How to process customer returns against original invoices, handle batch returns, and issue GST Rule 53 credit notes.",
+    summary:
+      "How to process customer returns against original invoices, handle batch returns, and issue GST Rule 53 credit notes.",
     category: "billing",
     readMinutes: 3,
     badge: "GST Rule 53",
@@ -87,163 +127,82 @@ export const HELP_ARTICLES: HelpArticle[] = [
     steps: [
       {
         title: "1. Locate Original Invoice",
-        content: "Navigate to Sales Returns and type the 16-character canonical invoice number or scan the QR code from the customer's thermal slip.",
+        content:
+          "Navigate to Sale returns (Credit Notes) and enter the canonical invoice number or scan the QR code from the customer's slip.",
       },
       {
         title: "2. Select Returned Line Items",
-        content: "Verify the batch number printed on the returned strip matches the original sale. Enter returned quantity and reason code (Damaged, Expired, Excess).",
+        content:
+          "Verify the batch number printed on the returned strip matches the original sale. Enter returned quantity and reason code (Damaged, Expired, Excess).",
       },
       {
         title: "3. Choose Refund Settlement Mode",
-        content: "Issue a cash refund, reverse to original UPI payment, or generate a Store Credit Note redeemable against future purchases.",
+        content:
+          "Issue a cash refund, reverse to original UPI payment, or generate a Store Credit Note redeemable against future purchases.",
       },
       {
         title: "4. Automated Accounting & Inventory Adjustment",
-        content: "MediFlow automatically creates an outward credit note, reverses proportional CGST & SGST, and increments non-expired stock or flags damaged stock for quarantine.",
+        content:
+          "MediFlow automatically creates an outward credit note, reverses proportional CGST & SGST, and increments non-expired stock or flags damaged stock for quarantine.",
       },
     ],
     faqs: [
-      { q: "Can a customer return medicines without an invoice?", a: "For compliance with Drugs & Cosmetics rules, sales returns require linking to an original bill." },
+      {
+        q: "Can a customer return medicines without an invoice?",
+        a: "For compliance with Drugs & Cosmetics rules, sales returns require linking to an original bill.",
+      },
     ],
     relatedSlugs: ["first-bill", "gst-filing"],
     keywords: ["return", "credit note", "refund", "damaged", "expiry", "reversal"],
   },
   {
-    slug: "stock-transfers",
-    title: "Inter-Branch Transfers & E-Way Bills",
-    summary: "Transfer inventory between retail stores or central warehouse with indent approvals and Part-A E-Way bill generation.",
-    category: "inventory",
-    readMinutes: 4,
-    badge: "GST Rule 138",
-    targetRole: "Store Manager, Warehouse Supervisor",
-    actionRoute: "/dashboard/inventory/transfers",
-    actionLabel: "Manage Transfers",
-    steps: [
-      {
-        title: "1. Create Stock Transfer Indent",
-        content: "Select the destination branch and add medicines with target quantities. Review available batch stock at the issuing location.",
-      },
-      {
-        title: "2. Dispatch Approval & Delivery Challan",
-        content: "When packing the consignment, MediFlow generates a statutory Delivery Challan under GST Rule 55 with serial numbers and HSN breakdown.",
-      },
-      {
-        title: "3. Automated E-Way Bill Verification",
-        content: "If the consignment value exceeds ₹50,000 (or state-specific threshold), MediFlow validates vehicle number and generates E-Way Bill Part-A credentials.",
-      },
-      {
-        title: "4. Inward Verification at Receiving Branch",
-        content: "The receiving store scans incoming batches. MediFlow performs variance detection: matching items increase local stock, while shortages trigger transit claims.",
-      },
-    ],
-    faqs: [
-      { q: "What happens if a transferred item is damaged in transit?", a: "Receiving staff marks the quantity as Damaged. MediFlow posts an inventory loss and notifies the issuing store." },
-    ],
-    relatedSlugs: ["gst-filing", "offline-mode"],
-    keywords: ["transfer", "indent", "warehouse", "challan", "eway bill", "transit", "inter-branch"],
-  },
-  {
-    slug: "gst-filing",
-    title: "Monthly GST Filing & GSTR-1/2B Reconciliation",
-    summary: "Step-by-step instructions for exporting GSTR-1 JSON for GSTN Offline Tool v1.4, matching 2B ITC, and handing off to your CA.",
-    category: "compliance",
-    readMinutes: 4,
-    badge: "Statutory Filing",
-    targetRole: "Accountant, Business Owner",
-    actionRoute: "/dashboard/accounting/export",
-    actionLabel: "Download CA Audit Pack",
-    steps: [
-      {
-        title: "1. Close the Month-End Period",
-        content: "Ensure all counter cash sessions are reconciled and supplier purchase invoices for the tax period are approved.",
-      },
-      {
-        title: "2. Reconcile Inward ITC with GSTR-2B",
-        content: "Upload your portal GSTR-2B JSON. MediFlow matches supplier invoices within 16(2)(aa) tolerance and flags blocked ITC or missing filings.",
-      },
-      {
-        title: "3. Export Official GSTR-1 JSON",
-        content: "Open CA Audit Pack in Accounting. Click 'Export GSTR-1 JSON'. The file strictly conforms to GSTN Offline Tool v1.4 (B2B, B2CS, CDNR, HSN data).",
-      },
-      {
-        title: "4. Hand Off Audit Pack to CA",
-        content: "Download the complete ZIP containing Sales Register CSV, Purchase Register CSV with ITC flags, Trial Balance, and Stock Valuation.",
-      },
-    ],
-    faqs: [
-      { q: "Does the GSTR-1 JSON require manual corrections?", a: "No. The schema is pre-validated with GSTN Offline Tool specs including UQC, state codes, and rate breakdowns." },
-    ],
-    relatedSlugs: ["sales-returns", "stock-transfers"],
-    keywords: ["gst", "gstr1", "gstr2b", "itc", "tax", "offline tool", "audit", "ca pack"],
-  },
-  {
-    slug: "offline-mode",
-    title: "Counter Continuity & Offline Auto-Sync",
-    summary: "How MediFlow protects billing when broadband drops, utilizing local SQLite caching and conflict-free sync recovery.",
-    category: "offline",
+    slug: "cash-register-shifts",
+    title: "Cash Register Shifts, X-Report & Z-Report",
+    summary:
+      "Open counter shifts (F4), track cash pay-ins/pay-outs, print mid-shift X-Reports, and close registers with blind Z-Report reconciliation.",
+    category: "purchasing",
     readMinutes: 3,
-    badge: "Zero-Downtime",
-    targetRole: "All Counter Staff",
-    actionRoute: "/dashboard/sales/pos",
-    actionLabel: "Inspect POS Counter",
+    badge: "Shift Control",
+    targetRole: "Cashier, Store Manager",
+    actionRoute: "/dashboard/sales/register",
+    actionLabel: "Open Cash Register",
     steps: [
       {
-        title: "1. Automatic Offline Detection",
-        content: "If the internet connection drops, MediFlow instantly switches to Offline Counter Mode. A banner appears indicating offline continuity.",
+        title: "1. Open a Register Shift",
+        content:
+          "Before billing (when shift enforcement is active), press F4 on the POS Counter or go to Cash register (Shifts) and enter your opening float cash.",
+        shortcutKey: "F4",
       },
       {
-        title: "2. Local Product & Price Lookup",
-        content: "The desktop SQLite database holds the store's complete medicine catalog, batch stock, and customer points for zero-latency queries.",
+        title: "2. Record Cash Drops & Petty Pay-Outs",
+        content:
+          "Log mid-day safe drops or petty cash expenses directly inside the active shift so expected drawer cash stays accurate.",
       },
       {
-        title: "3. Provisional Offline Invoicing",
-        content: "Bills continue printing with provisional invoice series (e.g. OFF-001). Stock deductions are reserved in local SQLite cache.",
+        title: "3. Print Mid-Shift X-Report",
+        content:
+          "Generate a non-closing X-Report anytime to inspect cash, UPI, card, and credit totals without ending the shift.",
       },
       {
-        title: "4. Automatic Sync on Reconnection",
-        content: "As soon as connectivity restores, MediFlow's background sync engine batches pending sales, reserves official 16-char GST numbers, and updates cloud ledgers.",
+        title: "4. Close Shift & Print Z-Report",
+        content:
+          "At day-end, count physical cash denominations, submit blind reconciliation, and print the statutory Z-Report for accounting sign-off.",
       },
     ],
     faqs: [
-      { q: "Will I lose sales if the computer restarts during an outage?", a: "No. Every line item is committed to SQLite locally before the receipt prints." },
-    ],
-    relatedSlugs: ["first-bill", "stock-transfers"],
-    keywords: ["offline", "sync", "sqlite", "connectivity", "outage", "resilience"],
-  },
-  {
-    slug: "narcotics-compliance",
-    title: "Schedule H1 & Narcotics Register Tracking",
-    summary: "Drugs and Cosmetics Rule 65(9)(b) statutory record keeping for Habit Forming, Schedule X, and H1 dispensations.",
-    category: "compliance",
-    readMinutes: 3,
-    badge: "D&C Rules 1945",
-    targetRole: "Dispensing Pharmacist",
-    actionRoute: "/dashboard/compliance/export",
-    actionLabel: "Download Inspector Pack",
-    steps: [
       {
-        title: "1. Automated Schedule Flagging",
-        content: "When a Schedule H1, X, or Narcotic formulation is added to the cart, MediFlow requires prescriber registration and patient address.",
-      },
-      {
-        title: "2. Register Entry Commitment",
-        content: "Each completed transaction writes directly to the immutable statutory register with patient details, doctor registration number, batch, and dispensing pharmacist.",
-      },
-      {
-        title: "3. One-Click Drug Inspector Export",
-        content: "When a Drug Inspector visits, go to Compliance -> Export. Click 'Download Inspector Pack' for clean Form 20/21/65(9)(b) CSV registers.",
+        q: "What happens if physical cash differs from expected cash?",
+        a: "MediFlow records the exact overage or shortage variance in the Z-Report and audit log for manager review.",
       },
     ],
-    faqs: [
-      { q: "How long are Schedule H1 registers retained?", a: "By Indian law, Schedule H1 registers must be preserved for a minimum of 3 years from the date of entry." },
-    ],
-    relatedSlugs: ["first-bill", "gst-filing"],
-    keywords: ["schedule h", "schedule h1", "narcotics", "drug inspector", "rule 65", "pharmacist"],
+    relatedSlugs: ["first-bill", "accounting-and-day-book"],
+    keywords: ["shift", "cash register", "x-report", "z-report", "float", "f4", "reconciliation"],
   },
   {
     slug: "margins-and-discounts",
     title: "Trade Discounts, MRP Caps & Customer Loyalty",
-    summary: "Configure customer tier discounts, enforce NPPA ceiling prices, and redeem loyalty points at counter checkout.",
+    summary:
+      "Configure customer tier discounts, enforce NPPA ceiling prices, and redeem loyalty points at counter checkout.",
     category: "billing",
     readMinutes: 3,
     badge: "Pricing & Loyalty",
@@ -253,22 +212,564 @@ export const HELP_ARTICLES: HelpArticle[] = [
     steps: [
       {
         title: "1. Customer Phone Number Lookup",
-        content: "Type the customer's 10-digit mobile number at the POS. The counter displays their name, active tier, and redeemable points balance.",
+        content:
+          "Type the customer's 10-digit mobile number at the POS. The counter displays their name, active tier, and redeemable points balance.",
       },
       {
         title: "2. Line-Level vs Invoice Discounts",
-        content: "Apply percentage or flat rupee discounts per line item or across the total bill. MediFlow verifies price stays below DPCO legal ceiling.",
+        content:
+          "Apply percentage or flat rupee discounts per line item or across the total bill. MediFlow verifies price stays below DPCO legal ceiling.",
       },
       {
-        title: "3. 100-Point Loyalty Redemption",
-        content: "When a customer has 100+ points, click 'Redeem Points'. Points apply as cash tender, reducing the net payable amount instantly.",
+        title: "3. Loyalty Point Redemption",
+        content:
+          "When a customer has redeemable points, apply them inside Split Tender / Credit (F8) to reduce the net payable amount instantly.",
+        shortcutKey: "F8",
       },
     ],
     faqs: [
-      { q: "Can a cashier discount beyond the store limit?", a: "No. Discounts exceeding the configured cashier threshold require manager override credentials." },
+      {
+        q: "Can a cashier discount beyond the store limit?",
+        a: "No. Discounts exceeding the configured cashier threshold require manager override credentials.",
+      },
     ],
     relatedSlugs: ["first-bill", "sales-returns"],
     keywords: ["discount", "loyalty", "points", "mrp", "dpco", "nppa", "ceiling price"],
+  },
+  {
+    slug: "stock-ocr-and-csv-import",
+    title: "AI Stock Sheet OCR, Multi-Page PDFs & CSV Import",
+    summary:
+      "Import opening stock and distributor rate sheets in seconds by scanning photos, multi-page PDFs, or uploading CSV spreadsheets.",
+    category: "inventory",
+    readMinutes: 4,
+    badge: "AI OCR & Bulk CSV",
+    targetRole: "Pharmacist, Inventory Manager",
+    actionRoute: "/dashboard/inventory/batches",
+    actionLabel: "Open Batches & Stock",
+    steps: [
+      {
+        title: "1. Open Batches & Stock",
+        content:
+          "Go to Inventory -> Batches & Stock. You can click 'Scan Stock Sheet (OCR)', 'Import CSV', or drag-and-drop a PDF/image/CSV directly onto the page.",
+      },
+      {
+        title: "2. Multi-Page PDF & Photo Extraction",
+        content:
+          "For multi-page supplier PDFs, MediFlow automatically splits pages into chunks, extracts medicine names, batches, expiry dates, MRP, and PTR, and lets you review every row before saving.",
+        tip: "Use clear, well-lit photos or native PDFs for the highest extraction accuracy.",
+      },
+      {
+        title: "3. CSV Column Mapping & Validation",
+        content:
+          "Upload CSV exports from older pharmacy software (Marg, Busy, Tally) and map columns to MediFlow's batch schema with duplicate and zero-rate checks.",
+      },
+      {
+        title: "4. Paginated Valuation & Expiry Monitoring",
+        content:
+          "Browse stock 50 batches per page with live summary cards for total units, total valuation, zero-cost-rate alerts, and expiring-soon batches.",
+      },
+    ],
+    faqs: [
+      {
+        q: "Can I import a 20-page distributor stock PDF?",
+        a: "Yes. MediFlow's PDF chunker splits multi-page PDFs automatically so large stock lists import reliably without timeouts.",
+      },
+    ],
+    relatedSlugs: ["purchases-grn-and-central-po", "stocktake-quarantine-and-licenses"],
+    keywords: [
+      "ocr",
+      "csv",
+      "import",
+      "pdf",
+      "stock sheet",
+      "batches",
+      "opening stock",
+      "drag and drop",
+    ],
+  },
+  {
+    slug: "stock-transfers",
+    title: "Inter-Branch Transfers & E-Way Bills",
+    summary:
+      "Transfer inventory between retail stores or central warehouse with indent approvals and Part-A E-Way bill generation.",
+    category: "inventory",
+    readMinutes: 4,
+    badge: "GST Rule 138",
+    targetRole: "Store Manager, Warehouse Supervisor",
+    actionRoute: "/dashboard/inventory/transfers",
+    actionLabel: "Manage Transfers",
+    steps: [
+      {
+        title: "1. Create Stock Transfer Indent",
+        content:
+          "Select the destination branch and add medicines with target quantities. Review available batch stock at the issuing location.",
+      },
+      {
+        title: "2. Dispatch Approval & Delivery Challan",
+        content:
+          "When packing the consignment, MediFlow generates a statutory Delivery Challan under GST Rule 55 with serial numbers and HSN breakdown.",
+      },
+      {
+        title: "3. Automated E-Way Bill Verification",
+        content:
+          "If the consignment value exceeds ₹50,000 (or state-specific threshold), MediFlow validates vehicle number and generates E-Way Bill Part-A credentials.",
+      },
+      {
+        title: "4. Inward Verification at Receiving Branch",
+        content:
+          "The receiving store scans incoming batches. MediFlow performs variance detection: matching items increase local stock, while shortages trigger transit claims.",
+      },
+    ],
+    faqs: [
+      {
+        q: "What happens if a transferred item is damaged in transit?",
+        a: "Receiving staff marks the quantity as Damaged. MediFlow posts an inventory loss and notifies the issuing store.",
+      },
+    ],
+    relatedSlugs: ["gst-filing", "stocktake-quarantine-and-licenses", "offline-mode"],
+    keywords: [
+      "transfer",
+      "indent",
+      "warehouse",
+      "challan",
+      "eway bill",
+      "transit",
+      "inter-branch",
+    ],
+  },
+  {
+    slug: "stocktake-quarantine-and-licenses",
+    title: "Physical Stocktake, Quarantine & Expiry Redistribution",
+    summary:
+      "Run cycle-count stocktakes, isolate damaged or recalled batches in Quarantine, and redistribute near-expiry stock across branches.",
+    category: "inventory",
+    readMinutes: 3,
+    badge: "Inventory Control",
+    targetRole: "Pharmacist, Store Manager",
+    actionRoute: "/dashboard/inventory/stocktake",
+    actionLabel: "Open Stocktake",
+    steps: [
+      {
+        title: "1. Start a Rack or Store Stocktake",
+        content:
+          "Open Inventory -> Stocktake, pick a rack or full store scope, and enter physical counts. MediFlow highlights excess/shortage variances before posting adjustments.",
+      },
+      {
+        title: "2. Quarantine Damaged or Recalled Batches",
+        content:
+          "Move damaged, recalled, or expired stock to Inventory -> Quarantine so it is immediately blocked from POS billing while awaiting supplier return or destruction.",
+      },
+      {
+        title: "3. Redistribute Near-Expiry Stock Across Branches",
+        content:
+          "Use Reports -> Expiry Redistribution to spot slow-moving near-expiry batches in one branch and transfer them to high-velocity branches.",
+      },
+    ],
+    faqs: [
+      {
+        q: "Can quarantined stock be accidentally billed at POS?",
+        a: "No. Quarantined quantities are excluded from sellable batch stock at the counter.",
+      },
+    ],
+    relatedSlugs: ["stock-transfers", "purchases-grn-and-central-po"],
+    keywords: [
+      "stocktake",
+      "cycle count",
+      "quarantine",
+      "recall",
+      "expiry redistribution",
+      "rack",
+      "audit",
+    ],
+  },
+  {
+    slug: "purchases-grn-and-central-po",
+    title: "Purchase Orders, GRN Invoice OCR & Central Purchasing",
+    summary:
+      "Generate smart POs from Reorder Suggestions, consolidate multi-branch Central POs, inward supplier bills with OCR, and process expiry returns.",
+    category: "purchasing",
+    readMinutes: 4,
+    badge: "Procurement",
+    targetRole: "Purchase Manager, Store Manager",
+    actionRoute: "/dashboard/purchases/orders",
+    actionLabel: "Open Purchase Orders",
+    steps: [
+      {
+        title: "1. Reorder Suggestions & Central Purchasing",
+        content:
+          "Check Purchases -> Reorder Suggestions for low-stock alerts based on sales velocity, or use Central Purchasing to raise consolidated multi-branch POs.",
+      },
+      {
+        title: "2. Inward Stock via Purchases (GRN) + Invoice OCR",
+        content:
+          "Open Purchases (GRN) -> New Purchase and upload a photo or PDF of the supplier's tax invoice. AI OCR extracts batch numbers, expiry dates, free qty, schemes, and GST.",
+        tip: "Always verify free quantity (scheme) and PTR/MRP margins before approving the GRN.",
+      },
+      {
+        title: "3. Purchase Returns & Expiry Returns",
+        content:
+          "Return non-moving or expired stock to distributors via Purchase Returns or Expiry Returns to generate supplier debit notes and adjust ITC.",
+      },
+    ],
+    faqs: [
+      {
+        q: "Does GRN automatically update my GST GSTR-2B reconciliation?",
+        a: "Yes. Approved GRNs post inward taxable values and CGST/SGST/IGST directly into the GST Inward register for GSTR-2B matching.",
+      },
+    ],
+    relatedSlugs: ["stock-ocr-and-csv-import", "gst-filing", "accounting-and-day-book"],
+    keywords: [
+      "purchase",
+      "grn",
+      "po",
+      "reorder",
+      "central purchasing",
+      "supplier",
+      "debit note",
+      "expiry return",
+      "invoice ocr",
+    ],
+  },
+  {
+    slug: "accounting-and-day-book",
+    title: "Day Book, Expenses, Ledgers & Financial Statements",
+    summary:
+      "Review daily double-entry vouchers in Day Book, log expenses, reconcile bank statements, and export Trial Balance, P&L, and Balance Sheet.",
+    category: "purchasing",
+    readMinutes: 4,
+    badge: "Double-Entry",
+    targetRole: "Accountant, Business Owner",
+    actionRoute: "/dashboard/accounting/day-book",
+    actionLabel: "Open Day Book",
+    steps: [
+      {
+        title: "1. Review Daily Vouchers in Day Book",
+        content:
+          "Every POS sale, credit note, GRN purchase, supplier payment, and receipt automatically posts balanced ledger entries visible in Accounting -> Day Book.",
+      },
+      {
+        title: "2. Record Store Expenses & Customer Receipts",
+        content:
+          "Log rent, electricity, salaries, and courier expenses under Accounting -> Expenses, and record credit-customer settlements under Receipts / Receivables.",
+      },
+      {
+        title: "3. Bank Reconciliation & Outstanding",
+        content:
+          "Match UPI/card settlements and bank transfers in Bank Reconciliation, and monitor supplier payables in Outstanding.",
+      },
+      {
+        title: "4. Trial Balance, P&L, Balance Sheet & Year-End",
+        content:
+          "Inspect real-time Trial Balance, Profit & Loss, Cash Flow, and Balance Sheet, lock closed periods, and run Year-End closing when the financial year ends.",
+      },
+    ],
+    faqs: [
+      {
+        q: "Do I need to manually post sales into accounting?",
+        a: "No. POS bills, returns, and GRNs auto-post double-entry journal vouchers in real time.",
+      },
+    ],
+    relatedSlugs: ["gst-filing", "cash-register-shifts", "purchases-grn-and-central-po"],
+    keywords: [
+      "accounting",
+      "day book",
+      "ledger",
+      "expense",
+      "bank reconciliation",
+      "trial balance",
+      "profit loss",
+      "balance sheet",
+      "year end",
+    ],
+  },
+  {
+    slug: "gst-filing",
+    title: "Monthly GST Filing & GSTR-1/2B Reconciliation",
+    summary:
+      "Step-by-step instructions for exporting GSTR-1 JSON for GSTN Offline Tool v1.4, matching 2B ITC, and handing off to your CA.",
+    category: "compliance",
+    readMinutes: 4,
+    badge: "Statutory Filing",
+    targetRole: "Accountant, Business Owner",
+    actionRoute: "/dashboard/accounting/export",
+    actionLabel: "Download CA Audit Pack",
+    steps: [
+      {
+        title: "1. Close the Month-End Period",
+        content:
+          "Ensure all counter cash sessions are reconciled and supplier purchase invoices for the tax period are approved.",
+      },
+      {
+        title: "2. Reconcile Inward ITC with GSTR-2B",
+        content:
+          "Open GST -> GSTR-2B and upload your portal JSON. MediFlow matches supplier invoices within 16(2)(aa) tolerance and flags blocked ITC or missing filings.",
+      },
+      {
+        title: "3. Export Official GSTR-1 JSON",
+        content:
+          "Open CA Audit Pack in Accounting. Click 'Export GSTR-1 JSON'. The file strictly conforms to GSTN Offline Tool v1.4 (B2B, B2CS, CDNR, HSN data).",
+      },
+      {
+        title: "4. Hand Off Audit Pack to CA",
+        content:
+          "Download the complete ZIP containing Sales Register CSV, Purchase Register CSV with ITC flags, Trial Balance, and Stock Valuation.",
+      },
+    ],
+    faqs: [
+      {
+        q: "Does the GSTR-1 JSON require manual corrections?",
+        a: "No. The schema is pre-validated with GSTN Offline Tool specs including UQC, state codes, and rate breakdowns.",
+      },
+    ],
+    relatedSlugs: ["sales-returns", "stock-transfers", "accounting-and-day-book"],
+    keywords: ["gst", "gstr1", "gstr2b", "itc", "tax", "offline tool", "audit", "ca pack"],
+  },
+  {
+    slug: "narcotics-compliance",
+    title: "Schedule H1, Narcotics & Drug License Compliance",
+    summary:
+      "Drugs and Cosmetics Rule 65(9)(b) statutory record keeping for Habit Forming, Schedule X, H1 dispensations, and Drug License expiry tracking.",
+    category: "compliance",
+    readMinutes: 3,
+    badge: "D&C Rules 1945",
+    targetRole: "Dispensing Pharmacist, Owner",
+    actionRoute: "/dashboard/compliance/export",
+    actionLabel: "Download Inspector Pack",
+    steps: [
+      {
+        title: "1. Automated Schedule Flagging at POS",
+        content:
+          "When a Schedule H, H1, X, or Narcotic formulation is added to the cart, MediFlow requires prescriber details and patient info inside the Doctor & Prescription panel.",
+      },
+      {
+        title: "2. Register Entry Commitment",
+        content:
+          "Each completed transaction writes directly to the immutable statutory register with patient details, doctor registration number, batch, and dispensing pharmacist.",
+      },
+      {
+        title: "3. Drug License Renewal Alerts",
+        content:
+          "Track Form 20, 21, and 20B/21B licenses per branch in Compliance -> Licenses & Renewals. Dashboard alerts warn before any branch license expires.",
+      },
+      {
+        title: "4. One-Click Drug Inspector Export",
+        content:
+          "When a Drug Inspector visits, go to Compliance -> Export. Click 'Download Inspector Pack' for clean Form 20/21/65(9)(b) CSV registers.",
+      },
+    ],
+    faqs: [
+      {
+        q: "How long are Schedule H1 registers retained?",
+        a: "By Indian law, Schedule H1 registers must be preserved for a minimum of 3 years from the date of entry.",
+      },
+    ],
+    relatedSlugs: ["first-bill", "gst-filing"],
+    keywords: [
+      "schedule h",
+      "schedule h1",
+      "narcotics",
+      "drug inspector",
+      "rule 65",
+      "pharmacist",
+      "drug license",
+      "form 20",
+      "form 21",
+    ],
+  },
+  {
+    slug: "ask-mediflow-ai",
+    title: "Ask MediFlow AI Assistant (Ctrl+J) & Command Palette",
+    summary:
+      "Use the movable Ask MediFlow AI assistant to query live store metrics, expiring stock, and operational questions from anywhere in the app.",
+    category: "ai-tools",
+    readMinutes: 2,
+    badge: "AI Assistant",
+    targetRole: "All Staff, Store Manager",
+    actionRoute: "/dashboard",
+    actionLabel: "Go to Overview",
+    steps: [
+      {
+        title: "1. Open Ask MediFlow Anywhere",
+        content:
+          "Press Ctrl+J (or click the floating 'Ask MediFlow' pill) from any dashboard screen to open the AI assistant.",
+        shortcutKey: "Ctrl+J",
+      },
+      {
+        title: "2. Drag & Position the Pill Freely",
+        content:
+          "Drag the 'Ask MediFlow' pill anywhere on your screen so it never covers buttons or tables. Your preferred position is remembered automatically.",
+      },
+      {
+        title: "3. Ask Natural-Language Store Questions",
+        content:
+          "Ask about today's revenue, low-stock medicines, near-expiry batches, GST summaries, or how to perform a MediFlow workflow.",
+      },
+      {
+        title: "4. Jump Faster with Command Palette",
+        content:
+          "Press Cmd+K / Ctrl+K (or click the top search bar) to jump straight to any screen, setting, or Ask MediFlow.",
+        shortcutKey: "Ctrl+K / Cmd+K",
+      },
+    ],
+    faqs: [
+      {
+        q: "Can I move the Ask MediFlow button if it overlaps a sidebar item?",
+        a: "Yes. Grab and drag the Ask MediFlow pill anywhere on the screen; it snaps cleanly inside the viewport and remembers its position.",
+      },
+    ],
+    relatedSlugs: ["custom-billing-templates", "stock-ocr-and-csv-import"],
+    keywords: [
+      "ai",
+      "ask mediflow",
+      "assistant",
+      "ctrl+j",
+      "command palette",
+      "draggable",
+      "movable",
+      "chat",
+    ],
+  },
+  {
+    slug: "custom-billing-templates",
+    title: "Custom HTML Billing Templates, Bill OCR & Printer Defaults",
+    summary:
+      "Design custom A4 or 80mm invoices by scanning a physical bill photo via OCR, uploading HTML, editing placeholders, and setting branch printer defaults.",
+    category: "ai-tools",
+    readMinutes: 4,
+    badge: "OCR & Custom HTML",
+    targetRole: "Store Manager, Owner",
+    actionRoute: "/dashboard/settings/printers",
+    actionLabel: "Open Printer & Template Settings",
+    steps: [
+      {
+        title: "1. Choose A4 GST Invoice or 80mm Thermal Slip",
+        content:
+          "Open Settings -> Billing Templates & Printer Settings and toggle between A4 GST Invoice and 80mm Thermal Slip formats for the selected branch.",
+      },
+      {
+        title: "2. Scan a Physical Bill Photo (OCR) or Upload .html",
+        content:
+          "Click 'Scan Bill Photo (OCR)' to convert a photo/PDF of your existing printed pharmacy bill into clean HTML + CSS, or upload your own .html template.",
+        tip: "Click any {{placeholder}} chip below the editor to insert store, patient, batch, or GST totals at your cursor.",
+      },
+      {
+        title: "3. Verify Live Sample Preview & Test Print",
+        content:
+          "Inspect the live rendered preview on the right (use Fit / 100% zoom for A4), click 'Test Print' to verify paper margins, then click 'Save & Activate'.",
+      },
+      {
+        title: "4. Configure Branch Printer Defaults",
+        content:
+          "Switch to the 'Branch Printer Defaults' tab to set whether the branch defaults to 80mm Continuous, 58mm Mini Roll, or A4 GST Tax Invoice at POS checkout.",
+      },
+    ],
+    faqs: [
+      {
+        q: "Can I revert to MediFlow's standard invoice anytime?",
+        a: "Yes. Click 'Use Default' on the MediFlow Built-in Default card to restore the standard GST-compliant layout immediately.",
+      },
+    ],
+    relatedSlugs: ["first-bill", "stock-ocr-and-csv-import"],
+    keywords: [
+      "printer",
+      "template",
+      "html",
+      "ocr",
+      "80mm",
+      "58mm",
+      "a4",
+      "thermal",
+      "receipt design",
+      "cash drawer",
+    ],
+  },
+  {
+    slug: "promise-orders-and-whatsapp",
+    title: "Promise Orders, Refill Reminders & WhatsApp Receipts",
+    summary:
+      "Capture out-of-stock patient demand with Promise Orders, automate chronic refill reminders, and send WhatsApp invoices.",
+    category: "ai-tools",
+    readMinutes: 3,
+    badge: "Patient Retention",
+    targetRole: "Cashier, Pharmacist, Store Manager",
+    actionRoute: "/dashboard/sales/promise-orders",
+    actionLabel: "Open Promise Orders",
+    steps: [
+      {
+        title: "1. Log a Promise Order for Out-of-Stock Items",
+        content:
+          "If a requested medicine is out of stock at POS, create a Promise Order with the patient's phone number and expected arrival date so you never lose the sale.",
+      },
+      {
+        title: "2. Send Automated WhatsApp Bills & Updates",
+        content:
+          "Configure WhatsApp templates under Settings -> WhatsApp and monitor delivery status in the WhatsApp dashboard.",
+      },
+      {
+        title: "3. Chronic Medicine Refill Reminders",
+        content:
+          "Track upcoming monthly refills in Reminders so staff can message chronic-care patients before their strip runs out.",
+      },
+    ],
+    faqs: [
+      {
+        q: "How is customer messaging consent handled?",
+        a: "Customer privacy preferences and opt-outs can be managed from each customer's Privacy page and Settings -> Privacy.",
+      },
+    ],
+    relatedSlugs: ["first-bill", "margins-and-discounts"],
+    keywords: [
+      "promise order",
+      "whatsapp",
+      "refill",
+      "reminder",
+      "out of stock",
+      "chronic",
+      "consent",
+    ],
+  },
+  {
+    slug: "offline-mode",
+    title: "Counter Continuity & Offline Auto-Sync",
+    summary:
+      "How MediFlow protects billing when broadband drops, utilizing local SQLite/IndexedDB caching and conflict-free sync recovery.",
+    category: "offline",
+    readMinutes: 3,
+    badge: "Zero-Downtime",
+    targetRole: "All Counter Staff",
+    actionRoute: "/dashboard/sales/pos",
+    actionLabel: "Inspect POS Counter",
+    steps: [
+      {
+        title: "1. Automatic Offline Detection",
+        content:
+          "If the internet connection drops, MediFlow instantly switches to Offline Counter Mode. The header status badge updates to indicate offline continuity.",
+      },
+      {
+        title: "2. Local Product & Price Lookup",
+        content:
+          "The local SQLite / browser store holds the branch's medicine catalog, batch stock, and customer balances for zero-latency queries.",
+      },
+      {
+        title: "3. Provisional Offline Invoicing",
+        content:
+          "Bills continue printing with provisional offline invoice numbers. Stock deductions are reserved locally so the counter never stops.",
+      },
+      {
+        title: "4. Automatic Sync on Reconnection",
+        content:
+          "As soon as connectivity restores, MediFlow's background sync engine batches pending sales, reserves official 16-char GST numbers, and updates cloud ledgers.",
+      },
+    ],
+    faqs: [
+      {
+        q: "Will I lose sales if the computer restarts during an outage?",
+        a: "No. Every line item is committed locally before the receipt prints and syncs automatically once online.",
+      },
+    ],
+    relatedSlugs: ["first-bill", "stock-transfers"],
+    keywords: ["offline", "sync", "sqlite", "connectivity", "outage", "resilience"],
   },
 ];
 
@@ -280,7 +781,10 @@ export function getHelpArticleBySlug(slug: string): HelpArticle | undefined {
   return HELP_ARTICLES.find((a) => a.slug === slug);
 }
 
-export function searchHelpArticles(query: string, category?: HelpCategory | "all"): HelpArticle[] {
+export function searchHelpArticles(
+  query: string,
+  category?: HelpCategory | "all"
+): HelpArticle[] {
   const q = query.toLowerCase().trim();
   return HELP_ARTICLES.filter((article) => {
     if (category && category !== "all" && article.category !== category) return false;
@@ -288,9 +792,10 @@ export function searchHelpArticles(query: string, category?: HelpCategory | "all
     return (
       article.title.toLowerCase().includes(q) ||
       article.summary.toLowerCase().includes(q) ||
-      article.keywords.some((kw) => kw.includes(q)) ||
-      article.steps.some((s) => s.title.toLowerCase().includes(q) || s.content.toLowerCase().includes(q))
+      article.keywords.some((kw) => kw.toLowerCase().includes(q)) ||
+      article.steps.some(
+        (s) => s.title.toLowerCase().includes(q) || s.content.toLowerCase().includes(q)
+      )
     );
   });
 }
-
