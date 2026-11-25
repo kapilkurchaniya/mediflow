@@ -49,6 +49,26 @@ describe("Task B6.5: User Help & In-App Task Guides", () => {
       expect(offlineMode).toBeDefined();
       expect(offlineMode?.category).toBe("offline");
     });
+
+    it("includes guides for AI tools, custom templates, purchasing, shifts, and accounting", () => {
+      const modernSlugs = [
+        "ask-mediflow-ai",
+        "custom-billing-templates",
+        "stock-ocr-and-csv-import",
+        "purchases-grn-and-central-po",
+        "cash-register-shifts",
+        "accounting-and-day-book",
+        "promise-orders-and-whatsapp",
+        "stocktake-quarantine-and-licenses",
+      ];
+
+      for (const slug of modernSlugs) {
+        const article = getHelpArticleBySlug(slug);
+        expect(article, `Missing modern guide: ${slug}`).toBeDefined();
+        expect(article?.steps.length).toBeGreaterThanOrEqual(3);
+        expect(article?.actionRoute).toBeTruthy();
+      }
+    });
   });
 
   describe("Help Search & Category Indexing", () => {

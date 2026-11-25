@@ -14,12 +14,23 @@ import {
   Boxes,
   ShieldCheck,
   WifiOff,
+  Receipt,
+  Wand2,
 } from "lucide-react";
 import { type HelpArticle, type HelpCategory } from "@/server/domain/help/catalog";
 
 interface HelpSearchClientProps {
   initialArticles: HelpArticle[];
 }
+
+const CATEGORY_LABELS: Record<HelpCategory, string> = {
+  billing: "Counter Billing",
+  inventory: "Stock & Transfers",
+  purchasing: "Purchasing & Accounts",
+  compliance: "GST & Compliance",
+  "ai-tools": "AI, Printers & Channels",
+  offline: "Offline Mode",
+};
 
 export function HelpSearchClient({ initialArticles }: HelpSearchClientProps) {
   const [query, setQuery] = useState("");
@@ -29,7 +40,9 @@ export function HelpSearchClient({ initialArticles }: HelpSearchClientProps) {
     { id: "all", label: "All SOP Guides", icon: <BookOpen className="h-3.5 w-3.5" /> },
     { id: "billing", label: "Counter Billing", icon: <FileText className="h-3.5 w-3.5" /> },
     { id: "inventory", label: "Stock & Transfers", icon: <Boxes className="h-3.5 w-3.5" /> },
+    { id: "purchasing", label: "Purchasing & Accounts", icon: <Receipt className="h-3.5 w-3.5" /> },
     { id: "compliance", label: "GST & Compliance", icon: <ShieldCheck className="h-3.5 w-3.5" /> },
+    { id: "ai-tools", label: "AI, Printers & Channels", icon: <Wand2 className="h-3.5 w-3.5" /> },
     { id: "offline", label: "Offline Mode", icon: <WifiOff className="h-3.5 w-3.5" /> },
   ];
 
@@ -57,7 +70,7 @@ export function HelpSearchClient({ initialArticles }: HelpSearchClientProps) {
           type="search"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search task guides (e.g. 'first bill', 'fefo', 'credit note', 'gstr1', 'offline')..."
+          placeholder="Search guides (e.g. 'first bill', 'ask mediflow', 'template ocr', 'grn', 'shift', 'gstr1', 'offline')..."
           className="w-full rounded-xl border border-ink-200 bg-white py-3 pl-10 pr-4 text-sm text-ink-900 placeholder:text-ink-400 shadow-2xs focus:border-primary-500 focus:outline-hidden focus:ring-2 focus:ring-primary-100"
         />
       </div>
@@ -104,7 +117,7 @@ export function HelpSearchClient({ initialArticles }: HelpSearchClientProps) {
                 <div className="flex items-center justify-between gap-2">
                   <span className="inline-flex items-center gap-1 rounded-md bg-ink-100 px-2 py-0.5 text-[11px] font-semibold text-ink-700 uppercase tracking-wider">
                     <Tag className="h-3 w-3" />
-                    {guide.category}
+                    {CATEGORY_LABELS[guide.category]}
                   </span>
                   <div className="flex items-center gap-1 text-[11px] font-medium text-ink-400">
                     <Clock className="h-3 w-3" />
