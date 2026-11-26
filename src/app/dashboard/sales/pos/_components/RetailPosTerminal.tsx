@@ -474,6 +474,8 @@ export function RetailPosTerminal() {
           onOpenSubstitutes={(gen) => setSubstituteGeneric(gen)}
           onFocusSearch={() => searchInputRef.current?.focus()}
         />
+
+        <LiveKeybar scope="pos" profile={shortcutProfile} />
       </div>
 
       <div className="w-full lg:w-80 flex flex-col space-y-3 shrink-0 lg:h-full lg:min-h-0">
@@ -566,8 +568,6 @@ export function RetailPosTerminal() {
         storeName={currentStore?.name}
         storeCode={currentStore?.code}
       />
-
-      <LiveKeybar scope="pos" profile={shortcutProfile} />
     </div>
   );
 }
