@@ -21,7 +21,7 @@ export const recordReceipt = protectedAction("accounting.post")
   .inputSchema(
     z.object({
       customerId: uuid,
-      method: z.enum(["cash", "upi", "card", "bank"]),
+      method: z.enum(["cash", "upi", "card", "bank", "cheque", "neft", "rtgs"]),
       paymentDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Choose the date"),
       reference: z.string().trim().max(64).optional(),
       note: z.string().trim().max(500).optional(),
