@@ -126,6 +126,27 @@ const REPORT_CATEGORIES = [
         icon: Receipt,
         badge: "Compliance",
       },
+      {
+        href: "/dashboard/reports/tb-register",
+        title: "Anti-TB Drug Register",
+        desc: "Tuberculosis molecule dispensing register with patient, prescriber, and batch audit.",
+        icon: FileInput,
+        badge: "TB / H1",
+      },
+      {
+        href: "/dashboard/reports/patient-doctor",
+        title: "Patient & Doctor-wise Sales",
+        desc: "Patient purchase history, prescriber analytics, and Doctor × Company breakdown.",
+        icon: Users,
+        badge: "Analytics",
+      },
+      {
+        href: "/dashboard/reports/business-analysis",
+        title: "Business Analysis Pivot",
+        desc: "Margin, COGS, and turnover pivoted by Manufacturer, Category, or Medicine.",
+        icon: BarChart3,
+        badge: "Margin",
+      },
     ],
   },
 ];

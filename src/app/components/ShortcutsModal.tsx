@@ -2,7 +2,9 @@
 
 import React from "react";
 import Link from "next/link";
-import { X, Keyboard, ScanLine, Search, Layout, Sparkles, Calculator, Navigation, ShoppingBag, BookOpen } from "lucide-react";
+import { useState } from "react";
+import { X, Keyboard, ScanLine, Search, Layout, Sparkles, Calculator, Navigation, ShoppingBag, BookOpen, Printer } from "lucide-react";
+import { getBindingsForScope, type ShortcutProfile } from "@/lib/keyboard/keymap-registry";
 import { useShell } from "./ShellContext";
 
 interface ShortcutGroup {
@@ -13,7 +15,7 @@ interface ShortcutGroup {
 
 const SHORTCUT_GROUPS: ShortcutGroup[] = [
   {
-    title: "Marg ERP Counter Billing",
+    title: "Counter Billing (Classic Keys)",
     icon: <ScanLine className="h-4 w-4 text-brand-600" />,
     shortcuts: [
       { key: "F2 / Alt + N", label: "New sale counter / Reset bill" },
@@ -23,7 +25,7 @@ const SHORTCUT_GROUPS: ShortcutGroup[] = [
       { key: "F6", label: "Park (hold) active bill" },
       { key: "F7", label: "Recall parked bills list" },
       { key: "F8", label: "Open split tender & customer credit" },
-      { key: "F9", label: "Substitute molecule / salt finder" },
+      { key: "F9", label: "Create promise order (out-of-stock item)" },
       { key: "F12 / Alt + F12", label: "Open floating counter calculator" },
       { key: "Esc", label: "Cancel search / close active dialog" },
     ],
@@ -47,7 +49,7 @@ const SHORTCUT_GROUPS: ShortcutGroup[] = [
       { key: "Alt + P", label: "Jump to New Purchase Bill (GRN)" },
       { key: "Alt + M", label: "Jump to Sales Register (Modify Bill)" },
       { key: "Alt + I", label: "Jump to Inventory & Batch Stock" },
-      { key: "Alt + L", label: "Jump to Customer Ledgers / Accounts" },
+      { key: "Alt + L", label: "Jump to All Ledgers (Accounting)" },
     ],
   },
   {
@@ -65,8 +67,11 @@ const SHORTCUT_GROUPS: ShortcutGroup[] = [
 
 export function ShortcutsModal() {
   const { shortcutsOpen, setShortcutsOpen } = useShell();
+  const [profile, setProfile] = useState<ShortcutProfile>("mediflow");
 
   if (!shortcutsOpen) return null;
+
+  const posRegistry = getBindingsForScope("pos", profile);
 
   return (
     <div
@@ -105,6 +110,38 @@ export function ShortcutsModal() {
         </div>
 
         <div className="max-h-[460px] overflow-y-auto p-5 space-y-5">
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-[12px] font-semibold text-ink-700 uppercase tracking-wider">
+                POS Profile Keys ({profile === "marg" ? "Marg Classic" : "MediFlow"})
+              </span>
+              <div className="inline-flex rounded-lg border border-ink-200 overflow-hidden text-[11px]">
+                <button
+                  type="button"
+                  onClick={() => setProfile("mediflow")}
+                  className={`px-2 py-0.5 ${profile === "mediflow" ? "bg-brand-600 text-white font-semibold" : "bg-white text-ink-600"}`}
+                >
+                  MediFlow
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setProfile("marg")}
+                  className={`px-2 py-0.5 ${profile === "marg" ? "bg-brand-600 text-white font-semibold" : "bg-white text-ink-600"}`}
+                >
+                  Marg Classic
+                </button>
+              </div>
+            </div>
+            <div className="divide-y divide-ink-100 rounded-lg border border-ink-150 bg-ink-25/50 overflow-hidden">
+              {posRegistry.map((b) => (
+                <div key={b.id} className="flex items-center justify-between px-3.5 py-2 text-[13px]">
+                  <span className="text-ink-700">{b.label}</span>
+                  <span className="kbd font-mono text-[11px]">{b.keyLabel}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
           {SHORTCUT_GROUPS.map((group, idx) => (
             <div key={idx} className="space-y-2">
               <div className="flex items-center gap-2 text-[12px] font-semibold text-ink-700 uppercase tracking-wider">
@@ -135,13 +172,23 @@ export function ShortcutsModal() {
             <BookOpen className="h-3.5 w-3.5" />
             <span>Looking for full task guides? Open Help Center</span>
           </Link>
-          <button
-            type="button"
-            onClick={() => setShortcutsOpen(false)}
-            className="btn btn-secondary btn-sm"
-          >
-            Got it
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => window.print()}
+              className="btn btn-ghost btn-sm"
+              title="Print keyboard shortcut reference"
+            >
+              <Printer className="h-3.5 w-3.5" /> Print Strip
+            </button>
+            <button
+              type="button"
+              onClick={() => setShortcutsOpen(false)}
+              className="btn btn-secondary btn-sm"
+            >
+              Got it
+            </button>
+          </div>
         </div>
       </div>
     </div>

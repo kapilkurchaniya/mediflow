@@ -99,6 +99,14 @@ export function posCartReducer(state: PosState, action: PosAction): PosState {
       };
     }
 
+    case "UPDATE_LINE_DAYS_SUPPLY":
+      return {
+        ...state,
+        cart: state.cart.map((l) =>
+          l.batchId === action.payload.batchId ? { ...l, daysSupply: action.payload.daysSupply } : l,
+        ),
+      };
+
     case "UPDATE_LINE_BATCH": {
       const { oldBatchId, newBatch, reason } = action.payload;
       const isOverride = Boolean(reason);
@@ -129,8 +137,24 @@ export function posCartReducer(state: PosState, action: PosAction): PosState {
       };
     }
 
-    case "REMOVE_LINE":
-      return { ...state, cart: state.cart.filter((l) => l.batchId !== action.payload.batchId) };
+    case "REMOVE_LINE": {
+      const removed = state.cart.find((l) => l.batchId === action.payload.batchId) ?? null;
+      return {
+        ...state,
+        cart: state.cart.filter((l) => l.batchId !== action.payload.batchId),
+        lastRemovedLine: removed,
+      };
+    }
+
+    case "UNDO_REMOVE_LINE": {
+      if (!state.lastRemovedLine) return state;
+      const exists = state.cart.some((l) => l.batchId === state.lastRemovedLine!.batchId);
+      return {
+        ...state,
+        cart: exists ? state.cart : [state.lastRemovedLine, ...state.cart],
+        lastRemovedLine: null,
+      };
+    }
 
     case "CLEAR_CART":
       return { ...state, cart: [] };

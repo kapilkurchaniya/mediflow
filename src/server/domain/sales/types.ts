@@ -41,6 +41,7 @@ export const SaleLineSchema = z
     autoFefo: z.boolean().optional(),
     overrideBatch: z.boolean().optional(),
     overrideReason: z.string().trim().max(255).optional(),
+    daysSupply: z.number().int().min(1).max(365).optional(),
   })
   .refine(
     (l) => Boolean(l.batchId || l.medicineId),

@@ -60,6 +60,12 @@ fn poll_watch_folder(channel: String) -> Result<Vec<ScannedDocument>, String> {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_single_instance::init(|_app, _args, _cwd| {}))
+        .on_window_event(|_window, event| {
+            if let tauri::WindowEvent::CloseRequested { .. } = event {
+                // Allow webview/React beforeunload or draft persistence to flush before exit
+            }
+        })
         .invoke_handler(tauri::generate_handler![
             list_printers,
             print_raw,

@@ -3,6 +3,7 @@
 import { db, schema } from "@/server/db";
 import { eq, and, desc, ilike, or, sql, inArray } from "drizzle-orm";
 import { requirePermission, checkPermission, can } from "@/server/rbac";
+import { redactMedicineCost } from "@/server/redact";
 import { writeAudit } from "@/server/audit";
 import { recordStockMovement } from "@/server/domain/stock";
 import { DEFAULT_GST_RATE_BP, isValidGstRateBp } from "@/lib/regulatory";
@@ -246,7 +247,7 @@ export async function getMedicines(
   const ctx = await requirePermission("medicine.view");
   const conditions = buildMedicineSearchConditions(ctx.tenantId, searchQuery, packFilter, statusFilter);
 
-  return db
+  const rows = await db
     .select({
       medicine: schema.medicines,
       manufacturer: schema.manufacturers,
@@ -277,6 +278,11 @@ export async function getMedicines(
     .orderBy(desc(schema.medicines.createdAt))
     .limit(limit)
     .offset(offset);
+
+  return rows.map((r) => ({
+    ...r,
+    medicine: redactMedicineCost(r.medicine, ctx),
+  }));
 }
 
 export async function createMedicine(formData: FormData) {

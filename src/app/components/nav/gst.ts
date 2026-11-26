@@ -9,4 +9,5 @@ export const gstNav: NavItem[] = [
   { group: "gst", order: 40, href: "/dashboard/gst/e-invoice", label: "E-Invoice & E-Way", icon: QrCode, description: "NIC IRN E-Invoice generation, QR codes & status tracking", permission: "gst.view" },
   { group: "gst", order: 45, href: "/dashboard/gst/e-way-bill", label: "E-Way Bills", icon: Truck, description: "Generate, update vehicle details & print GST E-Way Bills", permission: "gst.view" },
   { group: "gst", order: 50, href: "/dashboard/gst/returns", label: "Returns & Filing", icon: Landmark, description: "Export GSTR-1 JSON / CSV & track monthly GST return filing", permission: "gst.view" },
+  { group: "gst", order: 55, href: "/dashboard/gst/ims-and-tax", label: "Composition & TDS", icon: FileCheck, description: "1% CMP-08 composition tax, 194Q/194H TDS & GSTR-9", permission: "gst.view" },
 ];

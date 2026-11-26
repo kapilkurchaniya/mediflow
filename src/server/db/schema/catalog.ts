@@ -114,3 +114,25 @@ export type Medicine = typeof medicines.$inferSelect;
 export type NewMedicine = typeof medicines.$inferInsert;
 export type StoreMedicineSetting = typeof storeMedicineSettings.$inferSelect;
 export type NewStoreMedicineSetting = typeof storeMedicineSettings.$inferInsert;
+
+/** Global / Tenant Indian Drug Master reference catalog (B1). */
+export const drugMaster = pgTable(
+  "drug_master",
+  {
+    id: id(),
+    brandName: text("brand_name").notNull(),
+    genericName: text("generic_name").notNull(),
+    manufacturer: text("manufacturer"),
+    hsn: text("hsn").notNull().default("30049099"),
+    gstRateBp: integer("gst_rate_bp").notNull().default(1200),
+    schedule: text("schedule").notNull().default("none"), // none | G | H | H1 | X | narcotic
+    packSize: text("pack_size"),
+    mrpPaise: bigint("mrp_paise", { mode: "number" }),
+    isBannedFdc: boolean("is_banned_fdc").notNull().default(false),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    index("drug_master_brand_idx").on(t.brandName),
+    index("drug_master_generic_idx").on(t.genericName),
+  ],
+);

@@ -3,6 +3,7 @@
 import { useState, useCallback, useEffect, useMemo, useRef, type FormEvent } from "react";
 import { Search, Sparkles, BookmarkCheck, Layers, AlertCircle } from "lucide-react";
 import { formatINR } from "@/lib/format";
+import { parsePackBarcode } from "@/lib/barcode/gs1-parser";
 import {
   lookupInstantPosSearchCache,
   type PosDataSource,
@@ -83,17 +84,24 @@ export function SearchBar({
       }
 
       try {
-        const items = await dataSource.searchItems(trimmed, controller.signal);
+        const parsedPack = parsePackBarcode(trimmed);
+        const searchTerm =
+          parsedPack.format !== "plain" ? (parsedPack.gtin || parsedPack.batchNo || trimmed) : trimmed;
+        const items = await dataSource.searchItems(searchTerm, controller.signal);
         if (controller.signal.aborted || seq !== searchSeqRef.current) return;
 
         setResults(items);
         setHighlightedIndex(0);
 
-        // Auto-add on exact barcode match with single in-stock batch
-        const isBarcode = /^\d{8,14}$/.test(trimmed);
+        // Auto-add on exact barcode match or GS1/H2 pack QR match
+        const isBarcode = /^\d{8,14}$/.test(trimmed) || parsedPack.format !== "plain";
         if (isBarcode && items.length === 1 && items[0].batches.length > 0) {
-          const firstBatch = items[0].batches[0];
-          onSelectBatch(items[0].medicine, firstBatch, items[0].batches);
+          const matchedBatch = parsedPack.batchNo
+            ? (items[0].batches.find(
+                (b) => b.batchNo.toLowerCase() === parsedPack.batchNo?.toLowerCase(),
+              ) ?? items[0].batches[0])
+            : items[0].batches[0];
+          onSelectBatch(items[0].medicine, matchedBatch, items[0].batches);
           playSound("beep");
           setQuery("");
           setResults([]);
@@ -173,6 +181,12 @@ export function SearchBar({
             ? `"${oosMatch.medicine.name}" is currently out of stock (0 available). Use Substitutes or Promise Order below.`
             : `No in-stock medicine found matching "${query.trim()}".`
         );
+      }
+    } else if (e.key === "*") {
+      const oosMatch = results.find((r) => r.batches.length === 0) ?? results[0];
+      if (oosMatch) {
+        e.preventDefault();
+        onOpenPromiseOrder({ id: oosMatch.medicine.id, name: oosMatch.medicine.name });
       }
     } else if (e.key === "Escape") {
       e.preventDefault();

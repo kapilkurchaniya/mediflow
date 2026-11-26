@@ -274,6 +274,13 @@
       "when": 1795255245934,
       "tag": "0038_pending_supplier_meta",
       "breakpoints": true
+    },
+    {
+      "idx": 39,
+      "version": "7",
+      "when": 1795700000000,
+      "tag": "0039_marg_parity",
+      "breakpoints": true
     }
   ]
 }

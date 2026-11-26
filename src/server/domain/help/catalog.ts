@@ -57,8 +57,8 @@ export const HELP_ARTICLES: HelpArticle[] = [
       {
         title: "2. Search Formulation or Scan Barcode",
         content:
-          "Press F3 (or '/' or Insert) to focus the search bar, then type a brand/generic name or scan an EAN-13 barcode. Use Alt+N to quickly add a new Customer.",
-        shortcutKey: "F3 / Alt+N",
+          "Press F3 (or '/' or Insert) to focus the search bar, then type a brand/generic name or scan an EAN-13 barcode. Click '+ New' in Customer & Loyalty to add a customer inline.",
+        shortcutKey: "F3",
         tip: "MediFlow automatically suggests active generic substitutes or Promise Orders if the requested brand is out of stock.",
       },
       {
@@ -202,7 +202,7 @@ export const HELP_ARTICLES: HelpArticle[] = [
     slug: "margins-and-discounts",
     title: "Trade Discounts, MRP Caps & Customer Loyalty",
     summary:
-      "Configure customer tier discounts, enforce NPPA ceiling prices, and redeem loyalty points at counter checkout.",
+      "Configure customer tier discounts, enforce store discount limits, and redeem loyalty points at counter checkout.",
     category: "billing",
     readMinutes: 3,
     badge: "Pricing & Loyalty",
@@ -218,7 +218,7 @@ export const HELP_ARTICLES: HelpArticle[] = [
       {
         title: "2. Line-Level vs Invoice Discounts",
         content:
-          "Apply percentage or flat rupee discounts per line item or across the total bill. MediFlow verifies price stays below DPCO legal ceiling.",
+          "Apply percentage or flat rupee discounts per line item or across the total bill within configured store discount limits.",
       },
       {
         title: "3. Loyalty Point Redemption",

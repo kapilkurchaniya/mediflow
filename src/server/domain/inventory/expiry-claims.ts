@@ -4,6 +4,7 @@ import { DomainError } from "@/server/errors";
 import { nextDocNumber } from "@/server/domain/sequence";
 import { format } from "date-fns";
 import { postPurchaseReturnJournalEntry, getOrSeedAccounts } from "@/server/domain/accounting";
+import { postItcReversalJournalEntry } from "@/server/domain/accounting-vouchers";
 import { assertAccountingPeriodOpen } from "@/server/domain/accounting-periods";
 
 export interface QuarantineBatchInput {
@@ -474,6 +475,23 @@ export async function settleSupplierExpiryClaim(
           partyId: claim.supplierId,
         },
       ]);
+    }
+
+    // CGST s.17(5)(h) ITC reversal for written-off expired stock (standard 12% GST = 6% CGST + 6% SGST)
+    const cgstReversal = Math.round((claim.totalPaise * 600) / 10000);
+    const sgstReversal = cgstReversal;
+    if (cgstReversal + sgstReversal > 0) {
+      await postItcReversalJournalEntry({
+        tx,
+        tenantId,
+        storeId,
+        entryDate: entryDateStr,
+        cgstPaise: cgstReversal,
+        sgstPaise: sgstReversal,
+        igstPaise: 0,
+        narration: `ITC reversal u/s 17(5)(h) for written-off expiry claim ${claim.claimNo}`,
+        createdBy: userId,
+      });
     }
   }
 

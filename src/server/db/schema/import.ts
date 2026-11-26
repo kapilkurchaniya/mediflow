@@ -6,10 +6,12 @@ import {
   pgTable,
   text,
   timestamp,
+  uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
-import { id, createdAt } from "./_helpers";
+import { id, createdAt, money } from "./_helpers";
 import { stores, tenantId, users } from "./platform";
+import { medicines } from "./catalog";
 
 export interface ImportJobTotals {
   rows: number;
@@ -81,4 +83,28 @@ export type ImportJob = typeof importJobs.$inferSelect;
 export type NewImportJob = typeof importJobs.$inferInsert;
 export type ImportJobRow = typeof importJobRows.$inferSelect;
 export type NewImportJobRow = typeof importJobRows.$inferInsert;
+
+/** Persistent distributor item -> internal medicine mapping memory (C3). */
+export const supplierItemMap = pgTable(
+  "supplier_item_map",
+  {
+    id: id(),
+    tenantId: tenantId(),
+    supplierId: uuid("supplier_id"),
+    externalItemCode: text("external_item_code"),
+    externalItemName: text("external_item_name").notNull(),
+    normalizedName: text("normalized_name").notNull(),
+    medicineId: uuid("medicine_id")
+      .notNull()
+      .references(() => medicines.id, { onDelete: "cascade" }),
+    lastPurchaseRate: money("last_purchase_rate"),
+    useCount: integer("use_count").notNull().default(1),
+    createdAt: createdAt(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("supplier_item_map_uq").on(t.tenantId, t.supplierId, t.normalizedName),
+    index("supplier_item_map_med_idx").on(t.tenantId, t.medicineId),
+  ],
+);
 

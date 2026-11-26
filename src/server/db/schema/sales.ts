@@ -90,6 +90,8 @@ export const saleItems = pgTable(
     looseUnit: text("loose_unit").notNull().default("tablet"),
     packQty: integer("pack_qty").notNull().default(0),
     looseQty: integer("loose_qty").notNull().default(0),
+    freeQty: integer("free_qty").notNull().default(0),
+    schemeId: uuid("scheme_id"),
     returnedQty: integer("returned_qty").notNull().default(0),
     mrp: money("mrp"),
     rate: money("rate"),
@@ -196,7 +198,7 @@ export const cashMovements = pgTable(
   ],
 );
 
-export type BillingTemplateFormat = "a4" | "thermal_80mm";
+export type BillingTemplateFormat = "a4" | "a5" | "thermal_80mm" | "thermal_58mm";
 export type BillingTemplateSource = "manual" | "ocr";
 
 export const billingTemplates = pgTable(

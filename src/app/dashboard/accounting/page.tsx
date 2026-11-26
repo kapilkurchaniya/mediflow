@@ -91,6 +91,27 @@ const FINANCIAL_STATEMENTS = [
     icon: Lock,
     tone: "text-amber-700 bg-amber-50 border-amber-200",
   },
+  {
+    href: "/dashboard/accounting/vouchers",
+    title: "Journal, Contra & Notes",
+    desc: "Manual JV, cash ↔ bank contra, and standalone debit/credit notes",
+    icon: BookOpenText,
+    tone: "text-cyan-700 bg-cyan-50 border-cyan-200",
+  },
+  {
+    href: "/dashboard/accounting/export",
+    title: "CA Pack & Tally XML",
+    desc: "GSTR-1 JSON, Tally Prime XML Masters/Vouchers, and registers",
+    icon: FileSpreadsheet,
+    tone: "text-indigo-700 bg-indigo-50 border-indigo-200",
+  },
+  {
+    href: "/dashboard/accounting/pdc",
+    title: "PDC Cheque Register",
+    desc: "Post-dated cheques, pay-in-slips, clearance & dishonour",
+    icon: Landmark,
+    tone: "text-emerald-700 bg-emerald-50 border-emerald-200",
+  },
 ];
 
 export default async function AccountingPage({

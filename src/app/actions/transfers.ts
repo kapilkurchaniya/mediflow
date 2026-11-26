@@ -131,7 +131,11 @@ export async function getTransferBatchesAction(storeId: string, search?: string)
       .orderBy(schema.batches.expiryDate)
       .limit(50);
 
-    return { success: true, batches };
+    const canViewCost = can(ctx, "cost.view");
+    return {
+      success: true,
+      batches: canViewCost ? batches : batches.map((b) => ({ ...b, unitCost: 0 })),
+    };
   } catch (err: unknown) {
     return { success: false, error: err instanceof Error ? err.message : "Failed to fetch batches" };
   }

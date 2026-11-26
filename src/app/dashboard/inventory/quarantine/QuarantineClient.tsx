@@ -17,6 +17,7 @@ import type {
   QuarantinedItem,
 } from "./_components/types";
 import { useQuarantineState } from "./_components/useQuarantineState";
+import { sweepExpiredBatchesAction } from "@/app/actions/quarantine";
 import { QuarantinedStockTab } from "./_components/QuarantinedStockTab";
 import { DistributorClaimsTab } from "./_components/DistributorClaimsTab";
 import { NearExpiryStockTab } from "./_components/NearExpiryStockTab";
@@ -67,6 +68,26 @@ export function QuarantineClient({
       )}
 
       {/* KPI Cards */}
+      <div className="flex justify-end">
+        <button
+          type="button"
+          onClick={async () => {
+            const today = new Date().toISOString().slice(0, 10);
+            const res = await sweepExpiredBatchesAction(today);
+            if (res.success) {
+              state.setNotification({
+                type: "success",
+                text: `Swept ${res.sweptCount ?? 0} expired batch(es) (${res.totalUnitsSwept ?? 0} units) into quarantine.`,
+              });
+            } else {
+              state.setNotification({ type: "error", text: res.error || "Sweep failed" });
+            }
+          }}
+          className="btn btn-sm btn-secondary text-rose-700 border-rose-200 hover:bg-rose-50"
+        >
+          <ShieldAlert className="w-4 h-4" /> Sweep Expired Before Today
+        </button>
+      </div>
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div className="card p-5">
           <div className="flex items-center justify-between text-ink-500 mb-2">

@@ -72,6 +72,17 @@ export async function buildEInvoicePayload(
     throw new Error("GST Document not found");
   }
 
+  // 30-day IRN reporting deadline guard (B8.10 — mandatory for AATO >= ₹10 Cr from Apr 2026)
+  if (doc.docDate) {
+    const docMs = new Date(doc.docDate).getTime();
+    const ageDays = Math.floor((Date.now() - docMs) / 86_400_000);
+    if (ageDays > 30) {
+      throw new Error(
+        `Invoice ${doc.docNo} is ${ageDays} days old, exceeding the 30-day statutory IRP reporting window.`,
+      );
+    }
+  }
+
   if (doc.supplyType !== "B2B") {
     throw new Error(`E-Invoice is only mandatory for B2B supplies. Current type: ${doc.supplyType}`);
   }
@@ -262,6 +273,17 @@ export async function generateEInvoiceForDocument(
 
   if (!doc) {
     throw new Error("GST Document not found");
+  }
+
+  // 30-day IRN reporting deadline guard (B8.10 — mandatory for AATO >= ₹10 Cr from Apr 2026)
+  if (doc.docDate) {
+    const docMs = new Date(doc.docDate).getTime();
+    const ageDays = Math.floor((Date.now() - docMs) / 86_400_000);
+    if (ageDays > 30) {
+      throw new Error(
+        `Invoice ${doc.docNo} is ${ageDays} days old, exceeding the 30-day statutory IRP reporting window.`,
+      );
+    }
   }
 
   let provider = params.provider;

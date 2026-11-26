@@ -18,6 +18,9 @@ import { isValidGstRateBp, DEFAULT_GST_RATE_BP, type GstRateBp } from "@/lib/reg
 import { normalizeDrugSchedule, scheduleRequiresRx, type DrugSchedule } from "@/lib/schedule";
 import type { PurchaseItemInput } from "@/server/domain/purchases";
 import type { ExtractedSupplierInfo } from "@/server/domain/import/supplier-matcher";
+import { stringSimilarity } from "@/server/domain/import/match";
+import { lookupSupplierItemMaps, normalizeDistributorItemName } from "./supplier-item-map";
+import { evaluatePurchaseRateDiff } from "@/lib/purchases/rate-diff";
 
 export type DistributorSource = "pharmarack" | "retailio" | "marg" | "generic";
 
@@ -44,9 +47,10 @@ export interface ParsedDistributorInvoiceItem {
 
   // Medicine catalog matching
   matchedMedicineId: string | null;
-  matchType: "exact_barcode" | "exact_name_pack" | "exact_name" | "unmatched";
+  matchType: "exact_barcode" | "exact_name_pack" | "exact_name" | "fuzzy_name" | "unmatched";
   matchConfidence: number;
   matchedMedicineName?: string;
+  rateDiffWarning?: string;
 
   errors: string[];
 }
@@ -314,7 +318,10 @@ export async function parseDistributorInvoice(
   const db = options?.db;
   const tenantId = options?.tenantId;
   const existingMedicinesMap = new Map<string, { id: string; name: string; packSize?: string | null }>();
+  const existingMedicinesById = new Map<string, { id: string; name: string; packSize?: string | null }>();
+  const existingMedicinesList: Array<{ id: string; name: string; packSize?: string | null }> = [];
   const barcodeMap = new Map<string, { id: string; name: string }>();
+  let supplierMaps = new Map<string, { medicineId: string; lastPurchaseRate: number | null }>();
 
   if (db && tenantId) {
     const meds = await db
@@ -329,8 +336,18 @@ export async function parseDistributorInvoice(
 
     for (const m of meds) {
       existingMedicinesMap.set(m.name.trim().toLowerCase(), m);
+      existingMedicinesById.set(m.id, m);
+      existingMedicinesList.push(m);
       if (m.barcode) barcodeMap.set(m.barcode.trim(), m);
     }
+
+    const rawNames = parsed.data
+      .map((r) => {
+        const col = targetToCsv["name"];
+        return col && r[col] ? String(r[col]).trim() : "";
+      })
+      .filter(Boolean);
+    supplierMaps = await lookupSupplierItemMaps(db, { tenantId, itemNames: rawNames });
   }
 
   for (let idx = 0; idx < parsed.data.length; idx++) {
@@ -396,12 +413,12 @@ export async function parseDistributorInvoice(
     }
 
     const mrpResult = normalizePaise(getVal("mrp"));
-    let mrpPaise = mrpResult.success && mrpResult.paise ? mrpResult.paise : 0;
+    const mrpPaise = mrpResult.success && mrpResult.paise ? mrpResult.paise : 0;
     if (mrpPaise <= 0) {
-      mrpPaise = Math.round(ptrPaise * 1.3);
+      errors.push("MRP missing — enter printed MRP before committing");
     }
 
-    const saleRatePaise = Math.round(ptrPaise * 1.25);
+    const saleRatePaise = mrpPaise > 0 ? mrpPaise : 0;
 
     // Discount percentage & basis points
     let discountPct = parseFloat(getVal("discountPct").replace(/[^0-9.]/g, ""));
@@ -423,16 +440,23 @@ export async function parseDistributorInvoice(
 
     totalInvoiceAmountPaise += lineTotalTaxablePaise;
 
-    // Medicine matching
+    // Medicine matching (3-stage: barcode -> exact name/pack -> Dice fuzzy similarity)
     let matchedMedicineId: string | null = null;
-    let matchType: "exact_barcode" | "exact_name_pack" | "exact_name" | "unmatched" = "unmatched";
+    let matchType: "exact_barcode" | "exact_name_pack" | "exact_name" | "fuzzy_name" | "unmatched" = "unmatched";
     let matchConfidence = 0;
     let matchedMedicineName: string | undefined = undefined;
 
+    const rememberedMap = supplierMaps.get(normalizeDistributorItemName(name));
     if (barcode && barcodeMap.has(barcode)) {
       const match = barcodeMap.get(barcode)!;
       matchedMedicineId = match.id;
       matchType = "exact_barcode";
+      matchConfidence = 1.0;
+      matchedMedicineName = match.name;
+    } else if (rememberedMap && existingMedicinesById.has(rememberedMap.medicineId)) {
+      const match = existingMedicinesById.get(rememberedMap.medicineId)!;
+      matchedMedicineId = match.id;
+      matchType = "exact_name";
       matchConfidence = 1.0;
       matchedMedicineName = match.name;
     } else if (existingMedicinesMap.has(name.trim().toLowerCase())) {
@@ -444,9 +468,32 @@ export async function parseDistributorInvoice(
           : "exact_name";
       matchConfidence = matchType === "exact_name_pack" ? 0.95 : 0.9;
       matchedMedicineName = match.name;
+    } else if (existingMedicinesList.length > 0 && name.trim().length >= 3) {
+      let bestMatch: { id: string; name: string; packSize?: string | null } | null = null;
+      let bestScore = 0;
+      for (const candidate of existingMedicinesList) {
+        const score = stringSimilarity(name, candidate.name);
+        if (score > bestScore) {
+          bestScore = score;
+          bestMatch = candidate;
+        }
+      }
+      if (bestMatch && bestScore >= 0.65) {
+        matchedMedicineId = bestMatch.id;
+        matchType = "fuzzy_name";
+        matchConfidence = Number(bestScore.toFixed(2));
+        matchedMedicineName = bestMatch.name;
+      } else {
+        unmatchedMedicinesCount++;
+      }
     } else {
       unmatchedMedicinesCount++;
     }
+
+    const rateDiff = evaluatePurchaseRateDiff({
+      currentRatePaise: ptrPaise,
+      previousRatePaise: rememberedMap?.lastPurchaseRate,
+    });
 
     const item: ParsedDistributorInvoiceItem = {
       rowNo,
@@ -471,6 +518,7 @@ export async function parseDistributorInvoice(
       matchType,
       matchConfidence,
       matchedMedicineName,
+      rateDiffWarning: rateDiff.hasDiff ? (rateDiff.message ?? undefined) : undefined,
       errors,
     };
 

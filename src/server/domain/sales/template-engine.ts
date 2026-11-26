@@ -1,3 +1,5 @@
+import type { BillLabelSet } from "@/lib/i18n/bill-labels";
+
 export interface BillingTemplateItemContext {
   sno: number;
   name: string;
@@ -50,6 +52,7 @@ export interface BillingTemplateContext {
     ackNo: string;
     qrDataUrl: string;
   };
+  labels?: BillLabelSet;
   items: BillingTemplateItemContext[];
 }
 

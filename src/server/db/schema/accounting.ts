@@ -194,4 +194,81 @@ export const accountingPeriodEvents = pgTable(
   ],
 );
 
+/** Post-Dated Cheque (PDC) register with pay-in-slip, clearance, and dishonour lifecycle (F4). */
+export const pdcCheques = pgTable(
+  "pdc_cheques",
+  {
+    id: id(),
+    tenantId: tenantId(),
+    storeId: storeId(),
+    direction: text("direction").notNull(), // inward (received) | outward (issued)
+    partyType: text("party_type").notNull(), // customer | supplier
+    partyId: uuid("party_id"),
+    partyName: text("party_name").notNull(),
+    chequeNo: text("cheque_no").notNull(),
+    chequeDate: date("cheque_date").notNull(),
+    bankName: text("bank_name").notNull(),
+    amount: money("amount").notNull(),
+    status: text("status").notNull().default("pending"), // pending | deposited | cleared | dishonoured
+    payInSlipNo: text("pay_in_slip_no"),
+    depositedAt: date("deposited_at"),
+    clearedAt: date("cleared_at"),
+    dishonourReason: text("dishonour_reason"),
+    journalEntryId: uuid("journal_entry_id").references(() => journalEntries.id),
+    createdBy: uuid("created_by").notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    index("pdc_cheques_tenant_status_idx").on(t.tenantId, t.status, t.chequeDate),
+    index("pdc_cheques_tenant_store_idx").on(t.tenantId, t.storeId),
+  ],
+);
+
+/** Income-tax TDS Register entries (194Q / 194H / 194C / 194J, G9). */
+export const tdsEntries = pgTable(
+  "tds_entries",
+  {
+    id: id(),
+    tenantId: tenantId(),
+    storeId: storeId(),
+    section: text("section").notNull(), // 194Q | 194H | 194C_IND | 194C_OTH | 194J
+    partyName: text("party_name").notNull(),
+    partyPan: text("party_pan"),
+    entryDate: date("entry_date").notNull(),
+    baseAmount: money("base_amount").notNull(),
+    rateBp: integer("rate_bp").notNull(),
+    tdsAmount: money("tds_amount").notNull(),
+    netPayable: money("net_payable").notNull(),
+    createdBy: uuid("created_by").notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [index("tds_entries_tenant_date_idx").on(t.tenantId, t.entryDate)],
+);
+
+/** B2B Wholesale Delivery Challans (D1–D4). */
+export const wholesaleChallans = pgTable(
+  "wholesale_challans",
+  {
+    id: id(),
+    tenantId: tenantId(),
+    storeId: storeId(),
+    challanNo: text("challan_no").notNull(),
+    challanDate: date("challan_date").notNull(),
+    buyerName: text("buyer_name").notNull(),
+    buyerGstin: text("buyer_gstin"),
+    routeName: text("route_name"),
+    salesmanName: text("salesman_name"),
+    lrNo: text("lr_no"),
+    taxableAmount: money("taxable_amount").notNull(),
+    gstAmount: money("gst_amount").notNull(),
+    grandTotal: money("grand_total").notNull(),
+    requiresEwayBill: boolean("requires_eway_bill").notNull().default(false),
+    status: text("status").notNull().default("open"), // open | invoiced | cancelled
+    lines: jsonb("lines").$type<Array<Record<string, unknown>>>().notNull().default([]),
+    createdBy: uuid("created_by").notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [index("wholesale_challans_tenant_idx").on(t.tenantId, t.challanDate)],
+);
+
 export * from "./opening-balances";

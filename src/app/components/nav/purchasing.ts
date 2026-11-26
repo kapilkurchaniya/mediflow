@@ -13,4 +13,5 @@ export const purchasingNav: NavItem[] = [
   { group: "operations", order: 34, href: "/dashboard/purchases/expiry-returns", label: "Expiry returns", icon: Clock, description: "Near-expiry & expired stock return", permission: "purchase.return" },
   { group: "inventory", order: 40, href: "/dashboard/settings/schemes", label: "Trade schemes", icon: Tag, description: "Configure supplier bonus quantities (e.g. 10+1) & trade discounts", permission: "purchase.view" },
   { group: "directory", order: 10, href: "/dashboard/suppliers", label: "Suppliers", icon: Truck, description: "Wholesalers & distributors list", permission: "supplier.view" },
+  { group: "operations", order: 36, href: "/dashboard/import/marg-migration", label: "Marg Migration (Open Bills/PDC)", icon: FileInput, description: "Import open party bills and PDCs from Marg ERP", permission: "purchase.create", paletteOnly: true },
 ];

@@ -1,4 +1,4 @@
-const ALLOWED_PURCHASE_EXTENSIONS = [".pdf", ".jpg", ".jpeg", ".png", ".webp", ".csv", ".txt"];
+const ALLOWED_PURCHASE_EXTENSIONS = [".pdf", ".jpg", ".jpeg", ".png", ".webp", ".csv", ".txt", ".xlsx"];
 
 let pendingPurchaseImportFile: File | null = null;
 
@@ -12,7 +12,8 @@ export function isSupportedPurchaseBillFile(file: File): boolean {
     mime === "image/png" ||
     mime === "image/webp" ||
     mime === "text/csv" ||
-    mime === "text/plain"
+    mime === "text/plain" ||
+    mime === "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
   );
 }
 

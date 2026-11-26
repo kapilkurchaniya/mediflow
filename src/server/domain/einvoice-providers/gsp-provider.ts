@@ -52,6 +52,7 @@ export class GspIRPProvider implements IRPProvider {
 
   private getBaseUrl(): string {
     if (this.config.baseUrl) return this.config.baseUrl.replace(/\/$/, "");
+    if (process.env.GSP_BASE_URL) return process.env.GSP_BASE_URL.replace(/\/$/, "");
     return this.config.isSandbox
       ? "https://sandbox.gsp.mediflow.in/api/v1"
       : "https://api.gsp.mediflow.in/api/v1";

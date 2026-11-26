@@ -16,11 +16,17 @@ import {
 } from "@/server/domain/compliance";
 import { createGstDocumentFromSale, determineTaxContext, extractStateCodeFromGstin } from "@/server/domain/gst";
 import { LoyaltyService } from "@/server/domain/loyalty";
+import { RemindersService } from "@/server/domain/reminders";
 import { enqueue } from "@/server/jobs/outbox";
 import { writeAudit } from "@/server/audit";
 import { allocateFefoBatches } from "./allocate-fefo";
 import { canStoreUsePos } from "@/server/domain/stores";
 import { assertCreditSaleAllowed, evaluateCreditSale } from "@/server/domain/receivables";
+import { evaluateLinePriceGuard } from "@/lib/pricing/price-guard";
+import { resolveLinePricing } from "@/lib/pricing/pricing-resolver";
+import { getApplicableSchemes } from "@/server/domain/schemes";
+import { checkCdscoBannedFdc } from "@/lib/regulatory/banned-fdc";
+import { checkDpcoCeilingPrice } from "@/lib/regulatory/dpco-ceiling";
 import type { CreateSaleOptions, CreateSaleResult, SaleInput } from "./types";
 
 /** Money methods a customer can hand over. "Credit" is not a method: it is whatever is left unpaid. */
@@ -193,7 +199,16 @@ export async function createSale(
   // ── 2. Customer (scoped to the tenant) ─────────────────────────────────────────────────────────
 
   let customer:
-    | { name: string; phone: string | null; gstin: string | null; stateCode: string | null; creditLimit: number | null }
+    | {
+        name: string;
+        phone: string | null;
+        gstin: string | null;
+        stateCode: string | null;
+        creditLimit: number | null;
+        defaultDiscountBp: number;
+        drugLicenseNo: string | null;
+        drugLicenseExpiry: string | null;
+      }
     | undefined;
   if (input.customerId) {
     [customer] = await tx
@@ -203,17 +218,31 @@ export async function createSale(
         gstin: schema.customers.gstin,
         stateCode: schema.customers.stateCode,
         creditLimit: schema.customers.creditLimit,
+        defaultDiscountBp: schema.customers.defaultDiscountBp,
+        drugLicenseNo: schema.customers.drugLicenseNo,
+        drugLicenseExpiry: schema.customers.drugLicenseExpiry,
       })
       .from(schema.customers)
       .where(and(eq(schema.customers.id, input.customerId), eq(schema.customers.tenantId, ctx.tenantId)))
       .for("update");
     if (!customer) throw new DomainError("CUSTOMER_NOT_FOUND", "Customer not found.");
+
+    // B2B Drug License Expiry guard (B8.13 / D3)
+    if (customer.gstin && customer.drugLicenseExpiry && String(customer.drugLicenseExpiry) < todayStr) {
+      throw new DomainError(
+        "EXPIRED_CUSTOMER_DL",
+        `B2B buyer "${customer.name}" Drug License (${customer.drugLicenseNo ?? "DL"}) expired on ${customer.drugLicenseExpiry}.`,
+      );
+    }
   }
 
   // ── 3. FEFO Batch Allocation and validation (tenant + store scoped) ─────────────────────────
+  const negativeStockPolicy = store.settings?.negativeStockPolicy ?? "block";
+  const allowNegativeStockEffective = Boolean(opts.allowNegativeStock || negativeStockPolicy !== "block");
+
   const { allocatedLines } = await allocateFefoBatches(tx, ctx, input.lines, {
     todayStr,
-    allowNegativeStock: opts.allowNegativeStock,
+    allowNegativeStock: allowNegativeStockEffective,
   });
 
   const lineInputs: SaleLineInput[] = allocatedLines.map((p) => ({
@@ -222,9 +251,59 @@ export async function createSale(
     looseQty: p.looseQty,
     unitsPerPack: p.unitsPerPack,
     rate: p.saleRate,
-    discountBp: p.discountBp,
+    discountBp: Math.max(p.discountBp, customer?.defaultDiscountBp ?? 0),
     gstRateBp: p.medicine.gstRateBp,
   }));
+
+  // Enforce CDSCO banned FDC / prohibited drug hard block (Q4)
+  for (const p of allocatedLines) {
+    const banCheck = checkCdscoBannedFdc({
+      name: p.medicine.name,
+      genericName: p.medicine.genericName,
+    });
+    if (banCheck.banned) {
+      throw new DomainError(
+        "BANNED_FDC",
+        banCheck.reason ?? `"${p.medicine.name}" is prohibited under CDSCO FDC rules.`
+      );
+    }
+  }
+
+  // Enforce Legal Metrology (never > MRP) and store below-cost policy (Q7 / A5)
+  const belowCostPolicy = store.settings?.belowCostPolicy ?? "off";
+  const hasOverride = can(ctx, "sale.discount_override");
+  for (const p of allocatedLines) {
+    const guard = evaluateLinePriceGuard({
+      medicineName: p.medicine.name,
+      saleRatePaise: p.saleRate,
+      discountBp: p.discountBp,
+      mrpPaise: p.batch.mrp ?? 0,
+      costPaise: p.batch.purchaseRate ?? 0,
+      belowCostPolicy,
+    });
+    if (guard.aboveMrp) {
+      throw new DomainError("ABOVE_MRP", guard.reason ?? "Sale rate exceeds MRP.");
+    }
+
+    const dpcoPolicy = store.settings?.dpcoCeilingPolicy ?? "off";
+    if (dpcoPolicy === "block") {
+      const dpcoCheck = checkDpcoCeilingPrice({
+        medicineName: p.medicine.name,
+        genericName: p.medicine.genericName,
+        packRatePaise: p.saleRate,
+        unitsPerPack: p.unitsPerPack,
+      });
+      if (dpcoCheck.exceedsCeiling) {
+        throw new DomainError("DPCO_CEILING_EXCEEDED", `${p.medicine.name}: ${dpcoCheck.message}`);
+      }
+    }
+    if (guard.belowCost && belowCostPolicy === "block" && !hasOverride) {
+      throw new DomainError(
+        "BELOW_COST",
+        `${guard.reason ?? "Sale rate is below purchase cost."} Manager override ("sale.discount_override") required.`
+      );
+    }
+  }
 
   // ── 4. Drug-schedule compliance (Drugs & Cosmetics Rules) ───────────────────────────────────────
   const c = input.compliance;
@@ -421,6 +500,27 @@ export async function createSale(
   for (let i = 0; i < allocatedLines.length; i++) {
     const p = allocatedLines[i];
     const res = totals.lines[i];
+    const matchedSchemes = await getApplicableSchemes(tx, {
+      tenantId: ctx.tenantId,
+      storeId: ctx.storeId,
+      medicineId: p.medicine.id,
+      categoryId: p.medicine.categoryId,
+      qty: p.baseQty,
+      date: todayStr,
+    });
+    const bestScheme = matchedSchemes[0] ?? null;
+    const resolvedPricing = resolveLinePricing({
+      mrpPaise: p.batch.mrp ?? 0,
+      batchSaleRatePaise: p.saleRate,
+      qty: p.baseQty,
+      manualDiscountBp: p.discountBp,
+      scheme: bestScheme,
+    });
+    const effectiveFreeQty =
+      allowNegativeStockEffective || p.batch.qtyOnHand >= p.baseQty + resolvedPricing.freeQty
+        ? resolvedPricing.freeQty
+        : 0;
+
     await recordStockMovement({
       tx,
       tenantId: ctx.tenantId,
@@ -428,11 +528,12 @@ export async function createSale(
       batchId: p.batch.id,
       medicineId: p.medicine.id,
       type: "sale",
-      qtyChange: -p.baseQty,
+      qtyChange: -(p.baseQty + effectiveFreeQty),
       unitCost: p.batch.purchaseRate,
       refType: "sale",
       refId: sale.id,
       userId: ctx.userId,
+      policy: allowNegativeStockEffective && opts.source !== "offline" ? { mode: "allow_negative" } : undefined,
     });
     saleItems.push({
       tenantId: ctx.tenantId,
@@ -448,6 +549,8 @@ export async function createSale(
       looseUnit: p.medicine.looseUnit ?? "tablet",
       packQty: p.packQty,
       looseQty: p.looseQty,
+      freeQty: effectiveFreeQty,
+      schemeId: effectiveFreeQty > 0 ? resolvedPricing.schemeId : null,
       mrp: p.batch.mrp,
       rate: p.saleRate,
       discountBp: p.discountBp,
@@ -662,6 +765,38 @@ export async function createSale(
   // retried with back-off) by the worker, not inside this request.
   if (customer?.phone) {
     await queueOptional(tx, ctx.tenantId, "whatsapp.receipt", { saleId: sale.id });
+  }
+
+  // Schedule refill reminders for lines with an explicit daysSupply (Q2)
+  const refillPhone = customer?.phone || input.compliance?.patientPhone?.trim();
+  const refillName = customer?.name || input.compliance?.patientName?.trim() || "Customer";
+  if (refillPhone) {
+    const seenMeds = new Set<string>();
+    for (const item of input.lines) {
+      if (!item.daysSupply || item.daysSupply <= 0) continue;
+      const medId = item.medicineId;
+      if (!medId || seenMeds.has(medId)) continue;
+      seenMeds.add(medId);
+      const medName = allocatedLines.find((p) => p.medicine.id === medId)?.medicine.name;
+      if (!medName) continue;
+      try {
+        await tx.transaction(async (sp) => {
+          await RemindersService.createRefillReminder({
+            tx: sp,
+            tenantId: ctx.tenantId,
+            storeId: ctx.storeId,
+            customerId: input.customerId ?? null,
+            customerName: refillName,
+            customerPhone: refillPhone,
+            medicineId: medId,
+            medicineName: medName,
+            daysAfterPurchase: Math.max(1, item.daysSupply! - 2),
+          });
+        });
+      } catch (err) {
+        console.error("Warning: refill reminder scheduling failed; sale kept:", err);
+      }
+    }
   }
 
   const result = { saleId: sale.id, invoiceNo, total: totals.total, changeDue };

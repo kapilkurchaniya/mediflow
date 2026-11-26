@@ -159,6 +159,22 @@ export default async function SettingsPage() {
               Configure patient data protection notice, Data Protection Officer contact, and statutory retention policy.
             </p>
           </Link>
+
+          {/* Control Room, Audit Log & Backup Link Card */}
+          <Link
+            href="/dashboard/settings/control-room"
+            className="card p-5 space-y-2 hover:border-brand-300 transition-colors block group"
+          >
+            <div className="flex items-center justify-between">
+              <span className="font-semibold text-ink-900 group-hover:text-brand-700 flex items-center gap-2 text-sm">
+                <Sliders className="w-4 h-4 text-indigo-600" /> Control Room &amp; Audit Log
+              </span>
+              <span className="text-xs text-brand-600 font-semibold group-hover:underline">Open →</span>
+            </div>
+            <p className="text-[12px] text-ink-500 leading-relaxed">
+              Negative stock policy, regional bill language, GST composition mode, MCA audit edit-log, and JSON backup.
+            </p>
+          </Link>
         </div>
       </div>
     </div>

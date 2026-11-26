@@ -1,4 +1,4 @@
-import { db, schema } from "@/server/db";
+import { db, schema, type DbOrTx } from "@/server/db";
 import { eq, and, lte, desc } from "drizzle-orm";
 import { enqueue } from "@/server/jobs/outbox";
 
@@ -15,7 +15,9 @@ export class RemindersService {
     medicineId: string;
     medicineName: string;
     daysAfterPurchase?: number; // e.g. 26 days for a 30-day course
+    tx?: DbOrTx;
   }) {
+    const executor = opts.tx ?? db;
     const days = opts.daysAfterPurchase || 26;
     const scheduled = new Date();
     scheduled.setDate(scheduled.getDate() + days);
@@ -23,7 +25,7 @@ export class RemindersService {
 
     const message = `Hello ${opts.customerName}, your course of ${opts.medicineName} is due for refill on ${scheduledDateStr}. Reply YES to reserve your medicine with MediFlow.`;
 
-    const [reminder] = await db
+    const [reminder] = await executor
       .insert(schema.reminders)
       .values({
         tenantId: opts.tenantId,

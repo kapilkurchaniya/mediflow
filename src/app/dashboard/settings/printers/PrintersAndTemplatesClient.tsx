@@ -38,7 +38,7 @@ import {
 interface TemplateRow {
   id: string;
   storeId: string;
-  format: "a4" | "thermal_80mm";
+  format: "a4" | "a5" | "thermal_80mm" | "thermal_58mm";
   name: string;
   htmlContent: string;
   isActive: boolean;
@@ -49,7 +49,7 @@ interface StoreOption {
   id: string;
   name: string;
   code: string;
-  printFormat: "thermal_80mm" | "thermal_58mm" | "a4";
+  printFormat: "thermal_80mm" | "thermal_58mm" | "a4" | "a5";
 }
 
 const DEFAULT_A4_HTML = `<style>
@@ -186,7 +186,7 @@ export function PrintersAndTemplatesClient({
   const [previewZoomFit, setPreviewZoomFit] = useState(true);
 
   const currentStore = stores.find((s) => s.id === selectedStoreId) ?? stores[0];
-  const [printFormat, setPrintFormat] = useState<"thermal_80mm" | "thermal_58mm" | "a4">(
+  const [printFormat, setPrintFormat] = useState<"thermal_80mm" | "thermal_58mm" | "a4" | "a5">(
     currentStore?.printFormat ?? "thermal_80mm"
   );
   const [drawerStatus, setDrawerStatus] = useState<string | null>(null);
@@ -894,7 +894,7 @@ export function PrintersAndTemplatesClient({
               </p>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
               {[
                 {
                   id: "thermal_80mm" as const,
@@ -910,6 +910,11 @@ export function PrintersAndTemplatesClient({
                   id: "a4" as const,
                   title: "A4 GST Tax Invoice",
                   desc: "Full-page laser/inkjet GST invoice.",
+                },
+                {
+                  id: "a5" as const,
+                  title: "A5 Half-Page GST",
+                  desc: "Compact half-sheet laser/inkjet bill.",
                 },
               ].map((opt) => (
                 <button

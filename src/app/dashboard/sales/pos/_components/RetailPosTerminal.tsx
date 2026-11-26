@@ -11,6 +11,7 @@ import { getPosDB } from "@/offline/db";
 import type { OfflinePendingSale } from "@/offline/types";
 import { usePosCart } from "../_state/usePosCart";
 import { usePosShortcuts } from "../_state/usePosShortcuts";
+import { LiveKeybar } from "@/app/components/LiveKeybar";
 import { usePosBarcodeBridge } from "../_hooks/usePosBarcodeBridge";
 import { useShell } from "@/app/components/ShellContext";
 import { PosHeader } from "./PosHeader";
@@ -32,6 +33,17 @@ export function RetailPosTerminal() {
   const { toggleCalculator, setShortcutsOpen, calculatorOpen, shortcutsOpen, currentStore, setStoreSwitcherOpen, collapsed, toggleCollapsed, userId, tenantId } = useShell();
   const cartIdentity = useMemo(() => ({ tenantId, storeId: currentStore?.id, userId }), [tenantId, currentStore?.id, userId]);
   const { state, dispatch, totals, loyaltyDiscountPaise, rxWarning, controlledItems, playSound } = usePosCart(cartIdentity);
+
+  const storeSettings = (
+    currentStore as {
+      settings?: {
+        negativeStockPolicy?: "block" | "warn" | "allow";
+        shortcutPreset?: "mediflow" | "marg";
+      };
+    } | null
+  )?.settings;
+  const shortcutProfile = storeSettings?.shortcutPreset ?? "mediflow";
+  const negativeStockPolicy = storeSettings?.negativeStockPolicy ?? "block";
 
   const posDs = usePosDataSource({ storeId: currentStore?.id, cashierId: userId });
   const ds = posDs.dataSource;
@@ -304,6 +316,7 @@ export function RetailPosTerminal() {
           batchId: c.batchId, medicineId: c.medicineId, qty: c.qty, packQty: c.packQty, looseQty: c.looseQty,
           rate: c.saleRate ?? c.mrp, discountBp: c.discountBp, autoFefo: c.autoFefo,
           overrideBatch: c.overrideBatch, overrideReason: c.overrideReason,
+          daysSupply: c.daysSupply,
         })),
         paymentMethod: method === "split" ? "cash" : method,
         amountPaid: totals.total,
@@ -367,12 +380,18 @@ export function RetailPosTerminal() {
     onCompleteSale: () => handleCompleteSale(isPaymentOpen ? "split" : state.paymentMethod),
     onOpenCalculator: () => toggleCalculator(),
     onOpenShortcutsCheatSheet: () => setShortcutsOpen(true),
+    onUndoCart: () => dispatch({ type: "UNDO_REMOVE_LINE" }),
+    onFocusCustomer: () => {
+      const el = document.querySelector<HTMLInputElement>('input[placeholder*="customer" i], input[aria-label*="customer" i]');
+      el?.focus();
+    },
     onEscape: () => {
       setIsPaymentOpen(false); setIsParkOpen(false); setIsHeldListOpen(false);
       setSubstituteGeneric(null); setPromiseMedicine(null);
     },
     isModalOpen: isPaymentOpen || isParkOpen || isHeldListOpen || shortcutsOpen || calculatorOpen || Boolean(substituteGeneric) || Boolean(promiseMedicine),
     allowCompleteSaleInModal: isPaymentOpen && !isParkOpen && !isHeldListOpen && !shortcutsOpen && !calculatorOpen && !substituteGeneric && !promiseMedicine,
+    profile: shortcutProfile,
   });
 
   usePosBarcodeBridge({
@@ -447,12 +466,16 @@ export function RetailPosTerminal() {
           onUpdatePackQty={(batchId, pQty) => { setSubmitError(""); dispatch({ type: "UPDATE_LINE_PACK_QTY", payload: { batchId, packQty: pQty } }); }}
           onUpdateLooseQty={(batchId, lQty) => { setSubmitError(""); dispatch({ type: "UPDATE_LINE_LOOSE_QTY", payload: { batchId, looseQty: lQty } }); }}
           onUpdateDiscount={(batchId, dBp) => dispatch({ type: "UPDATE_LINE_DISCOUNT", payload: { batchId, discountBp: dBp } })}
+          onUpdateDaysSupply={(batchId, daysSupply) => dispatch({ type: "UPDATE_LINE_DAYS_SUPPLY", payload: { batchId, daysSupply } })}
+          negativeStockPolicy={negativeStockPolicy}
           onUpdateBatch={(oldId, newB, reason) => { setSubmitError(""); dispatch({ type: "UPDATE_LINE_BATCH", payload: { oldBatchId: oldId, newBatch: newB, reason } }); }}
           onCapToMax={(batchId, maxUnits) => { setSubmitError(""); dispatch({ type: "CAP_LINE_TO_MAX", payload: { batchId, maxUnits } }); }}
           onRemoveLine={(batchId) => { setSubmitError(""); dispatch({ type: "REMOVE_LINE", payload: { batchId } }); }}
           onOpenSubstitutes={(gen) => setSubstituteGeneric(gen)}
           onFocusSearch={() => searchInputRef.current?.focus()}
         />
+
+        <LiveKeybar scope="pos" profile={shortcutProfile} />
       </div>
 
       <div className="w-full lg:w-80 flex flex-col space-y-3 shrink-0 lg:h-full lg:min-h-0">

@@ -232,6 +232,13 @@ export function ShellProvider({
         return;
       }
 
+      // Ctrl + U -> Quick Store / Operator Switcher (U8)
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "u") {
+        e.preventDefault();
+        setStoreSwitcherOpen((o) => !o);
+        return;
+      }
+
       // '?' key (Shift + /) or Ctrl + F1 -> Shortcuts cheat sheet
       if ((!isInput && e.key === "?" && !e.ctrlKey && !e.metaKey) || (e.ctrlKey && (e.key === "F1" || e.key === "f1"))) {
         e.preventDefault();
@@ -246,10 +253,11 @@ export function ShellProvider({
         return;
       }
 
-      // Alt + [Key] -> Global ERP Hotkeys
-      if (e.altKey && !e.ctrlKey && !e.metaKey) {
+      // Alt + [Key] -> Global ERP Hotkeys (skip if screen handler already consumed it)
+      if (!e.defaultPrevented && e.altKey && !e.ctrlKey && !e.metaKey) {
+        const code = e.code;
         const k = e.key.toLowerCase();
-        if (k === "n" && pathname !== "/dashboard/sales/pos") {
+        if ((code === "KeyN" || k === "n") && pathname !== "/dashboard/sales/pos") {
           e.preventDefault();
           if (currentStore?.kind === "warehouse") {
             router.push("/dashboard/inventory/transfers/new");
@@ -258,26 +266,26 @@ export function ShellProvider({
           }
           return;
         }
-        if (k === "p") {
+        if (code === "KeyP" || k === "p") {
           e.preventDefault();
           router.push("/dashboard/purchases/new");
           return;
         }
-        if (k === "m") {
+        if (code === "KeyM" || k === "m") {
           e.preventDefault();
           if (currentStore?.kind !== "warehouse") {
             router.push("/dashboard/sales/register");
           }
           return;
         }
-        if (k === "i") {
+        if (code === "KeyI" || k === "i") {
           e.preventDefault();
           router.push("/dashboard/inventory");
           return;
         }
-        if (k === "l") {
+        if (code === "KeyL" || k === "l") {
           e.preventDefault();
-          router.push("/dashboard/crm/customers");
+          router.push("/dashboard/accounting/ledger");
           return;
         }
       }
