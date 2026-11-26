@@ -60,8 +60,16 @@ export type StoreKind = "retail" | "warehouse";
 export interface StoreSettings {
   requireShift?: boolean;
   maxDiscountBp?: number;
-  printFormat?: "thermal_80mm" | "thermal_58mm" | "a4";
+  printFormat?: "thermal_80mm" | "thermal_58mm" | "a4" | "a5";
   defaultPaymentMethod?: "cash" | "upi" | "card" | "credit";
+  belowCostPolicy?: "off" | "warn" | "block";
+  negativeStockPolicy?: "block" | "warn" | "allow";
+  upiVpa?: string;
+  upiPayeeName?: string;
+  billLanguage?: "en" | "hi" | "mr" | "gu" | "ta" | "bn";
+  compositionSchemeEnabled?: boolean;
+  shortcutPreset?: "mediflow" | "marg";
+  hfrFacilityId?: string;
 }
 
 export const DEFAULT_STORE_SETTINGS: StoreSettings = {
