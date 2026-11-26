@@ -7,6 +7,7 @@ import { formatINR, formatItemQuantity, formatISTDate, formatISTDateTime } from 
 import { can, requirePagePermission } from "@/server/rbac";
 import { getIndianBusinessDate } from "@/server/domain/sales/cancel-sale";
 import { buildWhatsAppDirectUrl, buildInvoiceWhatsAppMessage } from "@/lib/whatsapp";
+import { buildWhatsAppDeepLink } from "@/lib/comms/whatsapp-link";
 import { CancelSaleButton } from "./CancelSaleButton";
 import { ReturnSaleButton } from "./ReturnSaleButton";
 
@@ -50,6 +51,21 @@ export default async function SaleDetailPage({
       )
     : null;
 
+  const whatsappDesktopUrl = customerPhone && sale.invoiceNo
+    ? buildWhatsAppDeepLink({
+        phone: customerPhone,
+        text: buildInvoiceWhatsAppMessage({
+          customerName: customer?.name || sale.customerName,
+          storeName: store?.name || "MediFlow Pharmacy",
+          invoiceNo: sale.invoiceNo,
+          totalINR: formatINR(sale.totalAmount || 0),
+          dateStr: formatISTDate(saleDate),
+          itemCount: items.length,
+        }),
+        preferDesktop: true,
+      })
+    : null;
+
   return (
     <div className="page space-y-6">
       <PageHeader
@@ -79,6 +95,15 @@ export default async function SaleDetailPage({
                 title="Send digital receipt directly to customer's WhatsApp"
               >
                 <MessageSquare className="h-4 w-4 mr-1.5 text-emerald-600" /> WhatsApp Receipt
+              </a>
+            )}
+            {whatsappDesktopUrl && (
+              <a
+                href={whatsappDesktopUrl}
+                className="btn btn-ghost text-emerald-700 hover:bg-emerald-50"
+                title="Open directly in WhatsApp Desktop app (whatsapp://send)"
+              >
+                WhatsApp Desktop
               </a>
             )}
             <Link

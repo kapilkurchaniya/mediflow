@@ -60,6 +60,8 @@ interface CartTableProps {
   onUpdatePackQty: (batchId: string, packQty: number) => void;
   onUpdateLooseQty: (batchId: string, looseQty: number) => void;
   onUpdateDiscount: (batchId: string, discountBp: number) => void;
+  onUpdateDaysSupply?: (batchId: string, daysSupply?: number) => void;
+  negativeStockPolicy?: "block" | "warn" | "allow";
   onUpdateBatch: (oldBatchId: string, newBatch: SearchResultBatch, reason?: string) => void;
   onCapToMax?: (batchId: string, maxUnits: number) => void;
   onRemoveLine: (batchId: string) => void;
@@ -75,6 +77,8 @@ export function CartTable({
   onUpdatePackQty,
   onUpdateLooseQty,
   onUpdateDiscount,
+  onUpdateDaysSupply,
+  negativeStockPolicy = "block",
   onUpdateBatch,
   onCapToMax,
   onRemoveLine,
@@ -222,12 +226,20 @@ export function CartTable({
                           </div>
                         )}
                         {isStockShortage && (
-                          <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[11px] font-medium text-rose-700 bg-rose-100/80 border border-rose-200 rounded-md px-2 py-0.5 max-w-fit">
+                          <div
+                            className={`mt-1.5 flex flex-wrap items-center gap-1.5 text-[11px] font-medium rounded-md px-2 py-0.5 max-w-fit border ${
+                              negativeStockPolicy === "block"
+                                ? "text-rose-700 bg-rose-100/80 border-rose-200"
+                                : "text-amber-800 bg-amber-100/80 border-amber-300"
+                            }`}
+                          >
                             <AlertCircle className="w-3 h-3 shrink-0" />
                             <span>
-                              {availableStock <= 0
-                                ? "Out of stock (0 available)"
-                                : `Stock limit exceeded: requested ${lineCalc.baseQty}, only ${availableStock} ${line.looseUnit}s available`}
+                              {negativeStockPolicy !== "block"
+                                ? `Going Negative: requested ${lineCalc.baseQty}, on hand ${availableStock} ${line.looseUnit}s`
+                                : availableStock <= 0
+                                  ? "Out of stock (0 available)"
+                                  : `Stock limit exceeded: requested ${lineCalc.baseQty}, only ${availableStock} ${line.looseUnit}s available`}
                             </span>
                             {availableStock > 0 && onCapToMax && (
                               <button
@@ -246,6 +258,23 @@ export function CartTable({
                         {isAtStockLimit && (
                           <div className="mt-1 inline-flex items-center gap-1 text-[10.5px] font-medium text-amber-700 bg-amber-50 border border-amber-200 rounded px-1.5 py-0.5">
                             <span>Max stock limit reached ({availableStock} {line.looseUnit}s)</span>
+                          </div>
+                        )}
+                        {onUpdateDaysSupply && (
+                          <div className="mt-1 flex items-center gap-1 text-[10.5px] text-ink-500">
+                            <span>Refill (days):</span>
+                            <input
+                              type="number"
+                              min={1}
+                              max={365}
+                              placeholder="—"
+                              value={line.daysSupply ?? ""}
+                              onChange={(e) => {
+                                const v = parseInt(e.target.value, 10);
+                                onUpdateDaysSupply(line.batchId, Number.isFinite(v) && v > 0 ? v : undefined);
+                              }}
+                              className="input !py-0 !px-1.5 w-14 text-center font-mono text-[10.5px]"
+                            />
                           </div>
                         )}
                       </td>
