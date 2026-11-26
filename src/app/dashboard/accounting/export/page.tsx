@@ -1,8 +1,8 @@
 "use client";
 
 import React, { useState } from "react";
-import { Calculator, Download, FileSpreadsheet, RefreshCw, Calendar, CheckCircle2, AlertCircle } from "lucide-react";
-import { getCaMonthEndPackAction } from "@/app/actions/audit-packs";
+import { Calculator, Download, FileSpreadsheet, RefreshCw, Calendar, CheckCircle2, AlertCircle, FileCode2 } from "lucide-react";
+import { getCaMonthEndPackAction, getTallyXmlExportAction } from "@/app/actions/audit-packs";
 import type { CaMonthEndPackResult } from "@/server/domain/reports/ca-pack";
 
 export default function CaExportPage() {
@@ -93,6 +93,27 @@ export default function CaExportPage() {
         >
           {loading ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Calendar className="w-4 h-4" />}
           <span>{loading ? "Compiling Month-End Pack..." : "Compile CA Month-End Pack"}</span>
+        </button>
+
+        <button
+          onClick={async () => {
+            setError(null);
+            const res = await getTallyXmlExportAction({ monthString: selectedMonth });
+            if (!res.success) {
+              setError(res.error || "Failed to export Tally XML");
+              return;
+            }
+            if (res.mastersXml) {
+              downloadFile(res.mastersXml, `Tally_Masters_${selectedMonth}.xml`, "application/xml");
+            }
+            if (res.dayBookXml) {
+              downloadFile(res.dayBookXml, `Tally_DayBook_${selectedMonth}.xml`, "application/xml");
+            }
+          }}
+          className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-sm font-semibold shadow-sm transition-all"
+        >
+          <FileCode2 className="w-4 h-4" />
+          <span>Export Tally XML (Masters + Day Book)</span>
         </button>
 
         {data && (

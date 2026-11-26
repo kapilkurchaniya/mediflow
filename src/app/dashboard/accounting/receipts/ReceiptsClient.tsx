@@ -15,6 +15,9 @@ const METHODS = [
   { value: "upi", label: "UPI" },
   { value: "card", label: "Card" },
   { value: "bank", label: "Bank transfer" },
+  { value: "cheque", label: "Cheque" },
+  { value: "neft", label: "NEFT" },
+  { value: "rtgs", label: "RTGS" },
 ] as const;
 
 const toPaise = (v: string) => {
