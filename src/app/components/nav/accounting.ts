@@ -1,9 +1,11 @@
-import { BookOpen, BookOpenText, Building2, CalendarCheck, FileSpreadsheet, HandCoins, Lock, ReceiptText, Scale, Users } from "lucide-react";
+import { BookOpen, BookOpenText, Building2, CalendarCheck, FilePlus2, FileSpreadsheet, HandCoins, Landmark, Lock, ReceiptText, Scale, Users } from "lucide-react";
 import type { NavItem } from "./types";
 
 export const accountingNav: NavItem[] = [
   { group: "finance", order: 10, href: "/dashboard/accounting", label: "Accounting", icon: BookOpenText, description: "Overview & financial statements", permission: "accounting.view" },
+  { group: "finance", order: 11, href: "/dashboard/accounting/vouchers", label: "Vouchers (JV/Contra)", icon: FilePlus2, description: "Manual Journal, Contra & Debit/Credit notes", permission: "accounting.post" },
   { group: "finance", order: 12, href: "/dashboard/accounting/day-book", label: "Day Book", icon: BookOpen, description: "Chronological posted journal register", permission: "accounting.view" },
+  { group: "finance", order: 13, href: "/dashboard/accounting/pdc", label: "PDC Register", icon: Landmark, description: "Post-dated cheques, pay-in-slips & dishonour", permission: "accounting.view" },
   { group: "finance", order: 14, href: "/dashboard/accounting/ledger", label: "Ledgers", icon: FileSpreadsheet, description: "Account-wise running balance statements", permission: "accounting.view" },
   { group: "finance", order: 16, href: "/dashboard/accounting/receivables", label: "Receivables", icon: Users, description: "Credit control & receivables ageing", permission: "accounting.view" },
   { group: "finance", order: 18, href: "/dashboard/accounting/receipts", label: "Receipts", icon: HandCoins, description: "Record money received from customers", permission: "accounting.post" },
