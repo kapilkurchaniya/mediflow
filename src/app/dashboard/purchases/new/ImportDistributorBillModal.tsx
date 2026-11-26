@@ -23,6 +23,7 @@ import type { SupplierCheckResult } from "@/server/domain/import/supplier-matche
 import type { PendingSupplierMeta } from "@/lib/pending-supplier";
 import { detectBinaryContentMismatch } from "@/lib/stock-csv-validator";
 import { parseApiJsonResponse, splitPdfIntoChunks } from "@/lib/pdf-chunker";
+import { xlsxFileToCsvText } from "@/lib/xlsx-to-csv";
 import { QuickRegisterSupplierModal } from "@/app/components/QuickRegisterSupplierModal";
 
 interface ImportDistributorBillModalProps {
@@ -150,13 +151,19 @@ export function ImportDistributorBillModal({
           onSelectSupplier(firstSupplierCheck.matchedSupplier.id);
         }
       } else {
-        const binaryErr = await detectBinaryContentMismatch(fileToProcess);
-        if (binaryErr) {
-          setError(binaryErr);
-          setParseResult(null);
-          return;
+        const isXlsx = fileToProcess.name.toLowerCase().endsWith(".xlsx");
+        let text: string;
+        if (isXlsx) {
+          text = await xlsxFileToCsvText(fileToProcess);
+        } else {
+          const binaryErr = await detectBinaryContentMismatch(fileToProcess);
+          if (binaryErr) {
+            setError(binaryErr);
+            setParseResult(null);
+            return;
+          }
+          text = await fileToProcess.text();
         }
-        const text = await fileToProcess.text();
         const res = await parseDistributorInvoiceAction(text, selectedSupplierId);
         if (!res.success || !res.result) {
           setError(res.error || "Failed to parse distributor invoice.");
@@ -180,7 +187,7 @@ export function ImportDistributorBillModal({
 
   const handleFileSelect = (selectedFile: File) => {
     const lower = selectedFile.name.toLowerCase();
-    const isCsv = lower.endsWith(".csv") || lower.endsWith(".txt");
+    const isSpreadsheet = lower.endsWith(".csv") || lower.endsWith(".txt") || lower.endsWith(".xlsx");
     const isOcr =
       lower.endsWith(".pdf") ||
       lower.endsWith(".jpg") ||
@@ -188,8 +195,8 @@ export function ImportDistributorBillModal({
       lower.endsWith(".png") ||
       lower.endsWith(".webp");
 
-    if (!isCsv && !isOcr) {
-      setError("Please select a CSV (.csv/.txt) or bill scan (.pdf, .jpg, .png, .webp).");
+    if (!isSpreadsheet && !isOcr) {
+      setError("Please select a spreadsheet (.csv, .xlsx, .txt) or bill scan (.pdf, .jpg, .png, .webp).");
       return;
     }
     setFile(selectedFile);
@@ -419,7 +426,7 @@ export function ImportDistributorBillModal({
               <input
                 ref={fileInputRef}
                 type="file"
-                accept=".csv,.txt,.pdf,.jpg,.jpeg,.png,.webp,application/pdf,image/jpeg,image/png,image/webp"
+                accept=".csv,.xlsx,.txt,.pdf,.jpg,.jpeg,.png,.webp,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/pdf,image/jpeg,image/png,image/webp"
                 className="hidden"
                 onChange={(e) => {
                   if (e.target.files?.[0]) handleFileSelect(e.target.files[0]);
@@ -717,6 +724,14 @@ export function ImportDistributorBillModal({
                                 <AlertTriangle className="w-3 h-3" />
                                 Missing
                               </span>
+                            )}
+                            {item.rateDiffWarning && (
+                              <div
+                                className="mt-1 inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-100 text-amber-800 border border-amber-300"
+                                title={item.rateDiffWarning}
+                              >
+                                <AlertTriangle className="w-2.5 h-2.5 shrink-0" /> Diff Rate
+                              </div>
                             )}
                           </td>
                           <td className="py-2 px-3 font-mono">

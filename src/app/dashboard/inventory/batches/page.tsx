@@ -11,6 +11,7 @@ import { ExportButton } from "@/app/components/ExportButton";
 import { requirePagePermission, can } from "@/server/rbac";
 import { BackfillPtrBanner } from "./BackfillPtrBanner";
 import { EditBatchButton } from "./EditBatchModal";
+import { PrintBarcodeLabelButton } from "./_components/PrintBarcodeLabelButton";
 import { StockOcrButton } from "./_components/StockOcrButton";
 import { BatchCsvImportButton } from "./_components/BatchCsvImportButton";
 import { BatchesDropWrapper } from "./_components/BatchesDropWrapper";
@@ -226,24 +227,34 @@ export default async function BatchesPage({
                         )}
                       </td>
                       <td className="text-right">
-                        {canAdjust && (
-                          <EditBatchButton
-                            batch={{
-                              id: batch.id,
-                              batchNo: batch.batchNo,
-                              expiryDate: batch.expiryDate,
-                              purchaseRate: batch.purchaseRate,
-                              mrp: batch.mrp,
-                              saleRate: batch.saleRate,
-                              qtyOnHand: batch.qtyOnHand,
-                              status: batch.status,
-                              medicineName: medicine.name,
-                              unitsPerPack: medicine.unitsPerPack,
-                              packUnit: medicine.packUnit,
-                              looseUnit: medicine.looseUnit,
-                            }}
+                        <div className="inline-flex items-center gap-1 justify-end">
+                          <PrintBarcodeLabelButton
+                            storeName="MediFlow Pharmacy"
+                            medicineName={medicine.name}
+                            batchNo={batch.batchNo}
+                            expiryDate={batch.expiryDate}
+                            mrpPaise={batch.mrp ?? 0}
+                            barcode={medicine.barcode ?? batch.batchNo}
                           />
-                        )}
+                          {canAdjust && (
+                            <EditBatchButton
+                              batch={{
+                                id: batch.id,
+                                batchNo: batch.batchNo,
+                                expiryDate: batch.expiryDate,
+                                purchaseRate: batch.purchaseRate,
+                                mrp: batch.mrp,
+                                saleRate: batch.saleRate,
+                                qtyOnHand: batch.qtyOnHand,
+                                status: batch.status,
+                                medicineName: medicine.name,
+                                unitsPerPack: medicine.unitsPerPack,
+                                packUnit: medicine.packUnit,
+                                looseUnit: medicine.looseUnit,
+                              }}
+                            />
+                          )}
+                        </div>
                       </td>
                     </tr>
                   );
