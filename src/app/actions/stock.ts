@@ -5,6 +5,7 @@ import { eq, and, desc, or, sql, lte } from "drizzle-orm";
 import { recordStockMovement } from "@/server/domain/stock";
 import { writeAudit } from "@/server/audit";
 import { requirePermission, checkPermission } from "@/server/rbac";
+import { canViewCost, redactBatchCost, redactMedicineCost } from "@/server/redact";
 import { revalidatePath } from "next/cache";
 import { addDays, format } from "date-fns";
 import { protectedAction } from "@/server/action";
@@ -64,10 +65,15 @@ export async function getBatches(
     .where(and(...conditions))
     .orderBy(schema.batches.expiryDate);
 
-  if (typeof limit === "number" && limit > 0) {
-    return baseQuery.limit(limit).offset(Math.max(0, offset));
-  }
-  return baseQuery;
+  const rows =
+    typeof limit === "number" && limit > 0
+      ? await baseQuery.limit(limit).offset(Math.max(0, offset))
+      : await baseQuery;
+
+  return rows.map((r) => ({
+    batch: redactBatchCost(r.batch, ctx),
+    medicine: redactMedicineCost(r.medicine, ctx),
+  }));
 }
 
 export async function getBatchesSummary(opts?: {
@@ -120,11 +126,12 @@ export async function getBatchesSummary(opts?: {
     .innerJoin(schema.medicines, eq(schema.batches.medicineId, schema.medicines.id))
     .where(and(...conditions));
 
+  const allowCost = canViewCost(ctx);
   return {
     totalCount: row?.totalCount ?? 0,
     totalUnits: row?.totalUnits ?? 0,
-    totalValuation: row?.totalValuation ?? 0,
-    zeroRateCount: row?.zeroRateCount ?? 0,
+    totalValuation: allowCost ? (row?.totalValuation ?? 0) : 0,
+    zeroRateCount: allowCost ? (row?.zeroRateCount ?? 0) : 0,
     expiringCount: row?.expiringCount ?? 0,
   };
 }

@@ -145,12 +145,27 @@ export function CommandPalette() {
   const filteredItems = useMemo(() => {
     if (!query.trim()) return items;
     const q = query.toLowerCase().trim();
-    return items.filter(
-      (it) =>
-        it.label.toLowerCase().includes(q) ||
-        it.description?.toLowerCase().includes(q) ||
-        it.category.toLowerCase().includes(q)
-    );
+    const aliasMap: Record<string, string[]> = {
+      "control room": ["settings", "control-room", "policies"],
+      "self format": ["printers", "templates", "billing"],
+      "brk/exp": ["expiry", "quarantine", "returns"],
+      "godown": ["batches", "racks", "transfers"],
+      "tally": ["export", "accounting", "xml"],
+      "jv": ["vouchers", "journal"],
+      "contra": ["vouchers", "cash", "bank"],
+      "pdc": ["cheque", "pdc"],
+      "challan": ["wholesale", "dispatch"],
+    };
+    const expandedTerms = [q];
+    for (const [alias, targets] of Object.entries(aliasMap)) {
+      if (alias.includes(q) || q.includes(alias)) {
+        expandedTerms.push(...targets);
+      }
+    }
+    return items.filter((it) => {
+      const hay = `${it.label} ${it.description ?? ""} ${it.category}`.toLowerCase();
+      return expandedTerms.some((term) => hay.includes(term));
+    });
   }, [items, query]);
 
   // Reset selected index when query changes (React recommended pattern: adjust state during render)
