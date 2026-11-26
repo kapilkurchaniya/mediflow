@@ -212,4 +212,16 @@ NEW MEDICINE UNKNOWN,NM001,11/27,10'S,10,0,50.00,70.00,0.0,12,300490,89099999999
     expect(createdInDb.length).toBe(2);
     expect(createdInDb[0].name).toBe("CETRIZINE 10MG TAB");
   });
+
+  it("flags missing MRP for review instead of inventing MRP or sale rate", async () => {
+    const csvData = `Item Name,Batch No,Expiry,Pack,Billed Qty,Free Qty,PTR,MRP,Disc %,GST %,HSN,Barcode
+DOLO 650MG,DL101,12/28,15'S,10,0,24.50,,0,5,300490,`;
+
+    const result = await parseDistributorInvoice(csvData);
+    expect(result.items).toHaveLength(1);
+    expect(result.items[0].mrpPaise).toBe(0);
+    expect(result.items[0].saleRatePaise).toBe(0);
+    expect(result.items[0].errors.some((e) => e.includes("MRP missing"))).toBe(true);
+    expect(result.validLines).toBe(0);
+  });
 });
