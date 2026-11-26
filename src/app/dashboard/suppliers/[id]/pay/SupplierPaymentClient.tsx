@@ -46,7 +46,7 @@ export function SupplierPaymentClient({
   const [amountRupees, setAmountRupees] = useState<string>(
     supplier.closingBalance > 0 ? (supplier.closingBalance / 100).toFixed(2) : ""
   );
-  const [method, setMethod] = useState<"bank" | "upi" | "cash" | "card">("bank");
+  const [method, setMethod] = useState<"bank" | "upi" | "cash" | "card" | "cheque" | "neft" | "rtgs">("bank");
   const [paymentDate, setPaymentDate] = useState<string>(
     new Date().toISOString().split("T")[0]!
   );
@@ -196,11 +196,14 @@ export function SupplierPaymentClient({
               </label>
               <select
                 value={method}
-                onChange={(e) => setMethod(e.target.value as "bank" | "upi" | "cash" | "card")}
+                onChange={(e) => setMethod(e.target.value as "bank" | "upi" | "cash" | "card" | "cheque" | "neft" | "rtgs")}
                 className="input w-full text-sm"
                 required
               >
-                <option value="bank">Bank Transfer (NEFT/RTGS)</option>
+                <option value="bank">Bank Transfer</option>
+                <option value="neft">NEFT</option>
+                <option value="rtgs">RTGS</option>
+                <option value="cheque">Cheque</option>
                 <option value="upi">UPI / QR</option>
                 <option value="cash">Cash</option>
                 <option value="card">Corporate Card</option>
