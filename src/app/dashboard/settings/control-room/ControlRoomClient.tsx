@@ -150,6 +150,21 @@ export function ControlRoomClient({
             </div>
 
             <div>
+              <label className="label">NPPA / DPCO Ceiling-Price Policy</label>
+              <select
+                className="input"
+                value={settings.dpcoCeilingPolicy ?? "off"}
+                onChange={(e) =>
+                  setSettings({ ...settings, dpcoCeilingPolicy: e.target.value as StoreSettings["dpcoCeilingPolicy"] })
+                }
+              >
+                <option value="off">Off</option>
+                <option value="warn">Warn Only</option>
+                <option value="block">Block Above DPCO Ceiling</option>
+              </select>
+            </div>
+
+            <div>
               <label className="label">Print Bill Language (Regional)</label>
               <select
                 className="input"

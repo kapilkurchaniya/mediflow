@@ -63,6 +63,7 @@ export interface StoreSettings {
   printFormat?: "thermal_80mm" | "thermal_58mm" | "a4" | "a5";
   defaultPaymentMethod?: "cash" | "upi" | "card" | "credit";
   belowCostPolicy?: "off" | "warn" | "block";
+  dpcoCeilingPolicy?: "off" | "warn" | "block";
   negativeStockPolicy?: "block" | "warn" | "allow";
   upiVpa?: string;
   upiPayeeName?: string;

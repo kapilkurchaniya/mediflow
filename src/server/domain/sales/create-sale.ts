@@ -285,14 +285,17 @@ export async function createSale(
       throw new DomainError("ABOVE_MRP", guard.reason ?? "Sale rate exceeds MRP.");
     }
 
-    const dpcoCheck = checkDpcoCeilingPrice({
-      medicineName: p.medicine.name,
-      genericName: p.medicine.genericName,
-      packRatePaise: p.saleRate,
-      unitsPerPack: p.unitsPerPack,
-    });
-    if (dpcoCheck.exceedsCeiling) {
-      throw new DomainError("DPCO_CEILING_EXCEEDED", `${p.medicine.name}: ${dpcoCheck.message}`);
+    const dpcoPolicy = store.settings?.dpcoCeilingPolicy ?? "off";
+    if (dpcoPolicy === "block") {
+      const dpcoCheck = checkDpcoCeilingPrice({
+        medicineName: p.medicine.name,
+        genericName: p.medicine.genericName,
+        packRatePaise: p.saleRate,
+        unitsPerPack: p.unitsPerPack,
+      });
+      if (dpcoCheck.exceedsCeiling) {
+        throw new DomainError("DPCO_CEILING_EXCEEDED", `${p.medicine.name}: ${dpcoCheck.message}`);
+      }
     }
     if (guard.belowCost && belowCostPolicy === "block" && !hasOverride) {
       throw new DomainError(
