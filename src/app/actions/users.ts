@@ -4,13 +4,14 @@ import { z } from "zod";
 import { redirect } from "next/navigation";
 import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
-import { db } from "@/server/db";
+import { and, asc, eq, inArray } from "drizzle-orm";
+import { db, schema } from "@/server/db";
 import { protectedAction } from "@/server/action";
 import { requirePermission } from "@/server/rbac";
 import { createSession, generateSessionToken, hashPassword, setSessionCookie, verifyPassword } from "@/server/auth";
 import { DomainError } from "@/server/errors";
 import { acceptInvite, inviteUser, listTeam, revokeInvite, setMemberStatus, updateMembership } from "@/server/domain/users";
-import { ALL_PERMISSIONS, PERMISSIONS, SYSTEM_ROLES } from "@/lib/permissions";
+import { ALL_PERMISSIONS, PERMISSIONS, SYSTEM_ROLES, type Permission } from "@/lib/permissions";
 
 const uuid = z.string().uuid();
 const access = {
@@ -28,18 +29,139 @@ export async function getTeam() {
   return listTeam(db, ctx.tenantId);
 }
 
-/** The built-in roles and what each may do (read-only). Needs `user.manage`. */
+/** Built-in and custom roles for this pharmacy. Needs `user.manage`. */
 export async function getRolesOverview() {
-  await requirePermission("user.manage");
-  return SYSTEM_ROLES.map((r) => ({
-    key: r.key,
-    name: r.name,
-    description: r.description,
-    permissions: r.permissions.map((p) => ({ key: p, label: PERMISSIONS[p] })),
-    count: r.permissions.length,
-    total: ALL_PERMISSIONS.length,
-  }));
+  const ctx = await requirePermission("user.manage");
+  const dbRoles = await db
+    .select()
+    .from(schema.roles)
+    .where(eq(schema.roles.tenantId, ctx.tenantId))
+    .orderBy(asc(schema.roles.isSystem), asc(schema.roles.name));
+
+  if (dbRoles.length === 0) {
+    return SYSTEM_ROLES.map((r) => ({
+      id: r.key,
+      key: r.key,
+      name: r.name,
+      description: r.description,
+      isSystem: true,
+      permissions: r.permissions.map((p) => ({ key: p, label: PERMISSIONS[p] })),
+      count: r.permissions.length,
+      total: ALL_PERMISSIONS.length,
+    }));
+  }
+
+  const roleIds = dbRoles.map((r) => r.id);
+  const perms = await db
+    .select({ roleId: schema.rolePermissions.roleId, permission: schema.rolePermissions.permission })
+    .from(schema.rolePermissions)
+    .where(inArray(schema.rolePermissions.roleId, roleIds));
+
+  const permsByRole = new Map<string, Permission[]>();
+  for (const row of perms) {
+    const permKey = row.permission as Permission;
+    if (!(permKey in PERMISSIONS)) continue;
+    const list = permsByRole.get(row.roleId) ?? [];
+    list.push(permKey);
+    permsByRole.set(row.roleId, list);
+  }
+
+  return dbRoles.map((r) => {
+    const list = permsByRole.get(r.id) ?? [];
+    return {
+      id: r.id,
+      key: r.key,
+      name: r.name,
+      description: r.description ?? "",
+      isSystem: r.isSystem,
+      permissions: list.map((p) => ({ key: p, label: PERMISSIONS[p] })),
+      count: list.length,
+      total: ALL_PERMISSIONS.length,
+    };
+  });
 }
+
+export const createCustomRoleAction = protectedAction("user.manage")
+  .inputSchema(
+    z.object({
+      name: z.string().trim().min(2, "Role name is required").max(50),
+      description: z.string().trim().max(200).optional().default(""),
+      permissions: z.array(z.string()).min(1, "Select at least one permission"),
+    })
+  )
+  .action(async ({ parsedInput, ctx }) => {
+    const validPerms = parsedInput.permissions.filter((p): p is Permission => p in PERMISSIONS);
+    if (validPerms.length === 0) throw new DomainError("INVALID_PERMISSIONS", "Select at least one valid permission.");
+
+    const slug = parsedInput.name
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "_")
+      .replace(/^_|_$/g, "")
+      .slice(0, 32);
+    const key = `custom_${slug || "role"}_${Date.now().toString(36).slice(-4)}`;
+
+    const created = await db.transaction(async (tx) => {
+      const [role] = await tx
+        .insert(schema.roles)
+        .values({
+          tenantId: ctx.tenantId,
+          key,
+          name: parsedInput.name,
+          description: parsedInput.description || null,
+          isSystem: false,
+        })
+        .returning({ id: schema.roles.id, key: schema.roles.key });
+
+      await tx
+        .insert(schema.rolePermissions)
+        .values(validPerms.map((permission) => ({ roleId: role.id, permission })))
+        .onConflictDoNothing();
+
+      return role;
+    });
+
+    revalidatePath("/dashboard/settings/roles");
+    revalidatePath("/dashboard/settings/users");
+    return created;
+  });
+
+export const updateCustomRoleAction = protectedAction("user.manage")
+  .inputSchema(
+    z.object({
+      roleId: uuid,
+      name: z.string().trim().min(2, "Role name is required").max(50),
+      description: z.string().trim().max(200).optional().default(""),
+      permissions: z.array(z.string()).min(1, "Select at least one permission"),
+    })
+  )
+  .action(async ({ parsedInput, ctx }) => {
+    const validPerms = parsedInput.permissions.filter((p): p is Permission => p in PERMISSIONS);
+    if (validPerms.length === 0) throw new DomainError("INVALID_PERMISSIONS", "Select at least one valid permission.");
+
+    await db.transaction(async (tx) => {
+      const [existing] = await tx
+        .select({ id: schema.roles.id, isSystem: schema.roles.isSystem })
+        .from(schema.roles)
+        .where(and(eq(schema.roles.id, parsedInput.roleId), eq(schema.roles.tenantId, ctx.tenantId)));
+
+      if (!existing) throw new DomainError("ROLE_NOT_FOUND", "Role not found.");
+      if (existing.isSystem) throw new DomainError("SYSTEM_ROLE_LOCKED", "Built-in system roles cannot be modified.");
+
+      await tx
+        .update(schema.roles)
+        .set({ name: parsedInput.name, description: parsedInput.description || null })
+        .where(and(eq(schema.roles.id, existing.id), eq(schema.roles.tenantId, ctx.tenantId)));
+
+      await tx.delete(schema.rolePermissions).where(eq(schema.rolePermissions.roleId, existing.id));
+      await tx
+        .insert(schema.rolePermissions)
+        .values(validPerms.map((permission) => ({ roleId: existing.id, permission })));
+    });
+
+    revalidatePath("/dashboard/settings/roles");
+    revalidatePath("/dashboard/settings/users");
+    return { updated: true };
+  });
 
 /** Creates an invitation. The raw token is returned ONCE, to build the link; only its hash is stored. */
 export const inviteUserAction = protectedAction("user.manage")
