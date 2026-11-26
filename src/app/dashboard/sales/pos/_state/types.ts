@@ -25,6 +25,7 @@ export interface PosCartLine {
   autoFefo?: boolean;
   overrideBatch?: boolean;
   overrideReason?: string;
+  daysSupply?: number;
   availableBatches?: SearchResultBatch[];
 }
 
@@ -67,6 +68,7 @@ export interface PosState {
   redeemPoints: number;
   resumedHeldId: string | null;
   soundEnabled: boolean;
+  lastRemovedLine?: PosCartLine | null;
 }
 
 export type PosAction =
@@ -74,9 +76,11 @@ export type PosAction =
   | { type: "UPDATE_LINE_PACK_QTY"; payload: { batchId: string; packQty: number } }
   | { type: "UPDATE_LINE_LOOSE_QTY"; payload: { batchId: string; looseQty: number } }
   | { type: "UPDATE_LINE_DISCOUNT"; payload: { batchId: string; discountBp: number } }
+  | { type: "UPDATE_LINE_DAYS_SUPPLY"; payload: { batchId: string; daysSupply?: number } }
   | { type: "UPDATE_LINE_BATCH"; payload: { oldBatchId: string; newBatch: SearchResultBatch; reason?: string } }
   | { type: "CAP_LINE_TO_MAX"; payload: { batchId: string; maxUnits: number } }
   | { type: "REMOVE_LINE"; payload: { batchId: string } }
+  | { type: "UNDO_REMOVE_LINE" }
   | { type: "CLEAR_CART" }
   | { type: "SET_CUSTOMER"; payload: SelectedCustomer | null }
   | { type: "SET_CUSTOMER_REDEEMABLE"; payload: { redeemablePoints: number; redeemableValuePaise: number } }

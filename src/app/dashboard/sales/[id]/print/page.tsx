@@ -9,6 +9,7 @@ import PrintButton from "./PrintButton";
 import { formatINR, formatISTDate, formatISTDateTime, formatItemQuantity, formatItemQuantityCompact } from "@/lib/format";
 import { requirePagePermission } from "@/server/rbac";
 import { buildWhatsAppDirectUrl, buildInvoiceWhatsAppMessage } from "@/lib/whatsapp";
+import { getBillLabels } from "@/lib/i18n/bill-labels";
 import { QrCode } from "@/app/components/QrCode";
 import { PrintWatermark } from "@/app/components/PrintWatermark";
 
@@ -28,10 +29,18 @@ export default async function PrintInvoicePage({
 
   const { sale, items, customer, store, tenant, gstDoc, payments } = data;
   const storeDefaultFormat = store?.settings?.printFormat ?? "a4";
-  const isThermal = printFormatParam
-    ? printFormatParam === "thermal"
-    : storeDefaultFormat === "thermal_80mm" || storeDefaultFormat === "thermal_58mm";
-  const targetTemplateFormat = isThermal ? "thermal_80mm" : "a4";
+  const resolvedFormat: "thermal_80mm" | "thermal_58mm" | "a4" | "a5" =
+    printFormatParam === "thermal" || printFormatParam === "thermal_80mm"
+      ? "thermal_80mm"
+      : printFormatParam === "thermal_58mm"
+        ? "thermal_58mm"
+        : printFormatParam === "a5"
+          ? "a5"
+          : printFormatParam === "gst" || printFormatParam === "a4"
+            ? "a4"
+            : storeDefaultFormat;
+  const isThermal = resolvedFormat === "thermal_80mm" || resolvedFormat === "thermal_58mm";
+  const targetTemplateFormat = resolvedFormat;
 
   const [customTemplate] =
     store && templateOverride !== "default"
@@ -52,6 +61,7 @@ export default async function PrintInvoicePage({
           .limit(1)
       : [undefined];
 
+  const billLabels = getBillLabels(store?.settings?.billLanguage);
   const isSimulated = !gstDoc?.einvoiceProvider || gstDoc.einvoiceProvider === "SIMULATOR";
 
   let customRenderedHtml: string | null = null;
@@ -101,6 +111,7 @@ export default async function PrintInvoicePage({
         ackNo: gstDoc?.ackNo || "",
         qrDataUrl: "",
       },
+      labels: billLabels,
       items: items.map((it, idx) => ({
         sno: idx + 1,
         name: it.medicineName,
@@ -146,13 +157,26 @@ export default async function PrintInvoicePage({
       {/* Dynamic print page styling tailored for 80mm thermal roll vs A4 GST Tax invoice */}
       <style
         dangerouslySetInnerHTML={{
-          __html: isThermal
-            ? `@media print {
+          __html:
+            resolvedFormat === "thermal_58mm"
+              ? `@media print {
+                @page { size: 58mm auto; margin: 1.5mm 2mm; }
+                body { margin: 0 !important; padding: 0 !important; }
+                #invoice-printable { width: 58mm !important; max-width: 100% !important; margin: 0 !important; padding: 0 !important; }
+              }`
+              : isThermal
+                ? `@media print {
                 @page { size: 80mm auto; margin: 2mm 3mm; }
                 body { margin: 0 !important; padding: 0 !important; }
                 #invoice-printable { width: 100% !important; max-width: 100% !important; margin: 0 !important; padding: 0 !important; }
               }`
-            : `@media print {
+                : resolvedFormat === "a5"
+                  ? `@media print {
+                @page { size: A5 portrait; margin: 6mm; }
+                body { margin: 0 !important; padding: 0 !important; }
+                #invoice-printable { width: 100% !important; max-width: 100% !important; margin: 0 !important; padding: 0 !important; }
+              }`
+                  : `@media print {
                 @page { size: A4 portrait; margin: 8mm; }
                 body { margin: 0 !important; padding: 0 !important; }
                 #invoice-printable { width: 100% !important; max-width: 100% !important; margin: 0 !important; padding: 0 !important; }
@@ -256,12 +280,12 @@ export default async function PrintInvoicePage({
           {/* Bill Info */}
           <div className="py-2 border-b border-dashed border-black text-[10px] space-y-0.5">
             <div className="flex justify-between">
-              <span>Inv: {sale.invoiceNo}</span>
+              <span>{billLabels.invoiceNo}: {sale.invoiceNo}</span>
               <span>{formatISTDateTime(sale.completedAt ?? sale.createdAt!, "compact")}</span>
             </div>
-            <div>Cust: {customer?.name || "Walk-in"}</div>
+            <div>{billLabels.patient}: {customer?.name || "Walk-in"}</div>
             {customer?.phone && <div>Phone: {customer.phone}</div>}
-            {sale.doctorName && <div>Doctor: {sale.doctorName}</div>}
+            {sale.doctorName && <div>{billLabels.doctor}: {sale.doctorName}</div>}
           </div>
           {gstDoc?.irn && (
             <div className="py-1 border-b border-dashed border-black text-[9px] text-center">
@@ -359,7 +383,7 @@ export default async function PrintInvoicePage({
 
           {/* Thermal Footer */}
           <div className="text-center pt-2 border-t border-dashed border-black text-[9px] space-y-1">
-            <p>Thank you! Get well soon.</p>
+            <p>{billLabels.thankYou}</p>
             <p className="font-sans text-[8px] text-gray-500">MediFlow Cloud POS</p>
           </div>
         </div>
@@ -381,10 +405,10 @@ export default async function PrintInvoicePage({
               </div>
             </div>
             <div className="text-right">
-              <h2 className="text-xl font-bold text-ink-900 tracking-tight">TAX INVOICE</h2>
+              <h2 className="text-xl font-bold text-ink-900 tracking-tight">{billLabels.taxInvoice}</h2>
               <div className="mt-2 bg-ink-50 rounded-lg p-2.5 border border-ink-150 text-left text-xs font-mono inline-block">
-                <div><span className="text-ink-500">Invoice:</span> <strong>{sale.invoiceNo}</strong></div>
-                <div className="mt-0.5"><span className="text-ink-500">Date:</span> {formatISTDateTime(sale.completedAt ?? sale.createdAt!, "short")}</div>
+                <div><span className="text-ink-500">{billLabels.invoiceNo}:</span> <strong>{sale.invoiceNo}</strong></div>
+                <div className="mt-0.5"><span className="text-ink-500">{billLabels.date}:</span> {formatISTDateTime(sale.completedAt ?? sale.createdAt!, "short")}</div>
               </div>
             </div>
           </div>

@@ -1,7 +1,9 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { CreditCard, Banknote, QrCode, Sparkles, X, Loader2, AlertCircle } from "lucide-react";
 import { formatINR } from "@/lib/format";
+import { buildUpiUri, generateQrSvg } from "@/lib/payments/upi-qr";
 import type { SplitPayments, SelectedCustomer } from "../_state/types";
 
 interface PaymentPanelProps {
@@ -33,6 +35,27 @@ export function PaymentPanel({
   onSubmit,
   onClose,
 }: PaymentPanelProps) {
+  const [showUpiQr, setShowUpiQr] = useState(false);
+  const [counterVpa, setCounterVpa] = useState(() => {
+    if (typeof window !== "undefined") {
+      return window.localStorage.getItem("mediflow_upi_vpa") || "";
+    }
+    return "";
+  });
+
+  useEffect(() => {
+    if (!isOpen) return;
+    function onKey(e: KeyboardEvent) {
+      const tag = (document.activeElement?.tagName ?? "").toUpperCase();
+      if ((e.key.toLowerCase() === "u" && tag !== "INPUT" && tag !== "TEXTAREA") || (e.altKey && e.key.toLowerCase() === "u")) {
+        e.preventDefault();
+        setShowUpiQr((v) => !v);
+      }
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [isOpen]);
+
   if (!isOpen) return null;
 
   const cashPaise = Math.round((parseFloat(splitPayments.cash) || 0) * 100);
@@ -195,6 +218,57 @@ export function PaymentPanel({
               placeholder="0.00"
               className="input !py-1.5 font-mono text-sm font-bold"
             />
+            <div className="mt-1.5 flex items-center justify-between">
+              <button
+                type="button"
+                onClick={() => setShowUpiQr((v) => !v)}
+                className="text-[11px] font-semibold text-sky-700 hover:text-sky-900 inline-flex items-center gap-1"
+              >
+                <QrCode className="w-3 h-3" /> {showUpiQr ? "Hide Counter QR" : "Show Dynamic UPI QR"}
+              </button>
+              {showUpiQr && counterVpa.includes("@") && (
+                <span className="text-[10.5px] font-mono text-ink-500">
+                  {formatINR(upiPaise > 0 ? upiPaise : totalPaise)}
+                </span>
+              )}
+            </div>
+            {showUpiQr && (
+              <div className="mt-2 p-3 rounded-xl border border-sky-200 bg-sky-50/50 space-y-2">
+                <input
+                  type="text"
+                  value={counterVpa}
+                  onChange={(e) => {
+                    setCounterVpa(e.target.value);
+                    if (typeof window !== "undefined") {
+                      window.localStorage.setItem("mediflow_upi_vpa", e.target.value);
+                    }
+                  }}
+                  placeholder="Enter Store UPI VPA (e.g. pharmacy@okicici)"
+                  className="input !py-1 text-xs font-mono"
+                />
+                {counterVpa.includes("@") && (upiPaise > 0 || totalPaise > 0) && (
+                  <div className="flex flex-col items-center gap-1.5 pt-1">
+                    <div
+                      className="rounded-lg border border-sky-200 bg-white p-1.5 shadow-xs"
+                      dangerouslySetInnerHTML={{
+                        __html: generateQrSvg(
+                          buildUpiUri({
+                            vpa: counterVpa,
+                            payeeName: "MediFlow Pharmacy",
+                            amountPaise: upiPaise > 0 ? upiPaise : totalPaise,
+                            note: "Counter Sale",
+                          }),
+                          150,
+                        ),
+                      }}
+                    />
+                    <span className="text-[10px] font-mono text-sky-800">
+                      Scan via GPay / PhonePe / Paytm · {formatINR(upiPaise > 0 ? upiPaise : totalPaise)}
+                    </span>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Card Input */}
