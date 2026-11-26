@@ -8,9 +8,11 @@
 
 import { z } from "zod";
 import { schema, type Tx } from "@/server/db";
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import { computePurchaseTotals } from "@/lib/money";
 import { isValidGstRateBp, GST_RATES_BP } from "@/lib/regulatory";
+import { checkCdscoBannedFdc } from "@/lib/regulatory/banned-fdc";
+import { upsertSupplierItemMap } from "@/server/domain/import/supplier-item-map";
 import { extractStateCodeFromGstin } from "@/server/domain/gst";
 import { nextDocNumber } from "@/server/domain/sequence";
 import { recordStockMovement } from "@/server/domain/stock";
@@ -173,6 +175,22 @@ export async function createPurchase(
       throw new DomainError(
         "INVALID_GST_RATE",
         `Invalid GST rate ${item.gstRateBp} bp. Allowed rates are: ${GST_RATES_BP.join(", ")}.`
+      );
+    }
+  }
+
+  // 1b. Block CDSCO-banned FDC / prohibited drugs on GRN entry (Q4)
+  const uniqueMedIds = [...new Set(input.items.map((i) => i.medicineId))];
+  const medMetaRows = await tx
+    .select({ id: schema.medicines.id, name: schema.medicines.name, genericName: schema.medicines.genericName })
+    .from(schema.medicines)
+    .where(and(eq(schema.medicines.tenantId, ctx.tenantId), inArray(schema.medicines.id, uniqueMedIds)));
+  for (const med of medMetaRows) {
+    const ban = checkCdscoBannedFdc({ name: med.name, genericName: med.genericName });
+    if (ban.banned) {
+      throw new DomainError(
+        "BANNED_FDC",
+        ban.reason ?? `"${med.name}" is prohibited under CDSCO FDC rules.`
       );
     }
   }
@@ -440,6 +458,53 @@ export async function createPurchase(
       .returning();
 
     insertedItems.push(insertedItem);
+
+    // Remember supplier item mapping & last PTR (C3)
+    if (med?.name) {
+      await upsertSupplierItemMap(tx, {
+        tenantId: ctx.tenantId,
+        supplierId: supplier.id,
+        externalItemName: med.name,
+        medicineId: item.medicineId,
+        lastPurchaseRate: item.rate,
+      });
+    }
+
+    // Reconcile open negative-stock conflict cases on inward GRN stock (B8.4 / A8.5)
+    const [activeConflict] = await tx
+      .select()
+      .from(schema.stockConflictCases)
+      .where(
+        and(
+          eq(schema.stockConflictCases.tenantId, ctx.tenantId),
+          eq(schema.stockConflictCases.storeId, ctx.storeId),
+          eq(schema.stockConflictCases.batchId, batchId),
+          sql`${schema.stockConflictCases.status} IN ('open', 'investigating', 'partially_resolved')`,
+        ),
+      )
+      .for("update")
+      .limit(1);
+
+    if (activeConflict) {
+      const totalAddedUnits = (item.qty + (item.freeQty ?? 0)) * upp;
+      const needed = Math.max(0, activeConflict.requiredReconciliationQty - activeConflict.reconciledQty);
+      const creditQty = Math.min(needed, totalAddedUnits);
+      if (creditQty > 0) {
+        const newReconciled = activeConflict.reconciledQty + creditQty;
+        const isFullyResolved = newReconciled >= activeConflict.requiredReconciliationQty;
+        await tx
+          .update(schema.stockConflictCases)
+          .set({
+            reconciledQty: newReconciled,
+            status: isFullyResolved ? "resolved" : "partially_resolved",
+            resolvedAt: isFullyResolved ? new Date() : null,
+            resolutionType: "grn_receipt",
+            resolutionNotes: `Reconciled ${creditQty} unit(s) via Purchase ${purchaseNo}`,
+            updatedAt: new Date(),
+          })
+          .where(eq(schema.stockConflictCases.id, activeConflict.id));
+      }
+    }
   }
 
   // 6b. If received against a Purchase Order, update PO received quantities & status

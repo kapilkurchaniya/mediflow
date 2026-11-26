@@ -17,6 +17,7 @@ export type StockMovementType =
 
 export type StockMovementPolicy =
   | { mode: "strict" }
+  | { mode: "allow_negative"; reason?: string }
   | {
       mode: "offline_reconciliation";
       deviceId: string;
@@ -211,6 +212,8 @@ export async function recordStockMovement(params: RecordStockParams) {
           }
         }
       }
+    } else if (activePolicy.mode === "allow_negative") {
+      // Negative stock explicitly permitted by store/item policy (A6/Q11)
     } else {
       throw new Error(
         `Insufficient stock for batch ${batchId}. Current: ${lockedBatch.qtyOnHand}, Requested change: ${qtyChange}`,

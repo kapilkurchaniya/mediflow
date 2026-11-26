@@ -16,7 +16,7 @@ import { assertAccountingPeriodOpen } from "./accounting-periods";
  * Money is integer paise.
  */
 
-export const POST_PAYMENT_METHODS = ["cash", "upi", "card", "bank"] as const;
+export const POST_PAYMENT_METHODS = ["cash", "upi", "card", "bank", "cheque", "neft", "rtgs"] as const;
 
 export const PostPaymentInput = z.object({
   /** in = we receive (customer receipt), out = we pay (supplier payment, expense). */
