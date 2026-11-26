@@ -1,7 +1,7 @@
 "use server";
 
 import { db, schema } from "@/server/db";
-import { requirePermission } from "@/server/rbac";
+import { requirePermission, can } from "@/server/rbac";
 import { writeAudit } from "@/server/audit";
 import { revalidatePath } from "next/cache";
 import { and, desc, eq, gte, inArray, lte, sql } from "drizzle-orm";
@@ -72,6 +72,7 @@ export async function getNearExpiryBatchesForQuarantineAction(options?: {
     )
     .orderBy(schema.batches.expiryDate);
 
+  const canViewCost = can(ctx, "cost.view");
   return batches.map((b) => ({
     ...b,
     supplierName:
@@ -79,7 +80,8 @@ export async function getNearExpiryBatchesForQuarantineAction(options?: {
         ? "Unregistered Supplier"
         : b.supplierName,
     isExpired: b.expiryDate <= todayStr,
-    purchaseRatePaise: b.purchaseRate || 0,
+    purchaseRate: canViewCost ? b.purchaseRate : 0,
+    purchaseRatePaise: canViewCost ? (b.purchaseRate || 0) : 0,
     mrpPaise: b.mrp || 0,
   }));
 }
@@ -283,6 +285,32 @@ export async function settleSupplierExpiryClaimAction(params: {
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Failed to settle claim";
     return { success: false, error: message };
+  }
+}
+
+export async function sweepExpiredBatchesAction(cutoffDate: string): Promise<{
+  success: boolean;
+  sweptCount?: number;
+  totalUnitsSwept?: number;
+  error?: string;
+}> {
+  try {
+    const ctx = await requirePermission("inventory.adjust");
+    const { sweepExpiredBatchesToQuarantine } = await import("@/server/domain/inventory/expiry-sweep");
+    const res = await db.transaction((tx) =>
+      sweepExpiredBatchesToQuarantine({
+        tx,
+        tenantId: ctx.tenantId,
+        storeId: ctx.storeId,
+        cutoffDate,
+        userId: ctx.userId,
+      }),
+    );
+    revalidatePath("/dashboard/inventory/quarantine");
+    revalidatePath("/dashboard/inventory/batches");
+    return { success: true, sweptCount: res.sweptCount, totalUnitsSwept: res.totalUnitsSwept };
+  } catch (err: unknown) {
+    return { success: false, error: err instanceof Error ? err.message : "Failed to sweep expired batches" };
   }
 }
 
