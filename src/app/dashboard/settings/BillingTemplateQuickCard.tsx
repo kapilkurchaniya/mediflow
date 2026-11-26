@@ -10,7 +10,7 @@ import {
 
 export interface QuickTemplateItem {
   id: string;
-  format: "a4" | "thermal_80mm";
+  format: "a4" | "a5" | "thermal_80mm" | "thermal_58mm";
   name: string;
   isActive: boolean;
   sourceType: "manual" | "ocr";
@@ -18,7 +18,7 @@ export interface QuickTemplateItem {
 
 interface BillingTemplateQuickCardProps {
   storeId: string;
-  initialPrintFormat: "thermal_80mm" | "thermal_58mm" | "a4";
+  initialPrintFormat: "thermal_80mm" | "thermal_58mm" | "a4" | "a5";
   initialTemplates: QuickTemplateItem[];
 }
 
@@ -27,7 +27,7 @@ export function BillingTemplateQuickCard({
   initialPrintFormat,
   initialTemplates,
 }: BillingTemplateQuickCardProps) {
-  const [printFormat, setPrintFormat] = useState<"thermal_80mm" | "thermal_58mm" | "a4">(initialPrintFormat);
+  const [printFormat, setPrintFormat] = useState<"thermal_80mm" | "thermal_58mm" | "a4" | "a5">(initialPrintFormat);
   const [templates, setTemplates] = useState<QuickTemplateItem[]>(initialTemplates);
   const [notice, setNotice] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -37,7 +37,7 @@ export function BillingTemplateQuickCard({
   const activeThermalId = thermalTemplates.find((t) => t.isActive)?.id ?? "";
   const activeA4Id = a4Templates.find((t) => t.isActive)?.id ?? "";
 
-  const handlePrintFormatChange = (nextFormat: "thermal_80mm" | "thermal_58mm" | "a4") => {
+  const handlePrintFormatChange = (nextFormat: "thermal_80mm" | "thermal_58mm" | "a4" | "a5") => {
     setPrintFormat(nextFormat);
     setNotice(null);
     startTransition(async () => {
