@@ -110,6 +110,10 @@ export async function createCustomer(formData: FormData) {
   const rawStateCode = formData.get("stateCode") as string;
   const stateCode = (gstin ? extractStateCodeFromGstin(gstin) : null) || rawStateCode || null;
   const creditLimitStr = formData.get("creditLimit") as string;
+  const drugLicenseNo = (formData.get("drugLicenseNo") as string) || null;
+  const drugLicenseExpiry = (formData.get("drugLicenseExpiry") as string) || null;
+  const defaultDiscountPct = parseFloat((formData.get("defaultDiscountPct") as string) || "0") || 0;
+  const defaultDiscountBp = Math.min(10000, Math.max(0, Math.round(defaultDiscountPct * 100)));
   const notes = formData.get("notes") as string;
   const consentReminders = formData.get("consentReminders") === "on";
   const consentMarketing = formData.get("consentMarketing") === "on";
@@ -130,6 +134,9 @@ export async function createCustomer(formData: FormData) {
         address: address?.trim() || null,
         gstin: gstin?.trim().toUpperCase() || null,
         stateCode: stateCode || null,
+        drugLicenseNo: drugLicenseNo?.trim().toUpperCase() || null,
+        drugLicenseExpiry: drugLicenseExpiry?.trim() || null,
+        defaultDiscountBp,
         creditLimit,
         notes: notes?.trim() || null,
         isActive: true,
@@ -183,6 +190,10 @@ export async function updateCustomer(id: string, formData: FormData) {
   const rawStateCode = formData.get("stateCode") as string;
   const stateCode = (gstin ? extractStateCodeFromGstin(gstin) : null) || rawStateCode || null;
   const creditLimitStr = formData.get("creditLimit") as string;
+  const drugLicenseNo = (formData.get("drugLicenseNo") as string) || null;
+  const drugLicenseExpiry = (formData.get("drugLicenseExpiry") as string) || null;
+  const defaultDiscountPct = parseFloat((formData.get("defaultDiscountPct") as string) || "0") || 0;
+  const defaultDiscountBp = Math.min(10000, Math.max(0, Math.round(defaultDiscountPct * 100)));
   const notes = formData.get("notes") as string;
   const isActive = formData.get("isActive") === "on";
 
@@ -200,6 +211,9 @@ export async function updateCustomer(id: string, formData: FormData) {
         address: address?.trim() || null,
         gstin: gstin?.trim().toUpperCase() || null,
         stateCode: stateCode || null,
+        drugLicenseNo: drugLicenseNo?.trim().toUpperCase() || null,
+        drugLicenseExpiry: drugLicenseExpiry?.trim() || null,
+        defaultDiscountBp,
         creditLimit,
         notes: notes?.trim() || null,
         isActive,

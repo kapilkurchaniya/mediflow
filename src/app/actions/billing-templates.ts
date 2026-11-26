@@ -32,7 +32,7 @@ export async function getBillingTemplatesAction(storeId?: string) {
 const SaveBillingTemplateSchema = z.object({
   id: z.string().uuid().optional(),
   storeId: z.string().uuid().optional(),
-  format: z.enum(["a4", "thermal_80mm"]),
+  format: z.enum(["a4", "a5", "thermal_80mm", "thermal_58mm"]),
   name: z.string().trim().min(2, "Template name must be at least 2 characters").max(80),
   htmlContent: z.string().trim().min(10, "HTML content cannot be empty").max(200_000),
   sourceType: z.enum(["manual", "ocr"]).default("manual"),
@@ -120,7 +120,7 @@ export const saveBillingTemplateAction = protectedAction("settings.manage")
 
 const SetActiveTemplateSchema = z.object({
   storeId: z.string().uuid().optional(),
-  format: z.enum(["a4", "thermal_80mm"]),
+  format: z.enum(["a4", "a5", "thermal_80mm", "thermal_58mm"]),
   templateId: z.string().uuid().nullable(),
 });
 
@@ -196,7 +196,7 @@ export const deleteBillingTemplateAction = protectedAction("settings.manage")
 
 const SaveStorePrintFormatSchema = z.object({
   storeId: z.string().uuid().optional(),
-  printFormat: z.enum(["thermal_80mm", "thermal_58mm", "a4"]),
+  printFormat: z.enum(["thermal_80mm", "thermal_58mm", "a4", "a5"]),
 });
 
 export const saveStorePrintFormatAction = protectedAction("settings.manage")
