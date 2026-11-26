@@ -11,7 +11,7 @@ import { z } from "zod";
 export const RecordSupplierPaymentSchema = z.object({
   supplierId: z.string().uuid("Invalid supplier ID"),
   amount: z.number().int().positive("Payment amount must be greater than zero"),
-  method: z.enum(["cash", "upi", "bank", "card"]),
+  method: z.enum(["cash", "upi", "bank", "card", "cheque", "neft", "rtgs"]),
   paymentDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Payment date must be YYYY-MM-DD"),
   reference: z.string().max(100).optional(),
   note: z.string().max(500).optional(),
