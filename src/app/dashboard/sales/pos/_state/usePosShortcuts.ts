@@ -15,6 +15,10 @@ export interface ShortcutHandlers {
   onOpenCalculator?: () => void;
   onOpenShortcutsCheatSheet?: () => void;
   onEscape?: () => void;
+  onFocusCustomer?: () => void;
+  onUndoCart?: () => void;
+  onToggleBillProfit?: () => void;
+  profile?: "mediflow" | "marg";
   isModalOpen?: boolean;
   allowCompleteSaleInModal?: boolean;
 }
@@ -28,6 +32,27 @@ export function usePosShortcuts(handlers: ShortcutHandlers) {
         activeEl?.tagName === "TEXTAREA" ||
         activeEl?.tagName === "SELECT";
       const isModalActive = Boolean(handlers.isModalOpen);
+
+      // Ctrl/Cmd + Enter or Ctrl+W (Marg Classic) -> Complete Sale
+      if (((e.ctrlKey || e.metaKey) && e.key === "Enter") || (handlers.profile === "marg" && e.ctrlKey && e.key.toLowerCase() === "w")) {
+        e.preventDefault();
+        handlers.onCompleteSale?.();
+        return;
+      }
+
+      // Ctrl + Z / Alt + Backspace -> Undo last cart line/qty action (U7)
+      if (((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z" && !isInput) || (e.altKey && e.key === "Backspace")) {
+        e.preventDefault();
+        handlers.onUndoCart?.();
+        return;
+      }
+
+      // Alt + F10 -> Toggle bill profit preview (when allowed)
+      if (e.altKey && e.key === "F10") {
+        e.preventDefault();
+        handlers.onToggleBillProfit?.();
+        return;
+      }
 
       // Ctrl + F1 -> Shortcut Cheat Sheet
       if (e.ctrlKey && (e.key === "F1" || e.key === "f1")) {
@@ -87,6 +112,10 @@ export function usePosShortcuts(handlers: ShortcutHandlers) {
           e.preventDefault();
           handlers.onOpenRegister?.();
           break;
+        case "F5":
+          e.preventDefault();
+          handlers.onFocusCustomer?.();
+          break;
         case "F6":
           e.preventDefault();
           handlers.onHoldBill?.();
@@ -106,10 +135,6 @@ export function usePosShortcuts(handlers: ShortcutHandlers) {
         case "F10":
           e.preventDefault();
           handlers.onCompleteSale?.();
-          break;
-        case "F12":
-          e.preventDefault();
-          handlers.onOpenCalculator?.();
           break;
         case "Escape":
           handlers.onEscape?.();
