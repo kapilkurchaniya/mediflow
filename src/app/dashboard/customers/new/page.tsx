@@ -90,6 +90,15 @@ export default function NewCustomerPage() {
                 <input id="creditLimit" type="number" name="creditLimit" step="0.01" min="0" className="input pl-7 num" placeholder="0.00" />
               </div>
             </Field>
+            <Field label="Party Discount (%)" htmlFor="defaultDiscountPct" hint="Default discount % applied on POS bills (A3).">
+              <input id="defaultDiscountPct" type="number" name="defaultDiscountPct" step="0.5" min="0" max="100" className="input num" placeholder="0" />
+            </Field>
+            <Field label="Drug License No (20B/21B)" htmlFor="drugLicenseNo" hint="Required for B2B wholesale buyers.">
+              <input id="drugLicenseNo" name="drugLicenseNo" className="input font-mono uppercase" placeholder="MH-MZ1-123456" />
+            </Field>
+            <Field label="Drug License Expiry" htmlFor="drugLicenseExpiry">
+              <input id="drugLicenseExpiry" type="date" name="drugLicenseExpiry" className="input" />
+            </Field>
             <Field label="Billing address" className="sm:col-span-2" htmlFor="address">
               <textarea id="address" name="address" rows={3} className="input" placeholder="House no., street, city, PIN" />
             </Field>
