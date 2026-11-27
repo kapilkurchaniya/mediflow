@@ -14,6 +14,7 @@ import { scheduleRequiresRx } from "@/lib/schedule";
 import { checkCdscoBannedFdc } from "@/lib/indian-drug-catalog";
 import { useRouter } from "next/navigation";
 import { RackSelectorField, type RackOption } from "./RackSelectorField";
+import { MEDICINE_SEGMENTS, normalizeMedicineSegment } from "@/lib/inventory/medicine-segments";
 
 export interface EditableMedicineData {
   id: string;
@@ -21,6 +22,7 @@ export interface EditableMedicineData {
   genericName: string | null;
   manufacturerId: string | null;
   categoryId: string | null;
+  targetSegment?: string | null;
   packSize: string | null;
   unitsPerPack: number;
   packUnit: string;
@@ -72,6 +74,7 @@ export function EditMedicineButton({
   const [name, setName] = useState(medicine.name);
   const [genericName, setGenericName] = useState(medicine.genericName || "");
   const [categoryId, setCategoryId] = useState(medicine.categoryId || "");
+  const [targetSegment, setTargetSegment] = useState(normalizeMedicineSegment(medicine.targetSegment));
   const [manufacturerId, setManufacturerId] = useState(medicine.manufacturerId || "");
   const [barcode, setBarcode] = useState(medicine.barcode || "");
   const [hsn, setHsn] = useState(medicine.hsn || "");
@@ -96,6 +99,7 @@ export function EditMedicineButton({
     setName(medicine.name);
     setGenericName(medicine.genericName || "");
     setCategoryId(medicine.categoryId || "");
+    setTargetSegment(normalizeMedicineSegment(medicine.targetSegment));
     setManufacturerId(medicine.manufacturerId || "");
     setBarcode(medicine.barcode || "");
     setHsn(medicine.hsn || "");
@@ -244,6 +248,7 @@ export function EditMedicineButton({
     fd.append("name", name);
     fd.append("genericName", genericName);
     fd.append("categoryId", categoryId);
+    fd.append("targetSegment", targetSegment);
     fd.append("manufacturerId", manufacturerId);
     fd.append("barcode", barcode);
     fd.append("hsn", hsn);
@@ -437,6 +442,19 @@ export function EditMedicineButton({
                           </button>
                         </div>
                       )}
+                    </div>
+                    <div>
+                      <label className="label" htmlFor={`med-seg-${medicine.id}`}>Target Segment</label>
+                      <select
+                        id={`med-seg-${medicine.id}`}
+                        value={targetSegment}
+                        onChange={(e) => setTargetSegment(normalizeMedicineSegment(e.target.value))}
+                        className="input"
+                      >
+                        {MEDICINE_SEGMENTS.map((seg) => (
+                          <option key={seg.value} value={seg.value}>{seg.label}</option>
+                        ))}
+                      </select>
                     </div>
                     <div>
                       <label className="label" htmlFor={`med-mfg-${medicine.id}`}>Manufacturer</label>

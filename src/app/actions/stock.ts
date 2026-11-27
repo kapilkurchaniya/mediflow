@@ -18,6 +18,10 @@ export async function getBatches(
         from?: string | null;
         to?: string | null;
         medicineId?: string | null;
+        segment?: string | null;
+        molecule?: string | null;
+        categoryId?: string | null;
+        rackId?: string | null;
         limit?: number;
         offset?: number;
       }
@@ -30,6 +34,10 @@ export async function getBatches(
   const from = !isBool ? opts?.from : null;
   const to = !isBool ? opts?.to : null;
   const medicineId = !isBool ? opts?.medicineId : null;
+  const segment = !isBool ? opts?.segment : null;
+  const molecule = !isBool ? opts?.molecule : null;
+  const categoryId = !isBool ? opts?.categoryId : null;
+  const rackId = !isBool ? opts?.rackId : null;
   const limit = !isBool ? opts?.limit : undefined;
   const offset = !isBool ? opts?.offset ?? 0 : 0;
 
@@ -42,6 +50,29 @@ export async function getBatches(
 
   if (medicineId) {
     conditions.push(eq(schema.batches.medicineId, medicineId));
+  }
+  if (segment && segment !== "all") {
+    conditions.push(eq(schema.medicines.targetSegment, segment));
+  }
+  if (categoryId) {
+    conditions.push(eq(schema.medicines.categoryId, categoryId));
+  }
+  if (molecule?.trim()) {
+    const mq = `%${molecule.trim().toLowerCase()}%`;
+    conditions.push(
+      sql`(lower(coalesce(${schema.medicines.genericName}, '')) like ${mq} or lower(coalesce(${schema.medicines.composition}, '')) like ${mq} or lower(${schema.medicines.name}) like ${mq})`
+    );
+  }
+  if (rackId) {
+    conditions.push(
+      sql`exists (
+        select 1 from ${schema.storeMedicineSettings} sms
+        where sms.medicine_id = ${schema.batches.medicineId}
+          and sms.store_id = ${ctx.storeId}
+          and sms.tenant_id = ${ctx.tenantId}
+          and sms.rack_id = ${rackId}
+      )`
+    );
   }
 
   if (nearExpiryOnly && ninetyDaysFromNow) {
@@ -81,6 +112,10 @@ export async function getBatchesSummary(opts?: {
   from?: string | null;
   to?: string | null;
   medicineId?: string | null;
+  segment?: string | null;
+  molecule?: string | null;
+  categoryId?: string | null;
+  rackId?: string | null;
 }) {
   const ctx = await requirePermission("inventory.view");
 
@@ -88,6 +123,10 @@ export async function getBatchesSummary(opts?: {
   const from = opts?.from ?? null;
   const to = opts?.to ?? null;
   const medicineId = opts?.medicineId ?? null;
+  const segment = opts?.segment ?? null;
+  const molecule = opts?.molecule ?? null;
+  const categoryId = opts?.categoryId ?? null;
+  const rackId = opts?.rackId ?? null;
   const ninetyDaysFromNow = format(addDays(new Date(), 90), "yyyy-MM-dd");
 
   const conditions = [
@@ -97,6 +136,29 @@ export async function getBatchesSummary(opts?: {
 
   if (medicineId) {
     conditions.push(eq(schema.batches.medicineId, medicineId));
+  }
+  if (segment && segment !== "all") {
+    conditions.push(eq(schema.medicines.targetSegment, segment));
+  }
+  if (categoryId) {
+    conditions.push(eq(schema.medicines.categoryId, categoryId));
+  }
+  if (molecule?.trim()) {
+    const mq = `%${molecule.trim().toLowerCase()}%`;
+    conditions.push(
+      sql`(lower(coalesce(${schema.medicines.genericName}, '')) like ${mq} or lower(coalesce(${schema.medicines.composition}, '')) like ${mq} or lower(${schema.medicines.name}) like ${mq})`
+    );
+  }
+  if (rackId) {
+    conditions.push(
+      sql`exists (
+        select 1 from ${schema.storeMedicineSettings} sms
+        where sms.medicine_id = ${schema.batches.medicineId}
+          and sms.store_id = ${ctx.storeId}
+          and sms.tenant_id = ${ctx.tenantId}
+          and sms.rack_id = ${rackId}
+      )`
+    );
   }
 
   if (nearExpiryOnly) {

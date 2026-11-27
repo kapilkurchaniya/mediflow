@@ -956,6 +956,44 @@ export const HELP_ARTICLES: HelpArticle[] = [
     relatedSlugs: ["narcotics-compliance", "vouchers-and-pdc"],
     keywords: ["anti-tb", "tb register", "patient", "doctor", "business analysis", "owner pulse", "tco", "marg migration"],
   },
+  {
+    slug: "catalog-filters-udhaar-and-supplier-compare",
+    title: "Segment Filters (Male/Female/Kids), Customer Udhaar & Supplier Rate Comparison",
+    summary:
+      "Filter medicines by Male/Female/Kids/Senior, molecule, category, or rack/shelf; track customer partial payments and mark udhaar paid; and compare past supplier rates and schemes during PO & GRN.",
+    category: "billing",
+    readMinutes: 4,
+    badge: "Daily Operations",
+    targetRole: "Pharmacist, Cashier, Purchase Manager",
+    actionRoute: "/dashboard/customers/credit",
+    actionLabel: "Open Customer Udhaar & Dues",
+    steps: [
+      {
+        title: "1. Filter Medicines by Male / Female / Kids, Molecule & Rack/Shelf",
+        content:
+          "Open Inventory > Item Master or Inventory > Batches & Stock to filter medicines using quick segment pills (All, Male, Female, Kids, Senior, General), Molecule/Salt search, Category, and Rack & Shelf location.",
+      },
+      {
+        title: "2. Track Customer Udhaar (Partial Payments & Mark Paid)",
+        content:
+          "Open CRM > Customer Udhaar & Dues to view the total amount to collect across all customers, inspect each customer's complete purchase history and pending balances, record partial payments, or click 'Mark Paid' / 'Mark All Paid' as money is received.",
+        tip: "Use the WhatsApp Reminder button on the Udhaar ledger to send a pre-filled pending balance reminder directly to the customer.",
+      },
+      {
+        title: "3. Compare Past Supplier Rates, Quantities & Schemes",
+        content:
+          "When selecting a medicine in New Purchase Order, New Purchase (GRN), or Opening Stock (and via the History icon in Batches & Stock), MediFlow automatically shows past purchases across suppliers with dates, quantities, free/scheme offers, landed cost, and Call/WhatsApp links.",
+      },
+    ],
+    faqs: [
+      {
+        q: "If a customer pays ₹100 on a ₹140 POS bill, does the ₹40 balance appear in Customer Udhaar & Dues?",
+        a: "Yes. Any unpaid balance from a Split Tender / Credit POS bill automatically appears under Customer Udhaar & Dues until marked paid.",
+      },
+    ],
+    relatedSlugs: ["first-bill", "purchases-grn-and-central-po"],
+    keywords: ["male", "female", "kids", "molecule", "rack", "shelf", "udhaar", "due", "credit", "mark paid", "supplier compare", "scheme"],
+  },
 ];
 
 export function getAllHelpArticles(): HelpArticle[] {

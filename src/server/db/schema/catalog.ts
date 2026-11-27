@@ -62,6 +62,7 @@ export const medicines = pgTable(
     looseUnit: text("loose_unit").notNull().default("tablet"),
     manufacturerId: uuid("manufacturer_id").references(() => manufacturers.id),
     categoryId: uuid("category_id").references(() => categories.id),
+    targetSegment: text("target_segment").notNull().default("general"), // general | male | female | kids | senior
     barcode: text("barcode"),
     hsn: text("hsn"),
     gstRateBp: integer("gst_rate_bp").notNull().default(500), // GST 2.0: most pharma HSN 3003/3004 @ 5%
@@ -79,6 +80,7 @@ export const medicines = pgTable(
   (t) => [
     uniqueIndex("medicines_tenant_barcode_uq").on(t.tenantId, t.barcode).where(sql`${t.barcode} is not null`),
     index("medicines_tenant_idx").on(t.tenantId, t.isActive),
+    index("medicines_tenant_segment_idx").on(t.tenantId, t.targetSegment),
     index("medicines_name_trgm").using("gin", sql`${t.name} gin_trgm_ops`),
     index("medicines_generic_trgm").using("gin", sql`coalesce(${t.genericName}, '') gin_trgm_ops`),
     index("medicines_tenant_updated_idx").on(t.tenantId, t.updatedAt, t.id),

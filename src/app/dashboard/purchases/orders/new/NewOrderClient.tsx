@@ -8,6 +8,7 @@ import { PageHeader } from "@/app/components/ui";
 import { formatINR } from "@/lib/format";
 import { createPurchaseOrderAction } from "@/app/actions/purchase-orders";
 import { QuickRegisterSupplierModal } from "@/app/components/QuickRegisterSupplierModal";
+import { MedicineSupplierHistoryPanel } from "@/app/components/MedicineSupplierHistoryPanel";
 import { buildDraftKey, useFormDraft } from "@/lib/useFormDraft";
 
 interface MedicineOption {
@@ -85,6 +86,7 @@ export function NewOrderClient({
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [compareIndex, setCompareIndex] = useState<number>(0);
 
   const handleAddItem = () => {
     setItems((prev) => [...prev, { medicineId: "", qty: 10, freeQty: 0, rateRupees: 0 }]);
@@ -102,6 +104,7 @@ export function NewOrderClient({
 
       if (field === "medicineId") {
         item.medicineId = String(value);
+        setCompareIndex(index);
         // Estimate rate as 70% of MRP if available
         const selectedMed = medicines.find((m) => m.id === value);
         if (selectedMed?.mrp && item.rateRupees === 0) {
@@ -423,6 +426,31 @@ export function NewOrderClient({
             </button>
           </div>
         </div>
+
+        {(() => {
+          const activeLine = items[compareIndex] ?? items.find((i) => i.medicineId);
+          const activeMed = activeLine?.medicineId
+            ? medicines.find((m) => m.id === activeLine.medicineId)
+            : null;
+          if (!activeLine?.medicineId) return null;
+          return (
+            <MedicineSupplierHistoryPanel
+              medicineId={activeLine.medicineId}
+              medicineName={activeMed?.name}
+              onSelectRate={(supId, rateRupees) => {
+                if (supId && suppliers.some((s) => s.id === supId)) {
+                  setSupplierId(supId);
+                }
+                const targetIdx = items[compareIndex]?.medicineId === activeLine.medicineId
+                  ? compareIndex
+                  : items.findIndex((i) => i.medicineId === activeLine.medicineId);
+                if (targetIdx >= 0) {
+                  handleItemChange(targetIdx, "rateRupees", rateRupees);
+                }
+              }}
+            />
+          );
+        })()}
 
         {/* Totals Summary and Submit Bar */}
         <div className="card p-5 flex flex-col md:flex-row items-center justify-between gap-4 bg-ink-50/70 border border-ink-200">
