@@ -14,14 +14,20 @@ export default function BusinessAnalysisPage() {
   const [dimension, setDimension] = useState<"category" | "manufacturer" | "medicine">("manufacturer");
   const [rows, setRows] = useState<PivotRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   async function load(nextDim = dimension) {
     setLoading(true);
+    setError(null);
     try {
       const res = await getBusinessAnalysisAction({ from, to, dimension: nextDim });
       if (res.success && res.rows) {
         setRows(res.rows);
+      } else if (!res.success) {
+        setError(res.error || "Failed to load business analysis.");
       }
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to load business analysis.");
     } finally {
       setLoading(false);
     }
@@ -29,11 +35,18 @@ export default function BusinessAnalysisPage() {
 
   useEffect(() => {
     let active = true;
-    getBusinessAnalysisAction({ from, to, dimension }).then((res) => {
-      if (!active) return;
-      if (res.success && res.rows) setRows(res.rows);
-      setLoading(false);
-    });
+    getBusinessAnalysisAction({ from, to, dimension })
+      .then((res) => {
+        if (!active) return;
+        if (res.success && res.rows) setRows(res.rows);
+        else if (!res.success) setError(res.error || "Failed to load business analysis.");
+        setLoading(false);
+      })
+      .catch((err: unknown) => {
+        if (!active) return;
+        setError(err instanceof Error ? err.message : "Failed to load business analysis.");
+        setLoading(false);
+      });
     return () => {
       active = false;
     };
@@ -75,6 +88,10 @@ export default function BusinessAnalysisPage() {
           </button>
         </div>
       </div>
+
+      {error && (
+        <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-xs text-rose-800">{error}</div>
+      )}
 
       <div className="card overflow-hidden">
         {rows.length === 0 ? (

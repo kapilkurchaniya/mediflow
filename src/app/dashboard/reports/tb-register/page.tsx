@@ -13,15 +13,21 @@ export default function TbRegisterPage() {
   const [rows, setRows] = useState<TbRegisterRow[]>([]);
   const [csv, setCsv] = useState("");
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   async function load() {
     setLoading(true);
+    setError(null);
     try {
       const res = await getTbRegisterAction({ from, to });
       if (res.success && res.rows) {
         setRows(res.rows);
         setCsv(res.csv ?? "");
+      } else if (!res.success) {
+        setError(res.error || "Failed to load Anti-TB register.");
       }
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to load Anti-TB register.");
     } finally {
       setLoading(false);
     }
@@ -29,14 +35,22 @@ export default function TbRegisterPage() {
 
   useEffect(() => {
     let active = true;
-    getTbRegisterAction({ from, to }).then((res) => {
-      if (!active) return;
-      if (res.success && res.rows) {
-        setRows(res.rows);
-        setCsv(res.csv ?? "");
-      }
-      setLoading(false);
-    });
+    getTbRegisterAction({ from, to })
+      .then((res) => {
+        if (!active) return;
+        if (res.success && res.rows) {
+          setRows(res.rows);
+          setCsv(res.csv ?? "");
+        } else if (!res.success) {
+          setError(res.error || "Failed to load Anti-TB register.");
+        }
+        setLoading(false);
+      })
+      .catch((err: unknown) => {
+        if (!active) return;
+        setError(err instanceof Error ? err.message : "Failed to load Anti-TB register.");
+        setLoading(false);
+      });
     return () => {
       active = false;
     };
@@ -80,6 +94,10 @@ export default function TbRegisterPage() {
           )}
         </div>
       </div>
+
+      {error && (
+        <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-xs text-rose-800">{error}</div>
+      )}
 
       <div className="card overflow-hidden">
         {rows.length === 0 ? (
