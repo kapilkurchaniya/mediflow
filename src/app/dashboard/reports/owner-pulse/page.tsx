@@ -12,12 +12,17 @@ export default function OwnerPulseAndTcoPage() {
   const [walletMonthly, setWalletMonthly] = useState(500);
   const [mediflowAnnual, setMediflowAnnual] = useState(12000);
   const [pulse, setPulse] = useState<Awaited<ReturnType<typeof getLiveOwnerPulseAction>> | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
     let active = true;
-    getLiveOwnerPulseAction().then((data) => {
-      if (active) setPulse(data);
-    });
+    getLiveOwnerPulseAction()
+      .then((data) => {
+        if (active) setPulse(data);
+      })
+      .catch((err: unknown) => {
+        if (active) setLoadError(err instanceof Error ? err.message : "Failed to load multi-store pulse.");
+      });
     return () => {
       active = false;
     };
@@ -43,6 +48,10 @@ export default function OwnerPulseAndTcoPage() {
           </p>
         </div>
       </div>
+
+      {loadError && (
+        <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-xs text-rose-800">{loadError}</div>
+      )}
 
       {pulse && (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">

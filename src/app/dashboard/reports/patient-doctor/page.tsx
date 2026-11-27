@@ -14,14 +14,20 @@ export default function PatientDoctorReportPage() {
   const [tab, setTab] = useState<"patients" | "doctors" | "doctorCompanies">("patients");
   const [data, setData] = useState<PatientDoctorReportResult | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   async function load() {
     setLoading(true);
+    setError(null);
     try {
       const res = await getPatientDoctorSalesAction({ from, to });
       if (res.success && res.data) {
         setData(res.data);
+      } else if (!res.success) {
+        setError(res.error || "Failed to load patient/doctor report.");
       }
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to load patient/doctor report.");
     } finally {
       setLoading(false);
     }
@@ -29,13 +35,21 @@ export default function PatientDoctorReportPage() {
 
   useEffect(() => {
     let active = true;
-    getPatientDoctorSalesAction({ from, to }).then((res) => {
-      if (!active) return;
-      if (res.success && res.data) {
-        setData(res.data);
-      }
-      setLoading(false);
-    });
+    getPatientDoctorSalesAction({ from, to })
+      .then((res) => {
+        if (!active) return;
+        if (res.success && res.data) {
+          setData(res.data);
+        } else if (!res.success) {
+          setError(res.error || "Failed to load patient/doctor report.");
+        }
+        setLoading(false);
+      })
+      .catch((err: unknown) => {
+        if (!active) return;
+        setError(err instanceof Error ? err.message : "Failed to load patient/doctor report.");
+        setLoading(false);
+      });
     return () => {
       active = false;
     };
@@ -59,6 +73,10 @@ export default function PatientDoctorReportPage() {
           </button>
         </div>
       </div>
+
+      {error && (
+        <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-xs text-rose-800">{error}</div>
+      )}
 
       <div className="flex flex-wrap gap-2">
         <button

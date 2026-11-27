@@ -21,12 +21,17 @@ export default function ImsAndTaxWorkbenchPage() {
   const [hasPan, setHasPan] = useState(true);
   const [tdsRows, setTdsRows] = useState<Awaited<ReturnType<typeof listTdsEntriesAction>>>([]);
   const [tdsMsg, setTdsMsg] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
     let active = true;
-    listTdsEntriesAction().then((rows) => {
-      if (active) setTdsRows(rows);
-    });
+    listTdsEntriesAction()
+      .then((rows) => {
+        if (active) setTdsRows(rows);
+      })
+      .catch((err: unknown) => {
+        if (active) setLoadError(err instanceof Error ? err.message : "Failed to load TDS register.");
+      });
     return () => {
       active = false;
     };
@@ -47,6 +52,10 @@ export default function ImsAndTaxWorkbenchPage() {
           Calculate 1% Composition turnover tax (G5) and Income-tax Act TDS deductions under 194Q / 194H / 194C / 194J (G9).
         </p>
       </div>
+
+      {loadError && (
+        <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-xs text-rose-800">{loadError}</div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="card p-5 space-y-4">

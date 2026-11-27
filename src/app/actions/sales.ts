@@ -127,6 +127,7 @@ export type PosItemInput = {
   autoFefo?: boolean;
   overrideBatch?: boolean;
   overrideReason?: string;
+  daysSupply?: number;
 };
 
 export type ComplianceDetailsInput = {
@@ -217,6 +218,7 @@ export async function createSaleInvoice(
       autoFefo: i.autoFefo,
       overrideBatch: i.overrideBatch,
       overrideReason: i.overrideReason,
+      daysSupply: i.daysSupply && Number.isInteger(i.daysSupply) && i.daysSupply > 0 ? i.daysSupply : undefined,
     })),
     billDiscountPaise: 0,
     payments,

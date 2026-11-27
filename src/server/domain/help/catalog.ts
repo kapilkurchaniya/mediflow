@@ -55,18 +55,18 @@ export const HELP_ARTICLES: HelpArticle[] = [
         shortcutKey: "F2",
       },
       {
-        title: "2. Search Formulation or Scan Barcode",
+        title: "2. Search Formulation or Scan Barcode / GS1 Pack QR",
         content:
-          "Press F3 (or '/' or Insert) to focus the search bar, then type a brand/generic name or scan an EAN-13 barcode. Click '+ New' in Customer & Loyalty to add a customer inline.",
-        shortcutKey: "F3",
-        tip: "MediFlow automatically suggests active generic substitutes or Promise Orders if the requested brand is out of stock.",
+          "Press F3 (or '/' or Insert) to focus the search bar, then type a brand/generic name or scan an EAN-13, GS1-128, or Schedule H2 pack QR code (auto-extracts GTIN, Batch, and Expiry). Click '+ New' in Customer & Loyalty to add a customer inline, or press F5 to jump to the customer picker.",
+        shortcutKey: "F3 / F5",
+        tip: "MediFlow automatically suggests active generic substitutes or Promise Orders ('*') if the requested brand is out of stock. Use the bottom Live Keybar or Ctrl+F1 to view MediFlow or Marg Classic shortcuts.",
       },
       {
-        title: "3. Confirm Batch & Quantity (Packs / Loose)",
+        title: "3. Confirm Batch, Quantity (Packs / Loose) & Refill Days",
         content:
-          "Batches are ordered by First-Expiry-First-Out (FEFO). Enter Packs (Strips) or Loose (Tablets) — MediFlow calculates per-tablet rates and GST automatically.",
+          "Batches are ordered by First-Expiry-First-Out (FEFO). Enter Packs (Strips), Loose (Tablets), or Refill (days) to auto-schedule WhatsApp refill reminders. Press Ctrl+Z (or Alt+Backspace in Marg Classic) to undo the last removed cart line.",
         callout:
-          "Drugs expiring within 90 days are flagged with an amber badge for pharmacist awareness.",
+          "Drugs expiring within 90 days are flagged with an amber badge, and CDSCO banned FDCs or Legal Metrology MRP breaches are guarded automatically.",
       },
       {
         title: "4. Scrollable Doctor & Prescription Validation",
@@ -74,9 +74,9 @@ export const HELP_ARTICLES: HelpArticle[] = [
           "When Schedule H, H1, or X items are in the cart, the Doctor & Prescription card opens automatically with a scrollable form for Doctor Name, Reg. No, Patient Name, Age/Gender, Date, and Rx Ref.",
       },
       {
-        title: "5. Hold, Split Tender & Finalize Bill",
+        title: "5. Hold, Split Tender, UPI QR & Finalize Bill",
         content:
-          "Press F6 to Hold a bill, F7 to recall Parked bills, F8 for Split Tender / Credit (Cash + UPI + Card + Loyalty), or F10 to Finalize & Print immediately.",
+          "Press F6 to Hold a bill, F7 to recall Parked bills, F8 for Split Tender / Credit (press 'U' in the payment modal to display a Dynamic UPI QR for the exact payable amount), or F10 / Ctrl+Enter (End / Ctrl+W in Marg Classic) to Finalize & Print in Thermal 80mm, 58mm, A5, or A4 across 6 Indian bill languages, or share via WhatsApp Desktop.",
         shortcutKey: "F10 / F8",
       },
     ],
@@ -770,6 +770,191 @@ export const HELP_ARTICLES: HelpArticle[] = [
     ],
     relatedSlugs: ["first-bill", "stock-transfers"],
     keywords: ["offline", "sync", "sqlite", "connectivity", "outage", "resilience"],
+  },
+  {
+    slug: "control-room-and-roles",
+    title: "Control Room Policies, Languages & Custom Roles",
+    summary:
+      "Configure store-wide billing guardrails (below-cost, DPCO ceiling, negative stock), Marg Classic keyboard preset, multilingual bills, and granular cost/margin RBAC roles.",
+    category: "compliance",
+    readMinutes: 4,
+    badge: "Store Governance",
+    targetRole: "Owner, Store Manager",
+    actionRoute: "/dashboard/settings/control-room",
+    actionLabel: "Open Control Room",
+    steps: [
+      {
+        title: "1. Billing & Stock Guardrails",
+        content:
+          "Open Settings > Control Room to configure Below-Cost Policy (off / warn / block), NPPA DPCO Ceiling Price Policy (off / warn / block), and Negative Stock Policy (block / warn / allow).",
+        callout:
+          "Blocking policies prevent accidental margin loss or statutory DPCO overcharging at the POS counter unless a manager override permission is granted.",
+      },
+      {
+        title: "2. Keyboard Preset, UPI VPA & Multilingual Printing",
+        content:
+          "Choose between MediFlow Keys and Marg Classic (End / Ctrl+W / Alt+Backspace), configure your Store UPI VPA for counter QR codes, and select Thermal 80mm, 58mm, A5, or A4 in English, Hindi, Marathi, Gujarati, Tamil, or Bengali.",
+      },
+      {
+        title: "3. Custom Roles & Cost/Margin Redaction",
+        content:
+          "Open Settings > Roles & Access Control to create custom roles or inspect built-in permissions. Users without 'cost.view' or 'margin.view' automatically see purchase costs and margins redacted across inventory and batch screens.",
+      },
+    ],
+    faqs: [
+      {
+        q: "Can cashiers see our purchase rate or profit margin?",
+        a: "No. Purchase rates and valuation totals are redacted server-side unless the user's role includes cost.view / margin.view.",
+      },
+    ],
+    relatedSlugs: ["first-bill", "narcotics-compliance"],
+    keywords: ["control room", "dpco", "below cost", "negative stock", "marg", "roles", "rbac", "language", "upi"],
+  },
+  {
+    slug: "vouchers-and-pdc",
+    title: "Manual Vouchers (Contra, Journal, Notes) & PDC Register",
+    summary:
+      "Post double-entry Journal, Contra, and Debit/Credit Notes, and manage inward/outward Post-Dated Cheques from receipt through pay-in-slip, clearance, or dishonour.",
+    category: "purchasing",
+    readMinutes: 4,
+    badge: "Double-Entry",
+    targetRole: "Accountant, Owner",
+    actionRoute: "/dashboard/accounting/vouchers",
+    actionLabel: "Open Vouchers",
+    steps: [
+      {
+        title: "1. Post Journal, Contra & Debit/Credit Notes",
+        content:
+          "Navigate to Accounting > Vouchers & Notes (or press F4–F7 on the vouchers screen) to record Cash-to-Bank Contra transfers, manual Journal adjustments, or standalone financial Debit/Credit Notes.",
+        shortcutKey: "F4 / F5 / F6 / F7",
+      },
+      {
+        title: "2. Register Inward & Outward Post-Dated Cheques",
+        content:
+          "Open Accounting > PDC Cheques to log customer (inward) or supplier (outward) cheques with cheque number, cheque date, bank name, and amount.",
+      },
+      {
+        title: "3. Pay-In-Slip, Bank Clearance & Dishonour Reversal",
+        content:
+          "Mark cheques as Deposited with a Pay-In-Slip number, then Clear them to auto-post the double-entry bank ledger voucher, or mark Dishonoured with a reason.",
+      },
+    ],
+    faqs: [
+      {
+        q: "Does clearing a PDC update the accounting ledger automatically?",
+        a: "Yes. Clearing a PDC posts a balanced journal entry and links its entry number directly to the cheque record.",
+      },
+    ],
+    relatedSlugs: ["accounting-and-day-book", "wholesale-challans-and-b2b"],
+    keywords: ["voucher", "contra", "journal", "debit note", "credit note", "pdc", "cheque", "bank"],
+  },
+  {
+    slug: "wholesale-challans-and-b2b",
+    title: "Wholesale Delivery Challans, B2B Dispatch & DL Guards",
+    summary:
+      "Create B2B wholesale delivery challans with route/salesman/LR tracking, monitor ₹50,000 e-Way Bill thresholds, and enforce buyer Drug License expiry checks.",
+    category: "billing",
+    readMinutes: 3,
+    badge: "B2B Wholesale",
+    targetRole: "Wholesale Operator, Manager",
+    actionRoute: "/dashboard/wholesale",
+    actionLabel: "Open Wholesale Challans",
+    steps: [
+      {
+        title: "1. Create a Wholesale Delivery Challan",
+        content:
+          "Open Sales > Wholesale Challans to enter buyer details, GSTIN, Route, Salesman, and LR/Transport number along with PTR rates, free quantities, and GST.",
+      },
+      {
+        title: "2. E-Way Bill Threshold & B2B Drug License Guard",
+        content:
+          "MediFlow flags challans crossing the ₹50,000 e-Way Bill threshold automatically. During B2B sales, customers with GSTIN and an expired Drug License are blocked before invoice creation.",
+        callout:
+          "Keep B2B customer Drug License numbers and expiry dates updated under CRM > Customers.",
+      },
+    ],
+    faqs: [
+      {
+        q: "Can I track route and salesman dispatch on challans?",
+        a: "Yes, every saved challan stores Route, Salesman, and LR/Transport details for dispatch reconciliation.",
+      },
+    ],
+    relatedSlugs: ["first-bill", "gst-ims-tds-and-tally"],
+    keywords: ["wholesale", "challan", "b2b", "eway bill", "drug license", "route", "salesman", "lr"],
+  },
+  {
+    slug: "gst-ims-tds-and-tally",
+    title: "GST IMS, Composition Tax, TDS Register & Tally XML",
+    summary:
+      "Calculate CMP-08 composition tax, record Income-tax TDS deductions (194Q/194H/194C/194J), review GSTR-9 annual summaries, and export TallyPrime XML.",
+    category: "compliance",
+    readMinutes: 4,
+    badge: "Tax & ERP Export",
+    targetRole: "Accountant, CA, Owner",
+    actionRoute: "/dashboard/gst/ims-and-tax",
+    actionLabel: "Open IMS & Tax Workbench",
+    steps: [
+      {
+        title: "1. Composition Tax (CMP-08) & TDS Register",
+        content:
+          "Open GST & Tax > IMS, TDS & Composition to compute 1% composition turnover tax (0.5% CGST + 0.5% SGST) and record TDS entries under sections 194Q, 194H, 194C, and 194J.",
+      },
+      {
+        title: "2. 30-Day E-Invoice Reporting Window Guard",
+        content:
+          "For B2B invoices subject to the 30-day IRP reporting rule, MediFlow validates invoice age before generating IRN payloads.",
+      },
+      {
+        title: "3. TallyPrime XML & GSTR-9 Annual Summary",
+        content:
+          "Open Accounting > Tally / CA Export to download TallyPrime-compatible voucher XML files alongside GSTR-1/2B/3B/9 schedules.",
+      },
+    ],
+    faqs: [
+      {
+        q: "What happens if a vendor has no PAN during TDS entry?",
+        a: "Uncheck 'Has PAN' in the TDS calculator to apply the higher statutory non-PAN TDS rate automatically.",
+      },
+    ],
+    relatedSlugs: ["gst-filing", "accounting-and-day-book"],
+    keywords: ["ims", "tds", "194q", "194h", "composition", "cmp-08", "gstr-9", "tally", "xml"],
+  },
+  {
+    slug: "clinical-and-owner-reports",
+    title: "Anti-TB Register, Patient/Doctor Analytics, Owner Pulse & Marg Migration",
+    summary:
+      "Export statutory Anti-TB registers, inspect Doctor × Company and Business Analysis pivots, track multi-store Owner Pulse vs Marg TCO, and import Marg open bills & PDCs.",
+    category: "inventory",
+    readMinutes: 4,
+    badge: "Analytics & Migration",
+    targetRole: "Owner, Pharmacist, Manager",
+    actionRoute: "/dashboard/reports/owner-pulse",
+    actionLabel: "Open Owner Pulse",
+    steps: [
+      {
+        title: "1. Statutory Anti-TB & Patient/Doctor Reports",
+        content:
+          "Use Reports > Anti-TB Register to export Rifampicin/Isoniazid/Pyrazinamide/Ethambutol dispensing CSVs, and Reports > Patient & Doctor Sales for prescriber and Doctor × Company breakdowns.",
+      },
+      {
+        title: "2. Business Analysis Pivot & eOwner Pulse",
+        content:
+          "Open Reports > Business Analysis to pivot Turnover, COGS, and Gross Margin % by Manufacturer, Category, or Medicine. Open Reports > Owner Pulse for live multi-store sales, credit, and near-expiry exposure.",
+      },
+      {
+        title: "3. Marg ERP Deep Migration (Open Bills & PDCs)",
+        content:
+          "Open Import / Settings > Marg Migration to parse Marg outstanding receivable/payable CSVs and commit Post-Dated Cheques directly into MediFlow's PDC Register.",
+      },
+    ],
+    faqs: [
+      {
+        q: "Does distributor invoice import remember previous medicine mappings?",
+        a: "Yes. Confirming a distributor bill item saves the supplier-to-medicine mapping in supplier_item_map for future GRN imports.",
+      },
+    ],
+    relatedSlugs: ["narcotics-compliance", "vouchers-and-pdc"],
+    keywords: ["anti-tb", "tb register", "patient", "doctor", "business analysis", "owner pulse", "tco", "marg migration"],
   },
 ];
 

@@ -80,12 +80,16 @@ export default function MargDeepMigrationPage() {
               <button
                 type="button"
                 onClick={async () => {
-                  const res = await commitMargPdcImportAction(pdcs);
-                  setPdcMsg(
-                    res.success
-                      ? `Imported ${res.importedCount} PDC cheque(s) into PDC Register.`
-                      : res.error || "Import failed",
-                  );
+                  try {
+                    const res = await commitMargPdcImportAction(pdcs);
+                    setPdcMsg(
+                      res.success
+                        ? `Imported ${res.importedCount} PDC cheque(s) into PDC Register.`
+                        : res.error || "Import failed",
+                    );
+                  } catch (err: unknown) {
+                    setPdcMsg(err instanceof Error ? err.message : "Import failed");
+                  }
                 }}
                 className="btn btn-secondary btn-sm"
               >

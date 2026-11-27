@@ -15,13 +15,18 @@ export default function WholesaleChallanPage() {
   const [salesmanName, setSalesmanName] = useState("Vikram");
   const [lrNo, setLrNo] = useState("");
   const [savedMsg, setSavedMsg] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [savedChallans, setSavedChallans] = useState<Awaited<ReturnType<typeof listWholesaleChallansAction>>>([]);
 
   useEffect(() => {
     let active = true;
-    listWholesaleChallansAction().then((rows) => {
-      if (active) setSavedChallans(rows);
-    });
+    listWholesaleChallansAction()
+      .then((rows) => {
+        if (active) setSavedChallans(rows);
+      })
+      .catch((err: unknown) => {
+        if (active) setLoadError(err instanceof Error ? err.message : "Failed to load wholesale challans.");
+      });
     return () => {
       active = false;
     };
@@ -65,6 +70,10 @@ export default function WholesaleChallanPage() {
           </div>
         </div>
       </div>
+
+      {loadError && (
+        <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-xs text-rose-800">{loadError}</div>
+      )}
 
       <div className="card p-5 space-y-4">
         <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-3">
