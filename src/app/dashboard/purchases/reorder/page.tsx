@@ -12,8 +12,13 @@ export const metadata = {
     "AI & sales velocity-based inventory reorder recommendations with 1-click supplier purchase orders.",
 };
 
-export default async function ReorderPage() {
+export default async function ReorderPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ onlyBelowMin?: string }>;
+}) {
   const ctx = await requirePagePermission("purchase.view");
+  const params = await searchParams;
 
   const [stores, initialReport] = await Promise.all([
     getReorderStoresAction(),
@@ -26,6 +31,7 @@ export default async function ReorderPage() {
       stores={stores}
       currentStoreId={ctx.storeId}
       canCreatePo={can(ctx, "purchase.create")}
+      initialOnlyBelowMin={params.onlyBelowMin === "true"}
     />
   );
 }

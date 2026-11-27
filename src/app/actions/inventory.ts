@@ -350,6 +350,16 @@ export async function createMedicine(formData: FormData) {
   
   const rxRequired = formData.get("rxRequired") === "on";
   const schedule = formData.get("schedule") as string;
+  const rawReorderLevel = formData.get("reorderLevel");
+  const reorderLevel =
+    rawReorderLevel !== null && rawReorderLevel !== "" && Number.isFinite(Number(rawReorderLevel))
+      ? Math.max(0, Math.round(Number(rawReorderLevel)))
+      : 10;
+  const rawMaxStock = formData.get("maxStock");
+  const maxStock =
+    rawMaxStock !== null && rawMaxStock !== "" && Number.isFinite(Number(rawMaxStock))
+      ? Math.max(0, Math.round(Number(rawMaxStock)))
+      : 100;
 
   const rawUnitsPerPack = formData.get("unitsPerPack");
   let unitsPerPack = 1;
@@ -403,6 +413,8 @@ export async function createMedicine(formData: FormData) {
       salePrice,
       rxRequired,
       schedule: schedule || "none",
+      reorderLevel,
+      maxStock,
       isActive: true,
     }).returning({ id: schema.medicines.id });
     createdId = created.id;
@@ -465,6 +477,8 @@ const updateMedicineSchema = z.object({
   looseUnit: z.string().trim().min(1).default("tablet"),
   rxRequired: z.boolean().default(false),
   schedule: z.enum(["none", "G", "H", "H1", "X", "narcotic"]).default("none"),
+  reorderLevel: z.coerce.number().int().min(0, "Min alert qty must be 0 or more").optional(),
+  maxStock: z.coerce.number().int().min(0, "Max stock must be 0 or more").optional(),
   isActive: z.boolean().default(true),
   convertExistingBatches: z.boolean().default(false),
 });
@@ -573,6 +587,8 @@ export async function updateMedicine(formData: FormData) {
           ...(purchasePricePaise !== undefined ? { purchasePrice: purchasePricePaise } : {}),
           rxRequired: input.rxRequired,
           schedule: input.schedule,
+          ...(input.reorderLevel !== undefined ? { reorderLevel: input.reorderLevel } : {}),
+          ...(input.maxStock !== undefined ? { maxStock: input.maxStock } : {}),
           isActive: input.isActive,
           updatedAt: new Date(),
         })

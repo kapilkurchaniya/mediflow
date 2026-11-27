@@ -18,6 +18,7 @@ import {
 import { getReorderSuggestions, createPoFromReorderAction } from "@/app/actions/reorder";
 import type { ReorderSuggestionsReport } from "@/server/domain/purchasing/reorder";
 import { QuickRegisterSupplierModal } from "@/app/components/QuickRegisterSupplierModal";
+import { BatchSupplierHistoryButton } from "@/app/dashboard/inventory/batches/_components/BatchSupplierHistoryButton";
 import { buildDraftKey, useFormDraft } from "@/lib/useFormDraft";
 
 interface StoreOption {
@@ -31,6 +32,7 @@ interface ReorderClientProps {
   stores: StoreOption[];
   currentStoreId: string;
   canCreatePo?: boolean;
+  initialOnlyBelowMin?: boolean;
 }
 
 export function ReorderClient({
@@ -38,11 +40,13 @@ export function ReorderClient({
   stores,
   currentStoreId,
   canCreatePo = true,
+  initialOnlyBelowMin = false,
 }: ReorderClientProps) {
   const [report, setReport] = useState<ReorderSuggestionsReport>(initialReport);
   const [selectedStoreId, setSelectedStoreId] = useState<string>(currentStoreId);
   const [search, setSearch] = useState<string>("");
   const [includeNeverStocked, setIncludeNeverStocked] = useState<boolean>(false);
+  const [onlyBelowMin, setOnlyBelowMin] = useState<boolean>(initialOnlyBelowMin);
   const [isPending, startTransition] = useTransition();
   const [creatingPoSupplierId, setCreatingPoSupplierId] = useState<string | null>(null);
   const [createdPoNotice, setCreatedPoNotice] = useState<{ poNo: string; id: string } | null>(null);
@@ -274,6 +278,16 @@ export function ReorderClient({
             />
             <span>Include never-stocked catalog items</span>
           </label>
+
+          <label className="inline-flex items-center gap-1.5 text-xs font-medium text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-1 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={onlyBelowMin}
+              onChange={(e) => setOnlyBelowMin(e.target.checked)}
+              className="rounded border-amber-400 text-amber-600 focus:ring-amber-500"
+            />
+            <span>Below Min Alert Qty Only</span>
+          </label>
         </div>
 
         <div className="text-xs text-ink-500 flex items-center gap-2">
@@ -324,17 +338,33 @@ export function ReorderClient({
       </div>
 
       {/* Supplier Groups */}
-      {report.suppliers.length === 0 ? (
+      {(() => {
+        const displayedGroups = onlyBelowMin
+          ? report.suppliers
+              .map((g) => ({
+                ...g,
+                items: g.items.filter((i) => i.reorderLevel > 0 && i.onHand <= i.reorderLevel),
+              }))
+              .filter((g) => g.items.length > 0)
+          : report.suppliers;
+
+        if (displayedGroups.length === 0) {
+          return (
         <div className="card bg-white p-12 text-center rounded-xl border border-ink-100 shadow-sm">
           <CheckCircle2 className="h-12 w-12 text-emerald-500 mx-auto" />
           <h3 className="text-base font-semibold text-ink-900 mt-4">All Inventory Levels Are Healthy!</h3>
           <p className="text-xs text-ink-500 max-w-md mx-auto mt-1">
-            No stocked medicines in {report.storeName} currently breach safety stock or reorder levels based on 30-day velocity.
+            {onlyBelowMin
+              ? `No medicines in ${report.storeName} are currently at or below their Min Alert Qty.`
+              : `No stocked medicines in ${report.storeName} currently breach safety stock or reorder levels based on 30-day velocity.`}
           </p>
         </div>
-      ) : (
+          );
+        }
+
+        return (
         <div className="space-y-6">
-          {report.suppliers.map((group) => {
+          {displayedGroups.map((group) => {
             const isUnassigned = group.supplierId === "unassigned";
             const isSubmitting = creatingPoSupplierId === group.supplierId;
             const groupLiveTotal = group.items.reduce(
@@ -434,7 +464,19 @@ export function ReorderClient({
                       {group.items.map((item) => (
                         <tr key={item.medicineId} className="hover:bg-ink-50/50 transition-colors">
                           <td className="py-3 px-4">
-                            <div className="font-semibold text-ink-900">{item.medicineName}</div>
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span className="font-semibold text-ink-900">{item.medicineName}</span>
+                              {item.reorderLevel > 0 && item.onHand <= item.reorderLevel && (
+                                <span
+                                  className={`badge !text-[10px] !px-1.5 ${
+                                    item.onHand === 0 ? "badge-danger" : "badge-warning"
+                                  }`}
+                                >
+                                  {item.onHand === 0 ? "Out of Stock" : "Below Min"}
+                                </span>
+                              )}
+                              <BatchSupplierHistoryButton medicineId={item.medicineId} medicineName={item.medicineName} />
+                            </div>
                             {item.genericName && (
                               <div className="text-[11px] text-ink-400">{item.genericName}</div>
                             )}
@@ -502,7 +544,8 @@ export function ReorderClient({
             );
           })}
         </div>
-      )}
+        );
+      })()}
 
       <QuickRegisterSupplierModal
         isOpen={isAddSupplierOpen}

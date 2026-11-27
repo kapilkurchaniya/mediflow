@@ -244,6 +244,12 @@ export default function NewMedicinePage() {
                 <option value="narcotic">Narcotic</option>
               </select>
             </Field>
+            <Field label="Min alert qty (Reorder level)" htmlFor="reorderLevel" hint="Alerts in Notifications & Reorder Suggestions when stock drops to or below this qty.">
+              <input id="reorderLevel" name="reorderLevel" type="number" min="0" defaultValue="10" className="input font-mono" />
+            </Field>
+            <Field label="Max stock target" htmlFor="maxStock" hint="Upper stock cap used by Reorder Suggestions.">
+              <input id="maxStock" name="maxStock" type="number" min="0" defaultValue="100" className="input font-mono" />
+            </Field>
             <label
               htmlFor="rxRequired"
               className="sm:col-span-2 flex items-start gap-3 rounded-lg border border-ink-150 bg-ink-50/50 p-3.5 transition-colors hover:border-ink-300"

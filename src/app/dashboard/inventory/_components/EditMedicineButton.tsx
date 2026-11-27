@@ -34,6 +34,8 @@ export interface EditableMedicineData {
   purchasePrice: number;
   rxRequired: boolean;
   schedule: string;
+  reorderLevel?: number;
+  maxStock?: number;
   isActive: boolean;
 }
 
@@ -86,6 +88,8 @@ export function EditMedicineButton({
   const [looseUnit, setLooseUnit] = useState(medicine.looseUnit || "tablet");
   const [packSize, setPackSize] = useState(medicine.packSize || "");
   const [schedule, setSchedule] = useState(medicine.schedule || "none");
+  const [reorderLevel, setReorderLevel] = useState(String(medicine.reorderLevel ?? 10));
+  const [maxStock, setMaxStock] = useState(String(medicine.maxStock ?? 100));
   const [rackId, setRackId] = useState(currentRackId || "");
   const [rxRequired, setRxRequired] = useState(medicine.rxRequired);
   const [isActive, setIsActive] = useState(medicine.isActive);
@@ -111,6 +115,8 @@ export function EditMedicineButton({
     setLooseUnit(medicine.looseUnit || "tablet");
     setPackSize(medicine.packSize || "");
     setSchedule(medicine.schedule || "none");
+    setReorderLevel(String(medicine.reorderLevel ?? 10));
+    setMaxStock(String(medicine.maxStock ?? 100));
     setRackId(currentRackId || "");
     setRxRequired(medicine.rxRequired);
     setIsActive(medicine.isActive);
@@ -260,6 +266,8 @@ export function EditMedicineButton({
     fd.append("looseUnit", looseUnit);
     fd.append("packSize", packSize);
     fd.append("schedule", schedule);
+    fd.append("reorderLevel", reorderLevel);
+    fd.append("maxStock", maxStock);
     fd.append("rackId", rackId);
     if (rxRequired) fd.append("rxRequired", "on");
     if (isActive) fd.append("isActive", "on");
@@ -431,6 +439,28 @@ export function EditMedicineButton({
                           <option key={seg.value} value={seg.value}>{seg.label}</option>
                         ))}
                       </select>
+                    </div>
+                    <div>
+                      <label className="label" htmlFor={`med-reorder-${medicine.id}`}>Min Alert Qty (Reorder)</label>
+                      <input
+                        id={`med-reorder-${medicine.id}`}
+                        type="number"
+                        min={0}
+                        value={reorderLevel}
+                        onChange={(e) => setReorderLevel(e.target.value)}
+                        className="input font-mono"
+                      />
+                    </div>
+                    <div>
+                      <label className="label" htmlFor={`med-max-${medicine.id}`}>Max Stock Target</label>
+                      <input
+                        id={`med-max-${medicine.id}`}
+                        type="number"
+                        min={0}
+                        value={maxStock}
+                        onChange={(e) => setMaxStock(e.target.value)}
+                        className="input font-mono"
+                      />
                     </div>
                     <div>
                       <label className="label" htmlFor={`med-mfg-${medicine.id}`}>Manufacturer</label>

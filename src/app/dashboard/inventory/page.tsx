@@ -74,7 +74,7 @@ export default async function InventoryPage({
   } = counts;
 
   const stockTotals =
-    canManage && items.length > 0
+    items.length > 0
       ? await getStoreStockTotalsByMedicine(items.map((i) => i.medicine.id))
       : {};
   const rxCount = items.filter((i) => i.medicine.rxRequired).length;
@@ -207,6 +207,24 @@ export default async function InventoryPage({
                             </span>
                           )}
                           {medicine.rxRequired && <span className="badge badge-danger !h-[18px] !px-1.5 !text-[10.5px]">Rx</span>}
+                          {(() => {
+                            const effectiveMin = branchSettings?.reorderLevel ?? medicine.reorderLevel ?? 10;
+                            const onHand = stockTotals[medicine.id] ?? 0;
+                            if (effectiveMin > 0 && onHand <= effectiveMin) {
+                              return (
+                                <Link
+                                  href="/dashboard/purchases/reorder"
+                                  className={`badge !h-[18px] !px-1.5 !text-[10px] font-mono ${
+                                    onHand === 0 ? "badge-danger" : "badge-warning"
+                                  }`}
+                                  title={`Stock ${onHand} is at or below Min Alert Qty (${effectiveMin}). Click to open Reorder Suggestions.`}
+                                >
+                                  {onHand === 0 ? `Out (Min ${effectiveMin})` : `Low ${onHand}/${effectiveMin}`}
+                                </Link>
+                              );
+                            }
+                            return null;
+                          })()}
                         </div>
                         <div className="cell-sub truncate" title={medicine.genericName || ""}>
                           {medicine.genericName || "—"}
