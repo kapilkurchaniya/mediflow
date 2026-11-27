@@ -8,6 +8,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { PageHeader, FormSection, Field } from "@/app/components/ui";
 import { QuickCreateMedicineModal } from "@/app/components/QuickCreateMedicineModal";
+import { MedicineSupplierHistoryPanel } from "@/app/components/MedicineSupplierHistoryPanel";
 
 interface RawMedicine {
   id?: string;
@@ -103,6 +104,11 @@ export default function NewBatchPage() {
                   {selectedMedicine.genericName || "No composition"} · <span className="capitalize">{selectedMedicine.unit}</span>
                   {selectedMedicine.packSize ? ` · ${selectedMedicine.packSize}` : ""}. Prices below are pre-filled from the item master.
                 </span>
+              </div>
+            )}
+            {selectedMedicineId && (
+              <div className="sm:col-span-2">
+                <MedicineSupplierHistoryPanel medicineId={selectedMedicineId} />
               </div>
             )}
           </FormSection>

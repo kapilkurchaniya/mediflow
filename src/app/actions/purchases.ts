@@ -15,8 +15,15 @@ import {
   type CreatePurchaseInput,
   type PurchaseItemInput,
 } from "@/server/domain/purchases";
+import { getMedicineSupplierHistory } from "@/server/domain/purchasing/supplier-history";
 
 export type { PurchaseItemInput };
+
+export async function getMedicineSupplierHistoryAction(medicineId: string) {
+  const ctx = await requirePermission("purchase.view");
+  const validId = z.string().uuid().parse(medicineId);
+  return getMedicineSupplierHistory(db, ctx.tenantId, validId);
+}
 
 export async function getPurchases(dateFrom?: string | null, dateTo?: string | null) {
   const ctx = await requirePermission("purchase.view");

@@ -47,6 +47,7 @@ export const recordReceipt = protectedAction("accounting.post")
     revalidatePath("/dashboard/accounting/receipts");
     revalidatePath("/dashboard/accounting/outstanding");
     revalidatePath("/dashboard/customers");
+    revalidatePath("/dashboard/customers/credit");
     return result;
   });
 

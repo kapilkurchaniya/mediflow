@@ -55,6 +55,9 @@ export default async function SalesPage({
             </>
           ) : (
             <>
+              <Link href="/dashboard/customers/credit" className="btn btn-secondary">
+                Udhaar &amp; Dues
+              </Link>
               <Link href="/dashboard/sales/register" className="btn btn-secondary">
                 <Banknote className="h-4 w-4 mr-1 text-emerald-600" /> Cash register
               </Link>

@@ -7,6 +7,7 @@ import { redactMedicineCost } from "@/server/redact";
 import { writeAudit } from "@/server/audit";
 import { recordStockMovement } from "@/server/domain/stock";
 import { DEFAULT_GST_RATE_BP, isValidGstRateBp } from "@/lib/regulatory";
+import { normalizeMedicineSegment, type MedicineSegmentFilter } from "@/lib/inventory/medicine-segments";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
@@ -149,12 +150,20 @@ export async function createManufacturer(name: string) {
 
 export type MedicinePackFilter = "all" | "single";
 export type MedicineStatusFilter = "all" | "active" | "archived";
+export type MedicineFilterOptions = {
+  segment?: MedicineSegmentFilter;
+  molecule?: string;
+  categoryId?: string;
+  rackId?: string;
+};
 
 function buildMedicineSearchConditions(
   tenantId: string,
   searchQuery?: string,
   packFilter: MedicinePackFilter = "all",
-  statusFilter: MedicineStatusFilter = "all"
+  statusFilter: MedicineStatusFilter = "all",
+  filters?: MedicineFilterOptions,
+  storeId?: string
 ) {
   const conditions = [eq(schema.medicines.tenantId, tenantId)];
 
@@ -168,12 +177,44 @@ function buildMedicineSearchConditions(
     conditions.push(eq(schema.medicines.unitsPerPack, 1));
   }
 
+  if (filters?.segment && filters.segment !== "all") {
+    conditions.push(eq(schema.medicines.targetSegment, filters.segment));
+  }
+
+  if (filters?.categoryId?.trim()) {
+    conditions.push(eq(schema.medicines.categoryId, filters.categoryId.trim()));
+  }
+
+  if (filters?.molecule?.trim()) {
+    const mq = `%${filters.molecule.trim().toLowerCase()}%`;
+    conditions.push(
+      or(
+        ilike(schema.medicines.genericName, mq),
+        ilike(schema.medicines.composition, mq)
+      )!
+    );
+  }
+
+  if (filters?.rackId?.trim() && storeId) {
+    const rackId = filters.rackId.trim();
+    conditions.push(
+      sql`exists (
+        select 1 from ${schema.storeMedicineSettings} sms
+        where sms.medicine_id = ${schema.medicines.id}
+          and sms.store_id = ${storeId}
+          and sms.tenant_id = ${tenantId}
+          and sms.rack_id = ${rackId}
+      )`
+    );
+  }
+
   if (searchQuery?.trim()) {
     const q = `%${searchQuery.trim().toLowerCase()}%`;
     conditions.push(
       or(
         ilike(schema.medicines.name, q),
         ilike(schema.medicines.genericName, q),
+        ilike(schema.medicines.composition, q),
         ilike(schema.medicines.barcode, q)
       )!
     );
@@ -201,7 +242,8 @@ export async function getMedicinesCount(
 export async function getMedicinesCounts(
   searchQuery?: string,
   packFilter: MedicinePackFilter = "all",
-  statusFilter: MedicineStatusFilter = "all"
+  statusFilter: MedicineStatusFilter = "all",
+  filters?: MedicineFilterOptions
 ): Promise<{
   filteredCount: number;
   activeCount: number;
@@ -209,7 +251,7 @@ export async function getMedicinesCounts(
   singleUnitActiveCount: number;
 }> {
   const ctx = await requirePermission("medicine.view");
-  const baseConditions = buildMedicineSearchConditions(ctx.tenantId, searchQuery, "all", "all");
+  const baseConditions = buildMedicineSearchConditions(ctx.tenantId, searchQuery, "all", "all", filters, ctx.storeId);
 
   const statusCond =
     statusFilter === "active"
@@ -242,10 +284,11 @@ export async function getMedicines(
   limit = 50,
   offset = 0,
   packFilter: MedicinePackFilter = "all",
-  statusFilter: MedicineStatusFilter = "all"
+  statusFilter: MedicineStatusFilter = "all",
+  filters?: MedicineFilterOptions
 ) {
   const ctx = await requirePermission("medicine.view");
-  const conditions = buildMedicineSearchConditions(ctx.tenantId, searchQuery, packFilter, statusFilter);
+  const conditions = buildMedicineSearchConditions(ctx.tenantId, searchQuery, packFilter, statusFilter, filters, ctx.storeId);
 
   const rows = await db
     .select({
@@ -294,6 +337,7 @@ export async function createMedicine(formData: FormData) {
   const genericName = formData.get("genericName") as string;
   const manufacturerId = formData.get("manufacturerId") as string;
   const categoryId = formData.get("categoryId") as string;
+  const targetSegment = normalizeMedicineSegment(formData.get("targetSegment") as string);
   const rackId = formData.get("rackId") as string;
   const unit = (formData.get("unit") as string) || "strip";
   const packSize = formData.get("packSize") as string;
@@ -346,6 +390,7 @@ export async function createMedicine(formData: FormData) {
       genericName: genericName || null,
       manufacturerId: manufacturerId || null,
       categoryId: categoryId || null,
+      targetSegment,
       unit: packUnit,
       unitsPerPack,
       packUnit,
@@ -406,6 +451,7 @@ const updateMedicineSchema = z.object({
   genericName: z.string().optional(),
   manufacturerId: z.string().optional(),
   categoryId: z.string().optional(),
+  targetSegment: z.string().optional(),
   rackId: z.string().optional(),
   packSize: z.string().optional(),
   barcode: z.string().optional(),
@@ -513,6 +559,7 @@ export async function updateMedicine(formData: FormData) {
           genericName: input.genericName?.trim() || null,
           manufacturerId: mfgId,
           categoryId: catId,
+          targetSegment: normalizeMedicineSegment(input.targetSegment),
           unit: cleanPackUnit,
           unitsPerPack: input.unitsPerPack,
           packUnit: cleanPackUnit,

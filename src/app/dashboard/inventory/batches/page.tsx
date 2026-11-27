@@ -1,4 +1,7 @@
 import { getBatches, getBatchesSummary } from "@/app/actions/stock";
+import { getCategories } from "@/app/actions/inventory";
+import { getRacks } from "@/app/actions/racks";
+import { MedicineCatalogFilterBar } from "../_components/MedicineCatalogFilterBar";
 import { Plus, Boxes, IndianRupee, Layers, CalendarClock } from "lucide-react";
 import Link from "next/link";
 import clsx from "clsx";
@@ -12,6 +15,7 @@ import { requirePagePermission, can } from "@/server/rbac";
 import { BackfillPtrBanner } from "./BackfillPtrBanner";
 import { EditBatchButton } from "./EditBatchModal";
 import { PrintBarcodeLabelButton } from "./_components/PrintBarcodeLabelButton";
+import { BatchSupplierHistoryButton } from "./_components/BatchSupplierHistoryButton";
 import { StockOcrButton } from "./_components/StockOcrButton";
 import { BatchCsvImportButton } from "./_components/BatchCsvImportButton";
 import { BatchesDropWrapper } from "./_components/BatchesDropWrapper";
@@ -30,23 +34,38 @@ function ExpiryBadge({ date }: { date: string }) {
 export default async function BatchesPage({
   searchParams,
 }: {
-  searchParams: Promise<{ nearExpiry?: string; range?: string; from?: string; to?: string; medicineId?: string; page?: string }>;
+  searchParams: Promise<{
+    nearExpiry?: string;
+    range?: string;
+    from?: string;
+    to?: string;
+    medicineId?: string;
+    segment?: string;
+    molecule?: string;
+    categoryId?: string;
+    rackId?: string;
+    page?: string;
+  }>;
 }) {
   const ctx = await requirePagePermission("inventory.view");
   const canAdjust = can(ctx, "inventory.adjust");
-  const { nearExpiry, range, from, to, medicineId, page: pageStr } = await searchParams;
+  const { nearExpiry, range, from, to, medicineId, segment, molecule, categoryId, rackId, page: pageStr } = await searchParams;
   const isNearExpiry = nearExpiry === "true";
   const dateRange = resolveExpiryDateRange({ range, from, to });
   const page = Math.max(1, parseInt(pageStr || "1", 10));
   const PAGE_SIZE = 50;
   const offset = (page - 1) * PAGE_SIZE;
 
-  const [batches, summary] = await Promise.all([
+  const [batches, summary, categories, racks] = await Promise.all([
     getBatches({
       nearExpiryOnly: isNearExpiry,
       from: dateRange.from,
       to: dateRange.to,
       medicineId: medicineId || null,
+      segment: segment || null,
+      molecule: molecule || null,
+      categoryId: categoryId || null,
+      rackId: rackId || null,
       limit: PAGE_SIZE,
       offset,
     }),
@@ -55,7 +74,13 @@ export default async function BatchesPage({
       from: dateRange.from,
       to: dateRange.to,
       medicineId: medicineId || null,
+      segment: segment || null,
+      molecule: molecule || null,
+      categoryId: categoryId || null,
+      rackId: rackId || null,
     }),
+    getCategories(),
+    getRacks(),
   ]);
 
   const getEffectivePtr = (b: (typeof batches)[0]["batch"], m: (typeof batches)[0]["medicine"]) => {
@@ -123,6 +148,22 @@ export default async function BatchesPage({
       </div>
 
       <div className="card overflow-hidden">
+        <MedicineCatalogFilterBar
+          basePath="/dashboard/inventory/batches"
+          segment={segment || "all"}
+          molecule={molecule || ""}
+          categoryId={categoryId || ""}
+          rackId={rackId || ""}
+          categories={categories}
+          racks={racks}
+          preservedParams={{
+            nearExpiry: isNearExpiry ? "true" : undefined,
+            range: range || undefined,
+            from: from || undefined,
+            to: to || undefined,
+            medicineId: medicineId || undefined,
+          }}
+        />
         <div className="flex items-center justify-between gap-3 border-b border-ink-150 px-4 py-3">
           <div className="inline-flex rounded-md border border-ink-200 bg-ink-50 p-0.5" role="tablist">
             <Link
@@ -228,6 +269,7 @@ export default async function BatchesPage({
                       </td>
                       <td className="text-right">
                         <div className="inline-flex items-center gap-1 justify-end">
+                          <BatchSupplierHistoryButton medicineId={medicine.id} medicineName={medicine.name} />
                           <PrintBarcodeLabelButton
                             storeName="MediFlow Pharmacy"
                             medicineName={medicine.name}
@@ -296,6 +338,10 @@ export default async function BatchesPage({
             ...(from ? { from } : {}),
             ...(to ? { to } : {}),
             ...(medicineId ? { medicineId } : {}),
+            ...(segment ? { segment } : {}),
+            ...(molecule ? { molecule } : {}),
+            ...(categoryId ? { categoryId } : {}),
+            ...(rackId ? { rackId } : {}),
           }}
           itemLabel="batches"
         />

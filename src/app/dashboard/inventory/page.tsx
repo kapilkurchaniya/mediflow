@@ -16,6 +16,8 @@ import { requirePagePermission, can } from "@/server/rbac";
 import { BranchSettingsButton } from "./_components/BranchSettingsButton";
 import { EditMedicineButton } from "./_components/EditMedicineButton";
 import { BulkPackUpdaterModal } from "./_components/BulkPackUpdaterModal";
+import { MedicineCatalogFilterBar } from "./_components/MedicineCatalogFilterBar";
+import { getMedicineSegmentLabel, type MedicineSegmentFilter } from "@/lib/inventory/medicine-segments";
 import { Pagination } from "@/app/components/Pagination";
 
 export const metadata = { title: "Item master" };
@@ -23,25 +25,44 @@ export const metadata = { title: "Item master" };
 export default async function InventoryPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; page?: string; pack?: string; status?: string }>;
+  searchParams: Promise<{
+    q?: string;
+    page?: string;
+    pack?: string;
+    status?: string;
+    segment?: string;
+    molecule?: string;
+    categoryId?: string;
+    rackId?: string;
+  }>;
 }) {
   const ctx = await requirePagePermission("medicine.view");
   const canManage = can(ctx, "medicine.manage");
   const canAdjust = can(ctx, "inventory.adjust");
-  const { q, page: pageStr, pack, status } = await searchParams;
+  const { q, page: pageStr, pack, status, segment, molecule, categoryId, rackId } = await searchParams;
   const packFilter: MedicinePackFilter = pack === "single" ? "single" : "all";
   const statusFilter: MedicineStatusFilter =
     status === "archived" ? "archived" : status === "all" ? "all" : "active";
+  const segmentFilter: MedicineSegmentFilter =
+    segment === "male" || segment === "female" || segment === "kids" || segment === "senior" || segment === "general"
+      ? segment
+      : "all";
+  const filterOpts = {
+    segment: segmentFilter,
+    molecule: molecule || undefined,
+    categoryId: categoryId || undefined,
+    rackId: rackId || undefined,
+  };
   const page = Math.max(1, parseInt(pageStr || "1", 10));
   const PAGE_SIZE = 50;
   const offset = (page - 1) * PAGE_SIZE;
 
   const [items, counts, racks, categories, manufacturers] =
     await Promise.all([
-      getMedicines(q, PAGE_SIZE, offset, packFilter, statusFilter),
-      getMedicinesCounts(q, packFilter, statusFilter),
+      getMedicines(q, PAGE_SIZE, offset, packFilter, statusFilter, filterOpts),
+      getMedicinesCounts(q, packFilter, statusFilter, filterOpts),
       getRacks(),
-      canManage ? getCategories() : Promise.resolve([]),
+      getCategories(),
       canManage ? getManufacturers() : Promise.resolve([]),
     ]);
 
@@ -99,6 +120,10 @@ export default async function InventoryPage({
         <SearchForm defaultValue={q || ""} placeholder="Search by name, composition or barcode">
           {packFilter === "single" && <input type="hidden" name="pack" value="single" />}
           {statusFilter !== "active" && <input type="hidden" name="status" value={statusFilter} />}
+          {segmentFilter !== "all" && <input type="hidden" name="segment" value={segmentFilter} />}
+          {molecule && <input type="hidden" name="molecule" value={molecule} />}
+          {categoryId && <input type="hidden" name="categoryId" value={categoryId} />}
+          {rackId && <input type="hidden" name="rackId" value={rackId} />}
           <div className="flex flex-wrap items-center gap-2">
             <Link
               href={`/dashboard/inventory${q ? `?q=${encodeURIComponent(q)}` : ""}`}
@@ -138,6 +163,21 @@ export default async function InventoryPage({
           </div>
         </SearchForm>
 
+        <MedicineCatalogFilterBar
+          basePath="/dashboard/inventory"
+          segment={segmentFilter}
+          molecule={molecule || ""}
+          categoryId={categoryId || ""}
+          rackId={rackId || ""}
+          categories={categories}
+          racks={racks}
+          preservedParams={{
+            q: q || undefined,
+            pack: packFilter === "single" ? "single" : undefined,
+            status: statusFilter !== "active" ? statusFilter : undefined,
+          }}
+        />
+
         {items.length > 0 ? (
           <>
             <TableWrapper>
@@ -173,7 +213,14 @@ export default async function InventoryPage({
                           {manufacturer?.name && <span className="text-ink-400"> · {manufacturer.name}</span>}
                         </div>
                       </td>
-                      <td className="text-ink-600">{category?.name || <span className="text-ink-400">Uncategorised</span>}</td>
+                      <td className="text-ink-600">
+                        <div>{category?.name || <span className="text-ink-400">Uncategorised</span>}</div>
+                        {medicine.targetSegment && medicine.targetSegment !== "general" && (
+                          <span className="badge badge-neutral !text-[10px] !px-1.5 mt-0.5 capitalize">
+                            {getMedicineSegmentLabel(medicine.targetSegment)}
+                          </span>
+                        )}
+                      </td>
                       <td>
                         {rack ? (
                           <span className="font-mono text-ink-700">{rack.code}</span>
@@ -252,6 +299,10 @@ export default async function InventoryPage({
                 q,
                 ...(packFilter === "single" ? { pack: "single" } : {}),
                 ...(statusFilter !== "active" ? { status: statusFilter } : {}),
+                ...(segmentFilter !== "all" ? { segment: segmentFilter } : {}),
+                ...(molecule ? { molecule } : {}),
+                ...(categoryId ? { categoryId } : {}),
+                ...(rackId ? { rackId } : {}),
               }}
               itemLabel="medicines"
             />

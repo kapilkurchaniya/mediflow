@@ -22,6 +22,7 @@ import {
   UserPlus,
 } from "lucide-react";
 import { PageHeader } from "@/app/components/ui";
+import { MedicineSupplierHistoryPanel } from "@/app/components/MedicineSupplierHistoryPanel";
 import { formatINR } from "@/lib/format";
 import { computePurchaseTotals } from "@/lib/money";
 import { DEFAULT_GST_RATE_BP, isValidGstRateBp, type GstRateBp } from "@/lib/regulatory";
@@ -104,6 +105,7 @@ function NewPurchaseForm() {
 
   const [historicalDateNotice, setHistoricalDateNotice] = useState<string | null>(null);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [compareMedId, setCompareMedId] = useState("");
   const [droppedImportFile, setDroppedImportFile] = useState<File | null>(null);
   const [pendingSupplierMeta, setPendingSupplierMeta] = useState<PendingSupplierMeta | null>(null);
   const [showQuickRegisterSupplier, setShowQuickRegisterSupplier] = useState(false);
@@ -516,6 +518,7 @@ function NewPurchaseForm() {
                             onChange={(e) => {
                               const med = medicines.find((m) => m.id === e.target.value);
                               updateItem(index, "medicineId", e.target.value);
+                              setCompareMedId(e.target.value);
                               if (med) {
                                 updateItem(index, "gstRateBp", isValidGstRateBp(med.gstRateBp) ? med.gstRateBp : DEFAULT_GST_RATE_BP);
                                 updateItem(index, "unitsPerPack", med.unitsPerPack || 1);
@@ -690,6 +693,17 @@ function NewPurchaseForm() {
             </table>
           </div>
         </div>
+
+        {(compareMedId || items.find((i) => i.medicineId)?.medicineId) && (
+          <MedicineSupplierHistoryPanel
+            medicineId={compareMedId || items.find((i) => i.medicineId)?.medicineId || ""}
+            medicineName={
+              medicines.find(
+                (m) => m.id === (compareMedId || items.find((i) => i.medicineId)?.medicineId),
+              )?.name
+            }
+          />
+        )}
 
         {/* Summary Card & Save Button */}
         <div className="flex justify-end">

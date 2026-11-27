@@ -32,6 +32,9 @@ export default async function CustomersPage({
         description="Patients and accounts with contact details and credit limits."
         actions={
           <div className="flex items-center gap-2">
+            <Link href="/dashboard/customers/credit" className="btn btn-secondary">
+              Udhaar &amp; Dues
+            </Link>
             <Link href="/dashboard/customers/groups" className="btn btn-secondary">
               <Users className="h-4 w-4" /> Family Groups
             </Link>

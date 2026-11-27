@@ -67,6 +67,7 @@ interface RawSearchRow {
   loose_unit: string;
   manufacturer_id: string | null;
   category_id: string | null;
+  target_segment: string | null;
   barcode: string | null;
   hsn: string | null;
   gst_rate_bp: number;
@@ -241,6 +242,7 @@ export async function searchPosMedicines(
         looseUnit: row.loose_unit,
         manufacturerId: row.manufacturer_id ?? null,
         categoryId: row.category_id ?? null,
+        targetSegment: row.target_segment ?? "general",
         barcode: row.barcode ?? null,
         hsn: row.hsn ?? null,
         gstRateBp: Number(row.gst_rate_bp),

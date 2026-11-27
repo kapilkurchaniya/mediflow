@@ -8,6 +8,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { PageHeader, FormSection, Field } from "@/app/components/ui";
 import { RackSelectorField } from "../_components/RackSelectorField";
+import { MEDICINE_SEGMENTS } from "@/lib/inventory/medicine-segments";
 
 function InlineCreate({
   value,
@@ -115,6 +116,15 @@ export default function NewMedicinePage() {
                 ))}
               </select>
               <InlineCreate value={newCatName} onChange={setNewCatName} onAdd={handleAddCategory} placeholder="New category" />
+            </Field>
+            <Field label="Target segment (Male / Female / Kids)" htmlFor="targetSegment">
+              <select id="targetSegment" name="targetSegment" defaultValue="general" className="input">
+                {MEDICINE_SEGMENTS.map((seg) => (
+                  <option key={seg.value} value={seg.value}>
+                    {seg.label}
+                  </option>
+                ))}
+              </select>
             </Field>
             <Field label="Manufacturer" htmlFor="manufacturerId">
               <select id="manufacturerId" name="manufacturerId" className="input">
