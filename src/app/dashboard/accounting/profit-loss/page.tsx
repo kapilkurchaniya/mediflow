@@ -96,28 +96,30 @@ export default async function ProfitAndLossPage({
                 {formatINR(revenue.totalRevenue)}
               </span>
             </div>
-            <table className="w-full text-[13.5px]">
-              <tbody>
-                {revenue.accounts.length === 0 ? (
-                  <tr>
-                    <td className="py-2 text-ink-400 italic">No sales revenue recorded in this period.</td>
-                    <td className="py-2 text-right num text-ink-400">₹0.00</td>
-                  </tr>
-                ) : (
-                  revenue.accounts.map((acc) => (
-                    <tr key={acc.code} className="border-b border-ink-100 hover:bg-ink-50/50">
-                      <td className="py-2.5 text-ink-700">
-                        <span className="font-mono text-ink-400 mr-2">[{acc.code}]</span>
-                        {acc.name}
-                      </td>
-                      <td className="py-2.5 text-right font-medium num text-ink-900">
-                        {formatINR(acc.amount)}
-                      </td>
+            <div className="overflow-x-auto">
+              <table className="w-full text-[13.5px]">
+                <tbody>
+                  {revenue.accounts.length === 0 ? (
+                    <tr>
+                      <td className="py-2 text-ink-400 italic">No sales revenue recorded in this period.</td>
+                      <td className="py-2 text-right num text-ink-400">₹0.00</td>
                     </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
+                  ) : (
+                    revenue.accounts.map((acc) => (
+                      <tr key={acc.code} className="border-b border-ink-100 hover:bg-ink-50/50">
+                        <td className="py-2.5 text-ink-700">
+                          <span className="font-mono text-ink-400 mr-2">[{acc.code}]</span>
+                          {acc.name}
+                        </td>
+                        <td className="py-2.5 text-right font-medium num text-ink-900">
+                          {formatINR(acc.amount)}
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
 
           {/* Section 2: Cost of Goods Sold */}
@@ -130,28 +132,30 @@ export default async function ProfitAndLossPage({
                 {formatINR(cogs.totalCogs)}
               </span>
             </div>
-            <table className="w-full text-[13.5px]">
-              <tbody>
-                {cogs.accounts.length === 0 ? (
-                  <tr>
-                    <td className="py-2 text-ink-400 italic">No purchase expenses posted in this period.</td>
-                    <td className="py-2 text-right num text-ink-400">₹0.00</td>
-                  </tr>
-                ) : (
-                  cogs.accounts.map((acc) => (
-                    <tr key={acc.code} className="border-b border-ink-100 hover:bg-ink-50/50">
-                      <td className="py-2.5 text-ink-700">
-                        <span className="font-mono text-ink-400 mr-2">[{acc.code}]</span>
-                        {acc.name}
-                      </td>
-                      <td className="py-2.5 text-right font-medium num text-ink-900">
-                        {formatINR(acc.amount)}
-                      </td>
+            <div className="overflow-x-auto">
+              <table className="w-full text-[13.5px]">
+                <tbody>
+                  {cogs.accounts.length === 0 ? (
+                    <tr>
+                      <td className="py-2 text-ink-400 italic">No purchase expenses posted in this period.</td>
+                      <td className="py-2 text-right num text-ink-400">₹0.00</td>
                     </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
+                  ) : (
+                    cogs.accounts.map((acc) => (
+                      <tr key={acc.code} className="border-b border-ink-100 hover:bg-ink-50/50">
+                        <td className="py-2.5 text-ink-700">
+                          <span className="font-mono text-ink-400 mr-2">[{acc.code}]</span>
+                          {acc.name}
+                        </td>
+                        <td className="py-2.5 text-right font-medium num text-ink-900">
+                          {formatINR(acc.amount)}
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
 
           {/* Gross Profit Summary Banner */}
@@ -175,28 +179,30 @@ export default async function ProfitAndLossPage({
                 {formatINR(operatingExpenses.totalExpenses)}
               </span>
             </div>
-            <table className="w-full text-[13.5px]">
-              <tbody>
-                {operatingExpenses.accounts.length === 0 ? (
-                  <tr>
-                    <td className="py-2 text-ink-400 italic">No secondary operating expenses recorded.</td>
-                    <td className="py-2 text-right num text-ink-400">₹0.00</td>
-                  </tr>
-                ) : (
-                  operatingExpenses.accounts.map((acc) => (
-                    <tr key={acc.code} className="border-b border-ink-100 hover:bg-ink-50/50">
-                      <td className="py-2.5 text-ink-700">
-                        <span className="font-mono text-ink-400 mr-2">[{acc.code}]</span>
-                        {acc.name}
-                      </td>
-                      <td className="py-2.5 text-right font-medium num text-ink-900">
-                        {formatINR(acc.amount)}
-                      </td>
+            <div className="overflow-x-auto">
+              <table className="w-full text-[13.5px]">
+                <tbody>
+                  {operatingExpenses.accounts.length === 0 ? (
+                    <tr>
+                      <td className="py-2 text-ink-400 italic">No secondary operating expenses recorded.</td>
+                      <td className="py-2 text-right num text-ink-400">₹0.00</td>
                     </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
+                  ) : (
+                    operatingExpenses.accounts.map((acc) => (
+                      <tr key={acc.code} className="border-b border-ink-100 hover:bg-ink-50/50">
+                        <td className="py-2.5 text-ink-700">
+                          <span className="font-mono text-ink-400 mr-2">[{acc.code}]</span>
+                          {acc.name}
+                        </td>
+                        <td className="py-2.5 text-right font-medium num text-ink-900">
+                          {formatINR(acc.amount)}
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
 
           {/* Net Profit Final Box */}

@@ -67,6 +67,7 @@ export function EInvoiceClient({ invoices }: { invoices: GstDocItem[] }) {
   const [vehicleNo, setVehicleNo] = useState("");
   const [transporterId, setTransporterId] = useState("");
   const [generatingEwb, setGeneratingEwb] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   const filteredInvoices = invoices.filter((inv) => {
     if (filter === "pending") return !inv.irn && inv.status === "active";
@@ -77,15 +78,14 @@ export function EInvoiceClient({ invoices }: { invoices: GstDocItem[] }) {
 
   async function handleGenerateIrn(id: string) {
     setLoadingId(id);
+    setActionError(null);
     try {
       const res = await generateEInvoiceAction(id);
       if (res.error) {
-        alert("Failed to generate IRN: " + res.error);
-      } else {
-        // success handled by revalidatePath
+        setActionError("Failed to generate IRN: " + res.error);
       }
     } catch (err) {
-      alert("Error: " + (err instanceof Error ? err.message : String(err)));
+      setActionError("Error: " + (err instanceof Error ? err.message : String(err)));
     } finally {
       setLoadingId(null);
     }
@@ -94,16 +94,17 @@ export function EInvoiceClient({ invoices }: { invoices: GstDocItem[] }) {
   async function handleConfirmCancel() {
     if (!cancelDoc) return;
     setCancelling(true);
+    setActionError(null);
     try {
       const res = await cancelEInvoiceAction(cancelDoc.id, cancelReason, cancelRemarks || "Cancelled by user");
       if (res.error) {
-        alert("Failed to cancel IRN: " + res.error);
+        setActionError("Failed to cancel IRN: " + res.error);
       } else {
         setCancelDoc(null);
         setCancelRemarks("");
       }
     } catch (err) {
-      alert("Error: " + (err instanceof Error ? err.message : String(err)));
+      setActionError("Error: " + (err instanceof Error ? err.message : String(err)));
     } finally {
       setCancelling(false);
     }
@@ -112,6 +113,7 @@ export function EInvoiceClient({ invoices }: { invoices: GstDocItem[] }) {
   async function handleConfirmEwayBill() {
     if (!ewayDoc) return;
     setGeneratingEwb(true);
+    setActionError(null);
     try {
       const res = await generateEWayBillAction(ewayDoc.id, {
         distanceKm,
@@ -119,14 +121,14 @@ export function EInvoiceClient({ invoices }: { invoices: GstDocItem[] }) {
         transporterId: transporterId || undefined,
       });
       if (res.error) {
-        alert("Failed to generate E-Way bill: " + res.error);
+        setActionError("Failed to generate E-Way bill: " + res.error);
       } else {
         setEwayDoc(null);
         setVehicleNo("");
         setTransporterId("");
       }
     } catch (err) {
-      alert("Error: " + (err instanceof Error ? err.message : String(err)));
+      setActionError("Error: " + (err instanceof Error ? err.message : String(err)));
     } finally {
       setGeneratingEwb(false);
     }
@@ -140,6 +142,14 @@ export function EInvoiceClient({ invoices }: { invoices: GstDocItem[] }) {
 
   return (
     <div className="space-y-4">
+      {actionError && (
+        <div className="alert-error flex items-center justify-between gap-2">
+          <span>{actionError}</span>
+          <button type="button" onClick={() => setActionError(null)} className="text-xs underline shrink-0">
+            Dismiss
+          </button>
+        </div>
+      )}
       {/* Filter Tabs */}
       <div className="flex items-center gap-2 border-b border-ink-150 pb-2">
         <button
