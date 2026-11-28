@@ -15,9 +15,11 @@ export function ExportButton({
   label?: string;
 }) {
   const [isExporting, setIsExporting] = useState(false);
+  const [exportError, setExportError] = useState(false);
 
   const handleExport = async () => {
     setIsExporting(true);
+    setExportError(false);
     try {
       const params = new URLSearchParams();
       if (from) params.set("from", from);
@@ -44,7 +46,8 @@ export function ExportButton({
       a.remove();
       window.URL.revokeObjectURL(downloadUrl);
     } catch {
-      alert("Failed to export data. Please try again.");
+      setExportError(true);
+      setTimeout(() => setExportError(false), 3500);
     } finally {
       setIsExporting(false);
     }
@@ -55,12 +58,12 @@ export function ExportButton({
       type="button"
       onClick={handleExport}
       disabled={isExporting}
-      className="btn btn-secondary"
+      className={`btn ${exportError ? "btn-secondary border-rose-300 text-rose-700" : "btn-secondary"}`}
       data-tooltip-title="Download CSV Export"
       data-tooltip="Export the currently filtered register to a CSV spreadsheet for Excel or Tally/CA review."
     >
       {isExporting ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Download className="h-4 w-4 mr-1" />}
-      {isExporting ? "Exporting..." : label}
+      {isExporting ? "Exporting..." : exportError ? "Export Failed" : label}
     </button>
   );
 }
