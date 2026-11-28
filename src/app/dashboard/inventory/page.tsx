@@ -13,6 +13,7 @@ import Link from "next/link";
 import { PageHeader, SearchForm, EmptyState, TableWrapper } from "@/app/components/ui";
 import { formatINR, formatNumber } from "@/lib/format";
 import { requirePagePermission, can } from "@/server/rbac";
+import { canViewCost } from "@/server/redact";
 import { BranchSettingsButton } from "./_components/BranchSettingsButton";
 import { EditMedicineButton } from "./_components/EditMedicineButton";
 import { BulkPackUpdaterModal } from "./_components/BulkPackUpdaterModal";
@@ -39,6 +40,7 @@ export default async function InventoryPage({
   const ctx = await requirePagePermission("medicine.view");
   const canManage = can(ctx, "medicine.manage");
   const canAdjust = can(ctx, "inventory.adjust");
+  const allowCost = canViewCost(ctx);
   const { q, page: pageStr, pack, status, segment, molecule, categoryId, rackId } = await searchParams;
   const packFilter: MedicinePackFilter = pack === "single" ? "single" : "all";
   const statusFilter: MedicineStatusFilter =
@@ -292,6 +294,7 @@ export default async function InventoryPage({
                               racks={racks}
                               currentRackId={branchSettings?.rackId ?? null}
                               canAdjustStock={canAdjust}
+                              canViewCost={allowCost}
                             />
                           )}
                           {canManage && (

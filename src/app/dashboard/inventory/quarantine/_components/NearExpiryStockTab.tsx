@@ -19,7 +19,8 @@ export function NearExpiryStockTab({ nearExpiry, onOpenQuarantine }: Props) {
       </div>
 
       <div className="card overflow-hidden">
-        <table className="data-table">
+        <div className="overflow-x-auto">
+          <table className="data-table">
           <thead>
             <tr>
               <th>Medicine & Salt</th>
@@ -76,6 +77,7 @@ export function NearExpiryStockTab({ nearExpiry, onOpenQuarantine }: Props) {
             ))}
           </tbody>
         </table>
+        </div>
       </div>
     </div>
   );

@@ -55,9 +55,9 @@ export default function NewMedicinePage() {
 
   useEffect(() => {
     // Load categories, manufacturers, and racks on mount
-    getCategories().then(setCategories);
-    getManufacturers().then(setManufacturers);
-    getRacks().then((data) => setRacks(data || []));
+    getCategories().then(setCategories).catch(() => {});
+    getManufacturers().then(setManufacturers).catch(() => {});
+    getRacks().then((data) => setRacks(data || [])).catch(() => {});
   }, []);
 
   const [state, formAction, isPending] = useActionState(async (prevState: { error?: string; success?: boolean } | null, formData: FormData) => {
