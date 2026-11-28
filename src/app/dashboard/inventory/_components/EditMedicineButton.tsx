@@ -31,7 +31,7 @@ export interface EditableMedicineData {
   gstRateBp: number;
   mrp: number;
   salePrice: number;
-  purchasePrice: number;
+  purchasePrice: number | null;
   rxRequired: boolean;
   schedule: string;
   reorderLevel?: number;
@@ -46,6 +46,7 @@ interface EditMedicineButtonProps {
   racks?: RackOption[];
   currentRackId?: string | null;
   canAdjustStock?: boolean;
+  canViewCost?: boolean;
 }
 
 export function EditMedicineButton({
@@ -55,6 +56,7 @@ export function EditMedicineButton({
   racks = [],
   currentRackId = null,
   canAdjustStock = false,
+  canViewCost = true,
 }: EditMedicineButtonProps) {
   const router = useRouter();
   const [isOpen, setIsOpen] = useState(false);
@@ -82,7 +84,9 @@ export function EditMedicineButton({
   const [gstRatePct, setGstRatePct] = useState(String((medicine.gstRateBp || 500) / 100));
   const [mrp, setMrp] = useState(((medicine.mrp || 0) / 100).toFixed(2));
   const [salePrice, setSalePrice] = useState(((medicine.salePrice || medicine.mrp || 0) / 100).toFixed(2));
-  const [purchasePrice, setPurchasePrice] = useState(((medicine.purchasePrice || 0) / 100).toFixed(2));
+  const [purchasePrice, setPurchasePrice] = useState(
+    canViewCost ? ((medicine.purchasePrice || 0) / 100).toFixed(2) : "",
+  );
   const [packUnit, setPackUnit] = useState(medicine.packUnit || "strip");
   const [unitsPerPack, setUnitsPerPack] = useState(String(medicine.unitsPerPack || 1));
   const [looseUnit, setLooseUnit] = useState(medicine.looseUnit || "tablet");
@@ -109,7 +113,7 @@ export function EditMedicineButton({
     setGstRatePct(String((medicine.gstRateBp || 500) / 100));
     setMrp(((medicine.mrp || 0) / 100).toFixed(2));
     setSalePrice(((medicine.salePrice || medicine.mrp || 0) / 100).toFixed(2));
-    setPurchasePrice(((medicine.purchasePrice || 0) / 100).toFixed(2));
+    setPurchasePrice(canViewCost ? ((medicine.purchasePrice || 0) / 100).toFixed(2) : "");
     setPackUnit(medicine.packUnit || "strip");
     setUnitsPerPack(String(medicine.unitsPerPack || 1));
     setLooseUnit(medicine.looseUnit || "tablet");
@@ -260,7 +264,9 @@ export function EditMedicineButton({
     fd.append("gstRatePct", gstRatePct);
     fd.append("mrp", mrp);
     fd.append("salePrice", salePrice);
-    fd.append("purchasePrice", purchasePrice);
+    if (canViewCost && purchasePrice.trim() !== "") {
+      fd.append("purchasePrice", purchasePrice);
+    }
     fd.append("packUnit", packUnit);
     fd.append("unitsPerPack", unitsPerPack);
     fd.append("looseUnit", looseUnit);
@@ -601,15 +607,21 @@ export function EditMedicineButton({
                     </div>
                     <div>
                       <label className="label" htmlFor={`med-ptr-${medicine.id}`}>PTR (₹/base)</label>
-                      <input
-                        id={`med-ptr-${medicine.id}`}
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        value={purchasePrice}
-                        onChange={(e) => setPurchasePrice(e.target.value)}
-                        className="input num"
-                      />
+                      {canViewCost ? (
+                        <input
+                          id={`med-ptr-${medicine.id}`}
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={purchasePrice}
+                          onChange={(e) => setPurchasePrice(e.target.value)}
+                          className="input num"
+                        />
+                      ) : (
+                        <div className="input flex items-center bg-ink-50 text-ink-400 text-xs">
+                          Restricted (cost.view)
+                        </div>
+                      )}
                     </div>
                   </div>
                   <div className="grid grid-cols-3 gap-3">

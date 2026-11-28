@@ -40,6 +40,7 @@ export default function StockConflictsPage() {
           setConflicts(res.data);
         }
       })
+      .catch(() => {})
       .finally(() => {
         if (!ignore) setLoading(false);
       });
