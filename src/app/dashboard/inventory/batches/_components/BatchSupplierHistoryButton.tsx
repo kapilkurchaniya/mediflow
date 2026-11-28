@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { History, X } from "lucide-react";
 import { MedicineSupplierHistoryPanel } from "@/app/components/MedicineSupplierHistoryPanel";
 
@@ -13,6 +14,15 @@ export function BatchSupplierHistoryButton({
 }) {
   const [open, setOpen] = useState(false);
 
+  useEffect(() => {
+    if (!open) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [open]);
+
   return (
     <>
       <button
@@ -24,27 +34,35 @@ export function BatchSupplierHistoryButton({
       >
         <History className="w-4 h-4" />
       </button>
-      {open && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
-          onClick={(e) => {
-            if (e.target === e.currentTarget) setOpen(false);
-          }}
-        >
-          <div className="bg-white rounded-2xl shadow-2xl border border-ink-200 w-full max-w-3xl max-h-[85vh] overflow-y-auto p-5 space-y-3 text-left">
-            <div className="flex items-center justify-between border-b border-ink-150 pb-3">
-              <div>
-                <h3 className="text-sm font-bold text-ink-900">Supplier Purchase Comparison</h3>
-                <p className="text-xs text-ink-500">{medicineName}</p>
+      {open &&
+        typeof document !== "undefined" &&
+        createPortal(
+          <div
+            className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs animate-in fade-in duration-150"
+            onClick={(e) => {
+              if (e.target === e.currentTarget) setOpen(false);
+            }}
+          >
+            <div className="bg-white rounded-2xl shadow-2xl border border-ink-200 w-full max-w-3xl max-h-[85vh] overflow-y-auto p-5 space-y-3 text-left">
+              <div className="flex items-center justify-between border-b border-ink-150 pb-3">
+                <div>
+                  <h3 className="text-sm font-bold text-ink-900">Supplier Purchase Comparison</h3>
+                  <p className="text-xs text-ink-500">{medicineName}</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setOpen(false)}
+                  className="p-1 rounded hover:bg-ink-100"
+                  aria-label="Close supplier comparison"
+                >
+                  <X className="w-4 h-4" />
+                </button>
               </div>
-              <button type="button" onClick={() => setOpen(false)} className="p-1 rounded hover:bg-ink-100">
-                <X className="w-4 h-4" />
-              </button>
+              <MedicineSupplierHistoryPanel medicineId={medicineId} medicineName={medicineName} />
             </div>
-            <MedicineSupplierHistoryPanel medicineId={medicineId} medicineName={medicineName} />
-          </div>
-        </div>
-      )}
+          </div>,
+          document.body,
+        )}
     </>
   );
 }
