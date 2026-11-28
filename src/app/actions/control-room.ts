@@ -5,6 +5,7 @@ import { and, desc, eq } from "drizzle-orm";
 import { db, schema } from "@/server/db";
 import type { StoreSettings } from "@/server/db/schema/platform";
 import { requirePermission } from "@/server/rbac";
+import { canViewCost, canViewMargin } from "@/server/redact";
 import { writeAudit } from "@/server/audit";
 import {
   getBusinessAnalysisReport,
@@ -134,7 +135,15 @@ export async function getBusinessAnalysisAction(input: {
       to: input.to,
       dimension: input.dimension,
     });
-    return { success: true, rows };
+    const allowCost = canViewCost(ctx);
+    const allowMargin = canViewMargin(ctx);
+    const redactedRows = rows.map((r) => ({
+      ...r,
+      cogsPaise: allowCost ? r.cogsPaise : 0,
+      grossMarginPaise: allowMargin ? r.grossMarginPaise : 0,
+      marginPercent: allowMargin ? r.marginPercent : 0,
+    }));
+    return { success: true, rows: redactedRows };
   } catch (err: unknown) {
     return { success: false, error: err instanceof Error ? err.message : "Failed to load business analysis" };
   }

@@ -219,7 +219,7 @@ export default async function AccountingPage({
           {trialBalance.length === 0 ? (
             <EmptyState icon={Scale} title="No balances yet" description="Balances appear once the first sale or purchase is posted." compact />
           ) : (
-            <div className="flex-1 overflow-y-auto">
+            <div className="flex-1 overflow-auto">
               <table className="data-table">
                 <thead>
                   <tr>

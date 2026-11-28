@@ -66,6 +66,7 @@ export function AIAssistant() {
   const isPosTerminal = pathname === "/dashboard/sales/pos";
   const [isOpen, setIsOpen] = useState(false);
   const [isListening, setIsListening] = useState(false);
+  const [voiceNotice, setVoiceNotice] = useState<string | null>(null);
   const [input, setInput] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<ISpeechRecognition | null>(null);
@@ -228,9 +229,10 @@ export function AIAssistant() {
 
     const SpeechRecognition = typeof window !== "undefined" ? window.SpeechRecognition || window.webkitSpeechRecognition : undefined;
     if (!SpeechRecognition) {
-      alert("Speech recognition is not supported in this browser.");
+      setVoiceNotice("Speech recognition is not supported in this browser.");
       return;
     }
+    setVoiceNotice(null);
 
     const recognition = new SpeechRecognition();
     recognition.lang = "en-IN";
@@ -482,6 +484,18 @@ export function AIAssistant() {
         </div>
 
         {/* Input Area */}
+        {voiceNotice && (
+          <div className="flex items-center justify-between gap-2 border-t border-amber-200 bg-amber-50 px-3 py-1.5 text-[11.5px] text-amber-800 shrink-0">
+            <span>{voiceNotice}</span>
+            <button
+              type="button"
+              onClick={() => setVoiceNotice(null)}
+              className="text-amber-700 hover:underline font-medium shrink-0"
+            >
+              Dismiss
+            </button>
+          </div>
+        )}
         <form onSubmit={handleSubmit} className="flex items-center gap-2 border-t border-ink-150 bg-ink-50/60 px-3 py-2.5 shrink-0">
           <input
             className="input input-sm flex-1 !shadow-none bg-white border-ink-200 focus:border-brand-400 focus:ring-1 focus:ring-brand-400 outline-none rounded-lg px-3 py-1.5 text-[13px]"
