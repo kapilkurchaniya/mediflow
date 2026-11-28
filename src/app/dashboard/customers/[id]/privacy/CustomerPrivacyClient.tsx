@@ -113,7 +113,7 @@ export function CustomerPrivacyClient({
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
       } else {
-        alert(res.error || "Failed to export data");
+        setConsentMsg({ type: "error", text: res.error || "Failed to export data" });
       }
     } finally {
       setIsExporting(false);

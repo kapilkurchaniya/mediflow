@@ -22,16 +22,18 @@ export function UpdateVehicleModal({
   const [reasonCode, setReasonCode] = useState<"1" | "2" | "3" | "4">("2");
   const [reasonRemark, setReasonRemark] = useState("");
   const [updating, setUpdating] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const normalizedVehicle = newVehicleNo.replace(/[\s-]/g, "").toUpperCase();
   const isVehicleValid = /^[A-Z]{2}[0-9]{1,2}[A-Z]{0,3}[0-9]{4}$/.test(normalizedVehicle);
 
   async function handleUpdateVehicle() {
     if (!isVehicleValid) {
-      alert("Please enter a valid Indian vehicle registration number (e.g. MH12AB1234)");
+      setErrorMsg("Please enter a valid Indian vehicle registration number (e.g. MH12AB1234)");
       return;
     }
     setUpdating(true);
+    setErrorMsg(null);
     try {
       const res = await updateEWayBillVehicleAction(updateDoc.id, {
         vehicleNo: normalizedVehicle,
@@ -42,12 +44,12 @@ export function UpdateVehicleModal({
       });
 
       if ("error" in res && res.error) {
-        alert("Failed to update vehicle: " + res.error);
+        setErrorMsg("Failed to update vehicle: " + res.error);
       } else {
         onSuccess();
       }
     } catch (err: unknown) {
-      alert("Error: " + (err instanceof Error ? err.message : String(err)));
+      setErrorMsg("Error: " + (err instanceof Error ? err.message : String(err)));
     } finally {
       setUpdating(false);
     }
@@ -75,6 +77,7 @@ export function UpdateVehicleModal({
         </div>
 
         <div className="space-y-3 text-xs">
+          {errorMsg && <div className="alert-error text-xs">{errorMsg}</div>}
           <div>
             <label className="block font-medium text-ink-700 mb-1">
               New Vehicle Registration Number *

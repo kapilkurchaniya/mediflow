@@ -123,48 +123,52 @@ function NewPurchaseForm() {
       });
     }
 
-    getSuppliers().then(setSuppliers);
-    getMedicines("", 500).then((data) => {
-      setMedicines(
-        data.map((m) => ({
-          id: m.medicine.id,
-          name: m.medicine.name,
-          gstRateBp: m.medicine.gstRateBp,
-          unitsPerPack: m.medicine.unitsPerPack ?? 1,
-          packUnit: m.medicine.packUnit ?? "strip",
-          looseUnit: m.medicine.looseUnit ?? "tablet",
-        }))
-      );
-    });
+    getSuppliers("", 500, 0, true).then(setSuppliers).catch(() => {});
+    getMedicines("", 500)
+      .then((data) => {
+        setMedicines(
+          data.map((m) => ({
+            id: m.medicine.id,
+            name: m.medicine.name,
+            gstRateBp: m.medicine.gstRateBp,
+            unitsPerPack: m.medicine.unitsPerPack ?? 1,
+            packUnit: m.medicine.packUnit ?? "strip",
+            looseUnit: m.medicine.looseUnit ?? "tablet",
+          }))
+        );
+      })
+      .catch(() => {});
 
     if (poId) {
-      getPurchaseOrder(poId).then((po) => {
-        if (po) {
-          setLinkedPo({ id: po.id, poNo: po.poNo });
-          setSupplierId(po.supplierId);
-          if (po.items && po.items.length > 0) {
-            setItems(
-              po.items.map((i) => ({
-                medicineId: i.medicineId,
-                batchNo: "",
-                expiryDate: "",
-                qty: Math.max(1, i.qty - i.receivedQty),
-                freeQty: i.freeQty,
-                rate: i.rate,
-                mrp: Math.round(i.rate * 1.3),
-                saleRate: Math.round(i.rate * 1.2),
-                discountBp: 0,
-                tradeDiscountBp: 0,
-                cashDiscountBp: 0,
-                unitsPerPack: 1,
-                packUnit: "strip",
-                looseUnit: "tablet",
-                gstRateBp: DEFAULT_GST_RATE_BP,
-              }))
-            );
+      getPurchaseOrder(poId)
+        .then((po) => {
+          if (po) {
+            setLinkedPo({ id: po.id, poNo: po.poNo });
+            setSupplierId(po.supplierId);
+            if (po.items && po.items.length > 0) {
+              setItems(
+                po.items.map((i) => ({
+                  medicineId: i.medicineId,
+                  batchNo: "",
+                  expiryDate: "",
+                  qty: Math.max(1, i.qty - i.receivedQty),
+                  freeQty: i.freeQty,
+                  rate: i.rate,
+                  mrp: Math.round(i.rate * 1.3),
+                  saleRate: Math.round(i.rate * 1.2),
+                  discountBp: 0,
+                  tradeDiscountBp: 0,
+                  cashDiscountBp: 0,
+                  unitsPerPack: 1,
+                  packUnit: "strip",
+                  looseUnit: "tablet",
+                  gstRateBp: DEFAULT_GST_RATE_BP,
+                }))
+              );
+            }
           }
-        }
-      });
+        })
+        .catch(() => {});
     }
   }, [poId]);
 
@@ -794,7 +798,7 @@ function NewPurchaseForm() {
           }
         }}
         onSuppliersRefresh={async () => {
-          const fresh = await getSuppliers();
+          const fresh = await getSuppliers("", 500, 0, true);
           setSuppliers(fresh);
         }}
         onCatalogRefresh={async () => {
@@ -821,7 +825,7 @@ function NewPurchaseForm() {
           onClose={() => setShowQuickRegisterSupplier(false)}
           initialMeta={pendingSupplierMeta}
           onRegistered={async (sup) => {
-            const fresh = await getSuppliers();
+            const fresh = await getSuppliers("", 500, 0, true);
             setSuppliers(fresh);
             setSupplierId(sup.id);
             setPendingSupplierMeta(null);
@@ -836,7 +840,7 @@ function NewPurchaseForm() {
         title="Quick Add Supplier"
         subtitle="Add a distributor without losing your GRN bill items."
         onRegistered={async (sup) => {
-          const fresh = await getSuppliers();
+          const fresh = await getSuppliers("", 500, 0, true);
           setSuppliers(fresh);
           setSupplierId(sup.id);
           setPendingSupplierMeta(null);

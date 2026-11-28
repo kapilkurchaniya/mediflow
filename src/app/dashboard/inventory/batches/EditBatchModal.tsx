@@ -10,7 +10,7 @@ export interface BatchEditData {
   id: string;
   batchNo: string;
   expiryDate: string;
-  purchaseRate: number; // in paise per base unit
+  purchaseRate: number | null; // in paise per base unit (null when cost redacted)
   mrp: number; // in paise per pack
   saleRate: number; // in paise per pack
   qtyOnHand: number;
@@ -21,7 +21,13 @@ export interface BatchEditData {
   looseUnit?: string;
 }
 
-export function EditBatchButton({ batch }: { batch: BatchEditData }) {
+export function EditBatchButton({
+  batch,
+  canViewCost = true,
+}: {
+  batch: BatchEditData;
+  canViewCost?: boolean;
+}) {
   const router = useRouter();
   const [isOpen, setIsOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -34,8 +40,15 @@ export function EditBatchButton({ batch }: { batch: BatchEditData }) {
   const [batchNo, setBatchNo] = useState(batch.batchNo);
   const [expiryDate, setExpiryDate] = useState(batch.expiryDate);
   const [status, setStatus] = useState<"active" | "hold">(batch.status === "hold" ? "hold" : "active");
+  const rawPtr = batch.purchaseRate ?? 0;
   const [purchaseRate, setPurchaseRate] = useState(
-    batch.purchaseRate > 0 ? (batch.purchaseRate / 100).toFixed(2) : batch.mrp > 0 ? ((batch.mrp * 0.8) / 100 / upp).toFixed(2) : "0.00"
+    !canViewCost
+      ? ""
+      : rawPtr > 0
+        ? (rawPtr / 100).toFixed(2)
+        : batch.mrp > 0
+          ? ((batch.mrp * 0.8) / 100 / upp).toFixed(2)
+          : "0.00"
   );
   const [mrp, setMrp] = useState(((batch.mrp || 0) / 100).toFixed(2));
   const [saleRate, setSaleRate] = useState(((batch.saleRate || batch.mrp || 0) / 100).toFixed(2));
@@ -78,7 +91,13 @@ export function EditBatchButton({ batch }: { batch: BatchEditData }) {
     setExpiryDate(batch.expiryDate);
     setStatus(batch.status === "hold" ? "hold" : "active");
     setPurchaseRate(
-      batch.purchaseRate > 0 ? (batch.purchaseRate / 100).toFixed(2) : batch.mrp > 0 ? ((batch.mrp * 0.8) / 100 / upp).toFixed(2) : "0.00"
+      !canViewCost
+        ? ""
+        : rawPtr > 0
+          ? (rawPtr / 100).toFixed(2)
+          : batch.mrp > 0
+            ? ((batch.mrp * 0.8) / 100 / upp).toFixed(2)
+            : "0.00"
     );
     setMrp(((batch.mrp || 0) / 100).toFixed(2));
     setSaleRate(((batch.saleRate || batch.mrp || 0) / 100).toFixed(2));
@@ -107,7 +126,9 @@ export function EditBatchButton({ batch }: { batch: BatchEditData }) {
     formData.append("batchNo", batchNo);
     formData.append("expiryDate", expiryDate);
     formData.append("status", status);
-    formData.append("purchaseRate", purchaseRate);
+    if (canViewCost && purchaseRate.trim() !== "") {
+      formData.append("purchaseRate", purchaseRate);
+    }
     formData.append("mrp", mrp);
     formData.append("saleRate", saleRate);
     formData.append("stockMode", stockMode);
@@ -230,19 +251,25 @@ export function EditBatchButton({ batch }: { batch: BatchEditData }) {
                     <label className="label" htmlFor="edit-ptr">
                       PTR / {upp > 1 ? looseUnit : "unit"}
                     </label>
-                    <div className="relative">
-                      <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-ink-400 text-[12px]">₹</span>
-                      <input
-                        id="edit-ptr"
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        required
-                        value={purchaseRate}
-                        onChange={(e) => setPurchaseRate(e.target.value)}
-                        className="input pl-6 num"
-                      />
-                    </div>
+                    {canViewCost ? (
+                      <div className="relative">
+                        <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-ink-400 text-[12px]">₹</span>
+                        <input
+                          id="edit-ptr"
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          required
+                          value={purchaseRate}
+                          onChange={(e) => setPurchaseRate(e.target.value)}
+                          className="input pl-7 num"
+                        />
+                      </div>
+                    ) : (
+                      <div className="input flex items-center bg-ink-50 text-ink-400 text-xs">
+                        Restricted (cost.view)
+                      </div>
+                    )}
                   </div>
                   <div>
                     <label className="label" htmlFor="edit-mrp">
@@ -258,7 +285,7 @@ export function EditBatchButton({ batch }: { batch: BatchEditData }) {
                         required
                         value={mrp}
                         onChange={(e) => setMrp(e.target.value)}
-                        className="input pl-6 num"
+                        className="input pl-7 num"
                       />
                     </div>
                   </div>
@@ -276,7 +303,7 @@ export function EditBatchButton({ batch }: { batch: BatchEditData }) {
                         required
                         value={saleRate}
                         onChange={(e) => setSaleRate(e.target.value)}
-                        className="input pl-6 num"
+                        className="input pl-7 num"
                       />
                     </div>
                   </div>

@@ -115,7 +115,7 @@ export function RacksListClient({ initialRacks }: { initialRacks: RackItem[] }) 
     const res = await deleteRack({ id });
     const err = actionError(res);
     if (err) {
-      alert(err);
+      setError(err);
       return;
     }
     setRacks((prev) => prev.filter((r) => r.id !== id));

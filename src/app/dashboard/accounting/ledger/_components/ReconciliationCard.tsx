@@ -118,7 +118,7 @@ export function ReconciliationCard({ reconciliation }: ReconciliationCardProps) 
 
           {showUnattributed && (
             <div className="px-5 pb-3">
-              <div className="border border-slate-200 rounded-md overflow-hidden bg-white">
+              <div className="border border-slate-200 rounded-md overflow-x-auto bg-white">
                 <table className="table table-xs w-full">
                   <thead className="bg-slate-50 text-slate-500">
                     <tr>

@@ -19,9 +19,11 @@ export function CancelEWayBillModal({
   const [cancelReasonCode, setCancelReasonCode] = useState<"1" | "2" | "3" | "4">("2");
   const [cancelRemarks, setCancelRemarks] = useState("");
   const [cancelling, setCancelling] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   async function handleCancelEwb() {
     setCancelling(true);
+    setErrorMsg(null);
     try {
       const res = await cancelEWayBillAction(
         cancelDoc.id,
@@ -30,12 +32,12 @@ export function CancelEWayBillModal({
       );
 
       if ("error" in res && res.error) {
-        alert("Failed to cancel E-Way Bill: " + res.error);
+        setErrorMsg("Failed to cancel E-Way Bill: " + res.error);
       } else {
         onSuccess();
       }
     } catch (err: unknown) {
-      alert("Error: " + (err instanceof Error ? err.message : String(err)));
+      setErrorMsg("Error: " + (err instanceof Error ? err.message : String(err)));
     } finally {
       setCancelling(false);
     }
@@ -62,6 +64,7 @@ export function CancelEWayBillModal({
           </button>
         </div>
 
+        {errorMsg && <div className="alert-error text-xs">{errorMsg}</div>}
         <div className="rounded-lg bg-amber-50 p-3 text-xs text-amber-800 space-y-1 border border-amber-200">
           <p className="font-medium">⚠️ Statutory Rule Notice:</p>
           <p>

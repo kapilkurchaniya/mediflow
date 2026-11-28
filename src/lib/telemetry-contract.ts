@@ -16,6 +16,15 @@ export const ALLOWED_MODULES = [
   "compliance",
   "reports",
   "settings",
+  "customers",
+  "gst",
+  "suppliers",
+  "wholesale",
+  "orders",
+  "import",
+  "reminders",
+  "whatsapp",
+  "help",
 ] as const;
 
 export type AllowedBoundaryModule = (typeof ALLOWED_MODULES)[number];

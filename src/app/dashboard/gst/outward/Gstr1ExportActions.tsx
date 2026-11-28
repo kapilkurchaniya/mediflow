@@ -16,6 +16,7 @@ export function Gstr1ExportActions({
   hsnData: Array<Record<string, unknown>>;
 }) {
   const [downloadingJson, setDownloadingJson] = useState(false);
+  const [exportError, setExportError] = useState<string | null>(null);
 
   async function handleDownloadJson() {
     setDownloadingJson(true);
@@ -30,18 +31,19 @@ export function Gstr1ExportActions({
         downloadAnchor.click();
         downloadAnchor.remove();
       } else {
-        alert("Failed to build GSTR-1 JSON");
+        setExportError("Failed to build GSTR-1 JSON");
       }
     } catch (err) {
-      alert("Error: " + (err instanceof Error ? err.message : String(err)));
+      setExportError("Error: " + (err instanceof Error ? err.message : String(err)));
     } finally {
       setDownloadingJson(false);
     }
   }
 
   function handleExportCsv() {
+    setExportError(null);
     if (b2bData.length === 0) {
-      alert("No records to export");
+      setExportError("No records to export");
       return;
     }
 
@@ -89,29 +91,40 @@ export function Gstr1ExportActions({
   }
 
   return (
-    <div className="flex items-center gap-2">
-      <button
-        type="button"
-        onClick={handleExportCsv}
-        className="btn btn-secondary text-xs"
-      >
-        <Download className="h-3.5 w-3.5 mr-1" />
-        Export B2B CSV
-      </button>
+    <div className="flex flex-col items-end gap-1">
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={() => {
+            setExportError(null);
+            handleExportCsv();
+          }}
+          className="btn btn-secondary text-xs"
+        >
+          <Download className="h-3.5 w-3.5 mr-1" />
+          Export B2B CSV
+        </button>
 
-      <button
-        type="button"
-        onClick={handleDownloadJson}
-        disabled={downloadingJson}
-        className="btn btn-primary text-xs"
-      >
-        {downloadingJson ? (
-          <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" />
-        ) : (
-          <FileJson className="h-3.5 w-3.5 mr-1" />
-        )}
-        Download Portal JSON
-      </button>
+        <button
+          type="button"
+          onClick={() => {
+            setExportError(null);
+            void handleDownloadJson();
+          }}
+          disabled={downloadingJson}
+          className="btn btn-primary text-xs"
+        >
+          {downloadingJson ? (
+            <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" />
+          ) : (
+            <FileJson className="h-3.5 w-3.5 mr-1" />
+          )}
+          Download Portal JSON
+        </button>
+      </div>
+      {exportError && (
+        <span className="text-[11px] text-rose-600 font-medium">{exportError}</span>
+      )}
     </div>
   );
 }

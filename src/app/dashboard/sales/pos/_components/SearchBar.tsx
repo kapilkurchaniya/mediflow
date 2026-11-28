@@ -4,6 +4,7 @@ import { useState, useCallback, useEffect, useMemo, useRef, type FormEvent } fro
 import { Search, Sparkles, BookmarkCheck, Layers, AlertCircle } from "lucide-react";
 import { formatINR } from "@/lib/format";
 import { parsePackBarcode } from "@/lib/barcode/gs1-parser";
+import { getMedicineSegmentLabel, normalizeMedicineSegment } from "@/lib/inventory/medicine-segments";
 import {
   lookupInstantPosSearchCache,
   type PosDataSource,
@@ -266,6 +267,11 @@ export function SearchBar({
                               <Layers className="h-2.5 w-2.5 inline" /> Rack: {res.medicine.rackCode}
                             </span>
                           )}
+                          {normalizeMedicineSegment(res.medicine.targetSegment) !== "general" && (
+                            <span className="badge badge-neutral !text-[10px]">
+                              {getMedicineSegmentLabel(res.medicine.targetSegment)}
+                            </span>
+                          )}
                         </div>
                         <div className="text-[12px] text-ink-500 font-mono">
                           {res.medicine.genericName || "—"}
@@ -328,6 +334,11 @@ export function SearchBar({
                             {res.medicine.rackCode && (
                               <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-mono font-semibold bg-ink-100 text-ink-700">
                                 <Layers className="h-2.5 w-2.5 inline" /> {res.medicine.rackCode}
+                              </span>
+                            )}
+                            {normalizeMedicineSegment(res.medicine.targetSegment) !== "general" && (
+                              <span className="badge badge-neutral !text-[10px]">
+                                {getMedicineSegmentLabel(res.medicine.targetSegment)}
                               </span>
                             )}
                           </div>

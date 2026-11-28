@@ -15,6 +15,9 @@ interface PaymentPanelProps {
   isSubmitting: boolean;
   errorMsg?: string;
   isOffline?: boolean;
+  storeName?: string;
+  storeUpiVpa?: string;
+  storeUpiPayeeName?: string;
   onUpdateSplit: (patch: Partial<SplitPayments>) => void;
   onUpdateRedeemPoints: (points: number) => void;
   onSubmit: () => void;
@@ -30,18 +33,35 @@ export function PaymentPanel({
   isSubmitting,
   errorMsg,
   isOffline = false,
+  storeName,
+  storeUpiVpa,
+  storeUpiPayeeName,
   onUpdateSplit,
   onUpdateRedeemPoints,
   onSubmit,
   onClose,
 }: PaymentPanelProps) {
   const [showUpiQr, setShowUpiQr] = useState(false);
-  const [counterVpa, setCounterVpa] = useState(() => {
-    if (typeof window !== "undefined") {
-      return window.localStorage.getItem("mediflow_upi_vpa") || "";
+  const [counterVpa, setCounterVpa] = useState(storeUpiVpa || "");
+  const [prevStoreUpiVpa, setPrevStoreUpiVpa] = useState(storeUpiVpa);
+
+  if (storeUpiVpa !== prevStoreUpiVpa) {
+    setPrevStoreUpiVpa(storeUpiVpa);
+    if (storeUpiVpa && !counterVpa) {
+      setCounterVpa(storeUpiVpa);
     }
-    return "";
-  });
+  }
+
+  const toggleUpiQr = () => {
+    setShowUpiQr((prev) => {
+      const next = !prev;
+      if (next && !counterVpa && typeof window !== "undefined") {
+        const saved = window.localStorage.getItem("mediflow_upi_vpa") || "";
+        if (saved) setCounterVpa(saved);
+      }
+      return next;
+    });
+  };
 
   useEffect(() => {
     if (!isOpen) return;
@@ -221,7 +241,7 @@ export function PaymentPanel({
             <div className="mt-1.5 flex items-center justify-between">
               <button
                 type="button"
-                onClick={() => setShowUpiQr((v) => !v)}
+                onClick={toggleUpiQr}
                 className="text-[11px] font-semibold text-sky-700 hover:text-sky-900 inline-flex items-center gap-1"
               >
                 <QrCode className="w-3 h-3" /> {showUpiQr ? "Hide Counter QR" : "Show Dynamic UPI QR"}
@@ -254,7 +274,7 @@ export function PaymentPanel({
                         __html: generateQrSvg(
                           buildUpiUri({
                             vpa: counterVpa,
-                            payeeName: "MediFlow Pharmacy",
+                            payeeName: storeUpiPayeeName || storeName || "MediFlow Pharmacy",
                             amountPaise: upiPaise > 0 ? upiPaise : totalPaise,
                             note: "Counter Sale",
                           }),

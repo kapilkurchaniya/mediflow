@@ -1,4 +1,4 @@
- "use client";
+"use client";
 
 import { useActionState, useEffect, useState } from "react";
 import { addOpeningStock } from "@/app/actions/stock";
@@ -27,14 +27,17 @@ export default function NewBatchPage() {
   const [medicines, setMedicines] = useState<{ id: string; name: string; raw: RawMedicine }[]>([]);
   const [selectedMedicineId, setSelectedMedicineId] = useState("");
   const [selectedMedicine, setSelectedMedicine] = useState<RawMedicine | null>(null);
+  const [medSearch, setMedSearch] = useState("");
   const [isAddMedOpen, setIsAddMedOpen] = useState(false);
   const [packCount, setPackCount] = useState("");
   const [looseCount, setLooseCount] = useState("");
 
   useEffect(() => {
-    getMedicines().then((data) => {
-      setMedicines(data.map((m) => ({ id: m.medicine.id, name: m.medicine.name, raw: m.medicine })));
-    });
+    getMedicines("", 1000)
+      .then((data) => {
+        setMedicines(data.map((m) => ({ id: m.medicine.id, name: m.medicine.name, raw: m.medicine })));
+      })
+      .catch(() => {});
   }, []);
 
   const [state, formAction, isPending] = useActionState(async (prevState: { error?: string; success?: boolean } | null, formData: FormData) => {
@@ -81,6 +84,13 @@ export default function NewBatchPage() {
                   + New Medicine
                 </button>
               </div>
+              <input
+                type="text"
+                value={medSearch}
+                onChange={(e) => setMedSearch(e.target.value)}
+                placeholder="Filter item list by name or generic..."
+                className="input input-sm mb-2 text-xs"
+              />
               <select
                 id="medicineId"
                 name="medicineId"
@@ -90,11 +100,20 @@ export default function NewBatchPage() {
                 className="input"
               >
                 <option value="">Select an item…</option>
-                {medicines.map((m) => (
-                  <option key={m.id} value={m.id}>
-                    {m.name}
-                  </option>
-                ))}
+                {medicines
+                  .filter((m) => {
+                    if (!medSearch.trim()) return true;
+                    const q = medSearch.trim().toLowerCase();
+                    return (
+                      m.name.toLowerCase().includes(q) ||
+                      (m.raw.genericName ?? "").toLowerCase().includes(q)
+                    );
+                  })
+                  .map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {m.name}
+                    </option>
+                  ))}
               </select>
             </Field>
             {selectedMedicine && (
@@ -238,7 +257,7 @@ export default function NewBatchPage() {
         isOpen={isAddMedOpen}
         onClose={() => setIsAddMedOpen(false)}
         onCreated={async (med) => {
-          const data = await getMedicines();
+          const data = await getMedicines("", 1000).catch(() => []);
           const mapped = data.map((m) => ({ id: m.medicine.id, name: m.medicine.name, raw: m.medicine }));
           setMedicines(mapped);
           setSelectedMedicineId(med.id);

@@ -96,28 +96,30 @@ export default async function CashFlowPage({
                 +{formatINR(operatingInflows.totalInflows)}
               </span>
             </div>
-            <table className="w-full text-[13.5px]">
-              <tbody>
-                <tr className="border-b border-ink-100 hover:bg-ink-50/50">
-                  <td className="py-2.5 text-ink-700">Cash Collected at POS Counter</td>
-                  <td className="py-2.5 text-right font-medium num text-ink-900">
-                    {formatINR(operatingInflows.cashSales)}
-                  </td>
-                </tr>
-                <tr className="border-b border-ink-100 hover:bg-ink-50/50">
-                  <td className="py-2.5 text-ink-700">UPI / QR / Digital Collections</td>
-                  <td className="py-2.5 text-right font-medium num text-ink-900">
-                    {formatINR(operatingInflows.digitalSales)}
-                  </td>
-                </tr>
-                <tr className="border-b border-ink-100 hover:bg-ink-50/50">
-                  <td className="py-2.5 text-ink-700">Collections against Past Customer Credit (Debtors)</td>
-                  <td className="py-2.5 text-right font-medium num text-ink-900">
-                    {formatINR(operatingInflows.debtorReceipts)}
-                  </td>
-                </tr>
-              </tbody>
-            </table>
+            <div className="overflow-x-auto">
+              <table className="w-full text-[13.5px]">
+                <tbody>
+                  <tr className="border-b border-ink-100 hover:bg-ink-50/50">
+                    <td className="py-2.5 text-ink-700">Cash Collected at POS Counter</td>
+                    <td className="py-2.5 text-right font-medium num text-ink-900">
+                      {formatINR(operatingInflows.cashSales)}
+                    </td>
+                  </tr>
+                  <tr className="border-b border-ink-100 hover:bg-ink-50/50">
+                    <td className="py-2.5 text-ink-700">UPI / QR / Digital Collections</td>
+                    <td className="py-2.5 text-right font-medium num text-ink-900">
+                      {formatINR(operatingInflows.digitalSales)}
+                    </td>
+                  </tr>
+                  <tr className="border-b border-ink-100 hover:bg-ink-50/50">
+                    <td className="py-2.5 text-ink-700">Collections against Past Customer Credit (Debtors)</td>
+                    <td className="py-2.5 text-right font-medium num text-ink-900">
+                      {formatINR(operatingInflows.debtorReceipts)}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
           </div>
 
           {/* Section 2: Outflows */}
@@ -130,28 +132,30 @@ export default async function CashFlowPage({
                 -{formatINR(operatingOutflows.totalOutflows)}
               </span>
             </div>
-            <table className="w-full text-[13.5px]">
-              <tbody>
-                <tr className="border-b border-ink-100 hover:bg-ink-50/50">
-                  <td className="py-2.5 text-ink-700">Cash / Spot Purchases Paid to Suppliers</td>
-                  <td className="py-2.5 text-right font-medium num text-ink-900">
-                    {formatINR(operatingOutflows.cashPurchases)}
-                  </td>
-                </tr>
-                <tr className="border-b border-ink-100 hover:bg-ink-50/50">
-                  <td className="py-2.5 text-ink-700">Settlements against Supplier Invoices (Creditors)</td>
-                  <td className="py-2.5 text-right font-medium num text-ink-900">
-                    {formatINR(operatingOutflows.creditorPayments)}
-                  </td>
-                </tr>
-                <tr className="border-b border-ink-100 hover:bg-ink-50/50">
-                  <td className="py-2.5 text-ink-700">Operational & Incidental Cash Expenses</td>
-                  <td className="py-2.5 text-right font-medium num text-ink-900">
-                    {formatINR(operatingOutflows.expenses)}
-                  </td>
-                </tr>
-              </tbody>
-            </table>
+            <div className="overflow-x-auto">
+              <table className="w-full text-[13.5px]">
+                <tbody>
+                  <tr className="border-b border-ink-100 hover:bg-ink-50/50">
+                    <td className="py-2.5 text-ink-700">Cash / Spot Purchases Paid to Suppliers</td>
+                    <td className="py-2.5 text-right font-medium num text-ink-900">
+                      {formatINR(operatingOutflows.cashPurchases)}
+                    </td>
+                  </tr>
+                  <tr className="border-b border-ink-100 hover:bg-ink-50/50">
+                    <td className="py-2.5 text-ink-700">Settlements against Supplier Invoices (Creditors)</td>
+                    <td className="py-2.5 text-right font-medium num text-ink-900">
+                      {formatINR(operatingOutflows.creditorPayments)}
+                    </td>
+                  </tr>
+                  <tr className="border-b border-ink-100 hover:bg-ink-50/50">
+                    <td className="py-2.5 text-ink-700">Operational & Incidental Cash Expenses</td>
+                    <td className="py-2.5 text-right font-medium num text-ink-900">
+                      {formatINR(operatingOutflows.expenses)}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
           </div>
 
           {/* Net Movement Reconciliation */}

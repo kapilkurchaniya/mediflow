@@ -39,6 +39,8 @@ export function RetailPosTerminal() {
       settings?: {
         negativeStockPolicy?: "block" | "warn" | "allow";
         shortcutPreset?: "mediflow" | "marg";
+        upiVpa?: string;
+        upiPayeeName?: string;
       };
     } | null
   )?.settings;
@@ -297,7 +299,8 @@ export function RetailPosTerminal() {
       return;
     }
     if (requireShift && !activeShift) {
-      alert("Please open a cash register shift before completing sales.");
+      setSubmitError("Please open a cash register shift before completing sales.");
+      setIsPaymentOpen(true);
       return;
     }
     setIsSubmitting(true);
@@ -540,6 +543,9 @@ export function RetailPosTerminal() {
         isSubmitting={isSubmitting}
         submitError={submitError}
         isOffline={posDs.isOffline}
+        storeName={currentStore?.name}
+        storeUpiVpa={storeSettings?.upiVpa}
+        storeUpiPayeeName={storeSettings?.upiPayeeName}
         dataSource={ds}
         refreshMeta={refreshMeta}
         setRevalidationAlert={setRevalidationAlert}

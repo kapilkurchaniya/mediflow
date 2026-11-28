@@ -55,9 +55,9 @@ export default function NewMedicinePage() {
 
   useEffect(() => {
     // Load categories, manufacturers, and racks on mount
-    getCategories().then(setCategories);
-    getManufacturers().then(setManufacturers);
-    getRacks().then((data) => setRacks(data || []));
+    getCategories().then(setCategories).catch(() => {});
+    getManufacturers().then(setManufacturers).catch(() => {});
+    getRacks().then((data) => setRacks(data || [])).catch(() => {});
   }, []);
 
   const [state, formAction, isPending] = useActionState(async (prevState: { error?: string; success?: boolean } | null, formData: FormData) => {
@@ -243,6 +243,12 @@ export default function NewMedicinePage() {
                 <option value="X">Schedule X</option>
                 <option value="narcotic">Narcotic</option>
               </select>
+            </Field>
+            <Field label="Min alert qty (Reorder level)" htmlFor="reorderLevel" hint="Alerts in Notifications & Reorder Suggestions when stock drops to or below this qty.">
+              <input id="reorderLevel" name="reorderLevel" type="number" min="0" defaultValue="10" className="input font-mono" />
+            </Field>
+            <Field label="Max stock target" htmlFor="maxStock" hint="Upper stock cap used by Reorder Suggestions.">
+              <input id="maxStock" name="maxStock" type="number" min="0" defaultValue="100" className="input font-mono" />
             </Field>
             <label
               htmlFor="rxRequired"

@@ -27,7 +27,8 @@ export function DistributorClaimsTab({ claims, onOpenSettleModal }: Props) {
 
   return (
     <div className="card overflow-hidden">
-      <table className="data-table">
+      <div className="overflow-x-auto">
+        <table className="data-table">
         <thead>
           <tr>
             <th>Claim #</th>
@@ -93,6 +94,7 @@ export function DistributorClaimsTab({ claims, onOpenSettleModal }: Props) {
           ))}
         </tbody>
       </table>
+      </div>
     </div>
   );
 }

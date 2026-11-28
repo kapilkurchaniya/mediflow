@@ -4,6 +4,8 @@ import { useState, useEffect, type FormEvent } from "react";
 import { User, Plus, X, Sparkles, CreditCard, Phone, Loader2 } from "lucide-react";
 import { formatINR } from "@/lib/format";
 import type { CustomerRow, PosDataSource } from "../_data/posData";
+import Link from "next/link";
+import { getCustomerPendingDueAction } from "@/app/actions/customer-credit";
 import type { SelectedCustomer } from "../_state/types";
 
 interface CustomerPickerProps {
@@ -99,6 +101,35 @@ export function CustomerPicker({
     }
   };
 
+  const [pendingDue, setPendingDue] = useState<{
+    customerId: string;
+    pendingDuePaise: number;
+    openBills: number;
+  } | null>(null);
+
+  useEffect(() => {
+    if (!customer?.id) return;
+    let cancelled = false;
+    const customerId = customer.id;
+    getCustomerPendingDueAction(customerId)
+      .then((res) => {
+        if (!cancelled) {
+          setPendingDue({
+            customerId,
+            pendingDuePaise: res.pendingDuePaise,
+            openBills: res.openBills,
+          });
+        }
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [customer?.id]);
+
+  const activePendingDue =
+    customer && pendingDue?.customerId === customer.id ? pendingDue : null;
+
   return (
     <div className="card p-3 shadow-xs">
       <div className="flex items-center justify-between mb-2">
@@ -124,7 +155,7 @@ export function CustomerPicker({
                 <span className="text-ink-500 font-mono text-[11px]">({customer.phone})</span>
               )}
             </div>
-            <div className="flex items-center gap-2 mt-1">
+            <div className="flex items-center flex-wrap gap-2 mt-1">
               {customer.redeemablePoints !== undefined && customer.redeemablePoints > 0 ? (
                 <span className="badge badge-brand !text-[10px] flex items-center gap-0.5 font-bold">
                   <Sparkles className="w-2.5 h-2.5 text-amber-500" />
@@ -137,6 +168,15 @@ export function CustomerPicker({
                 <span className="text-[10.5px] text-ink-500 font-mono">
                   Limit: {formatINR(customer.creditLimit)}
                 </span>
+              )}
+              {activePendingDue && activePendingDue.pendingDuePaise > 0 && (
+                <Link
+                  href="/dashboard/customers/credit"
+                  className="badge !bg-amber-50 !text-amber-800 !border !border-amber-300 !text-[10px] font-bold hover:!bg-amber-100"
+                  title={`${activePendingDue.openBills} open credit bill(s) — click to open Udhaar Khata`}
+                >
+                  Udhaar: {formatINR(activePendingDue.pendingDuePaise)}
+                </Link>
               )}
             </div>
           </div>

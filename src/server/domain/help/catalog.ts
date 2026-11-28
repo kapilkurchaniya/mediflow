@@ -982,7 +982,13 @@ export const HELP_ARTICLES: HelpArticle[] = [
       {
         title: "3. Compare Past Supplier Rates, Quantities & Schemes",
         content:
-          "When selecting a medicine in New Purchase Order, New Purchase (GRN), or Opening Stock (and via the History icon in Batches & Stock), MediFlow automatically shows past purchases across suppliers with dates, quantities, free/scheme offers, landed cost, and Call/WhatsApp links.",
+          "When selecting a medicine in New Purchase Order, New Purchase (GRN), or Opening Stock (and via the History icon in Batches & Stock or Reorder Suggestions), MediFlow automatically shows past purchases across suppliers with dates, quantities, free/scheme offers, landed cost, and Call/WhatsApp links.",
+      },
+      {
+        title: "4. Set Min Alert Qty -> Live Notification Bell -> Reorder Suggestions",
+        content:
+          "Set each medicine's Min Alert Qty (Reorder Level) in Add Medicine, Edit Medicine, or Branch Settings. When stock falls at or below that quantity, the topbar Notification Bell immediately alerts you and the item automatically appears under Purchases > Reorder Suggestions with a 1-click Draft PO.",
+        tip: "Click 'Below Min Alert Qty Only' on Reorder Suggestions to focus strictly on low-stock & out-of-stock items.",
       },
     ],
     faqs: [
@@ -990,9 +996,13 @@ export const HELP_ARTICLES: HelpArticle[] = [
         q: "If a customer pays ₹100 on a ₹140 POS bill, does the ₹40 balance appear in Customer Udhaar & Dues?",
         a: "Yes. Any unpaid balance from a Split Tender / Credit POS bill automatically appears under Customer Udhaar & Dues until marked paid.",
       },
+      {
+        q: "How do Min Alert Qty notifications update?",
+        a: "The topbar Notification Bell checks live store stock against each medicine's Min Alert Qty, plus expiring batches, Customer Udhaar dues, PDC cheques due within 3 days, offline conflicts, and Promise Orders back in stock.",
+      },
     ],
     relatedSlugs: ["first-bill", "purchases-grn-and-central-po"],
-    keywords: ["male", "female", "kids", "molecule", "rack", "shelf", "udhaar", "due", "credit", "mark paid", "supplier compare", "scheme"],
+    keywords: ["male", "female", "kids", "molecule", "rack", "shelf", "udhaar", "due", "credit", "mark paid", "supplier compare", "scheme", "min alert", "reorder", "notifications"],
   },
 ];
 

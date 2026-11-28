@@ -27,6 +27,7 @@ export function ReturnsClientExport({
   };
 }) {
   const [downloadingJson, setDownloadingJson] = useState(false);
+  const [exportError, setExportError] = useState<string | null>(null);
 
   async function handleDownloadJson() {
     setDownloadingJson(true);
@@ -43,10 +44,10 @@ export function ReturnsClientExport({
         downloadAnchor.click();
         downloadAnchor.remove();
       } else {
-        alert("Failed to build GSTR-1 JSON");
+        setExportError("Failed to build GSTR-1 JSON");
       }
     } catch (err) {
-      alert("Error: " + (err instanceof Error ? err.message : String(err)));
+      setExportError("Error: " + (err instanceof Error ? err.message : String(err)));
     } finally {
       setDownloadingJson(false);
     }
@@ -107,38 +108,49 @@ export function ReturnsClientExport({
   }
 
   return (
-    <div className="flex flex-wrap items-center gap-2">
-      <button
-        type="button"
-        onClick={handleExportCsv}
-        className="btn btn-secondary text-xs"
-      >
-        <Download className="h-3.5 w-3.5 mr-1" />
-        Download GSTR-3B Computation
-      </button>
+    <div className="flex flex-col items-start gap-1">
+      <div className="flex flex-wrap items-center gap-2">
+        <button
+          type="button"
+          onClick={() => {
+            setExportError(null);
+            handleExportCsv();
+          }}
+          className="btn btn-secondary text-xs"
+        >
+          <Download className="h-3.5 w-3.5 mr-1" />
+          Download GSTR-3B Computation
+        </button>
 
-      <button
-        type="button"
-        onClick={handleDownloadJson}
-        disabled={downloadingJson}
-        className="btn btn-primary text-xs"
-      >
-        {downloadingJson ? (
-          <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" />
-        ) : (
-          <FileJson className="h-3.5 w-3.5 mr-1" />
-        )}
-        Download GSTR-1 Portal JSON
-      </button>
+        <button
+          type="button"
+          onClick={() => {
+            setExportError(null);
+            void handleDownloadJson();
+          }}
+          disabled={downloadingJson}
+          className="btn btn-primary text-xs"
+        >
+          {downloadingJson ? (
+            <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" />
+          ) : (
+            <FileJson className="h-3.5 w-3.5 mr-1" />
+          )}
+          Download GSTR-1 Portal JSON
+        </button>
 
-      <a
-        href="https://services.gst.gov.in/services/login"
-        target="_blank"
-        rel="noopener noreferrer"
-        className="btn btn-ghost text-xs inline-flex items-center gap-1 text-ink-700"
-      >
-        GST Portal <ExternalLink className="h-3 w-3" />
-      </a>
+        <a
+          href="https://services.gst.gov.in/services/login"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="btn btn-ghost text-xs inline-flex items-center gap-1 text-ink-700"
+        >
+          GST Portal <ExternalLink className="h-3 w-3" />
+        </a>
+      </div>
+      {exportError && (
+        <span className="text-[11px] text-rose-600 font-medium">{exportError}</span>
+      )}
     </div>
   );
 }

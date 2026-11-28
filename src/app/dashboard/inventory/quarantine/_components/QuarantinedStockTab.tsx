@@ -94,7 +94,8 @@ export function QuarantinedStockTab({
         </div>
       ) : (
         <div className="card overflow-hidden">
-          <table className="data-table">
+          <div className="overflow-x-auto">
+            <table className="data-table">
             <thead>
               <tr>
                 <th className="w-8 !px-3">
@@ -179,6 +180,7 @@ export function QuarantinedStockTab({
               })}
             </tbody>
           </table>
+          </div>
         </div>
       )}
     </div>

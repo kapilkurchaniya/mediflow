@@ -12,6 +12,8 @@ import { ExpiryDateFilter } from "@/app/components/ExpiryDateFilter";
 import { resolveExpiryDateRange } from "@/lib/date-range";
 import { ExportButton } from "@/app/components/ExportButton";
 import { requirePagePermission, can } from "@/server/rbac";
+import { canViewCost } from "@/server/redact";
+import { getCachedTenantStores } from "@/server/domain/stores/cached";
 import { BackfillPtrBanner } from "./BackfillPtrBanner";
 import { EditBatchButton } from "./EditBatchModal";
 import { PrintBarcodeLabelButton } from "./_components/PrintBarcodeLabelButton";
@@ -49,6 +51,7 @@ export default async function BatchesPage({
 }) {
   const ctx = await requirePagePermission("inventory.view");
   const canAdjust = can(ctx, "inventory.adjust");
+  const allowCost = canViewCost(ctx);
   const { nearExpiry, range, from, to, medicineId, segment, molecule, categoryId, rackId, page: pageStr } = await searchParams;
   const isNearExpiry = nearExpiry === "true";
   const dateRange = resolveExpiryDateRange({ range, from, to });
@@ -56,7 +59,7 @@ export default async function BatchesPage({
   const PAGE_SIZE = 50;
   const offset = (page - 1) * PAGE_SIZE;
 
-  const [batches, summary, categories, racks] = await Promise.all([
+  const [batches, summary, categories, racks, tenantStores] = await Promise.all([
     getBatches({
       nearExpiryOnly: isNearExpiry,
       from: dateRange.from,
@@ -81,7 +84,9 @@ export default async function BatchesPage({
     }),
     getCategories(),
     getRacks(),
+    getCachedTenantStores(ctx.tenantId),
   ]);
+  const activeStoreName = tenantStores.find((s) => s.id === ctx.storeId)?.name || "MediFlow Pharmacy";
 
   const getEffectivePtr = (b: (typeof batches)[0]["batch"], m: (typeof batches)[0]["medicine"]) => {
     if (b.purchaseRate > 0) return b.purchaseRate;
@@ -238,19 +243,25 @@ export default async function BatchesPage({
                         <ExpiryBadge date={batch.expiryDate} />
                       </td>
                       <td className="text-right num text-ink-600">
-                        {formatINR(effectivePtr)}
-                        {batch.purchaseRate === 0 && effectivePtr > 0 && (
-                          <span
-                            className="ml-1 text-[10.5px] font-medium text-amber-600 cursor-help"
-                            title="Estimated PTR based on standard 80% MRP"
-                          >
-                            est.
-                          </span>
+                        {allowCost ? (
+                          <>
+                            {formatINR(effectivePtr)}
+                            {batch.purchaseRate === 0 && effectivePtr > 0 && (
+                              <span
+                                className="ml-1 text-[10.5px] font-medium text-amber-600 cursor-help"
+                                title="Estimated PTR based on standard 80% MRP"
+                              >
+                                est.
+                              </span>
+                            )}
+                          </>
+                        ) : (
+                          <span className="text-ink-400">—</span>
                         )}
                       </td>
                       <td className="text-right num text-ink-900">{formatINR(batch.mrp)}</td>
                       <td className="text-right num text-ink-600 font-medium">
-                        {formatINR(batch.qtyOnHand * effectivePtr)}
+                        {allowCost ? formatINR(batch.qtyOnHand * effectivePtr) : <span className="text-ink-400">—</span>}
                       </td>
                       <td className="text-right">
                         <span
@@ -271,7 +282,7 @@ export default async function BatchesPage({
                         <div className="inline-flex items-center gap-1 justify-end">
                           <BatchSupplierHistoryButton medicineId={medicine.id} medicineName={medicine.name} />
                           <PrintBarcodeLabelButton
-                            storeName="MediFlow Pharmacy"
+                            storeName={activeStoreName}
                             medicineName={medicine.name}
                             batchNo={batch.batchNo}
                             expiryDate={batch.expiryDate}
@@ -280,6 +291,7 @@ export default async function BatchesPage({
                           />
                           {canAdjust && (
                             <EditBatchButton
+                              canViewCost={allowCost}
                               batch={{
                                 id: batch.id,
                                 batchNo: batch.batchNo,

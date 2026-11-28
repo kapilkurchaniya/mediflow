@@ -257,7 +257,8 @@ export function BulkPackUpdaterModal({
                 </div>
               ) : (
                 <div className="border border-ink-200 rounded-xl overflow-hidden">
-                  <table className="w-full text-xs text-left">
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-xs text-left">
                     <thead className="bg-ink-50 border-b border-ink-200 text-ink-600 font-semibold uppercase">
                       <tr>
                         <th className="p-2.5">Medicine</th>
@@ -367,6 +368,7 @@ export function BulkPackUpdaterModal({
                       })}
                     </tbody>
                   </table>
+                  </div>
                 </div>
               )}
             </div>

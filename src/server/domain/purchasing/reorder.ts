@@ -22,6 +22,7 @@ export interface ReorderItemSuggestion {
   estimatedCostPaise: number;
   preferredSupplierId: string | null;
   preferredSupplierName: string | null;
+  isBelowReorderLevel?: boolean;
 }
 
 export interface SupplierReorderGroup {
@@ -414,7 +415,7 @@ export async function computeReorderSuggestions(
         : med.maxStock;
     const upp = med.unitsPerPack || 1;
 
-    const { suggestedQty, suggestedPacks } = calculateReorderQuantity({
+    let { suggestedQty, suggestedPacks } = calculateReorderQuantity({
       onHand,
       onOrder,
       inTransit,
@@ -424,6 +425,13 @@ export async function computeReorderSuggestions(
       maxStock: effectiveMaxStock,
       unitsPerPack: upp,
     });
+
+    const isBelowReorderLevel = reorderLevel > 0 && onHand <= reorderLevel;
+    // Ensure medicines at or below Min Alert Qty always appear in Reorder Suggestions when not already on order/in transit
+    if (isBelowReorderLevel && suggestedQty === 0 && onOrder + inTransit === 0) {
+      suggestedPacks = 1;
+      suggestedQty = upp;
+    }
 
     if (suggestedQty > 0) {
       // Convert per-base-unit batch cost to per-pack rate when falling back from GRN pack rate
@@ -455,6 +463,7 @@ export async function computeReorderSuggestions(
         estimatedCostPaise: estimatedCost,
         preferredSupplierId: effectiveSupplierId,
         preferredSupplierName: effectiveSupplierName,
+        isBelowReorderLevel,
         ...(effectiveSupplierPhone ? { preferredSupplierPhone: effectiveSupplierPhone } : {}),
       } as ReorderItemSuggestion & { preferredSupplierPhone?: string });
     }

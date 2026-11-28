@@ -13,6 +13,7 @@ import Link from "next/link";
 import { PageHeader, SearchForm, EmptyState, TableWrapper } from "@/app/components/ui";
 import { formatINR, formatNumber } from "@/lib/format";
 import { requirePagePermission, can } from "@/server/rbac";
+import { canViewCost } from "@/server/redact";
 import { BranchSettingsButton } from "./_components/BranchSettingsButton";
 import { EditMedicineButton } from "./_components/EditMedicineButton";
 import { BulkPackUpdaterModal } from "./_components/BulkPackUpdaterModal";
@@ -39,6 +40,7 @@ export default async function InventoryPage({
   const ctx = await requirePagePermission("medicine.view");
   const canManage = can(ctx, "medicine.manage");
   const canAdjust = can(ctx, "inventory.adjust");
+  const allowCost = canViewCost(ctx);
   const { q, page: pageStr, pack, status, segment, molecule, categoryId, rackId } = await searchParams;
   const packFilter: MedicinePackFilter = pack === "single" ? "single" : "all";
   const statusFilter: MedicineStatusFilter =
@@ -74,7 +76,7 @@ export default async function InventoryPage({
   } = counts;
 
   const stockTotals =
-    canManage && items.length > 0
+    items.length > 0
       ? await getStoreStockTotalsByMedicine(items.map((i) => i.medicine.id))
       : {};
   const rxCount = items.filter((i) => i.medicine.rxRequired).length;
@@ -207,6 +209,24 @@ export default async function InventoryPage({
                             </span>
                           )}
                           {medicine.rxRequired && <span className="badge badge-danger !h-[18px] !px-1.5 !text-[10.5px]">Rx</span>}
+                          {(() => {
+                            const effectiveMin = branchSettings?.reorderLevel ?? medicine.reorderLevel ?? 10;
+                            const onHand = stockTotals[medicine.id] ?? 0;
+                            if (effectiveMin > 0 && onHand <= effectiveMin) {
+                              return (
+                                <Link
+                                  href="/dashboard/purchases/reorder"
+                                  className={`badge !h-[18px] !px-1.5 !text-[10px] font-mono ${
+                                    onHand === 0 ? "badge-danger" : "badge-warning"
+                                  }`}
+                                  title={`Stock ${onHand} is at or below Min Alert Qty (${effectiveMin}). Click to open Reorder Suggestions.`}
+                                >
+                                  {onHand === 0 ? `Out (Min ${effectiveMin})` : `Low ${onHand}/${effectiveMin}`}
+                                </Link>
+                              );
+                            }
+                            return null;
+                          })()}
                         </div>
                         <div className="cell-sub truncate" title={medicine.genericName || ""}>
                           {medicine.genericName || "—"}
@@ -274,6 +294,7 @@ export default async function InventoryPage({
                               racks={racks}
                               currentRackId={branchSettings?.rackId ?? null}
                               canAdjustStock={canAdjust}
+                              canViewCost={allowCost}
                             />
                           )}
                           {canManage && (

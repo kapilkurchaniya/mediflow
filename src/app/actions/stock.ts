@@ -394,7 +394,7 @@ const updateBatchSchema = z.object({
   batchId: z.string().min(1, "Batch ID is required"),
   batchNo: z.string().min(1, "Batch number is required"),
   expiryDate: z.string().min(1, "Expiry date is required"),
-  purchaseRate: z.coerce.number().min(0, "Purchase rate must be non-negative"),
+  purchaseRate: z.coerce.number().min(0, "Purchase rate must be non-negative").optional(),
   mrp: z.coerce.number().min(0, "MRP must be non-negative"),
   saleRate: z.coerce.number().min(0, "Sale rate must be non-negative").optional().default(0),
   status: z.enum(["active", "hold"]).optional(),
@@ -426,7 +426,11 @@ export async function updateBatch(formData: FormData) {
     adjustReason,
     adjustNote,
   } = parsed.data;
-  const purchaseRate = Math.round(parsed.data.purchaseRate * 100);
+  const allowCost = canViewCost(ctx);
+  const nextPurchaseRate =
+    allowCost && parsed.data.purchaseRate !== undefined
+      ? Math.round(parsed.data.purchaseRate * 100)
+      : undefined;
   const mrp = Math.round(parsed.data.mrp * 100);
   const saleRate = parsed.data.saleRate ? Math.round(parsed.data.saleRate * 100) : mrp;
 
@@ -453,7 +457,7 @@ export async function updateBatch(formData: FormData) {
         .set({
           batchNo: batchNo.trim().toUpperCase(),
           expiryDate,
-          purchaseRate,
+          ...(nextPurchaseRate !== undefined ? { purchaseRate: nextPurchaseRate } : {}),
           mrp,
           saleRate,
           status: nextStatus,
@@ -465,7 +469,7 @@ export async function updateBatch(formData: FormData) {
       await tx
         .update(schema.medicines)
         .set({
-          purchasePrice: purchaseRate > 0 ? purchaseRate : undefined,
+          purchasePrice: nextPurchaseRate !== undefined && nextPurchaseRate > 0 ? nextPurchaseRate : undefined,
           mrp: mrp > 0 ? mrp : undefined,
           salePrice: saleRate > 0 ? saleRate : undefined,
         })
@@ -484,6 +488,7 @@ export async function updateBatch(formData: FormData) {
             ? rawDelta
             : 0;
 
+      const effectivePurchaseRate = nextPurchaseRate ?? existing.purchaseRate ?? 0;
       let balanceAfter = existing.qtyOnHand;
       if (computedDelta !== 0) {
         balanceAfter = await recordStockMovement({
@@ -494,7 +499,7 @@ export async function updateBatch(formData: FormData) {
           medicineId: existing.medicineId,
           type: adjustReason,
           qtyChange: computedDelta,
-          unitCost: purchaseRate > 0 ? purchaseRate : null,
+          unitCost: effectivePurchaseRate > 0 ? effectivePurchaseRate : null,
           note: adjustNote?.trim() || `Batch edit (${stockMode === "set" ? "set exact count" : adjustReason})`,
           userId: ctx.userId,
         });
@@ -525,7 +530,7 @@ export async function updateBatch(formData: FormData) {
         newValue: {
           batchNo: batchNo.trim().toUpperCase(),
           expiryDate,
-          purchaseRate,
+          purchaseRate: effectivePurchaseRate,
           mrp,
           saleRate,
           status: nextStatus,

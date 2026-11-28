@@ -18,7 +18,7 @@ export default async function PurchaseOrdersPage({
       status: params.status,
       supplierId: params.supplierId,
     }),
-    getSuppliers(),
+    getSuppliers("", 500, 0, true),
   ]);
 
   return <OrdersListClient initialOrders={orders} suppliers={suppliers} initialStatus={params.status || "all"} />;

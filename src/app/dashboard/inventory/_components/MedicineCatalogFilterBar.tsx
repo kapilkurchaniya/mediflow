@@ -28,6 +28,12 @@ export function MedicineCatalogFilterBar({
 }: CatalogFilterProps) {
   const router = useRouter();
   const [molInput, setMolInput] = useState(molecule);
+  const [prevMolecule, setPrevMolecule] = useState(molecule);
+
+  if (molecule !== prevMolecule) {
+    setPrevMolecule(molecule);
+    setMolInput(molecule);
+  }
 
   const navigateWith = (overrides: Record<string, string | undefined>) => {
     const params = new URLSearchParams();

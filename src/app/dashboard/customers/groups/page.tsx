@@ -14,7 +14,7 @@ export default async function CustomerGroupsPage() {
   await requirePagePermission("customer.view");
   const [groups, customers] = await Promise.all([
     getCustomerGroups(),
-    getCustomers(),
+    getCustomers("", 500),
   ]);
 
   return (
