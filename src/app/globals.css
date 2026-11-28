@@ -119,6 +119,8 @@
   .btn-ghost { @apply text-ink-600 hover:bg-ink-100 hover:text-ink-900; }
   .btn-danger-ghost { @apply text-ink-400 hover:bg-red-50 hover:text-red-600; }
   .btn-sm { @apply h-8 px-2.5 text-[12.5px]; }
+  .btn-xs { @apply h-7 px-2 text-[11.5px] gap-1; }
+  .btn-xs svg { @apply h-3.5 w-3.5; }
   .btn-lg { @apply h-11 px-5 text-[14px]; }
   .btn-icon { @apply h-8 w-8 px-0; }
 
@@ -138,6 +140,15 @@
     background-position: right 0.6rem center;
   }
   .input-sm { @apply h-8 px-2 text-[13px]; }
+  .select {
+    @apply block w-full h-9 rounded-md border border-ink-200 bg-white px-3 pr-9 text-[13.5px] text-ink-900
+      shadow-xs appearance-none bg-no-repeat transition-[border-color,box-shadow] duration-150
+      hover:border-ink-300 focus:outline-none focus:border-brand-500 focus:ring-[3px] focus:ring-brand-500/15
+      disabled:bg-ink-50 disabled:text-ink-500;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='none' stroke='%239aa1ae' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round' viewBox='0 0 24 24'%3E%3Cpath d='m7 10 5 5 5-5'/%3E%3C/svg%3E");
+    background-position: right 0.6rem center;
+  }
+  .select-sm { @apply h-8 px-2.5 pr-8 text-[12.5px]; }
   .checkbox {
     @apply h-4 w-4 rounded border-ink-300 text-brand-600 accent-brand-600;
   }
