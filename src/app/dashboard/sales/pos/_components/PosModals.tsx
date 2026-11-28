@@ -20,6 +20,9 @@ interface PosModalsProps {
   isSubmitting: boolean;
   submitError: string;
   isOffline?: boolean;
+  storeName?: string;
+  storeUpiVpa?: string;
+  storeUpiPayeeName?: string;
   dataSource: PosDataSource;
   refreshMeta: () => void;
   setRevalidationAlert: (alert: {
@@ -102,6 +105,9 @@ export function PosModals(props: PosModalsProps) {
         isSubmitting={props.isSubmitting}
         errorMsg={props.submitError}
         isOffline={props.isOffline}
+        storeName={props.storeName}
+        storeUpiVpa={props.storeUpiVpa}
+        storeUpiPayeeName={props.storeUpiPayeeName}
         onUpdateSplit={(p) => dispatch({ type: "SET_SPLIT_PAYMENTS", payload: p })}
         onUpdateRedeemPoints={(pts) => dispatch({ type: "SET_REDEEM_POINTS", payload: pts })}
         onSubmit={props.onCompleteSplitSale}

@@ -8,7 +8,7 @@ import { formatINR } from "@/lib/format";
 
 export default function WholesaleChallanPage() {
   const [challanNo, setChallanNo] = useState("CH-2026-001");
-  const [challanDate, setChallanDate] = useState(new Date().toISOString().slice(0, 10));
+  const [challanDate, setChallanDate] = useState(() => new Date(Date.now() + 330 * 60_000).toISOString().slice(0, 10));
   const [buyerName, setBuyerName] = useState("City Medical Agencies");
   const [buyerGstin, setBuyerGstin] = useState("27AABCU9603R1ZM");
   const [routeName, setRouteName] = useState("South Zone");
