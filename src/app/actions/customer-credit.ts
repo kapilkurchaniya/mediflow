@@ -153,3 +153,30 @@ export async function getCustomerUdhaarHistoryAction(customerId: string) {
     receipts,
   };
 }
+
+export async function getCustomerPendingDueAction(customerId: string) {
+  const ctx = await requirePermission("sale.view");
+  const validCustomerId = uuid.parse(customerId);
+
+  const openBills = await db
+    .select({
+      creditAmount: schema.sales.creditAmount,
+    })
+    .from(schema.sales)
+    .where(
+      and(
+        eq(schema.sales.tenantId, ctx.tenantId),
+        eq(schema.sales.storeId, ctx.storeId),
+        eq(schema.sales.customerId, validCustomerId),
+        ne(schema.sales.status, "held"),
+        ne(schema.sales.status, "cancelled"),
+        gte(schema.sales.creditAmount, 1),
+      ),
+    );
+
+  const pendingDuePaise = openBills.reduce((sum, b) => sum + Math.max(0, Number(b.creditAmount ?? 0)), 0);
+  return {
+    pendingDuePaise,
+    openBills: openBills.length,
+  };
+}

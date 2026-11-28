@@ -3,7 +3,7 @@
 import { db, schema } from "@/server/db";
 import { eq, and, desc, ilike, or, sql, inArray } from "drizzle-orm";
 import { requirePermission, checkPermission, can } from "@/server/rbac";
-import { redactMedicineCost } from "@/server/redact";
+import { redactMedicineCost, canViewCost } from "@/server/redact";
 import { writeAudit } from "@/server/audit";
 import { recordStockMovement } from "@/server/domain/stock";
 import { DEFAULT_GST_RATE_BP, isValidGstRateBp } from "@/lib/regulatory";
@@ -512,13 +512,14 @@ export async function updateMedicine(formData: FormData) {
     return { error: "You need inventory.adjust permission to convert existing batch stock." };
   }
 
+  const allowCost = canViewCost(ctx);
   const mrpPaise = Math.round(input.mrp * 100);
   const salePricePaise =
     input.salePrice !== undefined && formData.get("salePrice") !== ""
       ? Math.round(input.salePrice * 100)
       : mrpPaise;
   const purchasePricePaise =
-    input.purchasePrice !== undefined && formData.get("purchasePrice") !== ""
+    allowCost && input.purchasePrice !== undefined && formData.get("purchasePrice") !== ""
       ? Math.round(input.purchasePrice * 100)
       : undefined;
 
