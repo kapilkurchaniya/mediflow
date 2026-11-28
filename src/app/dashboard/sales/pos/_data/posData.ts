@@ -37,6 +37,7 @@ export interface SearchResultMedicine {
   schedule?: string | null;
   rackCode?: string | null;
   rackName?: string | null;
+  targetSegment?: string | null;
   unitsPerPack?: number;
   packUnit?: string;
   looseUnit?: string;

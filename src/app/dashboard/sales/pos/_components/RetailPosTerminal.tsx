@@ -299,7 +299,8 @@ export function RetailPosTerminal() {
       return;
     }
     if (requireShift && !activeShift) {
-      alert("Please open a cash register shift before completing sales.");
+      setSubmitError("Please open a cash register shift before completing sales.");
+      setIsPaymentOpen(true);
       return;
     }
     setIsSubmitting(true);
